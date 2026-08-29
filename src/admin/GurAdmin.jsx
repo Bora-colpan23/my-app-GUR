@@ -144,6 +144,113 @@ function StatusBadge({ status }) {
   return <Badge {...s} />;
 }
 
+// ─── Buton — Apple HIG tonlu: filled/soft/outline/ghost/plain, tutarlı hover + basılma geri bildirimi ───
+const TONE_COLOR = { neutral: C.text, orange: C.orange, green: C.green, red: C.red, blue: C.blue, yellow: C.yellow };
+const TONE_SOFT = { neutral: C.panel2, orange: C.orangeSoft, green: C.greenSoft, red: C.redSoft, blue: C.blueSoft, yellow: C.yellowSoft };
+
+function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size = 'md', fullWidth = false, disabled, title }) {
+  const toneColor = TONE_COLOR[tone] || C.text;
+  const toneSoft = TONE_SOFT[tone] || C.panel2;
+  const paddings = { sm: '7px 12px', md: '9px 14px', lg: '12px 18px' };
+  const fontSizes = { sm: 12, md: 12.5, lg: 14 };
+  const variants = {
+    filled: { background: toneColor, color: tone === 'yellow' ? '#241c00' : '#fff', border: '1px solid transparent' },
+    soft: { background: toneSoft, color: toneColor, border: `1px solid ${toneColor}44` },
+    outline: { background: C.bg, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}` },
+    ghost: { background: 'transparent', color: toneColor, border: `1px solid ${C.border}` },
+    plain: { background: 'transparent', color: toneColor, border: '1px solid transparent' },
+  };
+  const base = variants[variant] || variants.outline;
+  const [hover, setHover] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  return (
+    <button
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => { setHover(false); setPressed(false); }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      className="gur-admin-btn"
+      style={{
+        width: fullWidth ? '100%' : 'auto',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        padding: paddings[size], borderRadius: 9,
+        fontFamily: F, fontSize: fontSizes[size], fontWeight: variant === 'filled' ? 700 : 600,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.45 : 1,
+        ...base,
+        filter: disabled ? 'none' : pressed ? 'brightness(0.9)' : hover ? 'brightness(1.15)' : 'none',
+        transform: pressed ? 'scale(0.98)' : 'scale(1)',
+        transition: 'filter 0.1s ease-out, transform 0.1s ease-out, background 0.15s, border-color 0.15s',
+        whiteSpace: 'nowrap', outline: 'none',
+      }}>
+      {icon}{label}
+    </button>
+  );
+}
+
+// ─── Kenar çubuğu navigasyon öğesi — seçili durumda kalıcı vurgu, hover/press geri bildirimi ───
+function NavItem({ item, active, onClick }) {
+  const [hover, setHover] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => { setHover(false); setPressed(false); }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      className="gur-admin-btn"
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+        padding: '10px 12px', marginBottom: 2, borderRadius: 10, border: 'none',
+        background: active ? C.orangeSoft : (hover ? C.panel2 : 'transparent'), cursor: 'pointer',
+        color: active ? C.orange : C.dim, fontFamily: F, fontSize: 13.5, fontWeight: active ? 600 : 500,
+        transform: pressed ? 'scale(0.98)' : 'scale(1)',
+        transition: 'background 0.12s, transform 0.1s', textAlign: 'left', outline: 'none',
+      }}>
+      <Icon path={item.icon} size={18} color={active ? C.orange : C.dim} />
+      <span style={{ flex: 1 }}>{item.label}</span>
+      {item.count !== undefined && (
+        <span style={{
+          fontSize: 11, fontWeight: 700, minWidth: 20, height: 20, borderRadius: 10, padding: '0 6px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: item.alert ? C.orange : C.panel2, color: item.alert ? '#fff' : C.dim,
+        }}>{item.count}</span>
+      )}
+    </button>
+  );
+}
+
+// ─── Icon-only buton — sabit kare hedef, ince kenarlık, hover'da panel rengi ───
+function IconBtn({ onClick, icon, size = 38, title, danger }) {
+  const [hover, setHover] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  return (
+    <button
+      onClick={onClick} title={title} aria-label={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => { setHover(false); setPressed(false); }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      className="gur-admin-btn"
+      style={{
+        width: size, height: size, minWidth: size, borderRadius: 10,
+        border: `1px solid ${danger && hover ? C.red : C.border}`,
+        background: hover ? (danger ? C.redSoft : C.panel2) : C.bg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', flexShrink: 0, position: 'relative', padding: 0,
+        transform: pressed ? 'scale(0.92)' : 'scale(1)',
+        transition: 'background 0.12s, border-color 0.12s, transform 0.1s',
+        outline: 'none',
+      }}>
+      {icon}
+    </button>
+  );
+}
+
 export default function GurAdmin() {
   const [page, setPage] = useState('dashboard');
   const [query, setQuery] = useState('');
@@ -200,6 +307,8 @@ export default function GurAdmin() {
         @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .row-hover:hover { background: ${C.panel2} !important; }
+        .gur-admin-btn:focus-visible { box-shadow: 0 0 0 3px ${C.orange}55 !important; }
+        @media (prefers-reduced-motion: reduce) { .gur-admin-btn { transition: none !important; } }
       `}</style>
 
       {/* ─── SIDEBAR ─── */}
@@ -217,27 +326,7 @@ export default function GurAdmin() {
         <nav style={{ flex: 1, padding: '12px 12px', overflowY: 'auto' }}>
           {nav.map(item => {
             const active = page === item.id;
-            return (
-              <button key={item.id} onClick={() => setPage(item.id)} style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 12px', marginBottom: 2, borderRadius: 10, border: 'none',
-                background: active ? C.orangeSoft : 'transparent', cursor: 'pointer',
-                color: active ? C.orange : C.dim, fontFamily: F, fontSize: 13.5, fontWeight: active ? 600 : 500,
-                transition: 'all 0.12s', textAlign: 'left',
-              }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = C.panel2; }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
-                <Icon path={item.icon} size={18} color={active ? C.orange : C.dim} />
-                <span style={{ flex: 1 }}>{item.label}</span>
-                {item.count !== undefined && (
-                  <span style={{
-                    fontSize: 11, fontWeight: 700, minWidth: 20, height: 20, borderRadius: 10, padding: '0 6px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: item.alert ? C.orange : C.panel2, color: item.alert ? '#fff' : C.dim,
-                  }}>{item.count}</span>
-                )}
-              </button>
-            );
+            return <NavItem key={item.id} item={item} active={active} onClick={() => setPage(item.id)} />;
           })}
         </nav>
 
@@ -248,9 +337,7 @@ export default function GurAdmin() {
               <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Admin</div>
               <div style={{ fontSize: 10.5, color: C.faint }}>admin@gur.app</div>
             </div>
-            <button style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', padding: 4 }}>
-              <Icon path={icons.logout} size={16} color={C.faint} />
-            </button>
+            <IconBtn size={30} title="Çıkış yap" danger icon={<Icon path={icons.logout} size={16} color={C.faint} />} />
           </div>
         </div>
       </aside>
@@ -270,10 +357,13 @@ export default function GurAdmin() {
               padding: '0 12px 0 36px', color: C.text, fontFamily: F, fontSize: 13, outline: 'none',
             }} />
           </div>
-          <button style={{ position: 'relative', width: 38, height: 38, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon path={icons.bell} size={17} color={C.dim} />
-            {apps.length > 0 && <span style={{ position: 'absolute', top: 8, right: 9, width: 7, height: 7, borderRadius: '50%', background: C.orange }} />}
-          </button>
+          <IconBtn
+            title="Bildirimler"
+            icon={<>
+              <Icon path={icons.bell} size={17} color={C.dim} />
+              {apps.length > 0 && <span style={{ position: 'absolute', top: 8, right: 9, width: 7, height: 7, borderRadius: '50%', background: C.orange }} />}
+            </>}
+          />
         </header>
 
         {/* Sayfa içeriği */}
@@ -298,9 +388,7 @@ export default function GurAdmin() {
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{reviewDoc.name}</h3>
                 <p style={{ margin: '2px 0 0', fontSize: 12.5, color: C.dim }}>{reviewDoc.cat} • {reviewDoc.district}</p>
               </div>
-              <button onClick={() => setReviewDoc(null)} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 8, cursor: 'pointer' }}>
-                <Icon path={icons.x} size={16} color={C.dim} />
-              </button>
+              <IconBtn onClick={() => setReviewDoc(null)} size={32} title="Kapat" icon={<Icon path={icons.x} size={16} color={C.dim} />} />
             </div>
             <div style={{ padding: 24 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
@@ -319,17 +407,17 @@ export default function GurAdmin() {
               <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, height: 280, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
                 <Icon path={icons.doc} size={44} color={C.faint} />
                 <div style={{ fontSize: 13, color: C.dim }}>vergi_levhasi_{reviewDoc.id}.pdf</div>
-                <button style={{ marginTop: 4, background: C.blueSoft, color: C.blue, border: 'none', borderRadius: 8, padding: '7px 16px', fontFamily: F, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Icon path={icons.eye} size={14} color={C.blue} /> Belgeyi Görüntüle
-                </button>
+                <div style={{ marginTop: 4 }}>
+                  <Btn label="Belgeyi Görüntüle" variant="soft" tone="blue" icon={<Icon path={icons.eye} size={14} color={C.blue} />} />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => rejectApp(reviewDoc.id)} style={{ flex: 1, padding: '12px', borderRadius: 10, border: `1px solid ${C.red}`, background: C.redSoft, color: C.red, fontFamily: F, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                  <Icon path={icons.x} size={16} color={C.red} /> Reddet
-                </button>
-                <button onClick={() => approveApp(reviewDoc.id)} style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: C.green, color: '#fff', fontFamily: F, fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                  <Icon path={icons.check} size={16} color="#fff" /> Onayla ve Yayına Al
-                </button>
+                <div style={{ flex: 1 }}>
+                  <Btn label="Reddet" onClick={() => rejectApp(reviewDoc.id)} variant="soft" tone="red" size="lg" fullWidth icon={<Icon path={icons.x} size={16} color={C.red} />} />
+                </div>
+                <div style={{ flex: 2 }}>
+                  <Btn label="Onayla ve Yayına Al" onClick={() => approveApp(reviewDoc.id)} variant="filled" tone="green" size="lg" fullWidth icon={<Icon path={icons.check} size={16} color="#fff" />} />
+                </div>
               </div>
             </div>
           </div>
@@ -484,12 +572,16 @@ function RestaurantsPage({ restaurants, query, onGastro, onSuspend }) {
             <td style={{ padding: '14px 18px' }}><StatusBadge status={r.status} /></td>
             <td style={{ padding: '14px 18px', textAlign: 'right' }}>
               <div style={{ display: 'inline-flex', gap: 6 }}>
-                <button onClick={() => onGastro(r.id)} title={r.gastro ? 'Gastro onayını kaldır' : 'Gastro Onaylı yap'} style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${r.gastro ? C.orange : C.border}`, background: r.gastro ? C.orangeSoft : 'transparent', color: r.gastro ? C.orange : C.dim, cursor: 'pointer', fontFamily: F, fontSize: 11.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Icon path={icons.star} size={13} color={r.gastro ? C.orange : C.dim} fill={r.gastro ? C.orange : 'none'} /> Gastro
-                </button>
-                <button onClick={() => onSuspend(r.id)} title={r.status === 'active' ? 'Askıya al' : 'Aktifleştir'} style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: r.status === 'active' ? C.yellow : C.green, cursor: 'pointer', fontFamily: F, fontSize: 11.5, fontWeight: 600 }}>
-                  {r.status === 'active' ? 'Askıya Al' : 'Aktifleştir'}
-                </button>
+                <Btn
+                  label="Gastro" onClick={() => onGastro(r.id)} title={r.gastro ? 'Gastro onayını kaldır' : 'Gastro Onaylı yap'}
+                  variant={r.gastro ? 'soft' : 'ghost'} tone={r.gastro ? 'orange' : 'neutral'} size="sm"
+                  icon={<Icon path={icons.star} size={13} color={r.gastro ? C.orange : C.dim} fill={r.gastro ? C.orange : 'none'} />}
+                />
+                <Btn
+                  label={r.status === 'active' ? 'Askıya Al' : 'Aktifleştir'} onClick={() => onSuspend(r.id)}
+                  title={r.status === 'active' ? 'Askıya al' : 'Aktifleştir'}
+                  variant="ghost" tone={r.status === 'active' ? 'yellow' : 'green'} size="sm"
+                />
               </div>
             </td>
           </tr>
@@ -530,12 +622,8 @@ function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
               <Badge text={a.docStatus === 'yüklendi' ? 'Levha yüklendi' : 'İnceleniyor'} color={a.docStatus === 'yüklendi' ? C.blue : C.yellow} soft={a.docStatus === 'yüklendi' ? C.blueSoft : C.yellowSoft} />
             </div>
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-              <button onClick={() => onReview(a)} style={{ padding: '9px 14px', borderRadius: 9, border: `1px solid ${C.border}`, background: C.bg, color: C.text, cursor: 'pointer', fontFamily: F, fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Icon path={icons.eye} size={14} color={C.dim} /> İncele
-              </button>
-              <button onClick={() => onApprove(a.id)} style={{ padding: '9px 14px', borderRadius: 9, border: 'none', background: C.green, color: '#fff', cursor: 'pointer', fontFamily: F, fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Icon path={icons.check} size={14} color="#fff" /> Onayla
-              </button>
+              <Btn label="İncele" onClick={() => onReview(a)} variant="outline" icon={<Icon path={icons.eye} size={14} color={C.dim} />} />
+              <Btn label="Onayla" onClick={() => onApprove(a.id)} variant="filled" tone="green" icon={<Icon path={icons.check} size={14} color="#fff" />} />
             </div>
           </div>
         ))}
@@ -578,7 +666,7 @@ function GastroPage({ restaurants, onGastro }) {
               <Icon path={icons.star} size={16} color={C.orange} fill={C.orange} />
             </div>
             <div style={{ fontSize: 12, color: C.dim, marginBottom: 12 }}>{r.cat} • ★ {r.rating}</div>
-            <button onClick={() => onGastro(r.id)} style={{ width: '100%', padding: '8px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.red, cursor: 'pointer', fontFamily: F, fontSize: 12, fontWeight: 600 }}>Onayı Kaldır</button>
+            <Btn label="Onayı Kaldır" onClick={() => onGastro(r.id)} variant="ghost" tone="red" fullWidth />
           </div>
         ))}
       </div>
@@ -592,9 +680,7 @@ function GastroPage({ restaurants, onGastro }) {
               <div key={r.id} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{r.name}</div>
                 <div style={{ fontSize: 12, color: C.dim, marginBottom: 12 }}>{r.cat} • ★ {r.rating}</div>
-                <button onClick={() => onGastro(r.id)} style={{ width: '100%', padding: '8px', borderRadius: 8, border: 'none', background: C.orange, color: '#fff', cursor: 'pointer', fontFamily: F, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  <Icon path={icons.star} size={13} color="#fff" fill="#fff" /> Gastro Onaylı Yap
-                </button>
+                <Btn label="Gastro Onaylı Yap" onClick={() => onGastro(r.id)} variant="filled" tone="orange" fullWidth icon={<Icon path={icons.star} size={13} color="#fff" fill="#fff" />} />
               </div>
             ))}
           </div>
@@ -651,8 +737,8 @@ function ReviewsPage() {
           <p style={{ margin: '0 0 12px', fontSize: 13, color: C.dim, lineHeight: 1.5 }}>{r.text}</p>
           {r.flagged && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${C.red}`, background: C.redSoft, color: C.red, cursor: 'pointer', fontFamily: F, fontSize: 12, fontWeight: 600 }}>Yorumu Kaldır</button>
-              <button style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.dim, cursor: 'pointer', fontFamily: F, fontSize: 12, fontWeight: 600 }}>Onayla</button>
+              <Btn label="Yorumu Kaldır" variant="soft" tone="red" />
+              <Btn label="Onayla" variant="outline" />
             </div>
           )}
         </div>
@@ -717,7 +803,7 @@ function SettingsPage() {
               <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{it.label}</div>
               <div style={{ fontSize: 12.5, color: C.dim }}>{it.desc}</div>
             </div>
-            <button onClick={() => setToggles(t => ({ ...t, [it.key]: !t[it.key] }))} style={{ width: 46, height: 26, borderRadius: 13, border: 'none', background: toggles[it.key] ? C.orange : C.border, cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+            <button onClick={() => setToggles(t => ({ ...t, [it.key]: !t[it.key] }))} className="gur-admin-btn" style={{ width: 46, height: 26, borderRadius: 13, border: 'none', background: toggles[it.key] ? C.orange : C.border, cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0, outline: 'none' }}>
               <div style={{ position: 'absolute', top: 3, left: toggles[it.key] ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </button>
           </div>
