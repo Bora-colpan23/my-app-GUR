@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 
 // ═══════════════════════════════════════════════════════════════
 // GUR YÖNETİCİ PANELİ — Platform kontrol merkezi
@@ -161,17 +162,14 @@ function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size
     plain: { background: 'transparent', color: toneColor, border: '1px solid transparent' },
   };
   const base = variants[variant] || variants.outline;
-  const [hover, setHover] = useState(false);
-  const [pressed, setPressed] = useState(false);
   return (
-    <button
+    <motion.button
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       title={title}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => { setHover(false); setPressed(false); }}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
+      whileHover={disabled ? undefined : { filter: 'brightness(1.15)' }}
+      whileTap={disabled ? undefined : { scale: 0.98, filter: 'brightness(0.9)' }}
+      transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
       className="gur-admin-btn"
       style={{
         width: fullWidth ? '100%' : 'auto',
@@ -181,35 +179,28 @@ function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.45 : 1,
         ...base,
-        filter: disabled ? 'none' : pressed ? 'brightness(0.9)' : hover ? 'brightness(1.15)' : 'none',
-        transform: pressed ? 'scale(0.98)' : 'scale(1)',
-        transition: 'filter 0.1s ease-out, transform 0.1s ease-out, background 0.15s, border-color 0.15s',
         whiteSpace: 'nowrap', outline: 'none',
       }}>
       {icon}{label}
-    </button>
+    </motion.button>
   );
 }
 
 // ─── Kenar çubuğu navigasyon öğesi — seçili durumda kalıcı vurgu, hover/press geri bildirimi ───
 function NavItem({ item, active, onClick }) {
-  const [hover, setHover] = useState(false);
-  const [pressed, setPressed] = useState(false);
   return (
-    <button
+    <motion.button
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => { setHover(false); setPressed(false); }}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
+      whileHover={active ? undefined : { backgroundColor: C.panel2 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
       className="gur-admin-btn"
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 12,
         padding: '10px 12px', marginBottom: 2, borderRadius: 10, border: 'none',
-        background: active ? C.orangeSoft : (hover ? C.panel2 : 'transparent'), cursor: 'pointer',
+        backgroundColor: active ? C.orangeSoft : 'transparent', cursor: 'pointer',
         color: active ? C.orange : C.dim, fontFamily: F, fontSize: 13.5, fontWeight: active ? 600 : 500,
-        transform: pressed ? 'scale(0.98)' : 'scale(1)',
-        transition: 'background 0.12s, transform 0.1s', textAlign: 'left', outline: 'none',
+        textAlign: 'left', outline: 'none',
       }}>
       <Icon path={item.icon} size={18} color={active ? C.orange : C.dim} />
       <span style={{ flex: 1 }}>{item.label}</span>
@@ -220,34 +211,29 @@ function NavItem({ item, active, onClick }) {
           background: item.alert ? C.orange : C.panel2, color: item.alert ? '#fff' : C.dim,
         }}>{item.count}</span>
       )}
-    </button>
+    </motion.button>
   );
 }
 
 // ─── Icon-only buton — sabit kare hedef, ince kenarlık, hover'da panel rengi ───
 function IconBtn({ onClick, icon, size = 38, title, danger }) {
-  const [hover, setHover] = useState(false);
-  const [pressed, setPressed] = useState(false);
   return (
-    <button
+    <motion.button
       onClick={onClick} title={title} aria-label={title}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => { setHover(false); setPressed(false); }}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
+      whileHover={{ backgroundColor: danger ? C.redSoft : C.panel2, borderColor: danger ? C.red : C.border }}
+      whileTap={{ scale: 0.92 }}
+      transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
       className="gur-admin-btn"
       style={{
         width: size, height: size, minWidth: size, borderRadius: 10,
-        border: `1px solid ${danger && hover ? C.red : C.border}`,
-        background: hover ? (danger ? C.redSoft : C.panel2) : C.bg,
+        borderWidth: 1, borderStyle: 'solid', borderColor: C.border,
+        backgroundColor: C.bg,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', flexShrink: 0, position: 'relative', padding: 0,
-        transform: pressed ? 'scale(0.92)' : 'scale(1)',
-        transition: 'background 0.12s, border-color 0.12s, transform 0.1s',
         outline: 'none',
       }}>
       {icon}
-    </button>
+    </motion.button>
   );
 }
 
@@ -304,7 +290,6 @@ export default function GurAdmin() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #2A3341; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #3A4453; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .row-hover:hover { background: ${C.panel2} !important; }
         .gur-admin-btn:focus-visible { box-shadow: 0 0 0 3px ${C.orange}55 !important; }
@@ -379,10 +364,19 @@ export default function GurAdmin() {
         </div>
       </main>
 
-      {/* ─── Başvuru inceleme modalı ─── */}
+      {/* ─── Başvuru inceleme modalı — perde soluklaşır, kart "materialize" olur (§12) ─── */}
+      <AnimatePresence>
       {reviewDoc && (
-        <div onClick={() => setReviewDoc(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, animation: 'fadeIn 0.15s' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: 560, maxHeight: '88vh', overflowY: 'auto', background: C.panel, borderRadius: 16, border: `1px solid ${C.border}`, animation: 'slideIn 0.2s' }}>
+        <motion.div
+          onClick={() => setReviewDoc(null)}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <motion.div
+            onClick={e => e.stopPropagation()}
+            initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ type: 'spring', bounce: 0.1, duration: 0.3 }}
+            style={{ width: 560, maxHeight: '88vh', overflowY: 'auto', background: C.panel, borderRadius: 16, border: `1px solid ${C.border}` }}>
             <div style={{ padding: '20px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{reviewDoc.name}</h3>
@@ -420,17 +414,23 @@ export default function GurAdmin() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
-      {/* ─── Toast ─── */}
+      {/* ─── Toast — geldiği kenardan geri gider (§7) ─── */}
+      <AnimatePresence>
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, right: 24, background: toast.type === 'error' ? C.red : C.green, color: '#fff', padding: '12px 20px', borderRadius: 12, fontFamily: F, fontSize: 13.5, fontWeight: 600, zIndex: 200, animation: 'slideIn 0.2s', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 30px rgba(0,0,0,0.4)' }}>
+        <motion.div
+          initial={{ opacity: 0, y: 16, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.95 }}
+          transition={{ type: 'spring', bounce: 0.2, duration: 0.35 }}
+          style={{ position: 'fixed', bottom: 24, right: 24, background: toast.type === 'error' ? C.red : C.green, color: '#fff', padding: '12px 20px', borderRadius: 12, fontFamily: F, fontSize: 13.5, fontWeight: 600, zIndex: 200, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 30px rgba(0,0,0,0.4)' }}>
           <Icon path={toast.type === 'error' ? icons.x : icons.check} size={16} color="#fff" />
           {toast.msg}
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 }

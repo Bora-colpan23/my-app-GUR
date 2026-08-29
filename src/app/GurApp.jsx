@@ -1,4 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
+import { animate } from 'motion';
+
+// Apple "Designing Fluid Interfaces" momentum projection: nereye bırakılacağını
+// bırakma anındaki konum değil, hızın taşıdığı yönü kullanarak tahmin eder.
+function projectMomentum(velocity, decelerationRate = 0.998) {
+  return (velocity / 1000) * decelerationRate / (1 - decelerationRate);
+}
 
 
 // ═══════════════════════════════════════════════
@@ -126,16 +134,13 @@ function IconBtn({ onClick, icon, children, tone = "glassDark", shape = "circle"
     plain: { bg: "transparent" },
   };
   const t = tones[tone] || tones.glassDark;
-  const [pressed, setPressed] = useState(false);
   return (
-    <button
+    <motion.button
       onClick={onClick}
       title={title}
       aria-label={title}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
+      whileTap={{ scale: 0.88 }}
+      transition={{ type: "spring", bounce: 0, duration: 0.3 }}
       className="gur-icon-btn"
       style={{
         width: size, height: size, minWidth: size, minHeight: size, flexShrink: 0,
@@ -145,12 +150,10 @@ function IconBtn({ onClick, icon, children, tone = "glassDark", shape = "circle"
         boxShadow: t.shadow || "none",
         display: "flex", alignItems: "center", justifyContent: "center",
         cursor: "pointer", padding: 0,
-        transform: pressed ? "scale(0.88)" : "scale(1)",
-        transition: "transform 0.12s cubic-bezier(.4,0,.2,1)",
         WebkitTapHighlightColor: "transparent", outline: "none",
       }}>
       {children || icon}
-    </button>
+    </motion.button>
   );
 }
 
@@ -204,15 +207,12 @@ function Btn({ text, onClick, disabled, variant = "onColor", size = "lg", fullWi
     plain: { bg: "transparent", color: "rgba(255,255,255,0.6)" },
   };
   const p = palettes[variant] || palettes.onColor;
-  const [pressed, setPressed] = useState(false);
   return (
-    <button
+    <motion.button
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
-      onPointerDown={() => !disabled && setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
+      whileTap={disabled ? undefined : { scale: 0.96 }}
+      transition={{ type: "spring", bounce: 0, duration: 0.3 }}
       className="gur-btn"
       style={{
         width: fullWidth ? "100%" : "auto",
@@ -223,12 +223,10 @@ function Btn({ text, onClick, disabled, variant = "onColor", size = "lg", fullWi
         cursor: disabled ? "not-allowed" : "pointer",
         boxShadow: disabled ? "none" : (p.shadow || "none"),
         opacity: disabled ? 0.4 : 1,
-        transform: pressed ? "scale(0.96)" : "scale(1)",
-        transition: "transform 0.12s cubic-bezier(.4,0,.2,1), opacity 0.15s",
         WebkitTapHighlightColor: "transparent", outline: "none", whiteSpace: "nowrap",
       }}>
       {icon}{text}
-    </button>
+    </motion.button>
   );
 }
 
@@ -267,26 +265,72 @@ function Screen({ children, grad = true }) {
 // ═══════════════════════════════════════════════
 // SWIPE CARD — Eski Tinder stili, tam ekran fotoğraf
 // ═══════════════════════════════════════════════
-function SwipeCard({ r, onLeft, onRight, isTop, onTap }) {
+const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTop, onTap }, flingRef) {
   const ref = useRef(null);
-  const sx = useRef(0); const cx = useRef(0); const drag = useRef(false); const moved = useRef(false);
-  const [off, setOff] = useState(0); const [rot, setRot] = useState(0); const [opa, setOpa] = useState(1); const [ex, setEx] = useState(null); const [ii, setIi] = useState(0);
-  const start = (x) => { if (!isTop) return; drag.current = true; sx.current = x; cx.current = 0; moved.current = false; };
-  const move = (x) => { if (!drag.current) return; const d = x - sx.current; cx.current = d; if (Math.abs(d) > 5) moved.current = true; setOff(d); setRot(d * 0.07); setOpa(Math.max(0.6, 1 - Math.abs(d) / 500)); };
-  const end = () => { if (!drag.current) return; drag.current = false; const d = cx.current;
-    if (Math.abs(d) > 100) { setEx(d > 0 ? "r" : "l"); setOff(d > 0 ? 500 : -500); setRot(d > 0 ? 25 : -25); setOpa(0); setTimeout(() => d > 0 ? onRight() : onLeft(), 300); }
-    else { setOff(0); setRot(0); setOpa(1); }
+  const movedRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+  const [ii, setIi] = useState(0);
+
+  // x, tüm görsel özellikleri sürükler: dönüş ve opaklık ondan türetilir (§7 — tek eksenden tutarlı hareket)
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-300, 0, 300], [-20, 0, 20]);
+  const dragOpacity = useTransform(x, [-320, -60, 0, 60, 320], [0.5, 1, 1, 1, 0.5]);
+  const favOpacity = useTransform(x, [30, 110], [0, 1]);
+  const nopeOpacity = useTransform(x, [-110, -30], [1, 0]);
+
+  // Kart hem sürüklenip bırakılınca hem de aksiyon butonuna basılınca aynı çıkış animasyonundan geçer
+  const commit = (direction, velocity = 0) => {
+    const flyX = direction * 900;
+    animate(x, flyX, { type: "spring", bounce: 0, duration: 0.5, velocity })
+      .then(() => (direction > 0 ? onRight() : onLeft()));
   };
-  const tap = (e) => { if (moved.current) return; const rect = ref.current?.getBoundingClientRect(); if (!rect) return; const tx = (e.clientX || e.changedTouches?.[0]?.clientX) - rect.left;
+  React.useImperativeHandle(flingRef, () => ({ fling: (direction) => commit(direction) }), [onLeft, onRight]);
+
+  const handleDragStart = () => { movedRef.current = false; setDragging(true); };
+  const handleDrag = (e, info) => { if (Math.abs(info.offset.x) > 6) movedRef.current = true; };
+
+  const handleDragEnd = (e, info) => {
+    setDragging(false);
+    const offset = info.offset.x;
+    const velocity = info.velocity.x;
+    // §6 — bırakma noktası değil, hızın taşıyacağı nokta karar verir
+    const projected = offset + projectMomentum(velocity);
+    const goRight = projected > 100;
+    const goLeft = projected < -100;
+    if (goRight || goLeft) {
+      // §5 — bırakma hızı sıfırlanmadan spring'e devrediliyor, animasyon parmağın hızıyla devam ediyor
+      commit(goRight ? 1 : -1, velocity);
+    } else {
+      animate(x, 0, { type: "spring", bounce: 0.15, duration: 0.5, velocity });
+    }
+  };
+
+  const tap = (e) => { if (movedRef.current) return; const rect = ref.current?.getBoundingClientRect(); if (!rect) return; const tx = e.clientX - rect.left;
     if (tx > rect.width * 0.6) setIi(i => Math.min(i + 1, r.imgs.length - 1));
     else if (tx < rect.width * 0.4) setIi(i => Math.max(i - 1, 0));
     else onTap?.();
   };
-  const label = off > 50 ? "FAV" : off < -50 ? "NOPE" : null;
+
   return (
-    <div ref={ref} onMouseDown={e => start(e.clientX)} onMouseMove={e => move(e.clientX)} onMouseUp={e => { end(); tap(e); }} onMouseLeave={end}
-      onTouchStart={e => start(e.touches[0].clientX)} onTouchMove={e => move(e.touches[0].clientX)} onTouchEnd={e => { end(); tap(e); }}
-      style={{ position: "absolute", inset: 0, transform: isTop ? `translateX(${off}px) rotate(${rot}deg)` : "scale(0.96) translateY(10px)", opacity: opa, transition: ex ? "all 0.35s cubic-bezier(.4,0,.2,1)" : (drag.current ? "none" : "all 0.3s"), cursor: isTop ? "grab" : "default", userSelect: "none", pointerEvents: isTop ? "auto" : "none", zIndex: isTop ? 2 : 1, borderRadius: 24, overflow: "hidden", boxShadow: isTop ? "0 12px 48px rgba(0,0,0,0.35)" : "0 4px 16px rgba(0,0,0,0.1)" }}>
+    <motion.div
+      ref={ref}
+      drag={isTop ? "x" : false}
+      dragMomentum={false}
+      onDragStart={handleDragStart}
+      onDrag={handleDrag}
+      onDragEnd={handleDragEnd}
+      onClick={tap}
+      style={{
+        x: isTop ? x : 0, rotate: isTop ? rotate : 0, opacity: isTop ? dragOpacity : 1,
+        position: "absolute", inset: 0,
+        cursor: isTop ? (dragging ? "grabbing" : "grab") : "default",
+        userSelect: "none", pointerEvents: isTop ? "auto" : "none", zIndex: isTop ? 2 : 1,
+        borderRadius: 24, overflow: "hidden",
+        boxShadow: isTop ? "0 12px 48px rgba(0,0,0,0.35)" : "0 4px 16px rgba(0,0,0,0.1)",
+      }}
+      animate={{ scale: isTop ? 1 : 0.96, y: isTop ? 0 : 10 }}
+      transition={{ type: "spring", bounce: 0, duration: 0.35 }}
+    >
       <Img src={r.imgs[ii]} style={{ position: "absolute", inset: 0, borderRadius: 24 }} bg="linear-gradient(135deg, #1a1008, #2a1a0a, #1a1008)" />
       {isTop && <>
       {/* Photo indicators */}
@@ -294,9 +338,9 @@ function SwipeCard({ r, onLeft, onRight, isTop, onTap }) {
         {r.imgs.map((_, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === ii ? "#fff" : "rgba(255,255,255,0.3)", transition: "background 0.2s" }} />)}
       </div>
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 30%, transparent 55%)", borderRadius: 24 }} />
-      {/* Swipe labels */}
-      {label === "FAV" && <div style={{ position: "absolute", top: 90, left: 24, zIndex: 10, border: "4px solid #4CAF50", borderRadius: 14, padding: "8px 22px", transform: "rotate(-15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}><span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#4CAF50" }}>FAV!</span></div>}
-      {label === "NOPE" && <div style={{ position: "absolute", top: 90, right: 24, zIndex: 10, border: "4px solid #FF3B30", borderRadius: 14, padding: "8px 22px", transform: "rotate(15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}><span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#FF3B30" }}>NOPE</span></div>}
+      {/* Swipe labels — sürükleme mesafesiyle orantılı belirir (§1 — sürekli geri bildirim) */}
+      <motion.div style={{ opacity: favOpacity, position: "absolute", top: 90, left: 24, zIndex: 10, border: "4px solid #4CAF50", borderRadius: 14, padding: "8px 22px", transform: "rotate(-15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}><span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#4CAF50" }}>FAV!</span></motion.div>
+      <motion.div style={{ opacity: nopeOpacity, position: "absolute", top: 90, right: 24, zIndex: 10, border: "4px solid #FF3B30", borderRadius: 14, padding: "8px 22px", transform: "rotate(15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}><span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#FF3B30" }}>NOPE</span></motion.div>
       {/* Content */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{r.name}</h3>
@@ -311,9 +355,9 @@ function SwipeCard({ r, onLeft, onRight, isTop, onTap }) {
         </div>
       </div>
       </>}
-    </div>
+    </motion.div>
   );
-}
+});
 
 // ═══════════════════════════════════════════════
 // SCREENS
@@ -1207,42 +1251,50 @@ function RestaurantDashboard({ onLogout }) {
         </div>
       </div>
 
-      {/* Çıkış onay modalı */}
-      {showLogout && (
-        <div style={{
-          position: "absolute", inset: 0, zIndex: 200,
-          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: 30, animation: "fadeInUp 0.25s ease-out",
-        }}>
-          <div style={{
-            background: "#1a1a1a", borderRadius: 24, padding: "30px 24px 24px",
-            width: "100%", maxWidth: 320, border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-          }}>
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <div style={{
-                width: 60, height: 60, borderRadius: "50%",
-                background: "rgba(255,59,48,0.1)", margin: "0 auto 16px",
-                display: "flex", alignItems: "center", justifyContent: "center",
+      {/* Çıkış onay modalı — perde soluklaşarak, kart "materialize" olarak (opaklık+ölçek birlikte) belirir */}
+      <AnimatePresence>
+        {showLogout && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{
+              position: "absolute", inset: 0, zIndex: 200,
+              background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 30,
+            }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: "spring", bounce: 0.15, duration: 0.35 }}
+              style={{
+                background: "#1a1a1a", borderRadius: 24, padding: "30px 24px 24px",
+                width: "100%", maxWidth: 320, border: "1px solid rgba(255,255,255,0.08)",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
               }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round">
-                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                <div style={{
+                  width: 60, height: 60, borderRadius: "50%",
+                  background: "rgba(255,59,48,0.1)", margin: "0 auto 16px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                </div>
+                <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>Çıkış Yap</h3>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.5 }}>
+                  İşletme panelinden çıkış yapmak istediğinize emin misiniz?
+                </p>
               </div>
-              <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>Çıkış Yap</h3>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.5 }}>
-                İşletme panelinden çıkış yapmak istediğinize emin misiniz?
-              </p>
-            </div>
 
-            <div style={{ marginBottom: 10 }}>
-              <Btn text="Evet, Çıkış Yap" onClick={onLogout} variant="destructive" />
-            </div>
-            <Btn text="Vazgeç" onClick={() => setShowLogout(false)} variant="outline" />
-          </div>
-        </div>
-      )}
+              <div style={{ marginBottom: 10 }}>
+                <Btn text="Evet, Çıkış Yap" onClick={onLogout} variant="destructive" />
+              </div>
+              <Btn text="Vazgeç" onClick={() => setShowLogout(false)} variant="outline" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </Screen>
   );
@@ -1402,6 +1454,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   const [idx, setIdx] = useState(0);
   const [toast, setToast] = useState(null);
   const [done, setDone] = useState(false);
+  const topCardRef = useRef(null);
   useEffect(() => { setIdx(0); setDone(false); }, [filterCat, restaurants]);
   const visible = allCards.slice(idx, idx + 2).reverse();
   const show = (m, t) => { setToast({ m, t }); setTimeout(() => setToast(null), 1200); };
@@ -1468,16 +1521,17 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
                 <Btn text="Kategoriler" onClick={onExplore} variant="outline" size="md" fullWidth={false} />
               </div>
             </div>
-          ) : visible.map((r, i) => (
-            <SwipeCard key={r.id} r={r} isTop={i === visible.length - 1} onRight={right} onLeft={left} onTap={() => onDetail(allCards[idx])} />
-          ))}
+          ) : visible.map((r, i) => {
+            const top = i === visible.length - 1;
+            return <SwipeCard key={r.id} ref={top ? topCardRef : null} r={r} isTop={top} onRight={right} onLeft={left} onTap={() => onDetail(allCards[idx])} />;
+          })}
         </div>
 
-        {/* Aksiyon butonları */}
+        {/* Aksiyon butonları — kartı sürüklemekle aynı fiziksel çıkışı tetikler */}
         {!done && allCards.length > 0 && (
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 18, padding: "10px 16px 16px", zIndex: 10 }}>
             <IconBtn
-              onClick={left} tone="solidLight" size={56} title="Geç"
+              onClick={() => topCardRef.current?.fling(-1)} tone="solidLight" size={56} title="Geç"
               icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
             />
 
@@ -1487,7 +1541,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             />
 
             <IconBtn
-              onClick={right} tone="solidLight" size={68} title="Favorilere ekle"
+              onClick={() => topCardRef.current?.fling(1)} tone="solidLight" size={68} title="Favorilere ekle"
               icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>}
             />
           </div>
@@ -1747,9 +1801,13 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           </div>
         </div>
 
-        {/* Yorum Detay Overlay */}
+        {/* Yorum Detay Overlay — alttan gelip alta geri döner (§7 — giriş/çıkış aynı yol) */}
+        <AnimatePresence>
         {selectedReview && (
-          <div style={{ position: "absolute", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", animation: "fadeInUp 0.25s ease-out" }}>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
+            style={{ position: "absolute", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column" }}>
             <div style={{ flex: 1, overflowY: "auto" }}>
               {/* Header */}
               <div style={{ padding: "52px 20px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1804,12 +1862,17 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
 
         {/* Menü Overlay — Görsel Galeri */}
+        <AnimatePresence>
         {showMenu && (
-          <div style={{ position: "absolute", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", animation: "fadeInUp 0.25s ease-out" }}>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
+            style={{ position: "absolute", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column" }}>
             {/* Header */}
             <div style={{ padding: "52px 20px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
@@ -1845,8 +1908,9 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
     </Screen>
   );
