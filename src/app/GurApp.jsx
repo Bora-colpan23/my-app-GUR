@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { animate } from 'motion';
 
@@ -6,6 +6,46 @@ import { animate } from 'motion';
 // bırakma anındaki konum değil, hızın taşıdığı yönü kullanarak tahmin eder.
 function projectMomentum(velocity, decelerationRate = 0.998) {
   return (velocity / 1000) * decelerationRate / (1 - decelerationRate);
+}
+
+// ── GUR Match: arkadaşın kararları ───────────────────────────────────────
+// Backend yok; arkadaşın beğenileri davet kodundan türeyen deterministik bir
+// diziyle üretilir. Aynı kod her zaman aynı sonucu verir, böylece "arkadaşınla
+// aynı oturumdasın" hissi tutarlı kalır ve demo tekrar edilebilir olur.
+function hashCode(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Arkadaş kartların ~%55'ini beğenir — eşleşme yeterince sık ama garanti değil
+function friendLikes(code, ids, likeRate = 0.55) {
+  const rand = mulberry32(hashCode(code || "GUR"));
+  const set = new Set();
+  ids.forEach(id => { if (rand() < likeRate) set.add(id); });
+  return set;
+}
+
+function makeInviteCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // karıştırılabilecek harfler yok
+  let out = "";
+  for (let i = 0; i < 6; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
+
+const FRIEND_NAMES = ["Ali", "Elif", "Mert", "Zeynep", "Can", "Deniz", "Ece", "Kaan"];
+function friendNameFor(code) {
+  return FRIEND_NAMES[hashCode(code || "GUR") % FRIEND_NAMES.length];
 }
 
 
@@ -69,6 +109,37 @@ const RESTAURANTS = [
   { id:14, name:"Spice Market", cat:"Hint", rating:4.4, dist:"3.8 km", price:"₺450+", addr:"Cihangir, Akarsu Cd. No:15", desc:"Otantik Hint baharat dünyası.", imgs:[I.curry1,I.interior1,I.bread1], menu:["https://picsum.photos/seed/menu-spic1/600/900","https://picsum.photos/seed/menu-spic2/600/900"], hours:"12:00 - 23:00", tags:["Hint","Curry"] },
   { id:15, name:"Mövenpick Bosphorus", cat:"Fine Dining", rating:4.5, dist:"7.3 km", price:"₺1.800+", addr:"Örnektepe, İstanbul", desc:"Boğaz kenarında muhteşem manzara.", imgs:[I.bosphorus,I.interior3,I.seafood1], menu:["https://picsum.photos/seed/menu-mov1/600/900","https://picsum.photos/seed/menu-mov2/600/900"], hours:"07:00 - 00:00", tags:["Boğaz","Dünya Mutfağı"] },
 ];
+
+// Seçilen dosyaları tek bir biçime indirger: { name, url, type }. Blob URL'i
+// seçim anında bir kez üretilir — render sırasında değil, yoksa her çizimde
+// yeni bir URL sızardı.
+function toMediaFiles(fileList) {
+  return Array.from(fileList || []).map(f => ({ name: f.name, url: URL.createObjectURL(f), type: f.type }));
+}
+
+// Doyurucu panelinden yüklenen görselleri, sahibi olduğu restoranın kendi
+// dizilerine karıştırır. Tüm ekranlar (swipe kartı, detay galerisi, menü
+// overlay'i, favoriler, profil) r.imgs / r.menu'den beslendiği için tek
+// noktadan yapılan bu ekleme hepsine birden yansır.
+function withOwnerMedia(list, ownerId, media) {
+  // Menü olarak PDF de yüklenebiliyor; galeri yalnızca görselleri gösterebilir.
+  const isImg = (f) => !f.type || f.type.startsWith("image/");
+  const photos = (media?.photos || []).filter(isImg);
+  const menu = (media?.menu || []).filter(isImg);
+  if (ownerId == null || (photos.length === 0 && menu.length === 0)) return list;
+  return list.map(r => r.id !== ownerId ? r : {
+    ...r,
+    imgs: [...photos.map(f => f.url), ...r.imgs],
+    menu: [...menu.map(f => f.url), ...(r.menu || [])],
+    ownerPhotoCount: photos.length,
+  });
+}
+
+// Doyurucu'nun yönettiği restoran. Canlı OSM verisinde id'ler string
+// ("osm-123"), demo veride sayı — bu yüzden sabit bir id'ye bağlanmıyoruz.
+function findOwnerRestaurant(list) {
+  return list.find(r => /Kadıköy/.test(r.addr || "")) || list[0] || null;
+}
 
 const CATEGORIES = [
   { name:"Türk Mutfağı", img:I.turkish1 }, { name:"Uzak Doğu", img:I.sushi1 },
@@ -168,11 +239,14 @@ function BackBtn({ onClick, variant = "dark" }) {
 }
 
 function Img({ src, style, bg = "#e8e0d8" }) {
-  const [ok, setOk] = useState(false);
+  const [state, setState] = useState("loading"); // loading | ok | failed
+  useEffect(() => { setState("loading"); }, [src]);
   return (
     <div style={{ ...style, position: "relative", overflow: "hidden", background: bg }}>
-      {!ok && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 22, height: 22, border: "3px solid rgba(0,0,0,0.08)", borderTopColor: "#FF6600", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
-      <img src={src} alt="" onLoad={() => setOk(true)} onError={() => setOk(true)} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: ok ? 1 : 0, transition: "opacity 0.4s" }} />
+      {state === "loading" && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 22, height: 22, border: "3px solid rgba(0,0,0,0.08)", borderTopColor: "#FF6600", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
+      {/* Yüklenemeyen görselde <img> gizli kalır; arka plan rengi/gradyanı görünür
+          — aksi halde tarayıcının bozuk görsel ikonu kartın üstüne düşüyordu. */}
+      <img src={src} alt="" onLoad={() => setState("ok")} onError={() => setState("failed")} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: state === "ok" ? 1 : 0, transition: "opacity 0.4s" }} />
     </div>
   );
 }
@@ -233,6 +307,7 @@ function Btn({ text, onClick, disabled, variant = "onColor", size = "lg", fullWi
 function UploadBox({ label, icon, accept, files, setFiles, multiple = true }) {
   const ref = useRef(null);
   const handle = (e) => { const nf = Array.from(e.target.files).map(f => ({ name: f.name, url: URL.createObjectURL(f), type: f.type })); setFiles(prev => multiple ? [...prev, ...nf] : nf); };
+  const remove = (i) => setFiles(prev => { const f = prev[i]; if (f?.url?.startsWith("blob:")) URL.revokeObjectURL(f.url); return prev.filter((_, j) => j !== i); });
   return (
     <div style={{ marginBottom: 20 }}>
       <label style={{ display: "block", marginBottom: 8, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#2D2419" }}>{label}</label>
@@ -242,7 +317,7 @@ function UploadBox({ label, icon, accept, files, setFiles, multiple = true }) {
         onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,102,0,0.3)"}>
         {files.length === 0 ? <><div style={{ display: "flex", justifyContent: "center" }}>{icon}</div><p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#A18F7C", margin: "10px 0 0" }}>Dosya seçmek için tıklayın</p></> : (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-            {files.map((f, i) => <div key={i} style={{ position: "relative" }}>{f.type?.startsWith("image/") ? <img src={f.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "2px solid rgba(255,102,0,0.2)" }} /> : <div style={{ width: 72, height: 72, borderRadius: 12, background: "#FFF3EA", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="doc" size={20} color="#FF6600" /></div>}<div onClick={e => { e.stopPropagation(); setFiles(prev => prev.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", background: "#FF3B30", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", cursor: "pointer", fontWeight: 700, boxShadow: "0 2px 6px rgba(0,0,0,0.2)" }}>✕</div></div>)}
+            {files.map((f, i) => <div key={i} style={{ position: "relative" }}>{f.type?.startsWith("image/") ? <img src={f.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "2px solid rgba(255,102,0,0.2)" }} /> : <div style={{ width: 72, height: 72, borderRadius: 12, background: "#FFF3EA", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="doc" size={20} color="#FF6600" /></div>}<div onClick={e => { e.stopPropagation(); remove(i); }} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", background: "#FF3B30", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", cursor: "pointer", fontWeight: 700, boxShadow: "0 2px 6px rgba(0,0,0,0.2)" }}>✕</div></div>)}
             <div style={{ width: 72, height: 72, borderRadius: 12, border: "2px dashed rgba(255,102,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 18, color: "rgba(255,102,0,0.4)" }}>+</span></div>
           </div>
         )}
@@ -333,6 +408,13 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTo
     >
       <Img src={r.imgs[ii]} style={{ position: "absolute", inset: 0, borderRadius: 24 }} bg="linear-gradient(135deg, #1a1008, #2a1a0a, #1a1008)" />
       {isTop && <>
+      {/* İşletmenin kendi yüklediği fotoğraflar öne alınır ve işaretlenir */}
+      {ii < (r.ownerPhotoCount || 0) && (
+        <div style={{ position: "absolute", top: 54, left: 14, zIndex: 6, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 20, padding: "4px 11px" }}>
+          <Icon n="camera" size={11} color="#FFA500" />
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#fff" }}>İşletmeden</span>
+        </div>
+      )}
       {/* Photo indicators */}
       <div style={{ position: "absolute", top: 40, left: 14, right: 14, display: "flex", gap: 4, zIndex: 5 }}>
         {r.imgs.map((_, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === ii ? "#fff" : "rgba(255,255,255,0.3)", transition: "background 0.2s" }} />)}
@@ -769,11 +851,15 @@ function RestRegStep2({ onBack, onNext }) {
 // ═══════════════════════════════════════════════
 // ADIM 3 — Menü, Logo & Görseller
 // ═══════════════════════════════════════════════
-function RestRegStep3({ onBack, onDone }) {
+function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
   const [logoFiles, setLogoFiles] = useState([]);
-  const [menuFiles, setMenuFiles] = useState([]);
-  const [photoFiles, setPhotoFiles] = useState([]);
   const [submitted, setSubmitted] = useState(false);
+  // Kayıt sırasında yüklenenler doğrudan uygulama geneline yazılır; böylece
+  // panele geçildiğinde de, tüketici tarafında da aynı görseller görünür.
+  const menuFiles = ownerMedia.menu;
+  const photoFiles = ownerMedia.photos;
+  const setMenuFiles = (up) => setOwnerMedia(p => ({ ...p, menu: typeof up === "function" ? up(p.menu) : up }));
+  const setPhotoFiles = (up) => setOwnerMedia(p => ({ ...p, photos: typeof up === "function" ? up(p.photos) : up }));
 
   if (submitted) {
     return (
@@ -910,11 +996,15 @@ function RestRegStep3({ onBack, onDone }) {
 // ═══════════════════════════════════════════════
 // RESTORAN PANELİ — İstatistikler (sadece restoranlar görür)
 // ═══════════════════════════════════════════════
-function RestaurantDashboard({ onLogout }) {
+function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaurant }) {
   const [activeTab, setActiveTab] = useState("stats");
   const [showLogout, setShowLogout] = useState(false);
-  const [menuUploads, setMenuUploads] = useState([]);
-  const [photoUploads, setPhotoUploads] = useState([]);
+  // Yüklemeler uygulama kökünde tutulur — panelden çıkınca kaybolmaz ve
+  // tüketici tarafındaki swipe/detay ekranlarına anında yansır.
+  const menuUploads = ownerMedia.menu;
+  const photoUploads = ownerMedia.photos;
+  const setMenuUploads = (up) => setOwnerMedia(p => ({ ...p, menu: typeof up === "function" ? up(p.menu) : up }));
+  const setPhotoUploads = (up) => setOwnerMedia(p => ({ ...p, photos: typeof up === "function" ? up(p.photos) : up }));
 
   // Mock istatistik verileri
   const stats = {
@@ -965,8 +1055,8 @@ function RestaurantDashboard({ onLogout }) {
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
             <div style={{ width: 56, height: 56, borderRadius: 18, background: "rgba(255,255,255,0.15)", border: "2px solid rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="plate" color="#fff" size={22} /></div>
             <div>
-              <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>Restoranınız</h2>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.7)", margin: 0 }}>Kadıköy, İstanbul • Aktif</p>
+              <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>{ownerRestaurant?.name || "Restoranınız"}</h2>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.7)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{ownerRestaurant?.addr || "Kadıköy, İstanbul"} • Aktif</p>
             </div>
           </div>
 
@@ -1166,7 +1256,7 @@ function RestaurantDashboard({ onLogout }) {
                         </div>
                       </div>
                       <IconBtn
-                        onClick={() => setMenuUploads(p => p.filter((_, idx) => idx !== i))}
+                        onClick={() => setMenuUploads(p => { if (p[i]?.url) URL.revokeObjectURL(p[i].url); return p.filter((_, idx) => idx !== i); })}
                         tone="dangerSoft" shape="rounded" size={32} title="Menüyü kaldır"
                         icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
                       />
@@ -1177,7 +1267,7 @@ function RestaurantDashboard({ onLogout }) {
 
               {/* Yükleme alanı */}
               <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px 16px", borderRadius: 20, border: "2px dashed rgba(255,102,0,0.25)", background: "rgba(255,102,0,0.04)", cursor: "pointer" }}>
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ display: "none" }} onChange={e => { const files = Array.from(e.target.files || []); setMenuUploads(p => [...p, ...files]); e.target.value = ""; }} />
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ display: "none" }} onChange={e => { const files = toMediaFiles(e.target.files); setMenuUploads(p => [...p, ...files]); e.target.value = ""; }} />
                 <div style={{ width: 48, height: 48, borderRadius: 16, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 </div>
@@ -1206,10 +1296,10 @@ function RestaurantDashboard({ onLogout }) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
                   {photoUploads.map((file, i) => (
                     <div key={i} style={{ position: "relative", borderRadius: 14, overflow: "hidden", aspectRatio: "1", animation: `fadeInUp 0.3s ease-out ${i * 0.05}s both` }}>
-                      <img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <img src={file.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       <div style={{ position: "absolute", top: 4, right: 4 }}>
                         <IconBtn
-                          onClick={() => setPhotoUploads(p => p.filter((_, idx) => idx !== i))}
+                          onClick={() => setPhotoUploads(p => { if (p[i]?.url) URL.revokeObjectURL(p[i].url); return p.filter((_, idx) => idx !== i); })}
                           tone="glassDark" shape="rounded" size={26} title="Fotoğrafı kaldır"
                           icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
                         />
@@ -1221,7 +1311,7 @@ function RestaurantDashboard({ onLogout }) {
 
               {/* Yükleme alanı */}
               <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px 16px", borderRadius: 20, border: "2px dashed rgba(255,102,0,0.25)", background: "rgba(255,102,0,0.04)", cursor: "pointer" }}>
-                <input type="file" accept=".jpg,.jpeg,.png,.webp" multiple style={{ display: "none" }} onChange={e => { const files = Array.from(e.target.files || []); setPhotoUploads(p => [...p, ...files]); e.target.value = ""; }} />
+                <input type="file" accept=".jpg,.jpeg,.png,.webp" multiple style={{ display: "none" }} onChange={e => { const files = toMediaFiles(e.target.files); setPhotoUploads(p => [...p, ...files]); e.target.value = ""; }} />
                 <div style={{ width: 48, height: 48, borderRadius: 16, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
                 </div>
@@ -1243,7 +1333,7 @@ function RestaurantDashboard({ onLogout }) {
               {photoUploads.length > 0 && (
                 <div style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.15)", borderRadius: 16, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
 <Icon n="check" color="#4CAF50" size={16} />
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(76,175,80,0.8)", margin: 0 }}>{photoUploads.length} fotoğraf yüklendi</p>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(76,175,80,0.8)", margin: 0 }}>{photoUploads.length} fotoğraf yüklendi — keşif kartınızda ilk sırada gösteriliyor</p>
                 </div>
               )}
             </div>
@@ -1303,7 +1393,7 @@ function RestaurantDashboard({ onLogout }) {
 // ═══════════════════════════════════════════════
 // KEŞFET SAYFASI — 4 rastgele kategori + tüm kategoriler sayfası
 // ═══════════════════════════════════════════════
-function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile }) {
+function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch }) {
   const [showAll, setShowAll] = useState(false);
   const [randomCats] = useState(() => {
     const shuffled = [...CATEGORIES].sort(() => Math.random() - 0.5);
@@ -1371,6 +1461,27 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile }) {
           <Icon n="search" size={16} color="#9A938B" />
           <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#9A938B" }}>Restoran veya mutfak ara...</span>
         </div>
+
+        {/* GUR Match girişi */}
+        <motion.div
+          onClick={onMatch}
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+          style={{
+            display: "flex", alignItems: "center", gap: 12, marginBottom: 16, cursor: "pointer",
+            background: "linear-gradient(100deg, #FF6600, #FF3B30)", borderRadius: 18, padding: "12px 14px",
+            boxShadow: "0 6px 20px rgba(255,69,0,0.28)", flexShrink: 0,
+          }}
+        >
+          <div style={{ width: 38, height: 38, borderRadius: 13, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon n="sparkle" size={18} color="#fff" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Match</p>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.8)", margin: 0 }}>Arkadaşınla birlikte kaydır, birlikte karar ver</p>
+          </div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
+        </motion.div>
 
         {/* Hero Banner */}
         <div style={{ borderRadius: 24, overflow: "hidden", marginBottom: 20, height: 130, position: "relative", boxShadow: "0 8px 30px rgba(0,0,0,0.12)", flexShrink: 0 }}>
@@ -1574,6 +1685,238 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
           </div>
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// GUR MATCH — Arkadaşınla birlikte kaydır
+// ═══════════════════════════════════════════════
+function MatchStartScreen({ onBack, onStart }) {
+  const [mode, setMode] = useState(null); // null | "create" | "join"
+  const [code] = useState(() => makeInviteCode());
+  const [joinCode, setJoinCode] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    try { navigator.clipboard?.writeText(code); } catch { /* pano yoksa sessiz geç */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  return (
+    <Screen grad={false}>
+      <div style={{ height: "100%", background: "linear-gradient(160deg, #1a0f00, #2b1400 55%, #1a0f00)", display: "flex", flexDirection: "column", padding: "44px 22px 24px", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26 }}>
+          <IconBtn onClick={onBack} tone="glassLight" title="Geri"
+            icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>} />
+          <GurLogo size={42} pill />
+          <div style={{ width: 40 }} />
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: 28, animation: "fadeInUp 0.5s ease-out" }}>
+          <div style={{ width: 76, height: 76, borderRadius: "50%", background: "rgba(255,102,0,0.14)", border: "1px solid rgba(255,102,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+            <Icon n="sparkle" size={30} color="#FFA500" />
+          </div>
+          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>GUR Match</h2>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: 0, lineHeight: 1.55 }}>
+            Arkadaşınla aynı anda kaydır. İkiniz de sağa kaydırdığınız restoranlar eşleşme olur — nereye gideceğinizi tartışmayın, bırakın kartlar karar versin.
+          </p>
+        </div>
+
+        {mode === null && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, animation: "fadeInUp 0.5s ease-out 0.1s both" }}>
+            <Btn text="Yeni oturum başlat" onClick={() => setMode("create")} variant="filled" size="lg" />
+            <Btn text="Koda katıl" onClick={() => setMode("join")} variant="outline" size="lg" />
+          </div>
+        )}
+
+        {mode === "create" && (
+          <div style={{ animation: "fadeInUp 0.4s ease-out" }}>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.45)", textAlign: "center", margin: "0 0 12px" }}>Bu kodu arkadaşına gönder</p>
+            <div onClick={copy} style={{ background: "rgba(255,255,255,0.06)", border: "1px dashed rgba(255,165,0,0.45)", borderRadius: 20, padding: "22px 16px", textAlign: "center", cursor: "pointer", marginBottom: 16 }}>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 32, fontWeight: 800, color: "#FFA500", letterSpacing: 6 }}>{code}</span>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: copied ? "#4CAF50" : "rgba(255,255,255,0.35)", margin: "10px 0 0" }}>
+                {copied ? "Kopyalandı!" : "Kopyalamak için dokun"}
+              </p>
+            </div>
+            <Btn text={`${friendNameFor(code)} katıldı — Başla`} onClick={() => onStart(code)} variant="filled" size="lg" />
+            <div style={{ marginTop: 10 }}>
+              <Btn text="Geri" onClick={() => setMode(null)} variant="plain" size="sm" />
+            </div>
+          </div>
+        )}
+
+        {mode === "join" && (
+          <div style={{ animation: "fadeInUp 0.4s ease-out" }}>
+            <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 20, padding: "18px 16px 4px", marginBottom: 16 }}>
+              <InputField label="Davet kodu" value={joinCode} onChange={v => setJoinCode(v.toUpperCase().slice(0, 6))} placeholder="ÖRN: K7WQ2M" />
+            </div>
+            <Btn text="Katıl ve kaydırmaya başla" onClick={() => onStart(joinCode)} variant="filled" size="lg" disabled={joinCode.length < 4} />
+            <div style={{ marginTop: 10 }}>
+              <Btn text="Geri" onClick={() => setMode(null)} variant="plain" size="sm" />
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginTop: "auto", paddingTop: 20 }}>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "rgba(255,255,255,0.22)", textAlign: "center", margin: 0, lineHeight: 1.5 }}>
+            Demo sürümü — arkadaşın kararları davet kodundan üretilir. Gerçek eş zamanlı oturum için backend gerekir.
+          </p>
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
+  const cards = restaurants;
+  const friendName = friendNameFor(code);
+  const likes = useMemo(() => friendLikes(code, cards.map(c => c.id)), [code, cards]);
+
+  const [idx, setIdx] = useState(0);
+  const [matches, setMatches] = useState([]);
+  const [popup, setPopup] = useState(null); // eşleşme overlay'i
+  const topCardRef = useRef(null);
+
+  const visible = cards.slice(idx, idx + 2).reverse();
+  const advance = () => { if (idx >= cards.length - 1) onFinish(matches); else setIdx(i => i + 1); };
+
+  const right = () => {
+    const r = cards[idx];
+    if (r && likes.has(r.id)) {
+      const next = [...matches, r];
+      setMatches(next);
+      setPopup(r);           // eşleşme: ikisi de sağa kaydırdı
+      return;                // kart ilerletme overlay kapanınca
+    }
+    advance();
+  };
+  const left = () => advance();
+
+  const closePopup = () => { setPopup(null); advance(); };
+
+  return (
+    <Screen grad={false}>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#0a0500" }}>
+        {/* Header */}
+        <div style={{ padding: "44px 18px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            <IconBtn onClick={onExit} tone="glassLight" size={34} title="Çık"
+              icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>} />
+            <GurLogo size={42} pill />
+            <div style={{ width: 34 }} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,102,0,0.12)", border: "1px solid rgba(255,165,0,0.28)", borderRadius: 14, padding: "5px 14px" }}>
+            <Icon n="sparkle" size={12} color="#FFA500" />
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#FFA500", fontWeight: 700 }}>
+              {friendName} ile eşleşiyorsun • {matches.length} eşleşme
+            </span>
+          </div>
+        </div>
+
+        {/* Kartlar — tüketici swipe'ıyla birebir aynı fizik */}
+        <div style={{ flex: 1, position: "relative", margin: "10px 16px 8px", minHeight: 0 }}>
+          {visible.map((r, i) => {
+            const top = i === visible.length - 1;
+            return <SwipeCard key={r.id} ref={top ? topCardRef : null} r={r} isTop={top} onRight={right} onLeft={left} onTap={() => {}} />;
+          })}
+        </div>
+
+        {/* Aksiyonlar */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 22, padding: "10px 16px 20px", zIndex: 10 }}>
+          <IconBtn onClick={() => topCardRef.current?.fling(-1)} tone="solidLight" size={56} title="Geç"
+            icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+          <IconBtn onClick={() => topCardRef.current?.fling(1)} tone="solidLight" size={68} title="Beğen"
+            icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>} />
+        </div>
+
+        {/* Eşleşme anı */}
+        <AnimatePresence>
+          {popup && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={closePopup}
+              style={{ position: "absolute", inset: 0, background: "rgba(10,5,0,0.92)", backdropFilter: "blur(10px)", zIndex: 200, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 28, cursor: "pointer" }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                style={{ width: "100%", textAlign: "center" }}
+              >
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#FFA500", fontWeight: 700, letterSpacing: 3, margin: "0 0 10px" }}>EŞLEŞTİNİZ!</p>
+                <div style={{ width: "100%", height: 220, borderRadius: 24, overflow: "hidden", position: "relative", marginBottom: 18, boxShadow: "0 18px 60px rgba(255,102,0,0.25)" }}>
+                  <Img src={popup.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.85), transparent 60%)" }} />
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px 18px", textAlign: "left" }}>
+                    <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>{popup.name}</h3>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.65)", margin: 0 }}>{popup.cat} • {popup.dist}</p>
+                  </div>
+                </div>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(255,255,255,0.7)", margin: "0 0 20px" }}>
+                  Sen ve {friendName} ikiniz de beğendiniz
+                </p>
+                <Btn text="Kaydırmaya devam et" onClick={closePopup} variant="filled" size="md" />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </Screen>
+  );
+}
+
+function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
+  const friendName = friendNameFor(code);
+  return (
+    <Screen>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: "44px 16px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18, position: "relative" }}>
+          <GurLogo size={42} pill />
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#2D2419", margin: "0 0 6px" }}>
+            {matches.length > 0 ? `${matches.length} eşleşme!` : "Eşleşme çıkmadı"}
+          </h2>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0 }}>
+            {matches.length > 0 ? `${friendName} ile ikinizin de beğendiği yerler` : `${friendName} ile ortak beğeniniz olmadı — tekrar deneyin`}
+          </p>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+          {matches.map((r, i) => (
+            <div key={r.id} onClick={() => onDetail(r)} style={{
+              display: "flex", gap: 12, alignItems: "center", background: "#fff", borderRadius: 20, padding: 10, marginBottom: 10,
+              boxShadow: "0 4px 16px rgba(0,0,0,0.06)", cursor: "pointer", animation: `fadeInUp 0.35s ease-out ${i * 0.05}s both`,
+            }}>
+              <div style={{ width: 74, height: 74, borderRadius: 16, overflow: "hidden", flexShrink: 0, position: "relative" }}>
+                <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h4 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14.5, fontWeight: 800, color: "#2D2419", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</h4>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(45,36,25,0.5)", margin: "0 0 6px" }}>{r.cat} • {r.dist}</p>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,102,0,0.1)", borderRadius: 10, padding: "3px 9px", fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#FF6600" }}>
+                  <Icon n="sparkle" size={10} color="#FF6600" /> Eşleşme
+                </span>
+              </div>
+            </div>
+          ))}
+          {matches.length === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60%", gap: 12 }}>
+              <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(45,36,25,0.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon n="brokenHeart" size={26} color="rgba(45,36,25,0.3)" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 10, padding: "14px 0 18px" }}>
+          <Btn text="Yeni oturum" onClick={onRestart} variant="filled" size="md" />
+          <Btn text="Keşfete dön" onClick={onExplore} variant="outlineDark" size="md" />
         </div>
       </div>
     </Screen>
@@ -2297,6 +2640,18 @@ export default function GurApp(props = {}) {
   const [filterCat, setFilterCat] = useState(null);
   const [restaurants, setRestaurants] = useState(RESTAURANTS); // mock ile başla
   const [dataSource, setDataSource] = useState("demo"); // "demo" | "live"
+  // Doyurucu panelinden yüklenen görseller — uygulama genelinde tek kaynak
+  const [ownerMedia, setOwnerMedia] = useState({ photos: [], menu: [] });
+  // GUR Match oturumu
+  const [matchCode, setMatchCode] = useState("");
+  const [matchResults, setMatchResults] = useState([]);
+
+  const ownerRestaurant = useMemo(() => findOwnerRestaurant(restaurants), [restaurants]);
+  // Tüketici tarafındaki her ekran bu türetilmiş listeden beslenir
+  const feed = useMemo(
+    () => withOwnerMedia(restaurants, ownerRestaurant?.id, ownerMedia),
+    [restaurants, ownerRestaurant, ownerMedia]
+  );
 
   // Canlı veri dene — başarısızsa sessizce mock ile devam
   useEffect(() => {
@@ -2306,6 +2661,13 @@ export default function GurApp(props = {}) {
       .catch(() => { /* mock veri zaten yüklü */ });
     return () => { cancelled = true; };
   }, []);
+
+  // Detay ekranı seçim anındaki kopyayı değil güncel kaydı gösterir; böylece
+  // panelden yeni fotoğraf eklenince açık detay da tazelenir.
+  const liveSelected = useMemo(
+    () => (selected ? feed.find(r => r.id === selected.id) || selected : null),
+    [feed, selected]
+  );
 
   const nav = (to) => { setHistory(p => [...p, screen]); setScreen(to); };
   const back = () => { if (history.length > 0) { setScreen(history[history.length - 1]); setHistory(h => h.slice(0, -1)); } };
@@ -2317,6 +2679,9 @@ export default function GurApp(props = {}) {
   const goFav = () => { nav("fav"); };
   const goProfile = () => { nav("profile"); };
   const catTap = (cat) => { setFilterCat(cat); nav("swipe"); };
+  const goMatch = () => { setMatchResults([]); nav("match-start"); };
+  const startMatch = (code) => { setMatchCode(code); setMatchResults([]); nav("match-swipe"); };
+  const finishMatch = (found) => { setMatchResults(found); nav("match-result"); };
 
   const render = () => {
     switch (screen) {
@@ -2328,11 +2693,14 @@ export default function GurApp(props = {}) {
       case "doyurucu-login": return <DoyurucuLoginScreen onBack={back} onLogin={() => nav("rest-dashboard")} />;
       case "rest1": return <RestRegStep1 onBack={back} onNext={() => nav("rest2")} />;
       case "rest2": return <RestRegStep2 onBack={back} onNext={() => nav("rest3")} />;
-      case "rest3": return <RestRegStep3 onBack={back} onDone={() => nav("rest-dashboard")} />;
-      case "rest-dashboard": return <RestaurantDashboard onLogout={() => { setHistory([]); setScreen("welcome"); }} />;
-      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} />;
-      case "swipe": return <SwipeScreen onDetail={openDetail} onExplore={goExplore} onFavorites={goFav} favorites={favorites} setFavorites={setFavorites} filterCat={filterCat} restaurants={restaurants} dataSource={dataSource} />;
-      case "detail": return <DetailScreen r={selected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} />;
+      case "rest3": return <RestRegStep3 onBack={back} onDone={() => nav("rest-dashboard")} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} />;
+      case "rest-dashboard": return <RestaurantDashboard onLogout={() => { setHistory([]); setScreen("welcome"); }} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} ownerRestaurant={ownerRestaurant} />;
+      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} />;
+      case "match-start": return <MatchStartScreen onBack={back} onStart={startMatch} />;
+      case "match-swipe": return <MatchSwipeScreen code={matchCode} restaurants={feed} onExit={goExplore} onFinish={finishMatch} />;
+      case "match-result": return <MatchResultScreen code={matchCode} matches={matchResults} onDetail={openDetail} onRestart={goMatch} onExplore={goExplore} />;
+      case "swipe": return <SwipeScreen onDetail={openDetail} onExplore={goExplore} onFavorites={goFav} favorites={favorites} setFavorites={setFavorites} filterCat={filterCat} restaurants={feed} dataSource={dataSource} />;
+      case "detail": return <DetailScreen r={liveSelected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} />;
       case "fav": return <FavScreen onExplore={goExplore} onSwipe={goSwipe} onDetail={openDetail} favorites={favorites} setFavorites={setFavorites} onProfile={goProfile} />;
       case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} />;
       default: return <SplashScreen onNext={() => setScreen("welcome")} />;

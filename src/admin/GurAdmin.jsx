@@ -237,7 +237,92 @@ function IconBtn({ onClick, icon, size = 38, title, danger }) {
   );
 }
 
+// ─── GİRİŞ ───────────────────────────────────────────────────────────────
+// Demo seviyesi koruma: doğrulama tarayıcıda yapılır, dolayısıyla gerçek bir
+// güvenlik sınırı değildir — panel verisi zaten mock. Gerçek yetkilendirme
+// için sunucu tarafı oturum/rol denetimi gerekir (bkz. CLAUDE.md, backend adımı).
+const DEMO_USER = 'admin';
+const DEMO_PASS = 'gur2026';
+
+function AdminField({ label, value, onChange, type = 'text', autoFocus, onEnter }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: C.dim, marginBottom: 6 }}>{label}</label>
+      <input
+        type={type} value={value} autoFocus={autoFocus}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') onEnter?.(); }}
+        style={{
+          width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9,
+          padding: '11px 13px', fontSize: 13.5, color: C.text, fontFamily: F, outline: 'none',
+        }}
+        onFocus={e => e.currentTarget.style.borderColor = C.orange}
+        onBlur={e => e.currentTarget.style.borderColor = C.border}
+      />
+    </div>
+  );
+}
+
+function AdminLogin({ onLogin }) {
+  const [user, setUser] = useState('');
+  const [pass, setPass] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = () => {
+    if (user.trim() === DEMO_USER && pass === DEMO_PASS) { setError(''); onLogin(); }
+    else setError('Kullanıcı adı veya parola hatalı.');
+  };
+
+  return (
+    <div style={{ height: '100vh', background: C.bg, fontFamily: F, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
+        * { box-sizing: border-box; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .gur-admin-btn:focus-visible { box-shadow: 0 0 0 3px ${C.orange}55 !important; }
+        @media (prefers-reduced-motion: reduce) { .gur-admin-btn { transition: none !important; } }
+      `}</style>
+
+      <div style={{ width: '100%', maxWidth: 380, animation: 'fadeIn 0.3s ease-out' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 26 }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: '8px 16px', display: 'inline-flex', marginBottom: 14 }}>
+            <GurLogo size={26} />
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: 0.5 }}>YÖNETİM PANELİ</div>
+          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 3 }}>Devam etmek için giriş yapın</div>
+        </div>
+
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '22px 20px' }}>
+          <AdminField label="Kullanıcı adı" value={user} onChange={v => { setUser(v); setError(''); }} autoFocus onEnter={submit} />
+          <AdminField label="Parola" value={pass} onChange={v => { setPass(v); setError(''); }} type="password" onEnter={submit} />
+
+          {error && (
+            <div style={{ background: C.redSoft, border: `1px solid ${C.red}44`, borderRadius: 9, padding: '9px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon path={icons.ban} size={14} color={C.red} />
+              <span style={{ fontSize: 12, color: C.red }}>{error}</span>
+            </div>
+          )}
+
+          <Btn label="Giriş yap" onClick={submit} variant="filled" tone="orange" size="md" fullWidth />
+
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: C.yellowSoft, border: `1px solid ${C.yellow}33`, borderRadius: 6, padding: '3px 8px', marginBottom: 8 }}>
+              <span style={{ fontSize: 9.5, fontWeight: 800, color: C.yellow, letterSpacing: 1 }}>DEMO</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
+              Kullanıcı adı <code style={{ color: C.dim, background: C.panel2, padding: '1px 5px', borderRadius: 4 }}>{DEMO_USER}</code>
+              {' · '}Parola <code style={{ color: C.dim, background: C.panel2, padding: '1px 5px', borderRadius: 4 }}>{DEMO_PASS}</code>
+              <br />Doğrulama tarayıcıda yapılır; gerçek koruma için backend gerekir.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function GurAdmin() {
+  const [authed, setAuthed] = useState(false);
   const [page, setPage] = useState('dashboard');
   const [query, setQuery] = useState('');
   const [apps, setApps] = useState(APPLICATIONS);
@@ -281,6 +366,11 @@ export default function GurAdmin() {
 
   const pageTitle = nav.find(n => n.id === page)?.label || 'Genel Bakış';
 
+  const logout = () => { setAuthed(false); setPage('dashboard'); setQuery(''); setReviewDoc(null); };
+
+  // Giriş yapılmadan panel hiç render edilmez
+  if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />;
+
   return (
     <div style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: F, color: C.text, overflow: 'hidden' }}>
       <style>{`
@@ -322,7 +412,7 @@ export default function GurAdmin() {
               <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Admin</div>
               <div style={{ fontSize: 10.5, color: C.faint }}>admin@gur.app</div>
             </div>
-            <IconBtn size={30} title="Çıkış yap" danger icon={<Icon path={icons.logout} size={16} color={C.faint} />} />
+            <IconBtn size={30} title="Çıkış yap" danger onClick={logout} icon={<Icon path={icons.logout} size={16} color={C.faint} />} />
           </div>
         </div>
       </aside>
