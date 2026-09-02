@@ -118,6 +118,11 @@ const REVIEW_POOL = [
   { stars: 5, text: 'Malzeme kalitesi belli oluyor. Taze ve özenli. Kahvaltı için de ayrıca gelmek istiyorum.' },
   { stars: 4, text: 'Servis nazik, mekan temiz. Otopark sıkıntısı var, toplu taşımayla gitmek daha rahat.' },
   { stars: 1, text: 'Rezervasyonumuz kaybolmuş, masa verilmedi. Telefonda ilgilenen olmadı. Hayal kırıklığı.' },
+  { stars: 2, text: 'Hesap yanlış geldi, düzeltmesi 20 dakika sürdü. Yemekler ortalamaydı, bu fiyata değmez.' },
+  { stars: 1, text: 'Masalar temizlenmemişti, üç kez söylememize rağmen ilgilenen olmadı. Bir daha gitmem.' },
+  { stars: 2, text: 'Menüdeki üç yemeğin ikisi yokmuş. Kalanı da beklediğimiz gibi çıkmadı.' },
+  { stars: 1, text: 'Garson tavrı rahatsız ediciydi. Yemeği bitirmeden kalktık, yöneticiye ulaşamadık.' },
+  { stars: 2, text: 'Porsiyonlar fotoğraflardakinin yarısı kadar. Lezzet fena değil ama beklenti yönetimi kötü.' },
 ];
 
 const REVIEWER_NAMES = ['Elif K.', 'Mert S.', 'Zeynep A.', 'Can B.', 'Ahmet Y.', 'Deniz Ö.', 'Selin T.', 'Burak D.', 'Ece M.', 'Kaan U.', 'Nil P.', 'Onur G.'];
@@ -176,6 +181,57 @@ function restaurantReviews(r) {
       flagged: rv.stars === 1,
     });
   }
+  return out.sort((a, b) => a.days - b.days);
+}
+
+// Gurme (şef) değerlendirmeleri: kullanıcı yorumlarından ayrı tutulur —
+// 10 üzerinden mesleki puan ve gerekçeli not içerir. Gastro rozeti bu
+// değerlendirmelere dayanır, atama ise Restoranlar bölümünde yapılır.
+const GOURMET_NOTES = [
+  'Malzeme seçimi ve pişirme disiplini tutarlı; menü kurgusu net okunuyor.',
+  'Klasik tarifleri bozmadan modernize etmişler, sunum dengeli.',
+  'Mutfak teknik olarak güçlü, servis akışı buna ayak uyduruyor.',
+  'Yerel üretici kullanımı takdire değer. Porsiyon dengesi gözden geçirilebilir.',
+  'Lezzet profili iddialı; tutarlılığın her serviste sağlanması gerekiyor.',
+  'Fiyat-kalite dengesi bölgesine göre başarılı, karşılama sıcak.',
+  'Soslarda derinlik var. Tatlı bölümü ana menünün gerisinde kalıyor.',
+  'Sezonluk menü değişimi ciddiye alınmış, mutfak kendini tekrar etmiyor.',
+];
+
+function gourmetReviews(restaurants) {
+  const out = [];
+  CHEFS.forEach(chef => {
+    restaurants.forEach(r => {
+      const rand = seeded(chef.id * 101 + r.id * 17);
+      // Her şef restoranların bir kısmını değerlendirir; onaylılar daha olası
+      if (rand() > (r.gastro ? 0.62 : 0.22)) return;
+      const days = 5 + Math.floor(rand() * 400);
+      out.push({
+        key: `${chef.id}-${r.id}`,
+        chef,
+        restId: r.id,
+        restName: r.name,
+        restCat: r.cat,
+        district: r.district,
+        gastro: r.gastro,
+        score: (7.4 + rand() * 2.5).toFixed(1),      // 10 üzerinden mesleki puan
+        note: GOURMET_NOTES[Math.floor(rand() * GOURMET_NOTES.length)],
+        days,
+        date: isoDaysAgo(days),
+      });
+    });
+  });
+  return out.sort((a, b) => a.days - b.days);
+}
+
+// Tüm restoranların kullanıcı yorumlarını tek akışta toplar
+function allUserReviews(restaurants) {
+  const out = [];
+  restaurants.forEach(r => {
+    restaurantReviews(r).forEach((v, i) => {
+      out.push({ ...v, key: `${r.id}-${i}`, restId: r.id, restName: r.name, restCat: r.cat, district: r.district });
+    });
+  });
   return out.sort((a, b) => a.days - b.days);
 }
 
@@ -427,6 +483,14 @@ export default function GurAdmin() {
   const [restaurants, setRestaurants] = useState(RESTAURANTS);
   const [reviewDoc, setReviewDoc] = useState(null);
   const [openRestaurantId, setOpenRestaurantId] = useState(null);
+  const [restTab, setRestTab] = useState('list');
+  const [hiddenReviews, setHiddenReviews] = useState(() => new Set());
+
+  const toggleHideReview = (key) => setHiddenReviews(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 2500); };
@@ -458,7 +522,6 @@ export default function GurAdmin() {
     { id: 'applications', label: 'Başvurular', icon: icons.inbox, count: apps.length, alert: apps.length > 0 },
     { id: 'gastro', label: 'Gastro Onaylı', icon: icons.star },
     { id: 'users', label: 'Kullanıcılar', icon: icons.users },
-    { id: 'reviews', label: 'Yorumlar', icon: icons.msg },
     { id: 'revenue', label: 'Gelir & Reklam', icon: icons.money },
     { id: 'settings', label: 'Ayarlar', icon: icons.settings },
   ];
@@ -470,7 +533,7 @@ export default function GurAdmin() {
 
   const goPage = (id) => { setOpenRestaurantId(null); setPage(id); };
 
-  const logout = () => { setAuthed(false); setPage('dashboard'); setQuery(''); setReviewDoc(null); setOpenRestaurantId(null); };
+  const logout = () => { setAuthed(false); setPage('dashboard'); setQuery(''); setReviewDoc(null); setOpenRestaurantId(null); setRestTab('list'); };
 
   // Giriş yapılmadan panel hiç render edilmez
   if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />;
@@ -550,11 +613,14 @@ export default function GurAdmin() {
           {page === 'dashboard' && <DashboardPage />}
           {page === 'restaurants' && (openRestaurant
             ? <RestaurantDetailPage r={openRestaurant} onBack={() => setOpenRestaurantId(null)} onGastro={toggleGastro} onSuspend={toggleSuspend} />
-            : <RestaurantsPage restaurants={restaurants} query={query} onSuspend={toggleSuspend} onOpen={setOpenRestaurantId} />)}
+            : <RestaurantsWorkspace
+                restaurants={restaurants} query={query}
+                tab={restTab} onTab={setRestTab}
+                onSuspend={toggleSuspend} onOpen={setOpenRestaurantId}
+                hidden={hiddenReviews} onHide={toggleHideReview} />)}
           {page === 'applications' && <ApplicationsPage apps={apps} onReview={setReviewDoc} onApprove={approveApp} onReject={rejectApp} />}
-          {page === 'gastro' && <GastroPage restaurants={restaurants} onGastro={toggleGastro} />}
+          {page === 'gastro' && <GastroPage restaurants={restaurants} onGoRestaurants={() => goPage('restaurants')} />}
           {page === 'users' && <UsersPage query={query} />}
-          {page === 'reviews' && <ReviewsPage />}
           {page === 'revenue' && <RevenuePage />}
           {page === 'settings' && <SettingsPage />}
         </div>
@@ -741,6 +807,37 @@ function TableShell({ headers, children }) {
   );
 }
 
+function TabBar({ tabs, active, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 11, padding: 4, marginBottom: 16, width: 'fit-content', maxWidth: '100%', overflowX: 'auto' }}>
+      {tabs.map(t => {
+        const on = t.id === active;
+        return (
+          <motion.button
+            key={t.id} onClick={() => onChange(t.id)} className="gur-admin-btn"
+            data-tab={t.id} aria-pressed={on}
+            whileTap={{ scale: 0.98 }} transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
+            style={{
+              border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 14px',
+              background: on ? C.panel2 : 'transparent', color: on ? C.text : C.dim,
+              fontFamily: F, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap',
+              display: 'inline-flex', alignItems: 'center', gap: 7, outline: 'none',
+            }}>
+            {t.label}
+            {t.count != null && (
+              <span style={{
+                fontSize: 10.5, fontWeight: 700, borderRadius: 20, padding: '1px 6px',
+                background: t.alert ? C.redSoft : C.bg, color: t.alert ? C.red : C.faint,
+                fontVariantNumeric: 'tabular-nums',
+              }}>{t.count}</span>
+            )}
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
 function StarRow({ n, size = 12 }) {
   return (
     <span style={{ fontSize: size, color: C.orange, letterSpacing: 1 }}>
@@ -754,6 +851,75 @@ function MetaCell({ label, children }) {
     <div style={{ padding: '12px 18px' }}>
       <div style={{ fontSize: 10.5, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>{label}</div>
       <div style={{ fontSize: 13.5, fontWeight: 600 }}>{children}</div>
+    </div>
+  );
+}
+
+// Tek yorum kartı — hem restoran detayında hem moderasyon akışlarında kullanılır
+function ReviewCard({ v, showRestaurant, onOpenRestaurant, hidden, onHide }) {
+  const low = v.stars <= 2;
+  return (
+    <article style={{
+      padding: '14px 18px',
+      borderTop: `1px solid ${C.border}`,
+      background: hidden ? C.bg : (v.flagged ? C.redSoft : 'transparent'),
+      opacity: hidden ? 0.5 : 1,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>{v.user}</span>
+        <StarRow n={v.stars} />
+        {showRestaurant && (
+          <button
+            onClick={() => onOpenRestaurant?.(v.restId)} className="gur-admin-btn"
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: F, fontSize: 12.5, fontWeight: 600, color: C.blue, outline: 'none' }}>
+            {v.restName}
+          </button>
+        )}
+        <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
+          {daysAgoLabel(v.days)} • {formatDate(v.date)}
+        </span>
+        {v.flagged && <Badge text="Şikayet edildi" color={C.red} soft={C.redSoft} />}
+        {low && !v.flagged && <Badge text={`${v.stars} puan`} color={C.yellow} soft={C.yellowSoft} />}
+      </div>
+      <p style={{ margin: 0, fontSize: 13, color: C.dim, lineHeight: 1.55, maxWidth: '68ch', textDecoration: hidden ? 'line-through' : 'none' }}>{v.text}</p>
+      {v.photos?.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+          {v.photos.map((src, i) => (
+            <div key={i} style={{ width: 56, height: 56, borderRadius: 8, overflow: 'hidden', border: `1px solid ${C.border}`, flexShrink: 0 }}>
+              <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+          ))}
+        </div>
+      )}
+      {onHide && (
+        <div style={{ marginTop: 10 }}>
+          <Btn
+            label={hidden ? 'Geri Yükle' : 'Yorumu Kaldır'}
+            onClick={() => onHide(v.key)}
+            variant={hidden ? 'outline' : 'soft'}
+            tone={hidden ? 'neutral' : 'red'}
+            size="sm"
+          />
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ReviewFeed({ reviews, hidden, onHide, onOpenRestaurant, empty }) {
+  if (reviews.length === 0) {
+    return (
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '40px 20px', textAlign: 'center', color: C.faint, fontSize: 13 }}>
+        {empty}
+      </div>
+    );
+  }
+  return (
+    <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+      {reviews.map(v => (
+        <ReviewCard key={v.key} v={v} showRestaurant onOpenRestaurant={onOpenRestaurant}
+          hidden={hidden.has(v.key)} onHide={onHide} />
+      ))}
     </div>
   );
 }
@@ -950,6 +1116,52 @@ function RestaurantsPage({ restaurants, query, onSuspend, onOpen }) {
   );
 }
 
+// Restoranlar artık üç sekmeli bir çalışma alanı: liste, tüm yorumlar ve
+// düşük puan kuyruğu. Yorumlar ayrı bir sayfa olmaktan çıkıp buraya taşındı.
+function RestaurantsWorkspace({ restaurants, query, tab, onTab, onSuspend, onOpen, hidden, onHide }) {
+  const reviews = useMemo(() => allUserReviews(restaurants), [restaurants]);
+  const q = query.trim().toLowerCase();
+  const match = (v) => !q || v.restName.toLowerCase().includes(q) || v.user.toLowerCase().includes(q) || v.text.toLowerCase().includes(q);
+  const all = reviews.filter(match);
+  const low = all.filter(v => v.stars <= 2);
+  const openLow = low.filter(v => !hidden.has(v.key)).length;
+
+  const tabs = [
+    { id: 'list', label: 'Restoranlar', count: restaurants.length },
+    { id: 'reviews', label: 'Yorumlar', count: all.length },
+    { id: 'low', label: 'Düşük Puanlar', count: openLow, alert: openLow > 0 },
+  ];
+
+  return (
+    <div style={{ animation: 'fadeIn 0.2s' }}>
+      <TabBar tabs={tabs} active={tab} onChange={onTab} />
+
+      {tab === 'list' && (
+        <RestaurantsPage restaurants={restaurants} query={query} onSuspend={onSuspend} onOpen={onOpen} />
+      )}
+
+      {tab === 'reviews' && (
+        <ReviewFeed reviews={all} hidden={hidden} onHide={onHide} onOpenRestaurant={onOpen}
+          empty={q ? `"${query}" için yorum bulunamadı` : 'Henüz yorum yok'} />
+      )}
+
+      {tab === 'low' && (
+        <>
+          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.red}`, borderRadius: 12, padding: '13px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Icon path={icons.ban} size={16} color={C.red} />
+            <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
+              1 ve 2 puanlı son yorumlar, en yenisi üstte. İşletmeyle iletişime geçmeden önce
+              yorumun kuralları ihlal edip etmediğini kontrol edin.
+            </div>
+          </div>
+          <ReviewFeed reviews={low} hidden={hidden} onHide={onHide} onOpenRestaurant={onOpen}
+            empty={q ? `"${query}" için düşük puanlı yorum yok` : 'Düşük puanlı yorum yok'} />
+        </>
+      )}
+    </div>
+  );
+}
+
 function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
   if (apps.length === 0) {
     return (
@@ -991,60 +1203,101 @@ function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
   );
 }
 
-function GastroPage({ restaurants, onGastro }) {
-  const approved = restaurants.filter(r => r.gastro);
-  const candidates = restaurants.filter(r => !r.gastro && r.rating >= 4.4);
+// Gastro Onaylı: yalnızca onaylı gurmelerin (şeflerin) değerlendirmeleri ve
+// verdikleri 10 üzerinden puanlar. Rozet ATAMASI burada değil — Restoranlar
+// bölümündeki restoran detayında, kullanıcı yorumlarının olduğu yerde yapılır.
+function GastroPage({ restaurants, onGoRestaurants }) {
+  const reviews = useMemo(() => gourmetReviews(restaurants), [restaurants]);
+  const [chefId, setChefId] = useState('all');
+  const shown = chefId === 'all' ? reviews : reviews.filter(v => v.chef.id === chefId);
+
+  const avg = (list) => list.length ? (list.reduce((a, v) => a + Number(v.score), 0) / list.length).toFixed(1) : '—';
+  const perChef = CHEFS.map(c => ({ ...c, list: reviews.filter(v => v.chef.id === c.id) }));
+
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
-      {/* Şefler */}
-      <div style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px', color: C.dim }}>ONAYLAYAN ŞEFLER</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          {CHEFS.map(c => (
-            <div key={c.id} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+      {/* Rozet atamasının nerede yapıldığını söyle — bu sayfa artık salt değerlendirme */}
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.orange}`, borderRadius: 12, padding: '13px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <Icon path={icons.star} size={16} color={C.orange} fill={C.orange} />
+        <div style={{ flex: 1, minWidth: 220, fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
+          Onaylı gurmelerin değerlendirmeleri ve verdikleri puanlar. Rozet ataması
+          Restoranlar bölümünde, restoranın yorumlarının olduğu yerde yapılır.
+        </div>
+        <Btn label="Restoranlara Git" onClick={onGoRestaurants} variant="outline" size="sm"
+          icon={<Icon path={icons.store} size={13} color={C.dim} />} />
+      </div>
+
+      {/* Gurme kartları — tıklayınca o gurmenin değerlendirmelerine filtrelenir */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 18 }}>
+        {perChef.map(c => {
+          const on = chefId === c.id;
+          return (
+            <motion.button
+              key={c.id} onClick={() => setChefId(on ? 'all' : c.id)} className="gur-admin-btn"
+              whileTap={{ scale: 0.99 }} transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
+              style={{
+                textAlign: 'left', cursor: 'pointer', fontFamily: F, outline: 'none',
+                background: on ? C.panel2 : C.panel,
+                border: `1px solid ${on ? C.orange + '77' : C.border}`,
+                borderRadius: 12, padding: 15,
+              }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#FF6600,#FF3B30)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#fff', fontSize: 15 }}>{c.name.split(' ')[1][0]}</div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</div>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#FF6600,#FF3B30)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#fff', fontSize: 15, flexShrink: 0 }}>{c.name.split(' ')[1][0]}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{c.name}</div>
                   <div style={{ fontSize: 11, color: C.faint }}>{c.specialty}</div>
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: C.dim }}><b style={{ color: C.orange }}>{c.endorsements}</b> onay verdi</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Onaylı restoranlar */}
-      <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px', color: C.dim }}>GASTRO ONAYLI RESTORANLAR ({approved.length})</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-        {approved.map(r => (
-          <div key={r.id} style={{ background: C.panel, border: `1px solid ${C.orange}44`, borderRadius: 12, padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{r.name}</div>
-              <Icon path={icons.star} size={16} color={C.orange} fill={C.orange} />
-            </div>
-            <div style={{ fontSize: 12, color: C.dim, marginBottom: 12 }}>{r.cat} • ★ {r.rating}</div>
-            <Btn label="Onayı Kaldır" onClick={() => onGastro(r.id)} variant="ghost" tone="red" fullWidth />
-          </div>
-        ))}
-      </div>
-
-      {/* Aday restoranlar */}
-      {candidates.length > 0 && (
-        <>
-          <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px', color: C.dim }}>ADAY RESTORANLAR (4.4+ puan)</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            {candidates.map(r => (
-              <div key={r.id} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{r.name}</div>
-                <div style={{ fontSize: 12, color: C.dim, marginBottom: 12 }}>{r.cat} • ★ {r.rating}</div>
-                <Btn label="Gastro Onaylı Yap" onClick={() => onGastro(r.id)} variant="filled" tone="orange" fullWidth icon={<Icon path={icons.star} size={13} color="#fff" fill="#fff" />} />
+              <div style={{ display: 'flex', gap: 14, fontSize: 11.5, color: C.dim, fontVariantNumeric: 'tabular-nums' }}>
+                <span><b style={{ color: C.orange, fontSize: 13 }}>{c.list.length}</b> değerlendirme</span>
+                <span>ort. <b style={{ color: C.text, fontSize: 13 }}>{avg(c.list)}</b></span>
               </div>
-            ))}
-          </div>
-        </>
-      )}
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Değerlendirme akışı */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+        <h3 style={{ fontSize: 11, fontWeight: 600, margin: 0, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          {chefId === 'all' ? 'Tüm Gurme Değerlendirmeleri' : `${CHEFS.find(c => c.id === chefId).name} Değerlendirmeleri`}
+        </h3>
+        <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
+          {shown.length} kayıt • ortalama {avg(shown)}/10
+        </span>
+      </div>
+
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+        {shown.map((v, i) => (
+          <article key={v.key} style={{ padding: '14px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+            {/* Puan rozeti */}
+            <div style={{
+              width: 52, flexShrink: 0, textAlign: 'center', borderRadius: 10, padding: '8px 4px',
+              background: Number(v.score) >= 9 ? C.greenSoft : Number(v.score) >= 8 ? C.orangeSoft : C.panel2,
+              border: `1px solid ${Number(v.score) >= 9 ? C.green + '55' : Number(v.score) >= 8 ? C.orange + '55' : C.border}`,
+            }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: Number(v.score) >= 9 ? C.green : Number(v.score) >= 8 ? C.orange : C.dim, fontVariantNumeric: 'tabular-nums' }}>{v.score}</div>
+              <div style={{ fontSize: 9.5, color: C.faint }}>/ 10</div>
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginBottom: 5 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{v.chef.name}</span>
+                <span style={{ fontSize: 12.5, color: C.faint }}>→</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.blue }}>{v.restName}</span>
+                {v.gastro && <Badge text="★ Gastro Onaylı" color={C.orange} soft={C.orangeSoft} />}
+                <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
+                  {daysAgoLabel(v.days)} • {formatDate(v.date)}
+                </span>
+              </div>
+              <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 6 }}>{v.restCat} • {v.district}</div>
+              <p style={{ margin: 0, fontSize: 13, color: C.dim, lineHeight: 1.55, maxWidth: '70ch' }}>{v.note}</p>
+            </div>
+          </article>
+        ))}
+        {shown.length === 0 && (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: C.faint, fontSize: 13 }}>Bu gurme henüz değerlendirme yapmamış</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1070,38 +1323,6 @@ function UsersPage({ query }) {
           </tr>
         ))}
       </TableShell>
-    </div>
-  );
-}
-
-function ReviewsPage() {
-  const reviews = [
-    { user: 'Elif K.', rest: 'Nusr-Et Steakhouse', stars: 5, text: 'Muhteşem lezzetler, kesinlikle tavsiye ederim.', flagged: false },
-    { user: 'Anonim', rest: 'Klein Bistro', stars: 1, text: 'Bu mekan berbat, herkese kötü davranıyorlar!!!', flagged: true },
-    { user: 'Mert S.', rest: 'Çiya Sofrası', stars: 5, text: 'Şehirdeki en iyi mekan, personel çok ilgili.', flagged: false },
-    { user: 'Zeynep A.', rest: 'The Burger Joint', stars: 3, text: 'Yemekler güzeldi ama bekleme süresi uzundu.', flagged: false },
-  ];
-  return (
-    <div style={{ animation: 'fadeIn 0.2s', display: 'grid', gap: 12 }}>
-      {reviews.map((r, i) => (
-        <div key={i} style={{ background: C.panel, border: `1px solid ${r.flagged ? C.red + '44' : C.border}`, borderRadius: 12, padding: 18 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-            <div>
-              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{r.user}</span>
-              <span style={{ fontSize: 12.5, color: C.faint }}> → {r.rest}</span>
-              <div style={{ fontSize: 12, color: C.orange, marginTop: 2 }}>{'★'.repeat(r.stars)}<span style={{ color: C.border }}>{'★'.repeat(5 - r.stars)}</span></div>
-            </div>
-            {r.flagged && <Badge text="⚠ Şikayet edildi" color={C.red} soft={C.redSoft} />}
-          </div>
-          <p style={{ margin: '0 0 12px', fontSize: 13, color: C.dim, lineHeight: 1.5 }}>{r.text}</p>
-          {r.flagged && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Btn label="Yorumu Kaldır" variant="soft" tone="red" />
-              <Btn label="Onayla" variant="outline" />
-            </div>
-          )}
-        </div>
-      ))}
     </div>
   );
 }

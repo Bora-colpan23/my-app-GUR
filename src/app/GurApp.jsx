@@ -1924,9 +1924,139 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
 }
 
 // ═══════════════════════════════════════════════
+// YORUM YAZMA — puan, metin ve fotoğraf ekleme
+// ═══════════════════════════════════════════════
+function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
+  const [stars, setStars] = useState(0);
+  const [text, setText] = useState("");
+  const [photos, setPhotos] = useState([]);
+  const fileRef = useRef(null);
+
+  // Blob URL'ler yalnızca vazgeçildiğinde serbest bırakılır; gönderilen
+  // yorumun görselleri uygulama boyunca yaşamaya devam eder.
+  const addPhotos = (e) => {
+    // Dosyalar burada, olay anında okunur — state güncelleyicisinin içinde
+    // değil: React güncelleyiciyi sonraya bıraktığı için o ana kadar input
+    // temizlenmiş olur ve seçim kaybolurdu. Ayrıca StrictMode güncelleyiciyi
+    // iki kez çağırdığından blob URL üretimi de dışarıda kalmalı.
+    const room = Math.max(0, 4 - photos.length);
+    const picked = toMediaFiles(Array.from(e.target.files || []).slice(0, room));
+    e.target.value = "";
+    if (picked.length) setPhotos(prev => [...prev, ...picked].slice(0, 4));
+  };
+  const removePhoto = (i) => setPhotos(prev => {
+    if (prev[i]?.url) URL.revokeObjectURL(prev[i].url);
+    return prev.filter((_, j) => j !== i);
+  });
+  const cancel = () => { photos.forEach(f => f.url && URL.revokeObjectURL(f.url)); onCancel(); };
+
+  const canSubmit = stars > 0 && text.trim().length >= 10;
+  const submit = () => {
+    if (!canSubmit) return;
+    onSubmit({
+      stamp: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      user: "Sen",
+      stars,
+      text: text.trim(),
+      date: "az önce",
+      photos: photos.map(f => f.url),
+      mine: true,
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      style={{ position: "absolute", inset: 0, background: "rgba(20,14,8,0.55)", backdropFilter: "blur(4px)", zIndex: 300, display: "flex", alignItems: "flex-end" }}
+      onClick={cancel}
+    >
+      <motion.div
+        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+        onClick={e => e.stopPropagation()}
+        style={{ width: "100%", maxHeight: "88%", overflowY: "auto", background: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: "20px 20px 24px" }}
+      >
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: "#E5E0DA", margin: "0 auto 16px" }} />
+
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+          <div style={{ minWidth: 0 }}>
+            <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, color: "#2D2419", margin: "0 0 3px" }}>Yorumunu yaz</h3>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{restaurantName}</p>
+          </div>
+          <IconBtn onClick={cancel} tone="subtle" size={34} title="Vazgeç"
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2D2419" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+        </div>
+
+        {/* Puan */}
+        <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Puanın</label>
+        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          {[1, 2, 3, 4, 5].map(n => (
+            <motion.button
+              key={n} onClick={() => setStars(n)} className="gur-icon-btn"
+              whileTap={{ scale: 0.86 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+              aria-label={`${n} yıldız`} title={`${n} yıldız`}
+              style={{ border: "none", background: "transparent", cursor: "pointer", padding: 2, outline: "none", WebkitTapHighlightColor: "transparent" }}>
+              <Icon n="star" size={30} color={n <= stars ? "#F59E0B" : "#E5E0DA"} />
+            </motion.button>
+          ))}
+        </div>
+
+        {/* Metin */}
+        <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Deneyimin</label>
+        <textarea
+          value={text} onChange={e => setText(e.target.value)} rows={4}
+          placeholder="Ne yedin, servis nasıldı, tekrar gider misin?"
+          style={{
+            width: "100%", resize: "vertical", borderRadius: 16, padding: "13px 14px",
+            border: "1.5px solid rgba(45,36,25,0.14)", background: "#FBFAF8",
+            fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#2D2419", lineHeight: 1.5, outline: "none",
+          }}
+          onFocus={e => e.currentTarget.style.borderColor = "#FF6600"}
+          onBlur={e => e.currentTarget.style.borderColor = "rgba(45,36,25,0.14)"}
+        />
+        <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: text.trim().length < 10 ? "#C4776B" : "rgba(45,36,25,0.4)", margin: "6px 0 18px" }}>
+          {text.trim().length < 10 ? `En az 10 karakter (${text.trim().length}/10)` : `${text.trim().length} karakter`}
+        </div>
+
+        {/* Fotoğraflar */}
+        <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>
+          Fotoğraf ekle <span style={{ fontWeight: 500, color: "rgba(45,36,25,0.45)" }}>— en fazla 4</span>
+        </label>
+        <input ref={fileRef} type="file" accept="image/*" multiple onChange={addPhotos} style={{ display: "none" }} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
+          {photos.map((f, i) => (
+            <div key={i} style={{ position: "relative", width: 74, height: 74, borderRadius: 14, overflow: "hidden", border: "1.5px solid rgba(45,36,25,0.1)" }}>
+              <img src={f.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <div onClick={() => removePhoto(i)} title="Fotoğrafı kaldır" style={{ position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✕</div>
+            </div>
+          ))}
+          {photos.length < 4 && (
+            <motion.button
+              onClick={() => fileRef.current?.click()} className="gur-icon-btn"
+              whileTap={{ scale: 0.94 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+              title="Fotoğraf seç"
+              style={{
+                width: 74, height: 74, borderRadius: 14, cursor: "pointer", outline: "none",
+                border: "2px dashed rgba(255,102,0,0.35)", background: "rgba(255,102,0,0.05)",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
+              }}>
+              <Icon n="camera" size={19} color="#FF6600" />
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#FF6600" }}>Ekle</span>
+            </motion.button>
+          )}
+        </div>
+
+        <Btn text="Yorumu Paylaş" onClick={submit} variant="filled" disabled={!canSubmit} />
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════
 // RESTORAN DETAY — Fotoğraf carousel + kaydırılabilir yorumlar
 // ═══════════════════════════════════════════════
-function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavorites }) {
+function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavorites, userReviews = [], onAddReview }) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const photoRef = useRef(null);
@@ -1966,15 +2096,17 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
     window.open(url, "_blank");
   };
 
-  // Örnek yorumlar (fotoğraflı)
-  const reviews = [
+  // Kullanıcının bu restorana yazdığı yorumlar en üstte, örnek yorunlar altında
+  const sampleReviews = [
     { user: "A.O.", stars: 5, text: "Taze malzemeler, hızlı servis ve harika sunum! Kesinlikle tavsiye ederim. Özellikle ana yemekler muhteşemdi.", date: "2 saat önce", photos: [r.imgs[0], r.imgs[1] || r.imgs[0]] },
     { user: "Elif K.", stars: 4, text: "Ambiyans çok güzel, servis hızlı. Fiyatlar biraz yüksek ama kalite var. Tatlıları da denemenizi öneririm.", date: "1 gün önce", photos: [r.imgs[1] || r.imgs[0]] },
     { user: "Mert S.", stars: 5, text: "Şehirdeki en iyi mekan! Personel çok ilgili ve yemekler şahane. Arkadaşlarımla harika vakit geçirdik.", date: "3 gün önce", photos: [r.imgs[2] || r.imgs[0], r.imgs[0]] },
     { user: "Zeynep A.", stars: 3, text: "Yemekler güzeldi ama bekleme süresi uzundu. Genel olarak fena değil ama iyileştirme gerekli.", date: "1 hafta önce", photos: [] },
   ];
+  const reviews = [...userReviews, ...sampleReviews];
 
   const [selectedReview, setSelectedReview] = useState(null);
+  const [composing, setComposing] = useState(false);
 
   return (
     <Screen grad={false}>
@@ -2049,7 +2181,11 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           <div style={{ marginBottom: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
 <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 700, color: "#333", margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icon n="chat" color="#333" size={16} />Yorumlar</p>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#bbb" }}>{revIdx + 1} / {reviews.length}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#bbb" }}>{revIdx + 1} / {reviews.length}</span>
+                <Btn text="Yorum Yaz" onClick={() => setComposing(true)} variant="filled" size="sm" fullWidth={false}
+                  icon={<Icon n="camera" size={13} color="#fff" />} />
+              </div>
             </div>
 
             <div
@@ -2143,6 +2279,17 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Konum</span>
           </div>
         </div>
+
+        {/* Yorum Yazma — yıldız, metin ve fotoğraf ekleme */}
+        <AnimatePresence>
+        {composing && (
+          <ReviewComposer
+            restaurantName={r.name}
+            onCancel={() => setComposing(false)}
+            onSubmit={(review) => { onAddReview?.(r.id, review); setComposing(false); setRevIdx(0); }}
+          />
+        )}
+        </AnimatePresence>
 
         {/* Yorum Detay Overlay — alttan gelip alta geri döner (§7 — giriş/çıkış aynı yol) */}
         <AnimatePresence>
@@ -2420,14 +2567,31 @@ const BADGES = [
   { icon: "flame", label: "Sadık Müşteri" },
 ];
 
-function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onDetail, accentColor = "#FF6600", showBadges = true, badgeSpeed = 14 }) {
+function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onDetail, accentColor = "#FF6600", showBadges = true, badgeSpeed = 14, userReviews = {}, restaurants = [], onRemoveUserReview }) {
   const [tab, setTab] = useState("reviews");
-  const [reviews, setReviews] = useState(MY_REVIEWS);
+  const [sampleReviews, setSampleReviews] = useState(MY_REVIEWS);
+  // Uygulama içinde yazılan yorumlar profil listesinin şekline dönüştürülür
+  const written = useMemo(() => Object.entries(userReviews).flatMap(([restId, list]) =>
+    (list || []).map(v => {
+      const rest = restaurants.find(x => String(x.id) === String(restId));
+      return {
+        rid: v.stamp, restId, mine: true,
+        name: rest?.name || "Restoran",
+        img: v.photos?.[0] || rest?.imgs?.[0],
+        date: v.date, stars: v.stars, text: v.text, photos: v.photos || [],
+      };
+    })
+  ), [userReviews, restaurants]);
+  const reviews = [...written, ...sampleReviews];
   const [photo, setPhoto] = useState(null);
   const fileRef = useRef(null);
   const pickPhoto = () => fileRef.current?.click();
   const onPhoto = (e) => { const f = e.target.files?.[0]; if (f) setPhoto(URL.createObjectURL(f)); };
-  const removeReview = (rid) => setReviews(prev => prev.filter(r => r.rid !== rid));
+  const removeReview = (rid) => {
+    const mine = written.find(r => r.rid === rid);
+    if (mine) onRemoveUserReview?.(mine.restId, rid);
+    else setSampleReviews(prev => prev.filter(r => r.rid !== rid));
+  };
   const avgScore = reviews.length ? (reviews.reduce((a, r) => a + r.stars, 0) / reviews.length).toFixed(1) : "-";
 
   return (
@@ -2513,6 +2677,15 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
                     {[1,2,3,4,5].map(st => <Icon key={st} n="star" size={10} color={st <= rev.stars ? "#F59E0B" : "#E5E0D8"} />)}
                   </div>
                   <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#57534E", margin: 0, lineHeight: 1.45 }}>{rev.text}</p>
+                  {rev.photos?.length > 0 && (
+                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                      {rev.photos.map((src, pi) => (
+                        <div key={pi} style={{ width: 46, height: 46, borderRadius: 10, overflow: "hidden", flexShrink: 0, border: "1px solid rgba(0,0,0,0.06)" }}>
+                          <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div style={{ alignSelf: "flex-start" }}>
                   <IconBtn onClick={() => removeReview(rev.rid)} tone="plain" size={28} title="Yorumu sil" icon={<Icon n="trash" size={14} color="#C4B5A3" />} />
@@ -2645,6 +2818,14 @@ export default function GurApp(props = {}) {
   // GUR Match oturumu
   const [matchCode, setMatchCode] = useState("");
   const [matchResults, setMatchResults] = useState([]);
+  // Kullanıcının yazdığı yorumlar restoran id'sine göre — hem restoran
+  // detayında hem profildeki "Yorumlarım" listesinde aynı kaynaktan okunur
+  const [userReviews, setUserReviews] = useState({});
+
+  const addReview = (restaurantId, review) =>
+    setUserReviews(prev => ({ ...prev, [restaurantId]: [review, ...(prev[restaurantId] || [])] }));
+  const removeUserReview = (restaurantId, stamp) =>
+    setUserReviews(prev => ({ ...prev, [restaurantId]: (prev[restaurantId] || []).filter(v => v.stamp !== stamp) }));
 
   const ownerRestaurant = useMemo(() => findOwnerRestaurant(restaurants), [restaurants]);
   // Tüketici tarafındaki her ekran bu türetilmiş listeden beslenir
@@ -2700,9 +2881,9 @@ export default function GurApp(props = {}) {
       case "match-swipe": return <MatchSwipeScreen code={matchCode} restaurants={feed} onExit={goExplore} onFinish={finishMatch} />;
       case "match-result": return <MatchResultScreen code={matchCode} matches={matchResults} onDetail={openDetail} onRestart={goMatch} onExplore={goExplore} />;
       case "swipe": return <SwipeScreen onDetail={openDetail} onExplore={goExplore} onFavorites={goFav} favorites={favorites} setFavorites={setFavorites} filterCat={filterCat} restaurants={feed} dataSource={dataSource} />;
-      case "detail": return <DetailScreen r={liveSelected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} />;
+      case "detail": return <DetailScreen r={liveSelected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} userReviews={userReviews[liveSelected?.id] || []} onAddReview={addReview} />;
       case "fav": return <FavScreen onExplore={goExplore} onSwipe={goSwipe} onDetail={openDetail} favorites={favorites} setFavorites={setFavorites} onProfile={goProfile} />;
-      case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} />;
+      case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} userReviews={userReviews} restaurants={feed} onRemoveUserReview={removeUserReview} />;
       default: return <SplashScreen onNext={() => setScreen("welcome")} />;
     }
   };
