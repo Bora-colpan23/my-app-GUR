@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // ═══════════════════════════════════════════════════════════════
@@ -80,6 +80,104 @@ const USERS = [
   { id: 4, name: 'Ahmet Yıldız', email: 'ahmet@mail.com', joined: '2024-09-02', swipes: 45, favs: 3, status: 'active' },
   { id: 5, name: 'Zeynep Ateş', email: 'zeynep@mail.com', joined: '2024-05-11', swipes: 1200, favs: 87, status: 'banned' },
 ];
+
+// ─── Restoran detayları (mock) ────────────────────────────────────────────
+// Her restoran için menü ve yorum listesi id'den deterministik üretilir:
+// veri sabit kalır, panelde gezinirken içerik zıplamaz.
+function seeded(id) {
+  let a = (id * 2654435761) >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const MENU_KINDS = [
+  { name: 'Ana Menü', pages: [8, 16] },
+  { name: 'İçecek Menüsü', pages: [2, 6] },
+  { name: 'Tatlı Menüsü', pages: [1, 4] },
+  { name: 'Kahvaltı Menüsü', pages: [2, 5] },
+  { name: 'Şarap Listesi', pages: [3, 9] },
+  { name: 'Set Menü', pages: [1, 3] },
+];
+
+const REVIEW_POOL = [
+  { stars: 5, text: 'Sunum ve lezzet beklentimin üzerindeydi. Personel ilgili, servis hızlıydı. Kesinlikle tekrar geleceğim.' },
+  { stars: 5, text: 'Uzun zamandır burayı takip ediyordum, hak ettiği övgüyü alıyor. Özellikle ana yemekler çok başarılı.' },
+  { stars: 4, text: 'Yemekler güzeldi, ambiyans hoş. Fiyatlar biraz yüksek ama porsiyonlar doyurucu.' },
+  { stars: 5, text: 'Arkadaşlarımla harika bir akşam geçirdik. Mutfak geç saate kadar açık olması büyük artı.' },
+  { stars: 3, text: 'Lezzet iyiydi ama rezervasyonumuz olmasına rağmen 25 dakika bekledik. Organizasyon geliştirilebilir.' },
+  { stars: 4, text: 'Menüdeki çeşitlilik güzel, vejetaryen seçenekler de var. Tatlıları ayrıca denemenizi öneririm.' },
+  { stars: 5, text: 'Şefin önerisini denedik, çok memnun kaldık. Fiyat-performans olarak bölgedeki en iyilerden.' },
+  { stars: 2, text: 'Yemek soğuk geldi, geri gönderdik. İkinci gelişte düzeldi ama ilk izlenim iyi olmadı.' },
+  { stars: 4, text: 'Manzara ve dekorasyon çok başarılı. Müzik sesi biraz yüksekti, sohbet etmek zorlaştı.' },
+  { stars: 5, text: 'Doğum günü için gittik, ekip ilgilendi ve sürpriz yaptı. Bu detaylar fark yaratıyor.' },
+  { stars: 3, text: 'Ortalama bir deneyimdi. Fena değil ama bu fiyata daha iyisini bulmak mümkün.' },
+  { stars: 5, text: 'Malzeme kalitesi belli oluyor. Taze ve özenli. Kahvaltı için de ayrıca gelmek istiyorum.' },
+  { stars: 4, text: 'Servis nazik, mekan temiz. Otopark sıkıntısı var, toplu taşımayla gitmek daha rahat.' },
+  { stars: 1, text: 'Rezervasyonumuz kaybolmuş, masa verilmedi. Telefonda ilgilenen olmadı. Hayal kırıklığı.' },
+];
+
+const REVIEWER_NAMES = ['Elif K.', 'Mert S.', 'Zeynep A.', 'Can B.', 'Ahmet Y.', 'Deniz Ö.', 'Selin T.', 'Burak D.', 'Ece M.', 'Kaan U.', 'Nil P.', 'Onur G.'];
+
+const MONTHS_TR = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+function formatDate(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getDate()} ${MONTHS_TR[d.getMonth()]} ${d.getFullYear()}`;
+}
+function daysAgoLabel(days) {
+  if (days === 0) return 'bugün';
+  if (days === 1) return 'dün';
+  if (days < 30) return `${days} gün önce`;
+  const m = Math.floor(days / 30);
+  return m < 12 ? `${m} ay önce` : `${Math.floor(m / 12)} yıl önce`;
+}
+// Sabit referans gün — "x gün önce" etiketleri her açılışta kaymasın
+const TODAY = new Date('2026-09-02T00:00:00Z');
+function isoDaysAgo(days) {
+  return new Date(TODAY.getTime() - days * 86400000).toISOString().slice(0, 10);
+}
+
+function restaurantMenus(r) {
+  const rand = seeded(r.id * 7 + 3);
+  const count = 2 + Math.floor(rand() * 3);           // 2-4 menü
+  const picked = [];
+  const pool = [...MENU_KINDS];
+  for (let i = 0; i < count && pool.length; i++) {
+    const k = pool.splice(Math.floor(rand() * pool.length), 1)[0];
+    const [lo, hi] = k.pages;
+    picked.push({
+      name: k.name,
+      pages: lo + Math.floor(rand() * (hi - lo + 1)),
+      uploaded: isoDaysAgo(4 + Math.floor(rand() * 300)),
+      sizeMb: (0.6 + rand() * 5.4).toFixed(1),
+    });
+  }
+  return picked.sort((a, b) => (a.uploaded < b.uploaded ? 1 : -1));
+}
+
+function restaurantReviews(r) {
+  const rand = seeded(r.id * 13 + 11);
+  const count = 5 + Math.floor(rand() * 4);           // 5-8 yorum
+  const pool = [...REVIEW_POOL];
+  const out = [];
+  for (let i = 0; i < count && pool.length; i++) {
+    const rv = pool.splice(Math.floor(rand() * pool.length), 1)[0];
+    const days = 1 + Math.floor(rand() * 120);
+    out.push({
+      user: REVIEWER_NAMES[Math.floor(rand() * REVIEWER_NAMES.length)],
+      stars: rv.stars,
+      text: rv.text,
+      days,
+      date: isoDaysAgo(days),
+      flagged: rv.stars === 1,
+    });
+  }
+  return out.sort((a, b) => a.days - b.days);
+}
 
 const CHEFS = [
   { id: 1, name: 'Şef Mehmet Gürs', endorsements: 12, specialty: 'Modern Türk' },
@@ -328,6 +426,7 @@ export default function GurAdmin() {
   const [apps, setApps] = useState(APPLICATIONS);
   const [restaurants, setRestaurants] = useState(RESTAURANTS);
   const [reviewDoc, setReviewDoc] = useState(null);
+  const [openRestaurantId, setOpenRestaurantId] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 2500); };
@@ -364,9 +463,14 @@ export default function GurAdmin() {
     { id: 'settings', label: 'Ayarlar', icon: icons.settings },
   ];
 
-  const pageTitle = nav.find(n => n.id === page)?.label || 'Genel Bakış';
+  // Açık restoran her zaman güncel kayıttan okunur; rozet/durum değişince
+  // detay ekranı da anında tazelenir.
+  const openRestaurant = openRestaurantId == null ? null : restaurants.find(r => r.id === openRestaurantId) || null;
+  const pageTitle = openRestaurant ? openRestaurant.name : (nav.find(n => n.id === page)?.label || 'Genel Bakış');
 
-  const logout = () => { setAuthed(false); setPage('dashboard'); setQuery(''); setReviewDoc(null); };
+  const goPage = (id) => { setOpenRestaurantId(null); setPage(id); };
+
+  const logout = () => { setAuthed(false); setPage('dashboard'); setQuery(''); setReviewDoc(null); setOpenRestaurantId(null); };
 
   // Giriş yapılmadan panel hiç render edilmez
   if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />;
@@ -401,7 +505,7 @@ export default function GurAdmin() {
         <nav style={{ flex: 1, padding: '12px 12px', overflowY: 'auto' }}>
           {nav.map(item => {
             const active = page === item.id;
-            return <NavItem key={item.id} item={item} active={active} onClick={() => setPage(item.id)} />;
+            return <NavItem key={item.id} item={item} active={active} onClick={() => goPage(item.id)} />;
           })}
         </nav>
 
@@ -444,7 +548,9 @@ export default function GurAdmin() {
         {/* Sayfa içeriği */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 28 }}>
           {page === 'dashboard' && <DashboardPage />}
-          {page === 'restaurants' && <RestaurantsPage restaurants={restaurants} query={query} onGastro={toggleGastro} onSuspend={toggleSuspend} />}
+          {page === 'restaurants' && (openRestaurant
+            ? <RestaurantDetailPage r={openRestaurant} onBack={() => setOpenRestaurantId(null)} onGastro={toggleGastro} onSuspend={toggleSuspend} />
+            : <RestaurantsPage restaurants={restaurants} query={query} onSuspend={toggleSuspend} onOpen={setOpenRestaurantId} />)}
           {page === 'applications' && <ApplicationsPage apps={apps} onReview={setReviewDoc} onApprove={approveApp} onReject={rejectApp} />}
           {page === 'gastro' && <GastroPage restaurants={restaurants} onGastro={toggleGastro} />}
           {page === 'users' && <UsersPage query={query} />}
@@ -635,14 +741,176 @@ function TableShell({ headers, children }) {
   );
 }
 
-function RestaurantsPage({ restaurants, query, onGastro, onSuspend }) {
+function StarRow({ n, size = 12 }) {
+  return (
+    <span style={{ fontSize: size, color: C.orange, letterSpacing: 1 }}>
+      {'★'.repeat(n)}<span style={{ color: C.border }}>{'★'.repeat(5 - n)}</span>
+    </span>
+  );
+}
+
+function MetaCell({ label, children }) {
+  return (
+    <div style={{ padding: '12px 18px' }}>
+      <div style={{ fontSize: 10.5, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>{label}</div>
+      <div style={{ fontSize: 13.5, fontWeight: 600 }}>{children}</div>
+    </div>
+  );
+}
+
+function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
+  const menus = useMemo(() => restaurantMenus(r), [r.id]);
+  const reviews = useMemo(() => restaurantReviews(r), [r.id]);
+  const planColor = { Premium: C.orange, Pro: C.blue, 'Ücretsiz': C.faint };
+
+  // Yorum dağılımı — rozet kararını verirken bakılan asıl kanıt
+  const dist = [5, 4, 3, 2, 1].map(star => ({ star, n: reviews.filter(v => v.stars === star).length }));
+  const maxN = Math.max(1, ...dist.map(d => d.n));
+  const flagged = reviews.filter(v => v.flagged).length;
+
+  return (
+    <div style={{ animation: 'fadeIn 0.2s' }}>
+      {/* Başlık */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+        <Btn label="Restoranlar" onClick={onBack} variant="ghost" size="sm"
+          icon={<Icon path="M15 18l-6-6 6-6" size={14} color={C.dim} />} />
+        <div style={{ width: 40, height: 40, borderRadius: 11, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, color: C.orange, flexShrink: 0 }}>{r.name[0]}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{r.name}</h2>
+            {r.gastro && <Badge text="★ Gastro Onaylı" color={C.orange} soft={C.orangeSoft} />}
+          </div>
+          <div style={{ fontSize: 12.5, color: C.dim, marginTop: 2 }}>{r.cat} • {r.district}</div>
+        </div>
+        <Btn
+          label={r.status === 'active' ? 'Askıya Al' : 'Aktifleştir'} onClick={() => onSuspend(r.id)}
+          variant="outline" tone={r.status === 'active' ? 'yellow' : 'green'} size="sm"
+        />
+      </div>
+
+      {/* Özet şeridi — listedeki bölge/puan/plan/durum bilgileri burada da görünür */}
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', marginBottom: 16, overflow: 'hidden' }}>
+        <MetaCell label="Bölge">{r.district}</MetaCell>
+        <MetaCell label="Puan"><span style={{ color: C.orange }}>★</span> {r.rating} <span style={{ color: C.faint, fontWeight: 500, fontSize: 12 }}>({r.reviews.toLocaleString('tr')})</span></MetaCell>
+        <MetaCell label="Plan"><span style={{ color: planColor[r.plan] }}>{r.plan}</span></MetaCell>
+        <MetaCell label="Durum"><StatusBadge status={r.status} /></MetaCell>
+        <MetaCell label="Katılım">{formatDate(r.joined)}</MetaCell>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: 16, alignItems: 'start' }}>
+
+        {/* ─── MENÜLER ─── */}
+        <section style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+          <header style={{ padding: '13px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Menüler</span>
+            <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{menus.length}</span>
+          </header>
+          <div>
+            {menus.map((m, i) => (
+              <div key={m.name} style={{ padding: '12px 16px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: C.orangeSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon path={icons.doc} size={15} color={C.orange} />
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>{m.name}</div>
+                  <div style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
+                    {m.pages} sayfa • {m.sizeMb} MB
+                  </div>
+                  <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
+                    Yüklendi: {formatDate(m.uploaded)}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {menus.length === 0 && (
+              <div style={{ padding: '22px 16px', fontSize: 12.5, color: C.faint, textAlign: 'center' }}>Henüz menü yüklenmemiş</div>
+            )}
+          </div>
+        </section>
+
+        {/* ─── YORUMLAR (rozet ataması bu bölümün başında) ─── */}
+        <section style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+          <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Yorumlar</span>
+            <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
+              son {reviews.length} yorum{flagged > 0 && <span style={{ color: C.red }}> • {flagged} şikayetli</span>}
+            </span>
+          </header>
+
+          {/* Rozet ataması — kanıtın hemen üstünde, kararın verildiği yer */}
+          <div style={{
+            margin: 16, padding: '14px 16px', borderRadius: 12,
+            background: r.gastro ? C.orangeSoft : C.panel2,
+            border: `1px solid ${r.gastro ? C.orange + '55' : C.border}`,
+            display: 'flex', alignItems: 'center', gap: 14,
+          }}>
+            <div style={{ width: 38, height: 38, borderRadius: 11, background: r.gastro ? C.orange : C.bg, border: `1px solid ${r.gastro ? C.orange : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon path={icons.star} size={17} color={r.gastro ? '#fff' : C.faint} fill={r.gastro ? '#fff' : 'none'} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: r.gastro ? C.orange : C.text }}>
+                {r.gastro ? 'Gastro Onaylı' : 'Gastro Onayı yok'}
+              </div>
+              <div style={{ fontSize: 11.5, color: C.dim, marginTop: 2 }}>
+                {r.gastro
+                  ? 'Rozet aktif — keşif akışında öncelikli yerleşim alıyor.'
+                  : 'Aşağıdaki yorumları değerlendirip rozeti verebilirsiniz.'}
+              </div>
+            </div>
+            <Btn
+              label={r.gastro ? 'Rozeti Kaldır' : 'Rozet Ver'}
+              onClick={() => onGastro(r.id)}
+              variant={r.gastro ? 'outline' : 'filled'}
+              tone={r.gastro ? 'red' : 'orange'}
+              size="md"
+              icon={<Icon path={r.gastro ? icons.x : icons.star} size={14} color={r.gastro ? C.red : '#fff'} fill={r.gastro ? 'none' : '#fff'} />}
+            />
+          </div>
+
+          {/* Puan dağılımı */}
+          <div style={{ padding: '0 18px 16px', display: 'grid', gap: 5 }}>
+            {dist.map(d => (
+              <div key={d.star} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 11.5, color: C.faint, width: 26, fontVariantNumeric: 'tabular-nums' }}>{d.star}★</span>
+                <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
+                  <div style={{ width: `${(d.n / maxN) * 100}%`, height: '100%', borderRadius: 3, background: d.star >= 4 ? C.green : d.star === 3 ? C.yellow : C.red }} />
+                </div>
+                <span style={{ fontSize: 11.5, color: C.faint, width: 18, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{d.n}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Yorum listesi */}
+          <div style={{ borderTop: `1px solid ${C.border}` }}>
+            {reviews.map((v, i) => (
+              <article key={i} style={{ padding: '14px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', background: v.flagged ? C.redSoft : 'transparent' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{v.user}</span>
+                  <StarRow n={v.stars} />
+                  <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
+                    {daysAgoLabel(v.days)} • {formatDate(v.date)}
+                  </span>
+                  {v.flagged && <Badge text="Şikayet edildi" color={C.red} soft={C.redSoft} />}
+                </div>
+                <p style={{ margin: 0, fontSize: 13, color: C.dim, lineHeight: 1.55, maxWidth: '68ch' }}>{v.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function RestaurantsPage({ restaurants, query, onSuspend, onOpen }) {
   const filtered = restaurants.filter(r => r.name.toLowerCase().includes(query.toLowerCase()) || r.cat.toLowerCase().includes(query.toLowerCase()));
   const planColor = { Premium: C.orange, Pro: C.blue, 'Ücretsiz': C.faint };
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
       <TableShell headers={['Restoran', 'Kategori', 'Bölge', 'Puan', 'Plan', 'Durum', { label: 'İşlemler', right: true }]}>
         {filtered.map(r => (
-          <tr key={r.id} className="row-hover" style={{ borderBottom: `1px solid ${C.border}`, transition: 'background 0.1s' }}>
+          <tr key={r.id} className="row-hover" onClick={() => onOpen(r.id)} title={`${r.name} detayını aç`}
+            style={{ borderBottom: `1px solid ${C.border}`, transition: 'background 0.1s', cursor: 'pointer' }}>
             <td style={{ padding: '14px 18px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: C.orange }}>{r.name[0]}</div>
@@ -660,17 +928,18 @@ function RestaurantsPage({ restaurants, query, onGastro, onSuspend }) {
             <td style={{ padding: '14px 18px', fontSize: 13, fontWeight: 600 }}>★ {r.rating}</td>
             <td style={{ padding: '14px 18px' }}><span style={{ fontSize: 12, fontWeight: 600, color: planColor[r.plan] }}>{r.plan}</span></td>
             <td style={{ padding: '14px 18px' }}><StatusBadge status={r.status} /></td>
-            <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-              <div style={{ display: 'inline-flex', gap: 6 }}>
-                <Btn
-                  label="Gastro" onClick={() => onGastro(r.id)} title={r.gastro ? 'Gastro onayını kaldır' : 'Gastro Onaylı yap'}
-                  variant={r.gastro ? 'soft' : 'ghost'} tone={r.gastro ? 'orange' : 'neutral'} size="sm"
-                  icon={<Icon path={icons.star} size={13} color={r.gastro ? C.orange : C.dim} fill={r.gastro ? C.orange : 'none'} />}
-                />
+            <td style={{ padding: '14px 18px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                 <Btn
                   label={r.status === 'active' ? 'Askıya Al' : 'Aktifleştir'} onClick={() => onSuspend(r.id)}
                   title={r.status === 'active' ? 'Askıya al' : 'Aktifleştir'}
                   variant="ghost" tone={r.status === 'active' ? 'yellow' : 'green'} size="sm"
+                />
+                {/* Rozet ataması restoran detayında, yorumların olduğu bölümde */}
+                <Btn
+                  label="Detay" onClick={() => onOpen(r.id)} title="Menüler, yorumlar ve rozet ataması"
+                  variant="outline" size="sm"
+                  icon={<Icon path={icons.eye} size={13} color={C.dim} />}
                 />
               </div>
             </td>
