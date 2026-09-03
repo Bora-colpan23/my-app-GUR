@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { animate } from 'motion';
+import { useFeature } from '../lib/phase.js';
 
 // Apple "Designing Fluid Interfaces" momentum projection: nereye bırakılacağını
 // bırakma anındaki konum değil, hızın taşıdığı yönü kullanarak tahmin eder.
@@ -150,6 +151,87 @@ const CATEGORIES = [
   { name:"Deniz Ürünleri", img:I.seafood1 }, { name:"Hint", img:I.curry1 },
   { name:"Fine Dining", img:I.interior2 },
 ];
+
+// ═══════════════════════════════════════════════
+// GELİR: SPONSORLU İÇERİK (Faz 1)
+// ═══════════════════════════════════════════════
+// Swipe akışına doğal biçimde giren reklam kartları. Restoran kartıyla
+// aynı fizikte hareket eder ama görsel olarak ayrışır ve her zaman
+// "Sponsorlu" etiketi taşır — kullanıcı neyin reklam olduğunu bilir.
+const SPONSORED = [
+  {
+    id: "sp-1", kind: "sponsored", format: "Sponsorlu Tarif",
+    brand: "Öz Değirmen", tagline: "Taş değirmen tam buğday unu",
+    title: "15 dakikada ev yapımı pide",
+    desc: "Şefin tarifiyle, tam buğday unuyla. Malzeme listesi ve adımlar uygulamada.",
+    cta: "Tarifi Gör",
+    imgs: ["https://picsum.photos/seed/gur-sp-bread/600/900"],
+    accent: "#C2410C",
+  },
+  {
+    id: "sp-2", kind: "sponsored", format: "Şefin Seçimi",
+    brand: "Kalamış Zeytinyağı", tagline: "Erken hasat, soğuk sıkım",
+    title: "Şef Mehmet Gürs'ün mutfağındaki yağ",
+    desc: "Salatadan son dokunuşa; düşük asit oranıyla ısıya dayanıklı.",
+    cta: "Ürünü İncele",
+    imgs: ["https://picsum.photos/seed/gur-sp-oil/600/900"],
+    accent: "#4D7C0F",
+  },
+  {
+    id: "sp-3", kind: "sponsored", format: "Sponsorlu Tarif",
+    brand: "Bereket Baharat", tagline: "Tek kaynaktan öğütülmüş",
+    title: "Ev usulü mangal marinasyonu",
+    desc: "Dört baharat, iki saat bekleme. Hafta sonu mangalını kurtaran karışım.",
+    cta: "Tarifi Gör",
+    imgs: ["https://picsum.photos/seed/gur-sp-spice/600/900"],
+    accent: "#B45309",
+  },
+];
+
+// Keşfet ekranındaki banner reklam envanteri (Faz 1 — mevcut yapı)
+const BANNER_ADS = [
+  { id: "ad-1", brand: "Öz Değirmen", text: "Tam buğday ununda %20 indirim", cta: "Kampanyayı gör", img: "https://picsum.photos/seed/gur-ad-flour/300/300", accent: "#C2410C" },
+  { id: "ad-2", brand: "Kalamış Zeytinyağı", text: "Erken hasat sezonu başladı", cta: "Ürünlere bak", img: "https://picsum.photos/seed/gur-ad-oil/300/300", accent: "#4D7C0F" },
+];
+
+// ═══════════════════════════════════════════════
+// GELİR: ANLIK FIRSATLAR (Faz 2)
+// ═══════════════════════════════════════════════
+// Restoran ölü saatini doldurmak için süreli indirim yayınlar; platform
+// bunu konum bazlı bildirim reklamı olarak satar. Bitiş saati sabit bir
+// referanstan türetilir ki geri sayım demo boyunca tutarlı kalsın.
+const DEALS = [
+  { restaurantId: 9, pct: 20, note: "15:00-17:00 arası tüm ana yemeklerde", minutesLeft: 96 },
+  { restaurantId: 3, pct: 25, note: "Öğle menüsünde, sınırlı sayıda", minutesLeft: 42 },
+  { restaurantId: 6, pct: 15, note: "Brunch saatleri dışında", minutesLeft: 158 },
+];
+function dealFor(restaurantId) {
+  return DEALS.find(d => d.restaurantId === restaurantId) || null;
+}
+function formatCountdown(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h} sa ${m} dk` : `${m} dk`;
+}
+
+// Restoran destesine her N kartta bir sponsorlu kart serpiştirilir.
+// Reklam yoğunluğu tek yerden ayarlanır; deste kısa olduğunda araya
+// hiç girmez ki keşif akışı reklamla boğulmasın.
+const AD_EVERY = 4;
+const AD_MIN_DECK = 3;   // bunun altındaki destede hiç reklam gösterme
+function injectSponsored(cards, enabled) {
+  if (!enabled || cards.length < AD_MIN_DECK) return cards;
+  const out = [];
+  let ad = 0;
+  cards.forEach((c, i) => {
+    out.push(c);
+    if ((i + 1) % AD_EVERY === 0 && ad < SPONSORED.length) out.push(SPONSORED[ad++]);
+  });
+  // Kategori filtresi destede 4'ten az kart bırakabiliyor; envanterin
+  // tamamen kaybolmaması için sona tek bir kart eklenir.
+  if (ad === 0) out.push(SPONSORED[0]);
+  return out;
+}
 
 // ═══════════════════════════════════════════════
 // SHARED UI — Polished
@@ -340,6 +422,47 @@ function Screen({ children, grad = true }) {
 // ═══════════════════════════════════════════════
 // SWIPE CARD — Eski Tinder stili, tam ekran fotoğraf
 // ═══════════════════════════════════════════════
+// Sponsorlu kartın iç yüzeyi. Sürükleme fiziği SwipeCard'da olduğu gibi
+// kalır; burada yalnızca içerik değişir, böylece reklam da uygulamanın
+// geri kalanıyla aynı his verir.
+function SponsoredFace({ r, isTop }) {
+  return (
+    <>
+      <div style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg, ${r.accent}, #1a1008)` }} />
+      <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0, opacity: 0.42 }} bg="transparent" />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.15) 100%)" }} />
+
+      {/* Destedeki arka kart yalnızca zemini gösterir — restoran kartıyla
+          aynı davranış; içerik sadece öndeki kartta okunur. */}
+      {!isTop ? null : <>
+      {/* Reklam etiketi — kart öndeyken her zaman görünür, gizlenmez */}
+      <div style={{ position: "absolute", top: 40, left: 14, right: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, zIndex: 6 }}>
+        <span style={{ background: "rgba(255,255,255,0.16)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 20, padding: "4px 11px", fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 800, color: "#fff", letterSpacing: 0.6 }}>SPONSORLU</span>
+        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{r.format}</span>
+      </div>
+
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(255,255,255,0.2)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon n="sparkle" size={13} color="#fff" />
+          </div>
+          <div>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 800, color: "#fff" }}>{r.brand}</div>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "rgba(255,255,255,0.65)" }}>{r.tagline}</div>
+          </div>
+        </div>
+        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, color: "#fff", margin: "0 0 8px", lineHeight: 1.25, textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{r.title}</h3>
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "rgba(255,255,255,0.85)", margin: "0 0 14px", lineHeight: 1.45 }}>{r.desc}</p>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#fff", borderRadius: 999, padding: "9px 18px" }}>
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: r.accent }}>{r.cta}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={r.accent} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
+        </div>
+      </div>
+      </>}
+    </>
+  );
+}
+
 const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTop, onTap }, flingRef) {
   const ref = useRef(null);
   const movedRef = useRef(false);
@@ -380,7 +503,9 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTo
     }
   };
 
+  const sponsored = r.kind === "sponsored";
   const tap = (e) => { if (movedRef.current) return; const rect = ref.current?.getBoundingClientRect(); if (!rect) return; const tx = e.clientX - rect.left;
+    if (sponsored) { onTap?.(); return; }   // reklam kartında foto gezinme yok
     if (tx > rect.width * 0.6) setIi(i => Math.min(i + 1, r.imgs.length - 1));
     else if (tx < rect.width * 0.4) setIi(i => Math.max(i - 1, 0));
     else onTap?.();
@@ -406,8 +531,23 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTo
       animate={{ scale: isTop ? 1 : 0.96, y: isTop ? 0 : 10 }}
       transition={{ type: "spring", bounce: 0, duration: 0.35 }}
     >
-      <Img src={r.imgs[ii]} style={{ position: "absolute", inset: 0, borderRadius: 24 }} bg="linear-gradient(135deg, #1a1008, #2a1a0a, #1a1008)" />
-      {isTop && <>
+      {sponsored
+        ? <SponsoredFace r={r} isTop={isTop} />
+        : <Img src={r.imgs[ii]} style={{ position: "absolute", inset: 0, borderRadius: 24 }} bg="linear-gradient(135deg, #1a1008, #2a1a0a, #1a1008)" />}
+      {/* Sürükleme etiketleri her kart türünde görünür — reklam kartında da
+          kullanıcı ne yaptığını anlamalı (§1 — sürekli geri bildirim) */}
+      {isTop && (
+        <>
+          <motion.div style={{ opacity: favOpacity, position: "absolute", top: 90, left: 24, zIndex: 10, border: `4px solid ${sponsored ? "#FFB020" : "#4CAF50"}`, borderRadius: 14, padding: "8px 22px", transform: "rotate(-15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: sponsored ? "#FFB020" : "#4CAF50" }}>{sponsored ? "İLGİMİ ÇEKTİ" : "FAV!"}</span>
+          </motion.div>
+          <motion.div style={{ opacity: nopeOpacity, position: "absolute", top: 90, right: 24, zIndex: 10, border: "4px solid #FF3B30", borderRadius: 14, padding: "8px 22px", transform: "rotate(15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#FF3B30" }}>{sponsored ? "GEÇ" : "NOPE"}</span>
+          </motion.div>
+        </>
+      )}
+
+      {isTop && !sponsored && <>
       {/* İşletmenin kendi yüklediği fotoğraflar öne alınır ve işaretlenir */}
       {ii < (r.ownerPhotoCount || 0) && (
         <div style={{ position: "absolute", top: 54, left: 14, zIndex: 6, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 20, padding: "4px 11px" }}>
@@ -420,9 +560,6 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTo
         {r.imgs.map((_, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === ii ? "#fff" : "rgba(255,255,255,0.3)", transition: "background 0.2s" }} />)}
       </div>
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 30%, transparent 55%)", borderRadius: 24 }} />
-      {/* Swipe labels — sürükleme mesafesiyle orantılı belirir (§1 — sürekli geri bildirim) */}
-      <motion.div style={{ opacity: favOpacity, position: "absolute", top: 90, left: 24, zIndex: 10, border: "4px solid #4CAF50", borderRadius: 14, padding: "8px 22px", transform: "rotate(-15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}><span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#4CAF50" }}>FAV!</span></motion.div>
-      <motion.div style={{ opacity: nopeOpacity, position: "absolute", top: 90, right: 24, zIndex: 10, border: "4px solid #FF3B30", borderRadius: 14, padding: "8px 22px", transform: "rotate(15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}><span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#FF3B30" }}>NOPE</span></motion.div>
       {/* Content */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
         <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{r.name}</h3>
@@ -996,8 +1133,83 @@ function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
 // ═══════════════════════════════════════════════
 // RESTORAN PANELİ — İstatistikler (sadece restoranlar görür)
 // ═══════════════════════════════════════════════
+// ── Doyurucu paneli: gelir ürünü kartları ────────────────────────────────
+function DarkChip({ label, active, onClick }) {
+  return (
+    <motion.button
+      onClick={onClick} className="gur-btn"
+      whileTap={{ scale: 0.95 }} transition={{ type: "spring", bounce: 0, duration: 0.25 }}
+      style={{
+        border: `1.5px solid ${active ? "#22C55E" : "rgba(255,255,255,0.14)"}`,
+        background: active ? "rgba(34,197,94,0.14)" : "transparent",
+        color: active ? "#4ADE80" : "rgba(255,255,255,0.6)",
+        borderRadius: 11, padding: "7px 13px", cursor: "pointer", outline: "none",
+        fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700,
+      }}>{label}</motion.button>
+  );
+}
+
+function GrowthSection({ title, phase, locked, children }) {
+  return (
+    <div style={{ marginBottom: 22, opacity: locked ? 0.55 : 1 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", margin: 0, textTransform: "uppercase", letterSpacing: 0.6 }}>{title}</p>
+        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 700, color: "#FF6600", background: "rgba(255,102,0,0.12)", borderRadius: 6, padding: "2px 7px" }}>{phase}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function LockedCard({ text }) {
+  return (
+    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 18, padding: "18px", marginBottom: 12, display: "flex", alignItems: "center", gap: 11 }}>
+      <Icon n="shield" size={16} color="rgba(255,255,255,0.3)" />
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.4)", margin: 0 }}>{text}</p>
+    </div>
+  );
+}
+
+function GrowthCard({ title, price, desc, active, locked, onBuy }) {
+  return (
+    <div style={{
+      background: active ? "rgba(255,102,0,0.07)" : "rgba(255,255,255,0.04)",
+      border: `1px solid ${active ? "rgba(255,102,0,0.28)" : "rgba(255,255,255,0.06)"}`,
+      borderRadius: 18, padding: "16px 18px", marginBottom: 12, opacity: locked ? 0.5 : 1,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0 }}>{title}</p>
+        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FF9A4D", flexShrink: 0 }}>{price}</span>
+      </div>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>{desc}</p>
+      {locked ? (
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.35)", margin: 0 }}>Bu paket sonraki fazda açılıyor</p>
+      ) : active ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Icon n="check" size={14} color="#4ADE80" />
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700, color: "#4ADE80" }}>Aktif</span>
+        </div>
+      ) : (
+        <Btn text="Satın Al" onClick={onBuy} variant="filled" size="sm" fullWidth={false} />
+      )}
+    </div>
+  );
+}
+
 function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaurant }) {
   const [activeTab, setActiveTab] = useState("stats");
+  // Gelir ürünleri faza göre açılır (bkz. src/lib/phase.js)
+  const sponsorOn = useFeature("pushAds");
+  const dealsOn = useFeature("instantDeals");
+  const bookingOn = useFeature("reservations");
+  const licenseOn = useFeature("contentLicense");
+  const saasOn = useFeature("analyticsSaas");
+  const [bought, setBought] = useState({});
+  const [notice, setNotice] = useState(null);
+  const buy = (key, label) => { setBought(p => ({ ...p, [key]: true })); setNotice(label); setTimeout(() => setNotice(null), 2200); };
+  const [dealPct, setDealPct] = useState(20);
+  const [dealHours, setDealHours] = useState(2);
+  const [dealLive, setDealLive] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
   // Yüklemeler uygulama kökünde tutulur — panelden çıkınca kaybolmaz ve
   // tüketici tarafındaki swipe/detay ekranlarına anında yansır.
@@ -1094,6 +1306,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
               { id: "reviews", label: "Yorumlar" },
               { id: "menu", label: "Menü" },
               { id: "photos", label: "Fotoğraflar" },
+              { id: "growth", label: "Büyüme" },
             ].map(tab => (
               <div key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
                 flex: 1, padding: "13px 8px", textAlign: "center", cursor: "pointer",
@@ -1284,6 +1497,105 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
             </div>
           )}
 
+          {/* ─── TAB: Büyüme (gelir ürünleri) ─── */}
+          {activeTab === "growth" && (
+            <div>
+              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>
+                  Görünürlüğünüzü artıran ve doğrudan gelir getiren paketler. Platform bunların bir kısmında işlem başına komisyon alır.
+                </p>
+              </div>
+
+              {/* Faz 1 — reklam / sponsorluk */}
+              <GrowthSection title="Reklam ve Sponsorluk" phase="Faz 1">
+                <GrowthCard
+                  title="Öne Çıkan Kart" price="₺2.400 / hafta" active={bought.featured}
+                  desc="Keşif akışında kartınız desteye üstte girer ve haftada ~4.000 ek gösterim alır."
+                  onBuy={() => buy("featured", "Öne Çıkan Kart paketi etkinleştirildi")}
+                />
+                <GrowthCard
+                  title="Push Bildirim Reklamı" price="₺1.800 / gönderim" active={bought.push} locked={!sponsorOn}
+                  desc="Semtinizdeki kullanıcılara tek seferlik bildirim. Gönderim saatini siz seçersiniz."
+                  onBuy={() => buy("push", "Push bildirim gönderimi planlandı")}
+                />
+              </GrowthSection>
+
+              {/* Faz 2 — performans ve işlem */}
+              <GrowthSection title="Anlık Fırsat ve Rezervasyon" phase="Faz 2" locked={!dealsOn && !bookingOn}>
+                {dealsOn ? (
+                  <div style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)", borderRadius: 18, padding: "16px 18px", marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0 }}>Anlık İndirim Yayınla</p>
+                      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#4ADE80" }}>₺450 / yayın</span>
+                    </div>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
+                      Ölü saatlerinizi doldurun: yakındaki kullanıcılara süreli indirim bildirimi gider.
+                    </p>
+
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.5)", margin: "0 0 7px" }}>İndirim oranı</p>
+                    <div style={{ display: "flex", gap: 7, marginBottom: 14, flexWrap: "wrap" }}>
+                      {[10, 15, 20, 25, 30].map(v => (
+                        <DarkChip key={v} label={`%${v}`} active={dealPct === v} onClick={() => setDealPct(v)} />
+                      ))}
+                    </div>
+
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.5)", margin: "0 0 7px" }}>Süre</p>
+                    <div style={{ display: "flex", gap: 7, marginBottom: 16, flexWrap: "wrap" }}>
+                      {[1, 2, 3, 4].map(v => (
+                        <DarkChip key={v} label={`${v} saat`} active={dealHours === v} onClick={() => setDealHours(v)} />
+                      ))}
+                    </div>
+
+                    {dealLive ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(34,197,94,0.12)", borderRadius: 14, padding: "11px 14px" }}>
+                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22C55E", animation: "pulse 1.6s ease-in-out infinite", flexShrink: 0 }} />
+                        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#4ADE80", margin: 0, flex: 1 }}>
+                          %{dealPct} indirim {dealHours} saat boyunca yayında
+                        </p>
+                        <Btn text="Durdur" onClick={() => setDealLive(false)} variant="destructiveSoft" size="sm" fullWidth={false} />
+                      </div>
+                    ) : (
+                      <Btn text={`%${dealPct} indirimi ${dealHours} saat yayınla`} onClick={() => { setDealLive(true); setNotice("Fırsat yayında — yakındaki kullanıcılara bildirim gitti"); setTimeout(() => setNotice(null), 2200); }} variant="filled" />
+                    )}
+                  </div>
+                ) : (
+                  <LockedCard text="Kullanıcı kitlesi hedefe ulaşınca açılır." />
+                )}
+
+                {bookingOn ? (
+                  <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: "16px 18px" }}>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Rezervasyon ve Tadım Menüsü</p>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
+                      Kullanıcı uygulamadan masa ayırtır veya tadım menüsü satın alır. Komisyon yalnızca gerçekleşen işlemden alınır.
+                    </p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                      {[["Bu ay", "38"], ["Ciro", "₺52.400"], ["Komisyon", "₺4.192"]].map(([k, v]) => (
+                        <div key={k} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "11px 12px" }}>
+                          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 3px" }}>{k}</p>
+                          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "#fff", margin: 0 }}>{v}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </GrowthSection>
+
+              {/* Faz 3 — B2B */}
+              <GrowthSection title="İçerik Lisansı ve Analiz" phase="Faz 3" locked={!licenseOn && !saasOn}>
+                <GrowthCard
+                  title="Gastro Video Lisansı" price="₺6.500 / video" active={bought.license} locked={!licenseOn}
+                  desc="Şefin çektiği 15 sn dikey videoyu kendi sosyal medya hesaplarınızda süresiz kullanma hakkı."
+                  onBuy={() => buy("license", "Video lisansı satın alındı")}
+                />
+                <GrowthCard
+                  title="Analiz Paneli" price="₺2.900 / ay" active={bought.saas} locked={!saasOn}
+                  desc="Tıklama, kaydetme ve konum bazlı ilgi verisi; rakip semt kıyaslaması ve haftalık rapor."
+                  onBuy={() => buy("saas", "Analiz Paneli aboneliği başlatıldı")}
+                />
+              </GrowthSection>
+            </div>
+          )}
+
           {/* ─── TAB: Fotoğraf Yönetimi ─── */}
           {activeTab === "photos" && (
             <div>
@@ -1341,6 +1653,23 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
         </div>
       </div>
 
+      {/* Büyüme sekmesi bildirimi */}
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
+            style={{
+              position: "absolute", left: 16, right: 16, bottom: 22, zIndex: 200,
+              background: "#22C55E", borderRadius: 16, padding: "12px 16px",
+              display: "flex", alignItems: "center", gap: 9, boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
+            }}>
+            <Icon n="check" size={15} color="#fff" />
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700, color: "#fff" }}>{notice}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Çıkış onay modalı — perde soluklaşarak, kart "materialize" olarak (opaklık+ölçek birlikte) belirir */}
       <AnimatePresence>
         {showLogout && (
@@ -1393,7 +1722,15 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 // ═══════════════════════════════════════════════
 // KEŞFET SAYFASI — 4 rastgele kategori + tüm kategoriler sayfası
 // ═══════════════════════════════════════════════
-function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch }) {
+function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, restaurants = [], onDetail }) {
+  const adsOn = useFeature("bannerAds");
+  const dealsOn = useFeature("instantDeals");
+  const [adIdx] = useState(() => Math.floor(Math.random() * BANNER_ADS.length));
+  const ad = BANNER_ADS[adIdx];
+  // Yalnızca destede gerçekten bulunan restoranların fırsatları gösterilir
+  const liveDeals = dealsOn
+    ? DEALS.map(d => ({ ...d, r: restaurants.find(x => x.id === d.restaurantId) })).filter(d => d.r)
+    : [];
   const [showAll, setShowAll] = useState(false);
   const [randomCats] = useState(() => {
     const shuffled = [...CATEGORIES].sort(() => Math.random() - 0.5);
@@ -1461,6 +1798,54 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           <Icon n="search" size={16} color="#9A938B" />
           <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#9A938B" }}>Restoran veya mutfak ara...</span>
         </div>
+
+        {/* Anlık fırsatlar — Faz 2 (konum bazlı süreli indirim) */}
+        {liveDeals.length > 0 && (
+          <div style={{ marginBottom: 16, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 800, color: "#2D2419", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22C55E", animation: "pulse 1.6s ease-in-out infinite" }} />
+                Şu an yakınında
+              </p>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(45,36,25,0.45)" }}>{liveDeals.length} fırsat</span>
+            </div>
+            <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 2 }}>
+              {liveDeals.map(d => (
+                <motion.div
+                  key={d.restaurantId} onClick={() => onDetail?.(d.r)}
+                  whileTap={{ scale: 0.97 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                  style={{ flexShrink: 0, width: 178, borderRadius: 18, overflow: "hidden", position: "relative", height: 96, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.1)" }}>
+                  <Img src={d.r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.88), rgba(0,0,0,0.15))" }} />
+                  <div style={{ position: "absolute", top: 8, left: 8, background: "#22C55E", borderRadius: 8, padding: "3px 8px" }}>
+                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 800, color: "#fff" }}>%{d.pct}</span>
+                  </div>
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "8px 10px" }}>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700, color: "#fff", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.r.name}</p>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "rgba(255,255,255,0.75)", margin: 0 }}>{formatCountdown(d.minutesLeft)} kaldı</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Banner reklam — Faz 1 envanteri, her zaman etiketli */}
+        {adsOn && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: 10, borderRadius: 16, background: "#FBFAF8", border: "1px solid rgba(45,36,25,0.07)", flexShrink: 0 }}>
+            <div style={{ width: 46, height: 46, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
+              <Img src={ad.img} style={{ width: "100%", height: "100%" }} bg={ad.accent} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700, color: "#2D2419" }}>{ad.brand}</span>
+                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 8.5, fontWeight: 800, color: "rgba(45,36,25,0.4)", border: "1px solid rgba(45,36,25,0.18)", borderRadius: 4, padding: "1px 4px", letterSpacing: 0.4 }}>REKLAM</span>
+              </div>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(45,36,25,0.6)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.text}</p>
+            </div>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: ad.accent, flexShrink: 0 }}>{ad.cta} ›</span>
+          </div>
+        )}
 
         {/* GUR Match girişi */}
         <motion.div
@@ -1561,19 +1946,59 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
 // KAYDIRMA (Swipe) SAYFASI — Temiz, profesyonel
 // ═══════════════════════════════════════════════
 function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites, filterCat, restaurants = RESTAURANTS, dataSource = "demo" }) {
-  const allCards = filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants;
+  const adsOn = useFeature("sponsoredCards");
+  const secondChanceOn = useFeature("secondChance");
+
+  const baseCards = filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants;
+  // Faz 1: sponsorlu kartlar desteye serpiştirilir
+  const allCards = useMemo(() => injectSponsored(baseCards, adsOn), [baseCards, adsOn]);
+
   const [idx, setIdx] = useState(0);
   const [toast, setToast] = useState(null);
   const [done, setDone] = useState(false);
+  // Faz 2 — "İkinci Şans": geçilen restoranlar deste bitince tekrar önerilir
+  const [passed, setPassed] = useState([]);
+  const [encore, setEncore] = useState(null); // {cards, idx} | null
   const topCardRef = useRef(null);
-  useEffect(() => { setIdx(0); setDone(false); }, [filterCat, restaurants]);
-  const visible = allCards.slice(idx, idx + 2).reverse();
-  const show = (m, t) => { setToast({ m, t }); setTimeout(() => setToast(null), 1200); };
-  const next = () => { if (idx >= allCards.length - 1) setDone(true); else setIdx(i => i + 1); };
-  const right = () => { const r = allCards[idx]; if (r && !favorites.find(f => f.id === r.id)) setFavorites(p => [...p, r]); show(r?.name + " favorilere eklendi!", "fav"); next(); };
-  const left = () => { show("Geçildi", "nope"); next(); };
 
-  const progress = allCards.length > 0 ? ((idx + (done ? 1 : 0)) / allCards.length) * 100 : 0;
+  useEffect(() => { setIdx(0); setDone(false); setPassed([]); setEncore(null); }, [filterCat, restaurants, adsOn]);
+
+  const deck = encore ? encore.cards : allCards;
+  const cursor = encore ? encore.idx : idx;
+  const visible = deck.slice(cursor, cursor + 2).reverse();
+  const show = (m, t) => { setToast({ m, t }); setTimeout(() => setToast(null), 1400); };
+
+  const next = () => {
+    if (encore) {
+      if (encore.idx >= encore.cards.length - 1) { setEncore(null); setDone(true); }
+      else setEncore(e => ({ ...e, idx: e.idx + 1 }));
+      return;
+    }
+    if (idx >= allCards.length - 1) {
+      // Deste bitti: geçilenler varsa ikinci şans turu başlar
+      if (secondChanceOn && passed.length > 0) {
+        setEncore({ cards: passed, idx: 0 });
+        setPassed([]);
+        show("İkinci şans: geçtiğin yerler", "fav");
+      } else setDone(true);
+    } else setIdx(i => i + 1);
+  };
+
+  const right = () => {
+    const r = deck[cursor];
+    if (r?.kind === "sponsored") { show(`${r.brand} — ilgin iletildi`, "fav"); next(); return; }
+    if (r && !favorites.find(f => f.id === r.id)) setFavorites(p => [...p, r]);
+    show(r?.name + " favorilere eklendi!", "fav");
+    next();
+  };
+  const left = () => {
+    const r = deck[cursor];
+    if (r && r.kind !== "sponsored" && !encore) setPassed(p => (p.find(x => x.id === r.id) ? p : [...p, r]));
+    show("Geçildi", "nope");
+    next();
+  };
+
+  const progress = deck.length > 0 ? ((cursor + (done ? 1 : 0)) / deck.length) * 100 : 0;
 
   return (
     <Screen grad={false}>
@@ -1598,7 +2023,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             </div>
           )}
           {/* Progress bar */}
-          {allCards.length > 0 && !done && (
+          {deck.length > 0 && !done && (
             <div style={{ width: "60%", height: 3, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
               <div style={{ width: `${progress}%`, height: "100%", borderRadius: 2, background: "#FF6600", transition: "width 0.4s ease-out" }} />
             </div>
@@ -1607,7 +2032,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
 
         {/* Swipe alanı */}
         <div style={{ flex: 1, position: "relative", margin: "0 16px 8px", minHeight: 0 }}>
-          {allCards.length === 0 ? (
+          {deck.length === 0 ? (
             <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
 <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Icon n="search" color="rgba(255,255,255,0.4)" size={20} />
@@ -1634,12 +2059,13 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             </div>
           ) : visible.map((r, i) => {
             const top = i === visible.length - 1;
-            return <SwipeCard key={r.id} ref={top ? topCardRef : null} r={r} isTop={top} onRight={right} onLeft={left} onTap={() => onDetail(allCards[idx])} />;
+            return <SwipeCard key={`${r.id}-${cursor}`} ref={top ? topCardRef : null} r={r} isTop={top} onRight={right} onLeft={left}
+              onTap={() => { const c = deck[cursor]; if (c?.kind === "sponsored") show(`${c.brand} — ilgin iletildi`, "fav"); else onDetail(c); }} />;
           })}
         </div>
 
         {/* Aksiyon butonları — kartı sürüklemekle aynı fiziksel çıkışı tetikler */}
-        {!done && allCards.length > 0 && (
+        {!done && deck.length > 0 && (
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 18, padding: "10px 16px 16px", zIndex: 10 }}>
             <IconBtn
               onClick={() => topCardRef.current?.fling(-1)} tone="solidLight" size={56} title="Geç"
@@ -1647,7 +2073,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             />
 
             <IconBtn
-              onClick={() => onDetail(allCards[idx])} tone="solidLight" size={40} title="Detay"
+              onClick={() => { const c = deck[cursor]; if (c?.kind === "sponsored") show(`${c.brand} — ilgin iletildi`, "fav"); else onDetail(c); }} tone="solidLight" size={40} title="Detay"
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4FC3F7" strokeWidth="2.4" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>}
             />
 
@@ -1924,6 +2350,174 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
 }
 
 // ═══════════════════════════════════════════════
+// GELİR: REZERVASYON VE TADIM MENÜSÜ (Faz 2)
+// ═══════════════════════════════════════════════
+// Kullanıcı keşifle kalmıyor, doğrudan masa ayırtıyor veya uygulamaya
+// özel tadım menüsünü satın alıyor. Platform işlem başına komisyon alır;
+// komisyon oranı onay ekranında açıkça gösterilir.
+const COMMISSION_RATE = 0.08;
+const TASTING_MENUS = {
+  default: { name: "Şef Tadım Menüsü", courses: 5, price: 1450, note: "Uygulamaya özel, 5 servis" },
+};
+function tastingMenuFor(r) {
+  const base = TASTING_MENUS.default;
+  const priceHint = parseInt(String(r.price).replace(/\D/g, ""), 10) || 600;
+  return { ...base, price: Math.round((priceHint * 1.9) / 50) * 50 };
+}
+
+function Sheet({ title, subtitle, onClose, children }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      onClick={onClose}
+      style={{ position: "absolute", inset: 0, background: "rgba(20,14,8,0.55)", backdropFilter: "blur(4px)", zIndex: 320, display: "flex", alignItems: "flex-end" }}
+    >
+      <motion.div
+        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+        onClick={e => e.stopPropagation()}
+        style={{ width: "100%", maxHeight: "88%", overflowY: "auto", background: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: "20px 20px 24px" }}
+      >
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: "#E5E0DA", margin: "0 auto 16px" }} />
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+          <div style={{ minWidth: 0 }}>
+            <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, color: "#2D2419", margin: "0 0 3px" }}>{title}</h3>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</p>
+          </div>
+          <IconBtn onClick={onClose} tone="subtle" size={34} title="Kapat"
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2D2419" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+        </div>
+        {children}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function Chip({ label, active, onClick }) {
+  return (
+    <motion.button
+      onClick={onClick} className="gur-btn"
+      whileTap={{ scale: 0.95 }} transition={{ type: "spring", bounce: 0, duration: 0.25 }}
+      style={{
+        border: `1.5px solid ${active ? "#FF6600" : "rgba(45,36,25,0.14)"}`,
+        background: active ? "rgba(255,102,0,0.08)" : "#fff",
+        color: active ? "#FF6600" : "#2D2419",
+        borderRadius: 12, padding: "9px 14px", cursor: "pointer", outline: "none",
+        fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+      }}>{label}</motion.button>
+  );
+}
+
+function ReservationSheet({ r, onClose, onConfirm }) {
+  const [people, setPeople] = useState(2);
+  const [day, setDay] = useState("Bugün");
+  const [time, setTime] = useState(null);
+  const times = ["18:30", "19:00", "19:30", "20:00", "20:30", "21:00"];
+  const deal = dealFor(r.id);
+
+  return (
+    <Sheet title="Masa ayırt" subtitle={r.name} onClose={onClose}>
+      <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Kişi sayısı</label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+        {[1, 2, 3, 4, 5, 6].map(n => <Chip key={n} label={n === 6 ? "6+" : String(n)} active={people === n} onClick={() => setPeople(n)} />)}
+      </div>
+
+      <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Gün</label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        {["Bugün", "Yarın", "Cumartesi"].map(d => <Chip key={d} label={d} active={day === d} onClick={() => setDay(d)} />)}
+      </div>
+
+      <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Saat</label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {times.map(t => <Chip key={t} label={t} active={time === t} onClick={() => setTime(t)} />)}
+      </div>
+
+      {deal && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 14, padding: "11px 14px", marginBottom: 18 }}>
+          <span style={{ background: "#22C55E", borderRadius: 8, padding: "3px 8px", fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 800, color: "#fff" }}>%{deal.pct}</span>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#166534", margin: 0, lineHeight: 1.4 }}>
+            Anlık fırsat bu rezervasyona uygulanır — {formatCountdown(deal.minutesLeft)} kaldı
+          </p>
+        </div>
+      )}
+
+      <Btn text={time ? `${day} ${time} • ${people} kişi — Onayla` : "Saat seçin"} onClick={() => time && onConfirm({ day, time, people, deal })} variant="filled" disabled={!time} />
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(45,36,25,0.4)", textAlign: "center", margin: "12px 0 0", lineHeight: 1.5 }}>
+        Rezervasyon ücretsizdir. Restoran, gerçekleşen rezervasyon başına platforma komisyon öder.
+      </p>
+    </Sheet>
+  );
+}
+
+function TastingSheet({ r, onClose, onConfirm }) {
+  const menu = tastingMenuFor(r);
+  const [people, setPeople] = useState(2);
+  const deal = dealFor(r.id);
+  const gross = menu.price * people;
+  const discount = deal ? Math.round(gross * deal.pct / 100) : 0;
+  const total = gross - discount;
+  const commission = Math.round(total * COMMISSION_RATE);
+
+  const row = (label, value, strong, color) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "7px 0" }}>
+      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: strong ? 14 : 13, fontWeight: strong ? 800 : 500, color: color || (strong ? "#2D2419" : "rgba(45,36,25,0.6)") }}>{label}</span>
+      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: strong ? 16 : 13, fontWeight: strong ? 800 : 600, color: color || "#2D2419", fontVariantNumeric: "tabular-nums" }}>{value}</span>
+    </div>
+  );
+
+  return (
+    <Sheet title={menu.name} subtitle={`${r.name} • ${menu.note}`} onClose={onClose}>
+      <div style={{ borderRadius: 18, overflow: "hidden", height: 130, position: "relative", marginBottom: 18 }}>
+        <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent 60%)" }} />
+        <div style={{ position: "absolute", bottom: 10, left: 14 }}>
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#fff" }}>{menu.courses} servislik şef menüsü</span>
+        </div>
+      </div>
+
+      <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Kişi sayısı</label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+        {[1, 2, 3, 4].map(n => <Chip key={n} label={String(n)} active={people === n} onClick={() => setPeople(n)} />)}
+      </div>
+
+      <div style={{ background: "#FBFAF8", borderRadius: 16, padding: "12px 16px", marginBottom: 18 }}>
+        {row(`${menu.name} × ${people}`, `₺${gross.toLocaleString("tr")}`)}
+        {deal && row(`Anlık fırsat (%${deal.pct})`, `−₺${discount.toLocaleString("tr")}`, false, "#16A34A")}
+        <div style={{ height: 1, background: "rgba(45,36,25,0.08)", margin: "6px 0" }} />
+        {row("Toplam", `₺${total.toLocaleString("tr")}`, true)}
+      </div>
+
+      <Btn text="Satın Al" onClick={() => onConfirm({ people, total, commission, menu })} variant="filled" />
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(45,36,25,0.4)", textAlign: "center", margin: "12px 0 0", lineHeight: 1.5 }}>
+        Demo ödeme — gerçek tahsilat yapılmaz. Platform komisyonu ₺{commission.toLocaleString("tr")} (%{Math.round(COMMISSION_RATE * 100)}).
+      </p>
+    </Sheet>
+  );
+}
+
+function ConfirmSheet({ title, lines, onClose }) {
+  return (
+    <Sheet title={title} subtitle="Onaylandı" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "6px 0 18px" }}>
+        <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#EAF7EC", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon n="check" color="#22A34D" size={26} strokeWidth={2.5} />
+        </div>
+      </div>
+      <div style={{ background: "#FBFAF8", borderRadius: 16, padding: "12px 16px", marginBottom: 18 }}>
+        {lines.map(([k, v]) => (
+          <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.6)" }}>{k}</span>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", fontVariantNumeric: "tabular-nums" }}>{v}</span>
+          </div>
+        ))}
+      </div>
+      <Btn text="Tamam" onClick={onClose} variant="filled" />
+    </Sheet>
+  );
+}
+
+// ═══════════════════════════════════════════════
 // YORUM YAZMA — puan, metin ve fotoğraf ekleme
 // ═══════════════════════════════════════════════
 function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
@@ -2057,6 +2651,12 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
 // RESTORAN DETAY — Fotoğraf carousel + kaydırılabilir yorumlar
 // ═══════════════════════════════════════════════
 function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavorites, userReviews = [], onAddReview }) {
+  const bookingOn = useFeature("reservations");
+  const dealsOn = useFeature("instantDeals");
+  const videoOn = useFeature("chefVideo");
+  const [sheet, setSheet] = useState(null);      // "reserve" | "tasting" | null
+  const [confirmed, setConfirmed] = useState(null);
+  const deal = dealsOn ? dealFor(r.id) : null;
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const photoRef = useRef(null);
@@ -2258,6 +2858,50 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
             <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>🕐 {r.hours}</span>
           </div>
 
+          {/* Anlık fırsat — Faz 2 */}
+          {deal && (
+            <div style={{ margin: "0 16px 16px", display: "flex", alignItems: "center", gap: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", borderRadius: 18, padding: "13px 15px" }}>
+              <div style={{ background: "#22C55E", borderRadius: 10, padding: "6px 11px", flexShrink: 0 }}>
+                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff" }}>%{deal.pct}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#166534", margin: "0 0 2px" }}>Şu an geçerli</p>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(22,101,52,0.75)", margin: 0 }}>{deal.note}</p>
+              </div>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: "#16A34A", flexShrink: 0 }}>{formatCountdown(deal.minutesLeft)}</span>
+            </div>
+          )}
+
+          {/* Gastro şef videosu — Faz 3 (tanıtım paketi) */}
+          {videoOn && r.gastro !== false && (
+            <div style={{ margin: "0 16px 16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <Icon n="sparkle" size={14} color="#FF6600" />
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#2D2419", margin: 0 }}>Şef tanıtımı</p>
+                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 700, color: "#FF6600", background: "#FFF0E5", borderRadius: 6, padding: "2px 7px" }}>15 sn</span>
+              </div>
+              <div style={{ position: "relative", height: 160, borderRadius: 18, overflow: "hidden" }}>
+                <Img src={r.imgs[1] || r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
+                <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(255,255,255,0.9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF6600"><polygon points="6 3 20 12 6 21" /></svg>
+                  </div>
+                </div>
+                <div style={{ position: "absolute", bottom: 10, left: 12, right: 12 }}>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.9)", margin: 0 }}>Gastro Onaylı şef çekimi</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rezervasyon ve tadım menüsü — Faz 2 (işlem komisyonu) */}
+          {bookingOn && (
+            <div style={{ display: "flex", gap: 10, padding: "0 16px", marginBottom: 12 }}>
+              <Btn text="Masa Ayırt" onClick={() => setSheet("reserve")} variant="filled" size="md" />
+              <Btn text="Tadım Menüsü" onClick={() => setSheet("tasting")} variant="outlineDark" size="md" />
+            </div>
+          )}
+
           {/* Favori butonu */}
           <div style={{ padding: "0 16px" }}>
             <Btn
@@ -2279,6 +2923,19 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Konum</span>
           </div>
         </div>
+
+        {/* Rezervasyon / tadım menüsü / onay — Faz 2 */}
+        <AnimatePresence>
+          {sheet === "reserve" && (
+            <ReservationSheet r={r} onClose={() => setSheet(null)}
+              onConfirm={(b) => { setSheet(null); setConfirmed({ title: "Masanız ayrıldı", lines: [["Restoran", r.name], ["Gün", b.day], ["Saat", b.time], ["Kişi", `${b.people}`], ...(b.deal ? [["Fırsat", `%${b.deal.pct} indirim`]] : [])] }); }} />
+          )}
+          {sheet === "tasting" && (
+            <TastingSheet r={r} onClose={() => setSheet(null)}
+              onConfirm={(t) => { setSheet(null); setConfirmed({ title: "Satın alındı", lines: [["Restoran", r.name], ["Menü", t.menu.name], ["Kişi", `${t.people}`], ["Ödenen", `₺${t.total.toLocaleString("tr")}`], ["Platform komisyonu", `₺${t.commission.toLocaleString("tr")}`]] }); }} />
+          )}
+          {confirmed && <ConfirmSheet title={confirmed.title} lines={confirmed.lines} onClose={() => setConfirmed(null)} />}
+        </AnimatePresence>
 
         {/* Yorum Yazma — yıldız, metin ve fotoğraf ekleme */}
         <AnimatePresence>
@@ -2876,7 +3533,7 @@ export default function GurApp(props = {}) {
       case "rest2": return <RestRegStep2 onBack={back} onNext={() => nav("rest3")} />;
       case "rest3": return <RestRegStep3 onBack={back} onDone={() => nav("rest-dashboard")} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} />;
       case "rest-dashboard": return <RestaurantDashboard onLogout={() => { setHistory([]); setScreen("welcome"); }} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} ownerRestaurant={ownerRestaurant} />;
-      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} />;
+      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} restaurants={feed} onDetail={openDetail} />;
       case "match-start": return <MatchStartScreen onBack={back} onStart={startMatch} />;
       case "match-swipe": return <MatchSwipeScreen code={matchCode} restaurants={feed} onExit={goExplore} onFinish={finishMatch} />;
       case "match-result": return <MatchResultScreen code={matchCode} matches={matchResults} onDetail={openDetail} onRestart={goMatch} onExplore={goExplore} />;

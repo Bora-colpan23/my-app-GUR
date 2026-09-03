@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { PHASES, FEATURE_PHASE, usePhase, setPhase } from '../lib/phase.js';
 import { motion, AnimatePresence } from 'motion/react';
 
 // ═══════════════════════════════════════════════════════════════
@@ -589,6 +590,7 @@ export default function GurAdmin() {
         {/* Üst bar */}
         <header style={{ height: 64, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 28px', gap: 20, flexShrink: 0, background: C.panel }}>
           <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{pageTitle}</h1>
+          <PhaseSwitch />
           <div style={{ flex: 1 }} />
           <div style={{ position: 'relative', width: 280 }}>
             <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}>
@@ -699,7 +701,7 @@ export default function GurAdmin() {
 
 // ═══ SAYFALAR ═══
 
-function KpiCard({ label, value, delta, deltaUp, icon, accent }) {
+function KpiCard({ label, value, delta, deltaUp, deltaNeutral, icon, accent }) {
   return (
     <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
@@ -707,8 +709,10 @@ function KpiCard({ label, value, delta, deltaUp, icon, accent }) {
           <Icon path={icon} size={20} color={accent.color} />
         </div>
         {delta && (
-          <span style={{ fontSize: 12, fontWeight: 600, color: deltaUp ? C.green : C.red, display: 'flex', alignItems: 'center', gap: 3 }}>
-            {deltaUp ? '↑' : '↓'} {delta}
+          // Nötr delta: artış/azalış değil, bilgi (örn. "açılmamış potansiyel").
+          // Ok ve renk kodu kullanılmaz ki yanlış okunmasın.
+          <span style={{ fontSize: 12, fontWeight: 600, color: deltaNeutral ? C.faint : (deltaUp ? C.green : C.red), display: 'flex', alignItems: 'center', gap: 3 }}>
+            {deltaNeutral ? '' : (deltaUp ? '↑' : '↓')} {delta}
           </span>
         )}
       </div>
@@ -803,6 +807,35 @@ function TableShell({ headers, children }) {
         </thead>
         <tbody>{children}</tbody>
       </table>
+    </div>
+  );
+}
+
+// Aktif gelir fazı. Buradan yapılan seçim hem yönetici panelini hem de
+// tüketici uygulamasını etkiler: kilitli fazın gelir kalemleri uygulamada
+// da görünmez (bkz. src/lib/phase.js).
+function PhaseSwitch() {
+  const phase = usePhase();
+  const info = PHASES.find(p => p.id === phase);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 18 }}>
+      <div style={{ display: 'flex', gap: 3, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: 3 }}>
+        {PHASES.map(p => {
+          const on = p.id === phase;
+          return (
+            <motion.button
+              key={p.id} onClick={() => setPhase(p.id)} className="gur-admin-btn"
+              data-phase={p.id} aria-pressed={on} title={p.name}
+              whileTap={{ scale: 0.97 }} transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
+              style={{
+                border: 'none', cursor: 'pointer', borderRadius: 7, padding: '5px 11px',
+                background: on ? C.orange : 'transparent', color: on ? '#fff' : C.dim,
+                fontFamily: F, fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', outline: 'none',
+              }}>{p.short}</motion.button>
+          );
+        })}
+      </div>
+      <span style={{ fontSize: 11, color: C.faint, maxWidth: 210, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={info.name}>{info.name}</span>
     </div>
   );
 }
@@ -1327,21 +1360,121 @@ function UsersPage({ query }) {
   );
 }
 
+// Gelir kalemleri faz planına birebir bağlı. Her kalem hangi fazda
+// açıldığını ve aktif fazda çalışıp çalışmadığını gösterir; toplam MRR
+// yalnızca açık kalemlerden hesaplanır, böylece faz anahtarı gerçek bir
+// senaryo farkı yaratır.
+const REVENUE_STREAMS = [
+  { key: 'bannerAds', name: 'Banner ve ekran reklamları', kind: 'Reklam', monthly: 128000, unit: '42 aktif kampanya', note: 'Keşif ve detay ekranlarındaki envanter.' },
+  { key: 'pushAds', name: 'Push bildirim reklamları', kind: 'Reklam', monthly: 74000, unit: '41 gönderim / ay', note: 'Semt bazlı tek seferlik bildirim satışı.' },
+  { key: 'sponsoredCards', name: 'Sponsorlu kartlar (Tarif / Şefin Seçimi)', kind: 'Sponsorluk', monthly: 96000, unit: '3 marka', note: 'Mutfak ürünü ve D2C markaları swipe akışında.' },
+  { key: 'secondChance', name: 'İkinci Şans yerleşimi', kind: 'Performans', monthly: 41000, unit: '86 restoran', note: 'Geçilen restoranın desteye geri girmesi.' },
+  { key: 'instantDeals', name: 'Anlık fırsat bildirimleri', kind: 'Performans', monthly: 63000, unit: '140 yayın / ay', note: 'Ölü saat doldurma; yayın başına ücret.' },
+  { key: 'reservations', name: 'Rezervasyon ve menü komisyonu', kind: 'İşlem', monthly: 88000, unit: '%8 komisyon', note: 'Gerçekleşen işlem başına alınır.' },
+  { key: 'chefVideo', name: 'Gastro şefli video paketi', kind: 'İçerik', monthly: 52000, unit: '8 çekim / ay', note: 'Üç büyük semtte VIP marka algısı.' },
+  { key: 'contentLicense', name: 'Gastro içerik lisanslama', kind: 'İçerik', monthly: 39000, unit: '6 lisans / ay', note: '15 sn dikey videonun restorana devri.' },
+  { key: 'analyticsSaas', name: 'Restoran Analiz Paneli (SaaS)', kind: 'Abonelik', monthly: 145000, unit: '50 abone', note: 'Tıklama, kaydetme ve konum ilgisi verisi.' },
+];
+
+const KIND_TONE = {
+  'Reklam': C.blue, 'Sponsorluk': C.orange, 'Performans': C.green,
+  'İşlem': C.yellow, 'İçerik': C.red, 'Abonelik': C.orange,
+};
+
 function RevenuePage() {
+  const phase = usePhase();
   const plans = [
     { name: 'Premium', price: 4999, count: 42, color: C.orange },
     { name: 'Pro', price: 1999, count: 118, color: C.blue },
     { name: 'Ücretsiz', price: 0, count: 182, color: C.faint },
   ];
-  const monthlyRev = plans.reduce((a, p) => a + p.price * p.count, 0);
+  const subsRev = plans.reduce((a, p) => a + p.price * p.count, 0);
+
+  const streams = REVENUE_STREAMS.map(x => ({ ...x, phase: FEATURE_PHASE[x.key], live: phase >= FEATURE_PHASE[x.key] }));
+  const liveStreams = streams.filter(x => x.live);
+  const streamRev = liveStreams.reduce((a, x) => a + x.monthly, 0);
+  const total = subsRev + streamRev;
+  const locked = streams.length - liveStreams.length;
+  const potential = streams.reduce((a, x) => a + x.monthly, 0) + subsRev;
+  const maxMonthly = Math.max(...streams.map(x => x.monthly));
+
+  const money = (n) => `₺${(n / 1000).toFixed(0)}K`;
+
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
-        <KpiCard label="Aylık Yinelenen Gelir" value={`₺${(monthlyRev / 1000).toFixed(0)}K`} delta="18%" deltaUp icon={icons.money} accent={{ color: C.green, soft: C.greenSoft }} />
-        <KpiCard label="Ücretli Abonelik" value={plans[0].count + plans[1].count} delta="9%" deltaUp icon={icons.store} accent={{ color: C.orange, soft: C.orangeSoft }} />
-        <KpiCard label="Dönüşüm Oranı" value="%46" delta="3%" deltaUp icon={icons.trend} accent={{ color: C.blue, soft: C.blueSoft }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+        <KpiCard label="Aylık Yinelenen Gelir" value={money(total)} delta="18%" deltaUp icon={icons.money} accent={{ color: C.green, soft: C.greenSoft }} />
+        <KpiCard label="Abonelikten" value={money(subsRev)} delta="9%" deltaUp icon={icons.store} accent={{ color: C.orange, soft: C.orangeSoft }} />
+        <KpiCard label="Diğer Gelir Kalemleri" value={money(streamRev)} delta="24%" deltaUp icon={icons.trend} accent={{ color: C.blue, soft: C.blueSoft }} />
+        <KpiCard label="Kilitli Kalem" value={`${locked}`} delta={`+${money(potential - total)} potansiyel`} deltaNeutral icon={icons.chart} accent={{ color: C.yellow, soft: C.yellowSoft }} />
       </div>
 
+      {/* Faz planı */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+        {PHASES.map(p => {
+          const on = phase >= p.id;
+          const active = phase === p.id;
+          const rev = streams.filter(x => x.phase === p.id).reduce((a, x) => a + x.monthly, 0);
+          return (
+            <div key={p.id} style={{
+              background: C.panel,
+              border: `1px solid ${active ? C.orange + '77' : C.border}`,
+              borderLeft: `3px solid ${on ? C.orange : C.border}`,
+              borderRadius: 12, padding: '15px 17px', opacity: on ? 1 : 0.6,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 800, color: on ? C.orange : C.faint }}>{p.short}</span>
+                {active && <Badge text="Aktif" color={C.green} soft={C.greenSoft} />}
+                {!on && <Badge text="Kilitli" color={C.faint} soft={C.panel2} />}
+                <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: on ? C.text : C.faint, fontVariantNumeric: 'tabular-nums' }}>{money(rev)}</span>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 5 }}>{p.name}</div>
+              <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.5, marginBottom: 10 }}>{p.summary}</div>
+              <div style={{ display: 'grid', gap: 4 }}>
+                {p.added.map(a => (
+                  <div key={a} style={{ display: 'flex', gap: 7, alignItems: 'flex-start' }}>
+                    <span style={{ color: on ? C.green : C.faint, fontSize: 11, lineHeight: 1.5 }}>+</span>
+                    <span style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.5 }}>{a}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Gelir kalemleri */}
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 20 }}>
+        <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Gelir Kalemleri</span>
+          <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{liveStreams.length}/{streams.length} açık</span>
+        </header>
+        {streams.map((x, i) => (
+          <div key={x.key} style={{ padding: '13px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14, opacity: x.live ? 1 : 0.45 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: x.live ? KIND_TONE[x.kind] : C.border, flexShrink: 0 }} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>{x.name}</span>
+                <Badge text={`Faz ${x.phase}`} color={x.live ? C.orange : C.faint} soft={x.live ? C.orangeSoft : C.panel2} />
+                <Badge text={x.kind} color={KIND_TONE[x.kind]} soft={C.panel2} />
+                {!x.live && <span style={{ fontSize: 11, color: C.faint }}>Faz {x.phase}'te açılıyor</span>}
+              </div>
+              <div style={{ fontSize: 11.5, color: C.faint }}>{x.note}</div>
+            </div>
+            <div style={{ width: 120, flexShrink: 0 }}>
+              <div style={{ height: 5, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
+                <div style={{ width: `${(x.monthly / maxMonthly) * 100}%`, height: '100%', borderRadius: 3, background: x.live ? KIND_TONE[x.kind] : C.border }} />
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', minWidth: 96, flexShrink: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: x.live ? C.text : C.faint, fontVariantNumeric: 'tabular-nums' }}>{money(x.monthly)}</div>
+              <div style={{ fontSize: 10.5, color: C.faint }}>{x.unit}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Abonelikler */}
       <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 22 }}>
         <h3 style={{ margin: '0 0 20px', fontSize: 15, fontWeight: 700 }}>Abonelik Paketleri</h3>
         {plans.map((p, i) => (
@@ -1356,7 +1489,7 @@ function RevenuePage() {
               <div style={{ fontSize: 11, color: C.faint }}>restoran</div>
             </div>
             <div style={{ textAlign: 'right', minWidth: 90 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: p.color }}>₺{((p.price * p.count) / 1000).toFixed(0)}K</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: p.color }}>{money(p.price * p.count)}</div>
               <div style={{ fontSize: 11, color: C.faint }}>aylık</div>
             </div>
           </div>
