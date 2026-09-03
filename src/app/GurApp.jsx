@@ -153,45 +153,37 @@ const CATEGORIES = [
 ];
 
 // ═══════════════════════════════════════════════
-// GELİR: SPONSORLU İÇERİK (Faz 1)
+// GELİR: ÖDÜLLÜ VİDEO REKLAM (Faz 1)
 // ═══════════════════════════════════════════════
-// Swipe akışına doğal biçimde giren reklam kartları. Restoran kartıyla
-// aynı fizikte hareket eder ama görsel olarak ayrışır ve her zaman
-// "Sponsorlu" etiketi taşır — kullanıcı neyin reklam olduğunu bilir.
-const SPONSORED = [
+// Kaydırma bir kotaya bağlı: FREE_SWIPES hak biter, kullanıcı kısa bir
+// video reklam izleyerek REWARD_SWIPES hak kazanır. Reklam akışı bölmez,
+// akışın devamının bedelidir — envanter böylece izlenme garantili olur.
+const FREE_SWIPES = 10;
+const REWARD_SWIPES = 5;
+const AD_DURATION = 5; // saniye
+
+const REWARD_ADS = [
   {
-    id: "sp-1", kind: "sponsored", format: "Sponsorlu Tarif",
-    brand: "Öz Değirmen", tagline: "Taş değirmen tam buğday unu",
-    title: "15 dakikada ev yapımı pide",
-    desc: "Şefin tarifiyle, tam buğday unuyla. Malzeme listesi ve adımlar uygulamada.",
-    cta: "Tarifi Gör",
-    imgs: ["https://picsum.photos/seed/gur-sp-bread/600/900"],
-    accent: "#C2410C",
+    id: "rw-1", brand: "Öz Değirmen", tagline: "Taş değirmen tam buğday unu",
+    headline: "15 dakikada ev yapımı pide", cta: "Tarifi Gör",
+    img: "https://picsum.photos/seed/gur-sp-bread/600/900", accent: "#C2410C",
   },
   {
-    id: "sp-2", kind: "sponsored", format: "Şefin Seçimi",
-    brand: "Kalamış Zeytinyağı", tagline: "Erken hasat, soğuk sıkım",
-    title: "Şef Mehmet Gürs'ün mutfağındaki yağ",
-    desc: "Salatadan son dokunuşa; düşük asit oranıyla ısıya dayanıklı.",
-    cta: "Ürünü İncele",
-    imgs: ["https://picsum.photos/seed/gur-sp-oil/600/900"],
-    accent: "#4D7C0F",
+    id: "rw-2", brand: "Kalamış Zeytinyağı", tagline: "Erken hasat, soğuk sıkım",
+    headline: "Şeflerin tercih ettiği zeytinyağı", cta: "Ürünü İncele",
+    img: "https://picsum.photos/seed/gur-sp-oil/600/900", accent: "#4D7C0F",
   },
   {
-    id: "sp-3", kind: "sponsored", format: "Sponsorlu Tarif",
-    brand: "Bereket Baharat", tagline: "Tek kaynaktan öğütülmüş",
-    title: "Ev usulü mangal marinasyonu",
-    desc: "Dört baharat, iki saat bekleme. Hafta sonu mangalını kurtaran karışım.",
-    cta: "Tarifi Gör",
-    imgs: ["https://picsum.photos/seed/gur-sp-spice/600/900"],
-    accent: "#B45309",
+    id: "rw-3", brand: "Bereket Baharat", tagline: "Tek kaynaktan öğütülmüş",
+    headline: "Mangalını kurtaran baharat karışımı", cta: "Sepete Ekle",
+    img: "https://picsum.photos/seed/gur-sp-spice/600/900", accent: "#B45309",
   },
 ];
 
-// Keşfet ekranındaki banner reklam envanteri (Faz 1 — mevcut yapı)
+// Keşfet üstündeki dönen banner: marka slaytı + sponsor slaytları
 const BANNER_ADS = [
-  { id: "ad-1", brand: "Öz Değirmen", text: "Tam buğday ununda %20 indirim", cta: "Kampanyayı gör", img: "https://picsum.photos/seed/gur-ad-flour/300/300", accent: "#C2410C" },
-  { id: "ad-2", brand: "Kalamış Zeytinyağı", text: "Erken hasat sezonu başladı", cta: "Ürünlere bak", img: "https://picsum.photos/seed/gur-ad-oil/300/300", accent: "#4D7C0F" },
+  { id: "ad-1", brand: "Öz Değirmen", text: "Tam buğday ununda %20 indirim", cta: "Kampanyayı gör", img: "https://picsum.photos/seed/gur-ad-flour/800/400", accent: "#C2410C" },
+  { id: "ad-2", brand: "Kalamış Zeytinyağı", text: "Erken hasat sezonu başladı", cta: "Ürünlere bak", img: "https://picsum.photos/seed/gur-ad-oil/800/400", accent: "#4D7C0F" },
 ];
 
 // ═══════════════════════════════════════════════
@@ -217,22 +209,6 @@ function formatCountdown(mins) {
 // Restoran destesine her N kartta bir sponsorlu kart serpiştirilir.
 // Reklam yoğunluğu tek yerden ayarlanır; deste kısa olduğunda araya
 // hiç girmez ki keşif akışı reklamla boğulmasın.
-const AD_EVERY = 4;
-const AD_MIN_DECK = 3;   // bunun altındaki destede hiç reklam gösterme
-function injectSponsored(cards, enabled) {
-  if (!enabled || cards.length < AD_MIN_DECK) return cards;
-  const out = [];
-  let ad = 0;
-  cards.forEach((c, i) => {
-    out.push(c);
-    if ((i + 1) % AD_EVERY === 0 && ad < SPONSORED.length) out.push(SPONSORED[ad++]);
-  });
-  // Kategori filtresi destede 4'ten az kart bırakabiliyor; envanterin
-  // tamamen kaybolmaması için sona tek bir kart eklenir.
-  if (ad === 0) out.push(SPONSORED[0]);
-  return out;
-}
-
 // ═══════════════════════════════════════════════
 // SHARED UI — Polished
 // ═══════════════════════════════════════════════
@@ -422,47 +398,6 @@ function Screen({ children, grad = true }) {
 // ═══════════════════════════════════════════════
 // SWIPE CARD — Eski Tinder stili, tam ekran fotoğraf
 // ═══════════════════════════════════════════════
-// Sponsorlu kartın iç yüzeyi. Sürükleme fiziği SwipeCard'da olduğu gibi
-// kalır; burada yalnızca içerik değişir, böylece reklam da uygulamanın
-// geri kalanıyla aynı his verir.
-function SponsoredFace({ r, isTop }) {
-  return (
-    <>
-      <div style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg, ${r.accent}, #1a1008)` }} />
-      <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0, opacity: 0.42 }} bg="transparent" />
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.15) 100%)" }} />
-
-      {/* Destedeki arka kart yalnızca zemini gösterir — restoran kartıyla
-          aynı davranış; içerik sadece öndeki kartta okunur. */}
-      {!isTop ? null : <>
-      {/* Reklam etiketi — kart öndeyken her zaman görünür, gizlenmez */}
-      <div style={{ position: "absolute", top: 40, left: 14, right: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, zIndex: 6 }}>
-        <span style={{ background: "rgba(255,255,255,0.16)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 20, padding: "4px 11px", fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 800, color: "#fff", letterSpacing: 0.6 }}>SPONSORLU</span>
-        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{r.format}</span>
-      </div>
-
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(255,255,255,0.2)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Icon n="sparkle" size={13} color="#fff" />
-          </div>
-          <div>
-            <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 800, color: "#fff" }}>{r.brand}</div>
-            <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "rgba(255,255,255,0.65)" }}>{r.tagline}</div>
-          </div>
-        </div>
-        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, color: "#fff", margin: "0 0 8px", lineHeight: 1.25, textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{r.title}</h3>
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "rgba(255,255,255,0.85)", margin: "0 0 14px", lineHeight: 1.45 }}>{r.desc}</p>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#fff", borderRadius: 999, padding: "9px 18px" }}>
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: r.accent }}>{r.cta}</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={r.accent} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
-        </div>
-      </div>
-      </>}
-    </>
-  );
-}
-
 const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTop, onTap }, flingRef) {
   const ref = useRef(null);
   const movedRef = useRef(false);
@@ -503,9 +438,7 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTo
     }
   };
 
-  const sponsored = r.kind === "sponsored";
   const tap = (e) => { if (movedRef.current) return; const rect = ref.current?.getBoundingClientRect(); if (!rect) return; const tx = e.clientX - rect.left;
-    if (sponsored) { onTap?.(); return; }   // reklam kartında foto gezinme yok
     if (tx > rect.width * 0.6) setIi(i => Math.min(i + 1, r.imgs.length - 1));
     else if (tx < rect.width * 0.4) setIi(i => Math.max(i - 1, 0));
     else onTap?.();
@@ -531,23 +464,21 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTo
       animate={{ scale: isTop ? 1 : 0.96, y: isTop ? 0 : 10 }}
       transition={{ type: "spring", bounce: 0, duration: 0.35 }}
     >
-      {sponsored
-        ? <SponsoredFace r={r} isTop={isTop} />
-        : <Img src={r.imgs[ii]} style={{ position: "absolute", inset: 0, borderRadius: 24 }} bg="linear-gradient(135deg, #1a1008, #2a1a0a, #1a1008)" />}
+      <Img src={r.imgs[ii]} style={{ position: "absolute", inset: 0, borderRadius: 24 }} bg="linear-gradient(135deg, #1a1008, #2a1a0a, #1a1008)" />
       {/* Sürükleme etiketleri her kart türünde görünür — reklam kartında da
           kullanıcı ne yaptığını anlamalı (§1 — sürekli geri bildirim) */}
       {isTop && (
         <>
-          <motion.div style={{ opacity: favOpacity, position: "absolute", top: 90, left: 24, zIndex: 10, border: `4px solid ${sponsored ? "#FFB020" : "#4CAF50"}`, borderRadius: 14, padding: "8px 22px", transform: "rotate(-15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: sponsored ? "#FFB020" : "#4CAF50" }}>{sponsored ? "İLGİMİ ÇEKTİ" : "FAV!"}</span>
+          <motion.div style={{ opacity: favOpacity, position: "absolute", top: 90, left: 24, zIndex: 10, border: "4px solid #4CAF50", borderRadius: 14, padding: "8px 22px", transform: "rotate(-15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#4CAF50" }}>FAV!</span>
           </motion.div>
           <motion.div style={{ opacity: nopeOpacity, position: "absolute", top: 90, right: 24, zIndex: 10, border: "4px solid #FF3B30", borderRadius: 14, padding: "8px 22px", transform: "rotate(15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#FF3B30" }}>{sponsored ? "GEÇ" : "NOPE"}</span>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#FF3B30" }}>NOPE</span>
           </motion.div>
         </>
       )}
 
-      {isTop && !sponsored && <>
+      {isTop && <>
       {/* İşletmenin kendi yüklediği fotoğraflar öne alınır ve işaretlenir */}
       {ii < (r.ownerPhotoCount || 0) && (
         <div style={{ position: "absolute", top: 54, left: 14, zIndex: 6, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 20, padding: "4px 11px" }}>
@@ -1509,9 +1440,14 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
               {/* Faz 1 — reklam / sponsorluk */}
               <GrowthSection title="Reklam ve Sponsorluk" phase="Faz 1">
                 <GrowthCard
-                  title="Öne Çıkan Kart" price="₺2.400 / hafta" active={bought.featured}
-                  desc="Keşif akışında kartınız desteye üstte girer ve haftada ~4.000 ek gösterim alır."
-                  onBuy={() => buy("featured", "Öne Çıkan Kart paketi etkinleştirildi")}
+                  title="Keşfet Banner'ı" price="₺2.400 / hafta" active={bought.featured}
+                  desc="Keşfet ekranının üstündeki dönen banner'da bir slayt. Haftada ~4.000 gösterim."
+                  onBuy={() => buy("featured", "Banner slaytınız yayına alındı")}
+                />
+                <GrowthCard
+                  title="Ödüllü Video Reklam" price="₺3.100 / 1.000 izlenme" active={bought.rewarded}
+                  desc="Kullanıcı kaydırma hakkı kazanmak için videonuzu sonuna kadar izler — tamamlanma oranı ~%78."
+                  onBuy={() => buy("rewarded", "Ödüllü video kampanyası başlatıldı")}
                 />
                 <GrowthCard
                   title="Push Bildirim Reklamı" price="₺1.800 / gönderim" active={bought.push} locked={!sponsorOn}
@@ -1722,11 +1658,69 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 // ═══════════════════════════════════════════════
 // KEŞFET SAYFASI — 4 rastgele kategori + tüm kategoriler sayfası
 // ═══════════════════════════════════════════════
+// Keşfet üstündeki dönen banner: marka slaytı ile sponsor slaytları
+// sırayla döner. Reklam slaytları her zaman "REKLAM" etiketi taşır.
+function HeroCarousel({ slides, intervalMs = 4500 }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (slides.length < 2) return;
+    const t = setTimeout(() => setI(v => (v + 1) % slides.length), intervalMs);
+    return () => clearTimeout(t);
+  }, [i, slides.length, intervalMs]);
+
+  const slide = slides[i] || slides[0];
+  if (!slide) return null;
+
+  return (
+    <div style={{ borderRadius: 24, overflow: "hidden", marginBottom: 18, height: 148, position: "relative", boxShadow: "0 8px 30px rgba(0,0,0,0.12)", flexShrink: 0 }}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={slide.id}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          transition={{ duration: 0.45 }}
+          style={{ position: "absolute", inset: 0 }}
+        >
+          <Img src={slide.img} style={{ position: "absolute", inset: 0 }} bg={slide.accent || "#2c1810"} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.25) 60%)" }} />
+          {slide.ad && (
+            <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "2px 7px", fontFamily: "'Outfit', sans-serif", fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.85)", letterSpacing: 0.5 }}>REKLAM</span>
+          )}
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "18px 18px 22px" }}>
+            {slide.eyebrow && (
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 4px" }}>{slide.eyebrow}</p>
+            )}
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, color: "#fff", margin: "0 0 3px", fontWeight: 800, textShadow: "0 2px 10px rgba(0,0,0,0.45)" }}>{slide.title}</p>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.75)", margin: 0 }}>{slide.sub}</p>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Slayt göstergeleri */}
+      {slides.length > 1 && (
+        <div style={{ position: "absolute", bottom: 10, right: 14, display: "flex", gap: 5, zIndex: 3 }}>
+          {slides.map((sl, k) => (
+            <div key={sl.id} onClick={() => setI(k)} style={{
+              width: k === i ? 16 : 6, height: 6, borderRadius: 3, cursor: "pointer",
+              background: k === i ? "#fff" : "rgba(255,255,255,0.45)", transition: "all 0.3s",
+            }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, restaurants = [], onDetail }) {
   const adsOn = useFeature("bannerAds");
   const dealsOn = useFeature("instantDeals");
-  const [adIdx] = useState(() => Math.floor(Math.random() * BANNER_ADS.length));
-  const ad = BANNER_ADS[adIdx];
+  // Marka slaytı her zaman ilk sırada; sponsor slaytları faz açıksa eklenir
+  const slides = useMemo(() => [
+    { id: "brand", img: I.hero, title: "İstanbul'un Lezzetleri", sub: "En popüler restoranları keşfet" },
+    ...(adsOn ? BANNER_ADS.map(a => ({
+      id: a.id, img: a.img, accent: a.accent, ad: true,
+      eyebrow: a.brand, title: a.text, sub: a.cta,
+    })) : []),
+  ], [adsOn]);
   // Yalnızca destede gerçekten bulunan restoranların fırsatları gösterilir
   const liveDeals = dealsOn
     ? DEALS.map(d => ({ ...d, r: restaurants.find(x => x.id === d.restaurantId) })).filter(d => d.r)
@@ -1793,11 +1787,8 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           </div>
         </div>
 
-        {/* Arama */}
-        <div style={{ background: "#F6F5F3", borderRadius: 12, padding: "12px 14px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, border: "1px solid rgba(0,0,0,0.05)" }}>
-          <Icon n="search" size={16} color="#9A938B" />
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#9A938B" }}>Restoran veya mutfak ara...</span>
-        </div>
+        {/* Dönen banner — marka slaytı + sponsor reklamları, ekranın en üstünde */}
+        <HeroCarousel slides={slides} />
 
         {/* Anlık fırsatlar — Faz 2 (konum bazlı süreli indirim) */}
         {liveDeals.length > 0 && (
@@ -1830,23 +1821,6 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           </div>
         )}
 
-        {/* Banner reklam — Faz 1 envanteri, her zaman etiketli */}
-        {adsOn && (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: 10, borderRadius: 16, background: "#FBFAF8", border: "1px solid rgba(45,36,25,0.07)", flexShrink: 0 }}>
-            <div style={{ width: 46, height: 46, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
-              <Img src={ad.img} style={{ width: "100%", height: "100%" }} bg={ad.accent} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700, color: "#2D2419" }}>{ad.brand}</span>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 8.5, fontWeight: 800, color: "rgba(45,36,25,0.4)", border: "1px solid rgba(45,36,25,0.18)", borderRadius: 4, padding: "1px 4px", letterSpacing: 0.4 }}>REKLAM</span>
-              </div>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(45,36,25,0.6)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.text}</p>
-            </div>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: ad.accent, flexShrink: 0 }}>{ad.cta} ›</span>
-          </div>
-        )}
-
         {/* GUR Match girişi */}
         <motion.div
           onClick={onMatch}
@@ -1867,16 +1841,6 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           </div>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
         </motion.div>
-
-        {/* Hero Banner */}
-        <div style={{ borderRadius: 24, overflow: "hidden", marginBottom: 20, height: 130, position: "relative", boxShadow: "0 8px 30px rgba(0,0,0,0.12)", flexShrink: 0 }}>
-          <Img src={I.hero} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
-          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: 18 }}>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#fff", margin: "0 0 2px", fontWeight: 700, textShadow: "0 2px 10px rgba(0,0,0,0.4)" }}>İstanbul'un Lezzetleri</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.7)", margin: 0 }}>En popüler restoranları keşfet</p>
-          </div>
-        </div>
 
         {/* Başlık */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -1945,13 +1909,118 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
 // ═══════════════════════════════════════════════
 // KAYDIRMA (Swipe) SAYFASI — Temiz, profesyonel
 // ═══════════════════════════════════════════════
+// ── Ödüllü video reklam ──────────────────────────────────────────────────
+// Geri sayım bitmeden kapatılamaz; bitince ödül verilir. Süre boyunca
+// ilerleme çubuğu doluyor, kullanıcı ne kadar kaldığını görüyor.
+function RewardedAdOverlay({ ad, onComplete, onAbort }) {
+  const [left, setLeft] = useState(AD_DURATION);
+  useEffect(() => {
+    if (left <= 0) return;
+    const t = setTimeout(() => setLeft(v => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [left]);
+  const done = left <= 0;
+  const pct = ((AD_DURATION - left) / AD_DURATION) * 100;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      style={{ position: "absolute", inset: 0, zIndex: 400, background: "#0a0500", display: "flex", flexDirection: "column" }}
+    >
+      {/* Video alanı */}
+      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg, ${ad.accent}, #0a0500)` }} />
+        <Img src={ad.img} style={{ position: "absolute", inset: 0, opacity: 0.45 }} bg="transparent" />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.2) 55%)" }} />
+
+        {/* Üst şerit: reklam etiketi + geri sayım */}
+        <div style={{ position: "absolute", top: 44, left: 16, right: 16, display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 5 }}>
+          <span style={{ background: "rgba(255,255,255,0.16)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 20, padding: "4px 11px", fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 800, color: "#fff", letterSpacing: 0.6 }}>REKLAM</span>
+          {done ? (
+            <IconBtn onClick={onComplete} tone="glassLight" size={32} title="Kapat"
+              icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+          ) : (
+            <span style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 13px", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.9)", fontVariantNumeric: "tabular-nums" }}>{left} sn</span>
+          )}
+        </div>
+
+        {/* Oynatma göstergesi */}
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
+          <div style={{ width: 62, height: 62, borderRadius: "50%", background: "rgba(255,255,255,0.14)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)"><polygon points="6 3 20 12 6 21" /></svg>
+          </div>
+        </div>
+
+        {/* Marka bilgisi */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 20px 22px", zIndex: 5 }}>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 800, color: "rgba(255,255,255,0.75)", margin: "0 0 4px" }}>{ad.brand}</p>
+          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, color: "#fff", margin: "0 0 6px", lineHeight: 1.25 }}>{ad.headline}</h3>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.6)", margin: "0 0 14px" }}>{ad.tagline}</p>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#fff", borderRadius: 999, padding: "9px 18px" }}>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: ad.accent }}>{ad.cta}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ad.accent} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </div>
+        </div>
+
+        {/* İlerleme */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, background: "rgba(255,255,255,0.12)", zIndex: 6 }}>
+          <div style={{ width: `${pct}%`, height: "100%", background: "#FF6600", transition: "width 1s linear" }} />
+        </div>
+      </div>
+
+      {/* Alt eylem */}
+      <div style={{ padding: "16px 20px 22px", background: "#0a0500" }}>
+        {done ? (
+          <Btn text={`+${REWARD_SWIPES} kaydırma hakkı al`} onClick={onComplete} variant="filled" icon={<Icon n="check" size={15} color="#fff" />} />
+        ) : (
+          <>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.45)", textAlign: "center", margin: "0 0 10px" }}>
+              Reklam bitince {REWARD_SWIPES} kaydırma hakkı kazanacaksın
+            </p>
+            <Btn text="Vazgeç" onClick={onAbort} variant="plain" size="sm" />
+          </>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// Kaydırma hakkı bitince çıkan kapı
+function SwipeGate({ onWatch, onExplore }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      style={{ position: "absolute", inset: 0, zIndex: 350, background: "rgba(10,5,0,0.9)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 28 }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+        style={{ width: "100%", textAlign: "center" }}
+      >
+        <div style={{ width: 74, height: 74, borderRadius: "50%", background: "rgba(255,102,0,0.14)", border: "1px solid rgba(255,102,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+          <Icon n="clock" size={28} color="#FFA500" />
+        </div>
+        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>Kaydırma hakkın bitti</h3>
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: "0 0 22px", lineHeight: 1.55 }}>
+          Kısa bir reklam izle, <b style={{ color: "#FFA500" }}>{REWARD_SWIPES} kaydırma hakkı</b> daha kazan.
+        </p>
+        <Btn text={`Reklam izle • +${REWARD_SWIPES} hak`} onClick={onWatch} variant="filled"
+          icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><polygon points="6 3 20 12 6 21" /></svg>} />
+        <div style={{ marginTop: 10 }}>
+          <Btn text="Keşfete dön" onClick={onExplore} variant="plain" size="sm" />
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites, filterCat, restaurants = RESTAURANTS, dataSource = "demo" }) {
-  const adsOn = useFeature("sponsoredCards");
+  const rewardOn = useFeature("rewardedAds");
   const secondChanceOn = useFeature("secondChance");
 
-  const baseCards = filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants;
-  // Faz 1: sponsorlu kartlar desteye serpiştirilir
-  const allCards = useMemo(() => injectSponsored(baseCards, adsOn), [baseCards, adsOn]);
+  const allCards = filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants;
 
   const [idx, setIdx] = useState(0);
   const [toast, setToast] = useState(null);
@@ -1961,14 +2030,39 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   const [encore, setEncore] = useState(null); // {cards, idx} | null
   const topCardRef = useRef(null);
 
-  useEffect(() => { setIdx(0); setDone(false); setPassed([]); setEncore(null); }, [filterCat, restaurants, adsOn]);
+  const show = (m, t) => { setToast({ m, t }); setTimeout(() => setToast(null), 1400); };
+
+  // Faz 1 — kaydırma kotası + ödüllü reklam
+  const [swipesLeft, setSwipesLeft] = useState(FREE_SWIPES);
+  const [gate, setGate] = useState(false);        // hak bitti kapısı
+  const [playingAd, setPlayingAd] = useState(null);
+  const [adIdx, setAdIdx] = useState(0);
+  const outOfSwipes = rewardOn && swipesLeft <= 0;
+
+  const watchAd = () => { setPlayingAd(REWARD_ADS[adIdx % REWARD_ADS.length]); setGate(false); };
+  const finishAd = () => {
+    setPlayingAd(null);
+    setAdIdx(i => i + 1);
+    setSwipesLeft(v => v + REWARD_SWIPES);
+    show(`+${REWARD_SWIPES} kaydırma hakkı kazandın`, "fav");
+  };
+  const abortAd = () => { setPlayingAd(null); setGate(true); };
+
+  useEffect(() => { setIdx(0); setDone(false); setPassed([]); setEncore(null); }, [filterCat, restaurants]);
 
   const deck = encore ? encore.cards : allCards;
   const cursor = encore ? encore.idx : idx;
   const visible = deck.slice(cursor, cursor + 2).reverse();
-  const show = (m, t) => { setToast({ m, t }); setTimeout(() => setToast(null), 1400); };
 
   const next = () => {
+    // Her kaydırma bir hak yer; hak biterse kapı açılır (Faz 1)
+    if (rewardOn) {
+      setSwipesLeft(v => {
+        const left = v - 1;
+        if (left <= 0) setGate(true);
+        return Math.max(0, left);
+      });
+    }
     if (encore) {
       if (encore.idx >= encore.cards.length - 1) { setEncore(null); setDone(true); }
       else setEncore(e => ({ ...e, idx: e.idx + 1 }));
@@ -1986,14 +2080,13 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
 
   const right = () => {
     const r = deck[cursor];
-    if (r?.kind === "sponsored") { show(`${r.brand} — ilgin iletildi`, "fav"); next(); return; }
     if (r && !favorites.find(f => f.id === r.id)) setFavorites(p => [...p, r]);
     show(r?.name + " favorilere eklendi!", "fav");
     next();
   };
   const left = () => {
     const r = deck[cursor];
-    if (r && r.kind !== "sponsored" && !encore) setPassed(p => (p.find(x => x.id === r.id) ? p : [...p, r]));
+    if (r && !encore) setPassed(p => (p.find(x => x.id === r.id) ? p : [...p, r]));
     show("Geçildi", "nope");
     next();
   };
@@ -2007,6 +2100,15 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
         {/* Header — sadece logo ortada + kategori filtresi */}
         <div style={{ padding: "44px 18px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
           <GurLogo size={42} pill />
+          {/* Kalan kaydırma hakkı — Faz 1 kotası */}
+          {rewardOn && !done && deck.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 7, background: swipesLeft <= 3 ? "rgba(255,102,0,0.16)" : "rgba(255,255,255,0.07)", border: `1px solid ${swipesLeft <= 3 ? "rgba(255,165,0,0.35)" : "rgba(255,255,255,0.1)"}`, borderRadius: 14, padding: "4px 13px" }}>
+              <Icon n="flame" size={12} color={swipesLeft <= 3 ? "#FFA500" : "rgba(255,255,255,0.5)"} />
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: swipesLeft <= 3 ? "#FFA500" : "rgba(255,255,255,0.6)", fontVariantNumeric: "tabular-nums" }}>
+                {swipesLeft} kaydırma hakkı
+              </span>
+            </div>
+          )}
           {dataSource === "live" && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(76,175,80,0.12)", border: "1px solid rgba(76,175,80,0.25)", borderRadius: 12, padding: "3px 12px" }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4CAF50", animation: "pulse 1.5s ease-in-out infinite" }} />
@@ -2059,8 +2161,8 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             </div>
           ) : visible.map((r, i) => {
             const top = i === visible.length - 1;
-            return <SwipeCard key={`${r.id}-${cursor}`} ref={top ? topCardRef : null} r={r} isTop={top} onRight={right} onLeft={left}
-              onTap={() => { const c = deck[cursor]; if (c?.kind === "sponsored") show(`${c.brand} — ilgin iletildi`, "fav"); else onDetail(c); }} />;
+            return <SwipeCard key={`${r.id}-${cursor}`} ref={top ? topCardRef : null} r={r} isTop={top && !outOfSwipes} onRight={right} onLeft={left}
+              onTap={() => onDetail(deck[cursor])} />;
           })}
         </div>
 
@@ -2068,21 +2170,27 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
         {!done && deck.length > 0 && (
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 18, padding: "10px 16px 16px", zIndex: 10 }}>
             <IconBtn
-              onClick={() => topCardRef.current?.fling(-1)} tone="solidLight" size={56} title="Geç"
+              onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.fling(-1))} tone="solidLight" size={56} title="Geç"
               icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
             />
 
             <IconBtn
-              onClick={() => { const c = deck[cursor]; if (c?.kind === "sponsored") show(`${c.brand} — ilgin iletildi`, "fav"); else onDetail(c); }} tone="solidLight" size={40} title="Detay"
+              onClick={() => onDetail(deck[cursor])} tone="solidLight" size={40} title="Detay"
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4FC3F7" strokeWidth="2.4" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>}
             />
 
             <IconBtn
-              onClick={() => topCardRef.current?.fling(1)} tone="solidLight" size={68} title="Favorilere ekle"
+              onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.fling(1))} tone="solidLight" size={68} title="Favorilere ekle"
               icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>}
             />
           </div>
         )}
+
+        {/* Kaydırma kapısı ve ödüllü reklam — Faz 1 */}
+        <AnimatePresence>
+          {gate && !playingAd && <SwipeGate onWatch={watchAd} onExplore={onExplore} />}
+          {playingAd && <RewardedAdOverlay ad={playingAd} onComplete={finishAd} onAbort={abortAd} />}
+        </AnimatePresence>
 
         {/* Toast */}
         {toast && (

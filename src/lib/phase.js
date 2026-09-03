@@ -23,7 +23,7 @@ export const PHASES = [
     short: 'Faz 1',
     summary: 'Reklam envanteri ve gıda sponsorlukları ile hızlı nakit akışı.',
     existing: ['Uygulama içi banner/ekran reklamları', 'Push bildirim reklamları', 'Temel gıda sponsorlukları'],
-    added: ['Swipe akışına gömülü “Sponsorlu Tarif” / “Şefin Seçimi” kartları'],
+    added: ['Ödüllü video reklam: 10 kaydırma sonrası reklam izleyip +5 hak kazanma', 'Keşfet üstündeki dönen sponsor banner'],
   },
   {
     id: 2,
@@ -46,9 +46,9 @@ export const PHASES = [
 // Özellik → açıldığı faz. Tek kaynak: hem UI kapıları hem gelir sayfası
 // bu haritadan besleniyor, böylece ikisi birbirinden kopamaz.
 export const FEATURE_PHASE = {
-  bannerAds: 1,        // uygulama içi banner/ekran reklamı
+  bannerAds: 1,        // Keşfet üstündeki dönen banner (marka + sponsor)
   pushAds: 1,          // push bildirim reklamı
-  sponsoredCards: 1,   // swipe akışındaki sponsorlu kartlar
+  rewardedAds: 1,      // kaydırma kotası + ödüllü video reklam
   secondChance: 2,     // geçilen restoranın desteye geri dönmesi
   instantDeals: 2,     // konum bazlı anlık indirim
   reservations: 2,     // rezervasyon + tadım menüsü komisyonu

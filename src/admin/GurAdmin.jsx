@@ -1365,9 +1365,9 @@ function UsersPage({ query }) {
 // yalnızca açık kalemlerden hesaplanır, böylece faz anahtarı gerçek bir
 // senaryo farkı yaratır.
 const REVENUE_STREAMS = [
-  { key: 'bannerAds', name: 'Banner ve ekran reklamları', kind: 'Reklam', monthly: 128000, unit: '42 aktif kampanya', note: 'Keşif ve detay ekranlarındaki envanter.' },
+  { key: 'bannerAds', name: 'Dönen keşfet banner\'ı', kind: 'Reklam', monthly: 128000, unit: '42 aktif kampanya', note: 'Keşfet ekranının üstündeki marka + sponsor karuseli.' },
   { key: 'pushAds', name: 'Push bildirim reklamları', kind: 'Reklam', monthly: 74000, unit: '41 gönderim / ay', note: 'Semt bazlı tek seferlik bildirim satışı.' },
-  { key: 'sponsoredCards', name: 'Sponsorlu kartlar (Tarif / Şefin Seçimi)', kind: 'Sponsorluk', monthly: 96000, unit: '3 marka', note: 'Mutfak ürünü ve D2C markaları swipe akışında.' },
+  { key: 'rewardedAds', name: 'Ödüllü video reklam (kaydırma hakkı)', kind: 'Sponsorluk', monthly: 96000, unit: '~%78 tamamlanma', note: '10 kaydırma sonrası izlenen video, +5 hak kazandırır.' },
   { key: 'secondChance', name: 'İkinci Şans yerleşimi', kind: 'Performans', monthly: 41000, unit: '86 restoran', note: 'Geçilen restoranın desteye geri girmesi.' },
   { key: 'instantDeals', name: 'Anlık fırsat bildirimleri', kind: 'Performans', monthly: 63000, unit: '140 yayın / ay', note: 'Ölü saat doldurma; yayın başına ücret.' },
   { key: 'reservations', name: 'Rezervasyon ve menü komisyonu', kind: 'İşlem', monthly: 88000, unit: '%8 komisyon', note: 'Gerçekleşen işlem başına alınır.' },
