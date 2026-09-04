@@ -333,7 +333,19 @@ function BackBtn({ onClick, variant = "dark" }) {
   );
 }
 
-function Img({ src, style, bg = "#e8e0d8" }) {
+// picsum.photos adresleri /seed/<ad>/<genişlik>/<yükseklik> biçiminde. 46px'lik
+// bir küçük görsel için 600×400 indirmek boşuna bant genişliği; gösterim ölçüsü
+// verildiğinde kaynağı da o ölçüde istiyoruz (2× retina payıyla).
+function sizedSrc(src, box) {
+  if (!src || !box || !/picsum\.photos\/seed\//.test(src)) return src;
+  return src.replace(/\/(\d+)\/(\d+)(\?|$)/, (m, w, h, tail) => {
+    const ratio = Number(h) / Number(w) || 1;
+    const targetW = Math.round(box * 2);
+    return `/${targetW}/${Math.round(targetW * ratio)}${tail}`;
+  });
+}
+
+function Img({ src, style, bg = "#e8e0d8", box }) {
   const [state, setState] = useState("loading"); // loading | ok | failed
   useEffect(() => {
     setState("loading");
@@ -347,7 +359,7 @@ function Img({ src, style, bg = "#e8e0d8" }) {
       {state === "loading" && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 22, height: 22, border: "3px solid rgba(0,0,0,0.08)", borderTopColor: "#FF6600", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
       {/* Yüklenemeyen görselde <img> gizli kalır; arka plan rengi/gradyanı görünür
           — aksi halde tarayıcının bozuk görsel ikonu kartın üstüne düşüyordu. */}
-      <img src={src} alt="" onLoad={() => setState("ok")} onError={() => setState("failed")} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: state === "ok" ? 1 : 0, transition: "opacity 0.4s" }} />
+      <img src={sizedSrc(src, box)} alt="" loading="lazy" decoding="async" onLoad={() => setState("ok")} onError={() => setState("failed")} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: state === "ok" ? 1 : 0, transition: "opacity 0.4s" }} />
     </div>
   );
 }
@@ -701,9 +713,9 @@ function LoginScreen({ onBack, onLogin, onRegister }) {
   return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>Giriş yap</h2><p onClick={onRegister} style={{ textAlign: "center", color: "rgba(255,255,255,0.85)", fontSize: 14, marginBottom: 32, cursor: "pointer", textDecoration: "underline", fontFamily: "'Outfit', sans-serif" }}>Üyeliğiniz yoksa lütfen kayıt için dokununuz</p><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR uldamaya başla" onClick={onLogin} /></div></div></Screen>;
 }
 
-function RegisterScreen({ onBack, onDone }) {
+function RegisterScreen({ onBack, onDone, onLegal }) {
   const [n,setN]=useState(""); const [e,setE]=useState(""); const [p,setP]=useState(""); const [d,setD]=useState(""); const [a,setA]=useState(false);
-  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "'Outfit', sans-serif", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Lütfen yasal sözleşmeyi onaylayarak devam ediniz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" onClick={onDone} /></div></Screen>;
+  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "'Outfit', sans-serif", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "#FF6600", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" onClick={onDone} /></div></Screen>;
 }
 
 // ═══════════════════════════════════════════════
@@ -1589,7 +1601,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
                   {photoUploads.map((file, i) => (
                     <div key={i} style={{ position: "relative", borderRadius: 14, overflow: "hidden", aspectRatio: "1", animation: `fadeInUp 0.3s ease-out ${i * 0.05}s both` }}>
-                      <img src={file.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <img src={file.url} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       <div style={{ position: "absolute", top: 4, right: 4 }}>
                         <IconBtn
                           onClick={() => setPhotoUploads(p => { if (p[i]?.url) URL.revokeObjectURL(p[i].url); return p.filter((_, idx) => idx !== i); })}
@@ -2485,7 +2497,7 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
               boxShadow: "0 4px 16px rgba(0,0,0,0.06)", cursor: "pointer", animation: `fadeInUp 0.35s ease-out ${i * 0.05}s both`,
             }}>
               <div style={{ width: 74, height: 74, borderRadius: 16, overflow: "hidden", flexShrink: 0, position: "relative" }}>
-                <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" />
+                <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" box={74} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h4 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14.5, fontWeight: 800, color: "#2D2419", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</h4>
@@ -2884,7 +2896,7 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
           {photos.map((f, i) => (
             <div key={i} style={{ position: "relative", width: 74, height: 74, borderRadius: 14, overflow: "hidden", border: "1.5px solid rgba(45,36,25,0.1)" }}>
-              <img src={f.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <img src={f.url} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               <button type="button" className="gur-icon-btn" onClick={() => removePhoto(i)} title="Fotoğrafı kaldır" aria-label="Fotoğrafı kaldır" style={{ position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: "50%", border: "none", padding: 0, outline: "none", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✕</button>
             </div>
           ))}
@@ -2956,7 +2968,8 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
     const url = r.lat && r.lng
       ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + " " + r.addr)}`;
-    window.open(url, "_blank");
+    // noopener: açılan sayfa window.opener üzerinden bu sekmeyi yönlendiremez
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   // Kullanıcının bu restorana yazdığı yorumlar en üstte, örnek yorunlar altında
@@ -3487,7 +3500,7 @@ const BADGES = [
   { icon: "flame", label: "Sadık Müşteri" },
 ];
 
-function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onDetail, accentColor = "#FF6600", showBadges = true, badgeSpeed = 14, userReviews = {}, restaurants = [], onRemoveUserReview, onDeleteAccount }) {
+function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onDetail, accentColor = "#FF6600", showBadges = true, badgeSpeed = 14, userReviews = {}, restaurants = [], onRemoveUserReview, onDeleteAccount, onLegal }) {
   const [tab, setTab] = useState("reviews");
   // Silme geri alınamıyor; her ikisi de önce onay ister
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -3589,7 +3602,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
             ) : reviews.map((rev, i) => (
               <div key={rev.rid} style={{ display: "flex", gap: 12, padding: "16px 0", borderBottom: i < reviews.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", animation: `fadeInUp 0.35s ease-out ${i * 0.06}s both` }}>
                 <div style={{ width: 50, height: 50, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
-                  <Img src={rev.img} style={{ width: "100%", height: "100%" }} bg="#e8e0d8" />
+                  <Img src={rev.img} style={{ width: "100%", height: "100%" }} bg="#e8e0d8" box={50} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -3604,7 +3617,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
                     <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                       {rev.photos.map((src, pi) => (
                         <div key={pi} style={{ width: 46, height: 46, borderRadius: 10, overflow: "hidden", flexShrink: 0, border: "1px solid rgba(0,0,0,0.06)" }}>
-                          <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <img src={src} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         </div>
                       ))}
                     </div>
@@ -3625,7 +3638,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
             ) : favorites.map((r, i) => (
               <div key={r.id} onClick={() => onDetail(r)} style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: i < favorites.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", cursor: "pointer" }}>
                 <div style={{ width: 46, height: 46, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
-                  <Img src={r.imgs[0]} style={{ width: "100%", height: "100%" }} bg="#e8e0d8" />
+                  <Img src={r.imgs[0]} style={{ width: "100%", height: "100%" }} bg="#e8e0d8" box={46} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 2px" }}>{r.name}</p>
@@ -3644,7 +3657,10 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
             <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#8A7A68", margin: "0 0 12px", lineHeight: 1.5 }}>
               Hesabını silersen yorumların, favorilerin ve rozetlerin kalıcı olarak kaldırılır.
             </p>
-            <Btn text="Hesabımı sil" onClick={() => setConfirmAccount(true)} variant="destructiveSoft" size="md" fullWidth={false} />
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <Btn text="Yasal metinler" onClick={onLegal} variant="outlineDark" size="md" fullWidth={false} />
+              <Btn text="Hesabımı sil" onClick={() => setConfirmAccount(true)} variant="destructiveSoft" size="md" fullWidth={false} />
+            </div>
           </div>
         </div>
       </div>
@@ -3679,6 +3695,111 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
           <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <Icon n="heart" color="#FF3B30" size={22} />
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+          </div>
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// YASAL METİNLER
+// İşletme bilgileri yayına çıkmadan önce doldurulmalı ve metinler bir
+// hukuk danışmanına onaylatılmalıdır; buradaki içerik hukuki tavsiye değildir.
+// ═══════════════════════════════════════════════
+const LEGAL_OPERATOR = "GUR Teknoloji A.Ş.";       // ticaret unvanı
+const LEGAL_ADDRESS = "İstanbul, Türkiye";          // tebligat adresi
+const LEGAL_CONTACT = "kvkk@gur.app";               // veri sorumlusu iletişimi
+const LEGAL_UPDATED = "1 Eylül 2026";
+
+const LEGAL_DOCS = [
+  {
+    id: "kvkk",
+    label: "KVKK",
+    title: "Kişisel Verilerin Korunması Aydınlatma Metni",
+    body: [
+      ["Veri sorumlusu", `6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") uyarınca kişisel verileriniz, veri sorumlusu sıfatıyla ${LEGAL_OPERATOR} (${LEGAL_ADDRESS}) tarafından aşağıda açıklanan kapsamda işlenmektedir.`],
+      ["İşlenen veriler", "Kimlik ve iletişim verileri (ad, e-posta, doğum yılı), uygulama kullanım verileri (kaydırma, favori, yorum ve puanlar), yüklediğiniz görseller, cihaz ve bağlantı verileri (cihaz türü, işletim sistemi, IP adresi) ve izin vermeniz hâlinde konum verisi."],
+      ["İşleme amaçları", "Üyelik kaydının oluşturulması, restoran önerilerinin kişiselleştirilmesi, favori ve yorumların saklanması, Gastro Onaylı değerlendirmelerinin yürütülmesi, kampanya ve kupon süreçleri, hizmet güvenliğinin sağlanması ve yasal yükümlülüklerin yerine getirilmesi."],
+      ["Hukuki sebepler", "Sözleşmenin kurulması ve ifası (m.5/2-c), hukuki yükümlülük (m.5/2-ç), meşru menfaat (m.5/2-f) ve açık rızanız (m.5/1) — konum, pazarlama iletişimi ve isteğe bağlı çerezler yalnızca açık rızaya dayanır."],
+      ["Aktarım", "Veriler; barındırma, ödeme, bildirim ve analiz hizmeti aldığımız tedarikçilere, talep hâlinde yetkili kamu kurumlarına ve restoran hesabınızın olması durumunda yalnızca kendi işletmenize ait istatistikler kapsamında ilgili işletmeye aktarılabilir. Yurt dışına aktarım KVKK m.9 şartlarına uygun olarak yapılır."],
+      ["Saklama süresi", "Üyelik verileri hesabınız açık kaldığı sürece; hesap silindiğinde yasal zorunluluklar dışında en geç 6 ay içinde silinir veya anonim hâle getirilir."],
+      ["Haklarınız", `KVKK m.11 kapsamında verilerinize erişme, düzeltme, silme, işlemeye itiraz etme ve veri taşınabilirliği haklarına sahipsiniz. Başvurularınızı ${LEGAL_CONTACT} adresine iletebilirsiniz; talepleriniz en geç 30 gün içinde yanıtlanır. Uygulamadaki "Hesabımı sil" seçeneği silme talebinizi doğrudan başlatır.`],
+    ],
+  },
+  {
+    id: "privacy",
+    label: "Gizlilik",
+    title: "Gizlilik Politikası",
+    body: [
+      ["Ne topluyoruz", "Yalnızca hizmeti sunmak için gerekli olanı: hesap bilgileriniz, uygulama içi tercihleriniz ve yazdığınız içerikler. Rehberinize, galerinizin tamamına veya mikrofonunuza erişmiyoruz."],
+      ["İzinler", "Konum izni yalnızca yakınınızdaki restoranları sıralamak, kamera/galeri izni yalnızca yorumunuza fotoğraf eklemek, bildirim izni yalnızca kampanya ve eşleşme bildirimleri için istenir. Her izin ihtiyaç doğduğu anda ve gerekçesiyle sorulur; reddetmeniz hâlinde uygulamanın kalan bölümleri çalışmaya devam eder."],
+      ["Çerezler ve ölçümleme", "Oturumunuzu sürdürmek için zorunlu yerel depolama kullanılır. Ziyaret istatistikleri için ölçümleme araçları yalnızca açık rızanızla ve IP maskeleme açıkken çalıştırılır."],
+      ["Üçüncü taraflar", "Harita bağlantıları Google Haritalar'a, restoran verisinin bir bölümü OpenStreetMap'e, görseller görsel dağıtım ağına yönlendirir. Bu servislerin kendi gizlilik politikaları geçerlidir."],
+      ["Reklamlar", "Ödüllü video reklamlar ve keşfet banner'ları kampanya bazlıdır; reklam gösterimi için kimliğinizi reklam verenle paylaşmayız, yalnızca toplulaştırılmış gösterim ve tamamlanma sayıları raporlanır."],
+      ["Güvenlik", "Veriler aktarımda TLS ile korunur, parolalar geri döndürülemez biçimde saklanır. Bir ihlal hâlinde KVKK m.12 uyarınca en kısa sürede Kurul'a ve size bildirim yapılır."],
+      ["Çocuklar", "Uygulama 13 yaşın altındaki kullanıcılara yönelik değildir."],
+    ],
+  },
+  {
+    id: "terms",
+    label: "Koşullar",
+    title: "Kullanım Koşulları",
+    body: [
+      ["Hizmet", `GUR, restoran keşfi sunan bir platformdur. ${LEGAL_OPERATOR} restoranların işletmecisi değildir; yemek, servis ve hijyen sorumluluğu ilgili işletmeye aittir.`],
+      ["Hesabınız", "Verdiğiniz bilgilerin doğruluğundan ve hesabınızın güvenliğinden siz sorumlusunuz. Hesabınızı istediğiniz zaman profil ekranından silebilirsiniz."],
+      ["İçerik kuralları", "Yorum ve fotoğraflarınız gerçek bir deneyime dayanmalıdır. Hakaret, ayrımcılık, gizli reklam, başkasına ait içerik ve yanıltıcı puanlama yasaktır; bu içerikler bildirim üzerine veya resen kaldırılabilir."],
+      ["Gastro Onaylı", "Gastro rozeti bağımsız şef değerlendirmesine dayanır ve satın alınamaz. Abonelik planları rozetin verilmesini etkilemez."],
+      ["Abonelik ve kampanyalar", "Restoran abonelikleri ile kupon ve indirim kampanyaları ilgili sayfada belirtilen süre ve koşullarla geçerlidir. Ücretli hizmetlerde cayma hakkınız Mesafeli Sözleşmeler Yönetmeliği kapsamında saklıdır."],
+      ["Sorumluluğun sınırı", "Puanlar, mesafeler ve çalışma saatleri bilgilendirme amaçlıdır ve hata içerebilir. Rezervasyon ve ödeme işlemlerinde aracı konumundayız."],
+      ["Uygulanacak hukuk", `Bu koşullara Türk hukuku uygulanır; uyuşmazlıklarda İstanbul mahkemeleri ve icra daireleri yetkilidir. Sorularınız için ${LEGAL_CONTACT}.`],
+    ],
+  },
+];
+
+function LegalScreen({ onBack, initialDoc = "kvkk" }) {
+  const [docId, setDocId] = useState(initialDoc);
+  const doc = LEGAL_DOCS.find(d => d.id === docId) || LEGAL_DOCS[0];
+
+  return (
+    <Screen grad={false}>
+      <div style={{ height: "100%", background: "#fff", overflowY: "auto" }}>
+        <div style={{ padding: "44px 20px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+            <BackBtn onClick={onBack} variant="light" />
+            <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "#1C1917", margin: 0 }}>Yasal metinler</h2>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            {LEGAL_DOCS.map(d => (
+              <button
+                key={d.id} type="button" onClick={() => setDocId(d.id)} className="gur-btn"
+                style={{
+                  border: d.id === docId ? "none" : "1px solid rgba(0,0,0,0.1)",
+                  background: d.id === docId ? "#FF6600" : "#fff",
+                  color: d.id === docId ? "#fff" : "#57534E",
+                  borderRadius: 999, padding: "7px 14px", cursor: "pointer", outline: "none",
+                  fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700,
+                }}>{d.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ padding: "18px 20px 120px" }}>
+          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16.5, fontWeight: 800, letterSpacing: "-0.02em", color: "#1C1917", margin: "0 0 4px", lineHeight: 1.3 }}>{doc.title}</h3>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#A8A29E", margin: "0 0 18px" }}>Son güncelleme: {LEGAL_UPDATED}</p>
+
+          {doc.body.map(([heading, text]) => (
+            <div key={heading} style={{ marginBottom: 18 }}>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "#1C1917", margin: "0 0 5px" }}>{heading}</p>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#57534E", lineHeight: 1.6, margin: 0 }}>{text}</p>
+            </div>
+          ))}
+
+          <div style={{ background: "#FFF8F4", border: "1px solid rgba(255,102,0,0.18)", borderRadius: 14, padding: "12px 14px", marginTop: 6 }}>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#8A5A2B", lineHeight: 1.55, margin: 0 }}>
+              Bu metinler yayına hazırlık taslağıdır. Ticaret unvanı, adres ve iletişim bilgileri doldurulmadan ve bir hukuk danışmanına onaylatılmadan yayına çıkarılmamalıdır.
+            </p>
           </div>
         </div>
       </div>
@@ -3738,10 +3859,13 @@ function osmToRestaurant(el, idx) {
 async function fetchLiveRestaurants() {
   // Kadıköy merkez bölgesi bounding box
   const query = `[out:json][timeout:15];node["amenity"="restaurant"]["name"](40.980,29.015,41.005,29.045);out body 40;`;
+  // Sunucu tarafı [timeout:15] yalnızca sorgu süresini sınırlar; bağlantı
+  // yanıtsız kalırsa istek sonsuza kadar bekler. İstemci tarafında da kesiyoruz.
   const res = await fetch("https://overpass-api.de/api/interpreter", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: "data=" + encodeURIComponent(query),
+    signal: AbortSignal.timeout ? AbortSignal.timeout(18000) : undefined,
   });
   if (!res.ok) throw new Error("Overpass hata: " + res.status);
   const data = await res.json();
@@ -3868,7 +3992,7 @@ export default function GurApp(props = {}) {
       case "splash": return <SplashScreen onNext={() => setScreen("welcome")} />;
       case "welcome": return <WelcomeScreen onStart={() => nav("login")} onDoyurucu={() => nav("doyurucu-auth")} />;
       case "login": return <LoginScreen onBack={back} onLogin={() => nav("explore")} onRegister={() => nav("register")} />;
-      case "register": return <RegisterScreen onBack={back} onDone={() => nav("explore")} />;
+      case "register": return <RegisterScreen onBack={back} onDone={() => nav("explore")} onLegal={() => nav("legal")} />;
       case "doyurucu-auth": return <DoyurucuAuthScreen onBack={back} onLogin={() => nav("doyurucu-login")} onRegister={() => nav("rest1")} />;
       case "doyurucu-login": return <DoyurucuLoginScreen onBack={back} onLogin={() => nav("rest-dashboard")} />;
       case "rest1": return <RestRegStep1 onBack={back} onNext={() => nav("rest2")} />;
@@ -3882,7 +4006,8 @@ export default function GurApp(props = {}) {
       case "swipe": return <SwipeScreen onDetail={openDetail} onExplore={goExplore} onFavorites={goFav} favorites={favorites} setFavorites={setFavorites} filterCat={filterCat} restaurants={feed} dataSource={dataSource} />;
       case "detail": return <DetailScreen r={liveSelected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} userReviews={userReviews[liveSelected?.id] || []} onAddReview={addReview} />;
       case "fav": return <FavScreen onExplore={goExplore} onSwipe={goSwipe} onDetail={openDetail} favorites={favorites} setFavorites={setFavorites} onProfile={goProfile} />;
-      case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} userReviews={userReviews} restaurants={feed} onRemoveUserReview={removeUserReview} onDeleteAccount={deleteAccount} />;
+      case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} userReviews={userReviews} restaurants={feed} onRemoveUserReview={removeUserReview} onDeleteAccount={deleteAccount} onLegal={() => nav("legal")} />;
+      case "legal": return <LegalScreen onBack={back} />;
       default: return <SplashScreen onNext={() => setScreen("welcome")} />;
     }
   };
