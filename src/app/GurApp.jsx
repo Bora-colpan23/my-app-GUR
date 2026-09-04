@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 're
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { animate } from 'motion';
 import { useFeature } from '../lib/phase.js';
+import { getConsent, setConsent, initAnalytics } from '../lib/analytics.js';
 
 // Apple "Designing Fluid Interfaces" momentum projection: nereye bırakılacağını
 // bırakma anındaki konum değil, hızın taşıdığı yönü kullanarak tahmin eder.
@@ -3757,6 +3758,29 @@ const LEGAL_DOCS = [
   },
 ];
 
+// Çerez/ölçümleme rıza bandı. Rıza verilmeden hiçbir ölçümleme scripti
+// yüklenmez; reddedilirse bir daha sorulmaz.
+function ConsentBanner({ onDecide, onLegal }) {
+  return (
+    <div style={{
+      position: "absolute", left: 12, right: 12, bottom: 12, zIndex: 900,
+      background: "rgba(20,14,8,0.92)", backdropFilter: "blur(12px)",
+      border: "1px solid rgba(255,255,255,0.1)", borderRadius: 22, padding: "16px 16px 14px",
+      boxShadow: "0 12px 40px rgba(0,0,0,0.4)", animation: "fadeInUp 0.4s ease-out",
+    }}>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", margin: "0 0 5px" }}>Ölçümleme çerezleri</p>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.5, margin: "0 0 13px" }}>
+        Uygulamayı geliştirmek için anonim kullanım istatistikleri toplayabiliriz. Zorunlu olanlar dışında hiçbir şey izniniz olmadan çalışmaz.{" "}
+        <span onClick={onLegal} style={{ color: "#FFA500", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>Ayrıntılar</span>
+      </p>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn text="Kabul et" onClick={() => onDecide("granted")} variant="filled" size="md" />
+        <Btn text="Yalnızca zorunlu" onClick={() => onDecide("denied")} variant="outline" size="md" />
+      </div>
+    </div>
+  );
+}
+
 function LegalScreen({ onBack, initialDoc = "kvkk" }) {
   const [docId, setDocId] = useState(initialDoc);
   const doc = LEGAL_DOCS.find(d => d.id === docId) || LEGAL_DOCS[0];
@@ -3895,6 +3919,10 @@ export default function GurApp(props = {}) {
   // Kullanıcının yazdığı yorumlar restoran id'sine göre — hem restoran
   // detayında hem profildeki "Yorumlarım" listesinde aynı kaynaktan okunur
   const [userReviews, setUserReviews] = useState({});
+  // null = henüz sorulmadı; "granted" | "denied" = karar verilmiş
+  const [consent, setConsentState] = useState(() => getConsent());
+  useEffect(() => { initAnalytics(); }, []);
+  const decideConsent = (value) => { setConsent(value); setConsentState(value); };
 
   const addReview = (restaurantId, review) =>
     setUserReviews(prev => ({ ...prev, [restaurantId]: [review, ...(prev[restaurantId] || [])] }));
@@ -4076,7 +4104,13 @@ export default function GurApp(props = {}) {
           }
         }
       `}</style>
-      <PhoneFrame>{render()}</PhoneFrame>
+      <PhoneFrame>
+        {render()}
+        {/* Splash geçilene kadar sorulmaz — ilk izlenim bir onay kutusu olmasın */}
+        {!consent && screen !== "splash" && screen !== "legal" && (
+          <ConsentBanner onDecide={decideConsent} onLegal={() => nav("legal")} />
+        )}
+      </PhoneFrame>
     </div>
   );
 }
