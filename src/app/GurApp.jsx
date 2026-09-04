@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { animate } from 'motion';
 import { useFeature } from '../lib/phase.js';
@@ -7,6 +7,12 @@ import { useFeature } from '../lib/phase.js';
 // bırakma anındaki konum değil, hızın taşıdığı yönü kullanarak tahmin eder.
 function projectMomentum(velocity, decelerationRate = 0.998) {
   return (velocity / 1000) * decelerationRate / (1 - decelerationRate);
+}
+
+// Sınırın ötesine gidildikçe artan direnç: sert durmak "donmuş" hissi verir,
+// giderek zorlaşan hareket "buraya kadar" der ama tepkisiz kalmaz.
+function rubberband(overshoot, dimension, constant = 0.55) {
+  return (overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot));
 }
 
 // ── GUR Match: arkadaşın kararları ───────────────────────────────────────
@@ -180,6 +186,24 @@ const REWARD_ADS = [
   },
 ];
 
+// Sistem "Hareketi Azalt" tercihini React tarafında okur. MotionConfig
+// yalnızca Motion animasyonlarını kapsıyor; setTimeout ile dönen karusel
+// gibi kendi zamanlayıcılarımızın da bu tercihe uyması gerekiyor.
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const on = () => setReduced(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return reduced;
+}
+
 // Keşfet üstündeki dönen banner: marka slaytı + sponsor slaytları
 const BANNER_ADS = [
   { id: "ad-1", brand: "Öz Değirmen", text: "Tam buğday ununda %20 indirim", cta: "Kampanyayı gör", img: "https://picsum.photos/seed/gur-ad-flour/800/400", accent: "#C2410C" },
@@ -255,8 +279,8 @@ function Icon({ n, size = 18, color = "currentColor", strokeWidth = 2 }) {
 // ─── Icon-only buton — Apple HIG: dairesel/rounded "glass" veya opak hedef, min 40pt dokunma alanı ───
 function IconBtn({ onClick, icon, children, tone = "glassDark", shape = "circle", size = 40, title }) {
   const tones = {
-    glassDark: { bg: "rgba(0,0,0,0.35)", blur: true },
-    glassLight: { bg: "rgba(255,255,255,0.16)", blur: true },
+    glassDark: { bg: "rgba(0,0,0,0.35)", blur: true, glass: "dark" },
+    glassLight: { bg: "rgba(255,255,255,0.16)", blur: true, glass: "dark" },
     solidLight: { bg: "#fff", shadow: "0 2px 10px rgba(0,0,0,0.08)" },
     subtle: { bg: "rgba(45,36,25,0.06)" },
     dangerSoft: { bg: "rgba(255,59,48,0.1)" },
@@ -270,7 +294,7 @@ function IconBtn({ onClick, icon, children, tone = "glassDark", shape = "circle"
       aria-label={title}
       whileTap={{ scale: 0.88 }}
       transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-      className="gur-icon-btn"
+      className={`gur-icon-btn${t.glass ? ` gur-glass gur-glass-${t.glass}` : ""}`}
       style={{
         width: size, height: size, minWidth: size, minHeight: size, flexShrink: 0,
         borderRadius: shape === "circle" ? "50%" : 14,
@@ -493,7 +517,7 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTo
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 30%, transparent 55%)", borderRadius: 24 }} />
       {/* Content */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
-        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{r.name}</h3>
+        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{r.name}</h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
           <span style={{ background: "#fff", borderRadius: 10, padding: "4px 12px", fontSize: 13, fontWeight: 700, color: "#1C1917", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="#F59E0B" size={12} />{r.rating}</span>
           <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "'Outfit', sans-serif" }}>{r.dist}</span>
@@ -945,7 +969,7 @@ function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
           </div>
 
           <h2 style={{
-            fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, color: "#2D2419",
+            fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "#2D2419",
             textAlign: "center", margin: "0 0 10px",
             animation: "fadeInUp 0.5s ease-out 0.1s both",
           }}>Başvurunuz Alındı!</h2>
@@ -1263,7 +1287,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 <div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(76,175,80,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="heart" color="#4CAF50" size={16} /></div>
                     <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(76,175,80,0.8)", fontWeight: 600 }}>Sağ Kaydırma</span>
                   </div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#4CAF50", margin: "0 0 2px" }}>{stats.swipeRight}</p>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#4CAF50", margin: "0 0 2px" }}>{stats.swipeRight}</p>
                   <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>kişi beğendi</p>
                 </div>
                 {/* Sol kaydırma */}
@@ -1272,7 +1296,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 <div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(255,59,48,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="cross" color="#FF3B30" size={16} /></div>
                     <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,59,48,0.8)", fontWeight: 600 }}>Sol Kaydırma</span>
                   </div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#FF3B30", margin: "0 0 2px" }}>{stats.swipeLeft}</p>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#FF3B30", margin: "0 0 2px" }}>{stats.swipeLeft}</p>
                   <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>kişi geçti</p>
                 </div>
               </div>
@@ -1283,7 +1307,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(255,165,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="eye" color="#FFA500" size={18} /></div>
                   <div>
                     <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Toplam Görüntülenme</p>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#fff", margin: 0 }}>{stats.totalViews.toLocaleString()}</p>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: 0 }}>{stats.totalViews.toLocaleString()}</p>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -1662,11 +1686,14 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 // sırayla döner. Reklam slaytları her zaman "REKLAM" etiketi taşır.
 function HeroCarousel({ slides, intervalMs = 4500 }) {
   const [i, setI] = useState(0);
+  const reduced = usePrefersReducedMotion();
   useEffect(() => {
-    if (slides.length < 2) return;
+    // Hareket azaltıldığında kendiliğinden dönmez: sürekli tekrar eden
+    // hareket vestibüler rahatsızlık kaynağı. Slaytlar noktalarla gezilir.
+    if (reduced || slides.length < 2) return;
     const t = setTimeout(() => setI(v => (v + 1) % slides.length), intervalMs);
     return () => clearTimeout(t);
-  }, [i, slides.length, intervalMs]);
+  }, [i, slides.length, intervalMs, reduced]);
 
   const slide = slides[i] || slides[0];
   if (!slide) return null;
@@ -1699,10 +1726,14 @@ function HeroCarousel({ slides, intervalMs = 4500 }) {
       {slides.length > 1 && (
         <div style={{ position: "absolute", bottom: 10, right: 14, display: "flex", gap: 5, zIndex: 3 }}>
           {slides.map((sl, k) => (
-            <div key={sl.id} onClick={() => setI(k)} style={{
-              width: k === i ? 16 : 6, height: 6, borderRadius: 3, cursor: "pointer",
-              background: k === i ? "#fff" : "rgba(255,255,255,0.45)", transition: "all 0.3s",
-            }} />
+            <button
+              key={sl.id} onClick={() => setI(k)} className="gur-dot"
+              aria-label={`${k + 1}. slayt`} aria-current={k === i}
+              style={{
+                width: k === i ? 16 : 6, height: 6, borderRadius: 3, cursor: "pointer",
+                border: "none", padding: 0, WebkitTapHighlightColor: "transparent",
+                background: k === i ? "#fff" : "rgba(255,255,255,0.45)", transition: "width 0.3s, background 0.3s",
+              }} />
           ))}
         </div>
       )}
@@ -1955,7 +1986,7 @@ function RewardedAdOverlay({ ad, onComplete, onAbort }) {
         {/* Marka bilgisi */}
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 20px 22px", zIndex: 5 }}>
           <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 800, color: "rgba(255,255,255,0.75)", margin: "0 0 4px" }}>{ad.brand}</p>
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, color: "#fff", margin: "0 0 6px", lineHeight: 1.25 }}>{ad.headline}</h3>
+          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 6px", lineHeight: 1.25 }}>{ad.headline}</h3>
           <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.6)", margin: "0 0 14px" }}>{ad.tagline}</p>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#fff", borderRadius: 999, padding: "9px 18px" }}>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: ad.accent }}>{ad.cta}</span>
@@ -1963,9 +1994,13 @@ function RewardedAdOverlay({ ad, onComplete, onAbort }) {
           </div>
         </div>
 
-        {/* İlerleme */}
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, background: "rgba(255,255,255,0.12)", zIndex: 6 }}>
-          <div style={{ width: `${pct}%`, height: "100%", background: "#FF6600", transition: "width 1s linear" }} />
+        {/* İlerleme — width yerine transform: layout tetiklemez, kompozitörde kalır */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, background: "rgba(255,255,255,0.12)", zIndex: 6, overflow: "hidden" }}>
+          <div style={{
+            width: "100%", height: "100%", background: "#FF6600",
+            transformOrigin: "left center", transform: `scaleX(${pct / 100})`,
+            transition: "transform 1s linear", willChange: "transform",
+          }} />
         </div>
       </div>
 
@@ -2002,7 +2037,7 @@ function SwipeGate({ onWatch, onExplore }) {
         <div style={{ width: 74, height: 74, borderRadius: "50%", background: "rgba(255,102,0,0.14)", border: "1px solid rgba(255,102,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
           <Icon n="clock" size={28} color="#FFA500" />
         </div>
-        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>Kaydırma hakkın bitti</h3>
+        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px" }}>Kaydırma hakkın bitti</h3>
         <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: "0 0 22px", lineHeight: 1.55 }}>
           Kısa bir reklam izle, <b style={{ color: "#FFA500" }}>{REWARD_SWIPES} kaydırma hakkı</b> daha kazan.
         </p>
@@ -2254,7 +2289,7 @@ function MatchStartScreen({ onBack, onStart }) {
           <div style={{ width: 76, height: 76, borderRadius: "50%", background: "rgba(255,102,0,0.14)", border: "1px solid rgba(255,102,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
             <Icon n="sparkle" size={30} color="#FFA500" />
           </div>
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>GUR Match</h2>
+          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px" }}>GUR Match</h2>
           <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: 0, lineHeight: 1.55 }}>
             Arkadaşınla aynı anda kaydır. İkiniz de sağa kaydırdığınız restoranlar eşleşme olur — nereye gideceğinizi tartışmayın, bırakın kartlar karar versin.
           </p>
@@ -2386,7 +2421,7 @@ function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
                   <Img src={popup.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
                   <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.85), transparent 60%)" }} />
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px 18px", textAlign: "left" }}>
-                    <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>{popup.name}</h3>
+                    <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 4px" }}>{popup.name}</h3>
                     <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.65)", margin: 0 }}>{popup.cat} • {popup.dist}</p>
                   </div>
                 </div>
@@ -2413,7 +2448,7 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
         </div>
 
         <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#2D2419", margin: "0 0 6px" }}>
+          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#2D2419", margin: "0 0 6px" }}>
             {matches.length > 0 ? `${matches.length} eşleşme!` : "Eşleşme çıkmadı"}
           </h2>
           <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0 }}>
@@ -2473,28 +2508,112 @@ function tastingMenuFor(r) {
   return { ...base, price: Math.round((priceHint * 1.9) / 50) * 50 };
 }
 
+// Sheet, aşağı sürüklenerek kapatılabilir. Kapanıp kapanmayacağına bırakma
+// noktası değil, momentumun taşıyacağı nokta karar verir; kapanış animasyonu
+// parmağın hızını devralır, yani sürükleme ile animasyon arasında dikiş olmaz.
+// Yukarı çekişte lastik direnç var — sert durmak "donmuş" hissi verirdi.
+const SHEET_DISMISS_RATIO = 0.4;   // yüksekliğin bu kadarını geçerse kapanır
+
 function Sheet({ title, subtitle, onClose, children }) {
+  // y'yi Framer'ın declarative animate'ine bırakmıyoruz: aynı değeri hem o
+  // hem biz sürersek jest sırasındaki set'lerimiz eziliyor. Giriş, çıkış ve
+  // sürükleme tek elden burada yönetiliyor.
+  const y = useMotionValue(0);
+  const panelRef = useRef(null);
+  const drag = useRef(null);
+  const [dragging, setDragging] = useState(false);
+
+  useLayoutEffect(() => {
+    const h = panelRef.current?.offsetHeight || 420;
+    y.set(h);
+    animate(y, 0, { type: "spring", bounce: 0.2, duration: 0.3 });
+    // Yalnızca ilk açılışta: y ve panel yüksekliği ref üzerinden okunuyor
+  }, []);
+
+  // Kapanış her yoldan aynı: panel aşağı iner, sonra kapanır (§7 — giriş ve
+  // çıkış aynı yolu izler)
+  const close = () => {
+    const h = panelRef.current?.offsetHeight || 420;
+    animate(y, h, { type: "spring", bounce: 0, duration: 0.3 }).then(onClose);
+  };
+  // Perde panel indikçe soluklaşır; panelin kendisi solmaz — sürüklenen
+  // nesne parmakla birebir kalmalı.
+  const scrimOpacity = useTransform(y, [0, 320], [1, 0.12]);
+
+  // Sürükleme Framer'ın drag'ine değil doğrudan Pointer Events'e bağlı:
+  // dragConstraints kendi geri dönüşünü yapıp bırakma fiziğimizle çakışıyordu.
+  const height = () => panelRef.current?.offsetHeight || 420;
+
+  const onPointerDown = (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { startY: e.clientY, base: y.get(), hist: [[performance.now(), e.clientY]] };
+    setDragging(true);
+  };
+
+  const onPointerMove = (e) => {
+    const d = drag.current;
+    if (!d) return;
+    const raw = d.base + (e.clientY - d.startY);
+    // Aşağı serbest, yukarı lastik direnç
+    y.set(raw < 0 ? -rubberband(-raw, height()) : raw);
+    d.hist.push([performance.now(), e.clientY]);
+    if (d.hist.length > 6) d.hist.shift();
+  };
+
+  const onPointerUp = () => {
+    const d = drag.current;
+    if (!d) return;
+    drag.current = null;
+    setDragging(false);
+    const [t0, y0] = d.hist[0];
+    const [t1, y1] = d.hist[d.hist.length - 1];
+    const velocity = t1 > t0 ? ((y1 - y0) / (t1 - t0)) * 1000 : 0;   // px/s
+    // Bırakma noktası değil, momentumun taşıyacağı nokta karar verir
+    const projected = y.get() + projectMomentum(velocity);
+    if (projected > height() * SHEET_DISMISS_RATIO) {
+      // Çıkış parmağın hızını devralır — sürükleme ile animasyon arasında dikiş yok
+      animate(y, height(), { type: "spring", bounce: 0, duration: 0.35, velocity }).then(onClose);
+    } else {
+      // Apple'ın çekmece değerleri: damping 0.8 / response 0.3
+      animate(y, 0, { type: "spring", bounce: 0.2, duration: 0.3, velocity });
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      onClick={onClose}
-      style={{ position: "absolute", inset: 0, background: "rgba(20,14,8,0.55)", backdropFilter: "blur(4px)", zIndex: 320, display: "flex", alignItems: "flex-end" }}
+      onClick={close}
+      style={{ position: "absolute", inset: 0, zIndex: 320, display: "flex", alignItems: "flex-end" }}
     >
       <motion.div
-        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-        transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+        aria-hidden
+        style={{ position: "absolute", inset: 0, background: "rgba(20,14,8,0.55)", backdropFilter: "blur(4px)", opacity: scrimOpacity }}
+      />
+      <motion.div
+        ref={panelRef}
         onClick={e => e.stopPropagation()}
-        style={{ width: "100%", maxHeight: "88%", overflowY: "auto", background: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: "20px 20px 24px" }}
+        style={{ y, position: "relative", width: "100%", maxHeight: "88%", overflowY: dragging ? "hidden" : "auto", background: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: "20px 20px 24px" }}
       >
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: "#E5E0DA", margin: "0 auto 16px" }} />
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
-          <div style={{ minWidth: 0 }}>
-            <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, color: "#2D2419", margin: "0 0 3px" }}>{title}</h3>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</p>
+        {/* Sürükleme bölgesi: tutamaç ve başlık. İçerik kaydırılabilir kaldığı
+            için jest yalnızca burada dinleniyor. */}
+        <div
+          data-sheet-drag
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          style={{ touchAction: "none", cursor: dragging ? "grabbing" : "grab", margin: "-20px -20px 0", padding: "20px 20px 0" }}
+        >
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: dragging ? "#C9C1B8" : "#E5E0DA", margin: "0 auto 16px", transition: "background 0.2s" }} />
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+            <div style={{ minWidth: 0 }}>
+              <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "#2D2419", margin: "0 0 3px" }}>{title}</h3>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</p>
+            </div>
+            <IconBtn onClick={close} tone="subtle" size={34} title="Kapat"
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2D2419" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
           </div>
-          <IconBtn onClick={onClose} tone="subtle" size={34} title="Kapat"
-            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2D2419" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
         </div>
         {children}
       </motion.div>
@@ -2683,7 +2802,7 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
 
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
           <div style={{ minWidth: 0 }}>
-            <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, color: "#2D2419", margin: "0 0 3px" }}>Yorumunu yaz</h3>
+            <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "#2D2419", margin: "0 0 3px" }}>Yorumunu yaz</h3>
             <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{restaurantName}</p>
           </div>
           <IconBtn onClick={cancel} tone="subtle" size={34} title="Vazgeç"
@@ -3078,7 +3197,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
                   <div style={{ width: 52, height: 52, borderRadius: 18, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 800 }}>{selectedReview.user.charAt(0)}</div>
                   <div>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>{selectedReview.user}</p>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 3px" }}>{selectedReview.user}</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ display: "flex", gap: 2 }}>
                         {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 14, color: s <= selectedReview.stars ? "#FFA500" : "rgba(255,255,255,0.15)" }}>★</span>)}
@@ -3372,14 +3491,14 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
             <input ref={fileRef} type="file" accept="image/*" onChange={onPhoto} style={{ display: "none" }} />
             <div onClick={pickPhoto} style={{ position: "relative", cursor: "pointer" }}>
-              <div style={{ width: 84, height: 84, borderRadius: "50%", background: photo ? "transparent" : accentColor, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 30, fontWeight: 800 }}>
+              <div style={{ width: 84, height: 84, borderRadius: "50%", background: photo ? "transparent" : accentColor, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em" }}>
                 {photo ? <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "B"}
               </div>
               <div style={{ position: "absolute", bottom: 0, right: 0, width: 26, height: 26, borderRadius: "50%", background: "#fff", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
                 <Icon n="camera" size={13} color={accentColor} />
               </div>
             </div>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, color: "#1C1917", margin: "14px 0 3px" }}>Bora Çolpan</p>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#1C1917", margin: "14px 0 3px" }}>Bora Çolpan</p>
             <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#A8A29E", margin: "0 0 16px" }}>Nisan 2024'ten beri üye</p>
 
             {/* Tek satır istatistik */}
@@ -3664,8 +3783,37 @@ export default function GurApp(props = {}) {
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
         * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
         ::-webkit-scrollbar { display:none; }
-        .gur-btn:focus-visible, .gur-icon-btn:focus-visible { box-shadow: 0 0 0 3px rgba(255,102,0,0.5) !important; }
-        @media (prefers-reduced-motion: reduce) { .gur-btn, .gur-icon-btn { transition: none !important; } }
+        .gur-btn:focus-visible, .gur-icon-btn:focus-visible, .gur-dot:focus-visible { box-shadow: 0 0 0 3px rgba(255,102,0,0.6) !important; outline: none; }
+
+        /* Erişilebilirlik tercihleri. Uygulama tamamen inline stille yazıldığı
+           için cam yüzeyler .gur-glass sınıfıyla işaretlendi; hareket kuralları
+           ise animasyon adını style özniteliğinden yakalıyor. */
+        @media (prefers-reduced-motion: reduce) {
+          .gur-btn, .gur-icon-btn { transition: none !important; }
+          /* Sürekli dönen/nefes alan hareketler durur — vestibüler rahatsızlık kaynağı */
+          [style*="badgeMarquee"], [style*="pulse"] { animation: none !important; }
+          [style*="fadeInUp"] { animation-duration: 0.01ms !important; }
+          [style*="spin"] { animation-duration: 2s !important; }
+        }
+        /* Saydamlık azaltıldığında bulanıklık kalkar ve zemin katılaşır —
+           yalnızca blur'u kaldırmak yarı saydam yüzeyi okunmaz bırakırdı. */
+        /* Buradaki cam yüzeylerin tamamı koyu ve fotoğraf üzerinde duruyor.
+           Her biri inline stille yazıldığı için alfa değerini CSS'ten
+           yükseltmek mümkün değil; inset gölge yazının altını dolduruyor. */
+        @media (prefers-reduced-transparency: reduce) {
+          [style*="backdrop-filter"] {
+            backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+            box-shadow: inset 0 0 0 999px rgba(18,12,6,0.88) !important;
+          }
+          .gur-glass-light { box-shadow: inset 0 0 0 999px rgba(255,255,255,0.96) !important; }
+        }
+        @media (prefers-contrast: more) {
+          [style*="backdrop-filter"] {
+            backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+            box-shadow: inset 0 0 0 999px #140d06 !important;
+            border: 1px solid rgba(255,255,255,0.65) !important;
+          }
+        }
       `}</style>
       <PhoneFrame>{render()}</PhoneFrame>
     </div>
