@@ -120,6 +120,19 @@ const RESTAURANTS = [
 // Seçilen dosyaları tek bir biçime indirger: { name, url, type }. Blob URL'i
 // seçim anında bir kez üretilir — render sırasında değil, yoksa her çizimde
 // yeni bir URL sızardı.
+// Dokunsal geri bildirim — yalnızca anlam taşıyan anlarda (§13: nedensellik ve
+// fayda). Vibration API masaüstünde ve iOS Safari'de yok; sessizce atlanır.
+function haptic(pattern = 12) {
+  try { navigator.vibrate?.(pattern); } catch { /* desteklenmiyor */ }
+}
+
+// Sanal klavye açılınca odaklanılan alan klavyenin altında kalabiliyor;
+// odaktan kısa süre sonra alanı görünür alanın ortasına kaydırıyoruz.
+function keepVisible(e) {
+  const el = e.currentTarget;
+  setTimeout(() => el?.scrollIntoView?.({ block: "center", behavior: "smooth" }), 280);
+}
+
 function toMediaFiles(fileList) {
   return Array.from(fileList || []).map(f => ({ name: f.name, url: URL.createObjectURL(f), type: f.type }));
 }
@@ -302,7 +315,7 @@ function IconBtn({ onClick, icon, children, tone = "glassDark", shape = "circle"
         backdropFilter: t.blur ? "blur(8px)" : undefined,
         boxShadow: t.shadow || "none",
         display: "flex", alignItems: "center", justifyContent: "center",
-        cursor: "pointer", padding: 0,
+        cursor: "pointer", padding: 0, position: "relative",
         WebkitTapHighlightColor: "transparent", outline: "none",
       }}>
       {children || icon}
@@ -322,7 +335,13 @@ function BackBtn({ onClick, variant = "dark" }) {
 
 function Img({ src, style, bg = "#e8e0d8" }) {
   const [state, setState] = useState("loading"); // loading | ok | failed
-  useEffect(() => { setState("loading"); }, [src]);
+  useEffect(() => {
+    setState("loading");
+    // Ağ hiç yanıt vermezse onLoad/onError de gelmez; spinner sonsuza kadar
+    // dönmesin diye kendi zaman aşımımız var.
+    const t = setTimeout(() => setState(v => (v === "loading" ? "failed" : v)), 8000);
+    return () => clearTimeout(t);
+  }, [src]);
   return (
     <div style={{ ...style, position: "relative", overflow: "hidden", background: bg }}>
       {state === "loading" && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 22, height: 22, border: "3px solid rgba(0,0,0,0.08)", borderTopColor: "#FF6600", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
@@ -336,7 +355,7 @@ function Img({ src, style, bg = "#e8e0d8" }) {
 function InputField({ label, value, onChange, placeholder, type = "text" }) {
   return <div style={{ marginBottom: 20 }}>
     <label style={{ display: "block", marginBottom: 7, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#2D2419" }}>{label}</label>
-    <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "#fff", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box" }} />
+    <input type={type} value={value} onChange={e => onChange(e.target.value)} onFocus={keepVisible} placeholder={placeholder} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "#fff", color: "#2D2419", WebkitTextFillColor: "#2D2419", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box" }} />
   </div>;
 }
 
@@ -399,7 +418,7 @@ function UploadBox({ label, icon, accept, files, setFiles, multiple = true }) {
         onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,102,0,0.3)"}>
         {files.length === 0 ? <><div style={{ display: "flex", justifyContent: "center" }}>{icon}</div><p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#A18F7C", margin: "10px 0 0" }}>Dosya seçmek için tıklayın</p></> : (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-            {files.map((f, i) => <div key={i} style={{ position: "relative" }}>{f.type?.startsWith("image/") ? <img src={f.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "2px solid rgba(255,102,0,0.2)" }} /> : <div style={{ width: 72, height: 72, borderRadius: 12, background: "#FFF3EA", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="doc" size={20} color="#FF6600" /></div>}<div onClick={e => { e.stopPropagation(); remove(i); }} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", background: "#FF3B30", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", cursor: "pointer", fontWeight: 700, boxShadow: "0 2px 6px rgba(0,0,0,0.2)" }}>✕</div></div>)}
+            {files.map((f, i) => <div key={i} style={{ position: "relative" }}>{f.type?.startsWith("image/") ? <img src={f.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "2px solid rgba(255,102,0,0.2)" }} /> : <div style={{ width: 72, height: 72, borderRadius: 12, background: "#FFF3EA", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="doc" size={20} color="#FF6600" /></div>}<button type="button" className="gur-icon-btn" title="Kaldır" aria-label="Kaldır" onClick={e => { e.stopPropagation(); remove(i); }} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", border: "none", padding: 0, outline: "none", background: "#FF3B30", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", cursor: "pointer", fontWeight: 700, boxShadow: "0 2px 6px rgba(0,0,0,0.2)" }}>✕</button></div>)}
             <div style={{ width: 72, height: 72, borderRadius: 12, border: "2px dashed rgba(255,102,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 18, color: "rgba(255,102,0,0.4)" }}>+</span></div>
           </div>
         )}
@@ -409,14 +428,14 @@ function UploadBox({ label, icon, accept, files, setFiles, multiple = true }) {
 }
 
 function PhoneFrame({ children }) {
-  return <div style={{ width: 390, maxWidth: "100%", height: 844, borderRadius: 44, overflow: "hidden", boxShadow: "0 25px 80px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05)", position: "relative", background: "#fff", margin: "0 auto" }}>
+  return <div className="gur-frame" style={{ width: 390, maxWidth: "100%", height: 844, borderRadius: 44, overflow: "hidden", boxShadow: "0 25px 80px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05)", position: "relative", background: "#fff", margin: "0 auto" }}>
     <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 126, height: 30, background: "#000", borderBottomLeftRadius: 18, borderBottomRightRadius: 18, zIndex: 999 }} />
     {children}
   </div>;
 }
 
 function Screen({ children, grad = true }) {
-  return <div style={{ width: "100%", height: "100%", background: grad ? "#fff" : "#fff", overflowY: "auto", overflowX: "hidden", position: "relative" }}>{children}</div>;
+  return <div className="gur-screen" style={{ width: "100%", height: "100%", background: grad ? "#fff" : "#fff", overflowY: "auto", overflowX: "hidden", position: "relative" }}>{children}</div>;
 }
 
 // ═══════════════════════════════════════════════
@@ -437,6 +456,8 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, isTo
 
   // Kart hem sürüklenip bırakılınca hem de aksiyon butonuna basılınca aynı çıkış animasyonundan geçer
   const commit = (direction, velocity = 0) => {
+    // Karar anında tek bir kısa titreşim: beğeni biraz daha belirgin
+    haptic(direction > 0 ? [10, 28, 14] : 8);
     const flyX = direction * 900;
     animate(x, flyX, { type: "spring", bounce: 0, duration: 0.5, velocity })
       .then(() => (direction > 0 ? onRight() : onLeft()));
@@ -843,9 +864,9 @@ function RestRegStep1({ onBack, onNext }) {
           <div style={{ position: "relative" }}>
             <input
               value={location} onChange={e => setLocation(e.target.value)}
-              onFocus={() => setLocFocused(true)} onBlur={() => setTimeout(() => setLocFocused(false), 200)}
+              onFocus={e => { setLocFocused(true); keepVisible(e); }} onBlur={() => setTimeout(() => setLocFocused(false), 200)}
               placeholder="İlçe veya adres yazın..."
-              style={{ width: "100%", padding: "15px 18px 15px 42px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "#fff", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box" }}
+              style={{ width: "100%", padding: "15px 18px 15px 42px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "#fff", color: "#2D2419", WebkitTextFillColor: "#2D2419", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box" }}
             />
             <svg style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
           </div>
@@ -2359,6 +2380,7 @@ function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
       const next = [...matches, r];
       setMatches(next);
       setPopup(r);           // eşleşme: ikisi de sağa kaydırdı
+      haptic([14, 50, 22, 50, 14]);
       return;                // kart ilerletme overlay kapanınca
     }
     advance();
@@ -2744,6 +2766,20 @@ function ConfirmSheet({ title, lines, onClose }) {
   );
 }
 
+// Geri alınamayan işlemler için onay. Apple HIG: yıkıcı eylem kırmızı ve
+// açık isimli, kaçış yolu ("Vazgeç") her zaman görünür.
+function DangerConfirm({ title, message, confirmText, onConfirm, onClose }) {
+  return (
+    <Sheet title={title} subtitle="Bu işlem geri alınamaz" onClose={onClose}>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(45,36,25,0.68)", lineHeight: 1.55, margin: "0 0 20px" }}>{message}</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Btn text={confirmText} onClick={() => { haptic([18, 40, 18]); onConfirm(); }} variant="destructive" />
+        <Btn text="Vazgeç" onClick={onClose} variant="outlineDark" />
+      </div>
+    </Sheet>
+  );
+}
+
 // ═══════════════════════════════════════════════
 // YORUM YAZMA — puan, metin ve fotoğraf ekleme
 // ═══════════════════════════════════════════════
@@ -2833,7 +2869,7 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
             border: "1.5px solid rgba(45,36,25,0.14)", background: "#FBFAF8",
             fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#2D2419", lineHeight: 1.5, outline: "none",
           }}
-          onFocus={e => e.currentTarget.style.borderColor = "#FF6600"}
+          onFocus={e => { e.currentTarget.style.borderColor = "#FF6600"; keepVisible(e); }}
           onBlur={e => e.currentTarget.style.borderColor = "rgba(45,36,25,0.14)"}
         />
         <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: text.trim().length < 10 ? "#C4776B" : "rgba(45,36,25,0.4)", margin: "6px 0 18px" }}>
@@ -2849,7 +2885,7 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
           {photos.map((f, i) => (
             <div key={i} style={{ position: "relative", width: 74, height: 74, borderRadius: 14, overflow: "hidden", border: "1.5px solid rgba(45,36,25,0.1)" }}>
               <img src={f.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              <div onClick={() => removePhoto(i)} title="Fotoğrafı kaldır" style={{ position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✕</div>
+              <button type="button" className="gur-icon-btn" onClick={() => removePhoto(i)} title="Fotoğrafı kaldır" aria-label="Fotoğrafı kaldır" style={{ position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: "50%", border: "none", padding: 0, outline: "none", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✕</button>
             </div>
           ))}
           {photos.length < 4 && (
@@ -3451,8 +3487,11 @@ const BADGES = [
   { icon: "flame", label: "Sadık Müşteri" },
 ];
 
-function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onDetail, accentColor = "#FF6600", showBadges = true, badgeSpeed = 14, userReviews = {}, restaurants = [], onRemoveUserReview }) {
+function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onDetail, accentColor = "#FF6600", showBadges = true, badgeSpeed = 14, userReviews = {}, restaurants = [], onRemoveUserReview, onDeleteAccount }) {
   const [tab, setTab] = useState("reviews");
+  // Silme geri alınamıyor; her ikisi de önce onay ister
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [confirmAccount, setConfirmAccount] = useState(false);
   const [sampleReviews, setSampleReviews] = useState(MY_REVIEWS);
   // Uygulama içinde yazılan yorumlar profil listesinin şekline dönüştürülür
   const written = useMemo(() => Object.entries(userReviews).flatMap(([restId, list]) =>
@@ -3572,7 +3611,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
                   )}
                 </div>
                 <div style={{ alignSelf: "flex-start" }}>
-                  <IconBtn onClick={() => removeReview(rev.rid)} tone="plain" size={28} title="Yorumu sil" icon={<Icon n="trash" size={14} color="#C4B5A3" />} />
+                  <IconBtn onClick={() => setPendingDelete(rev)} tone="plain" size={28} title="Yorumu sil" icon={<Icon n="trash" size={14} color="#C4B5A3" />} />
                 </div>
               </div>
             ))
@@ -3599,8 +3638,35 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
               </div>
             ))
           )}
+          {/* Hesap — geri alınamayan işlem, listelerden ayrı ve en altta */}
+          <div style={{ marginTop: 30, paddingTop: 18, borderTop: "1px solid rgba(0,0,0,0.07)" }}>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#1C1917", margin: "0 0 4px" }}>Hesap</p>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#8A7A68", margin: "0 0 12px", lineHeight: 1.5 }}>
+              Hesabını silersen yorumların, favorilerin ve rozetlerin kalıcı olarak kaldırılır.
+            </p>
+            <Btn text="Hesabımı sil" onClick={() => setConfirmAccount(true)} variant="destructiveSoft" size="md" fullWidth={false} />
+          </div>
         </div>
       </div>
+
+      {pendingDelete && (
+        <DangerConfirm
+          title="Yorumu sil"
+          message={`"${pendingDelete.name}" için yazdığın yorum kaldırılacak.`}
+          confirmText="Yorumu sil"
+          onConfirm={() => { removeReview(pendingDelete.rid); setPendingDelete(null); }}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
+      {confirmAccount && (
+        <DangerConfirm
+          title="Hesabımı sil"
+          message="Tüm yorumların, favorilerin ve profil bilgilerin silinir ve giriş ekranına dönersin."
+          confirmText="Hesabımı kalıcı olarak sil"
+          onConfirm={() => { setConfirmAccount(false); onDeleteAccount?.(); }}
+          onClose={() => setConfirmAccount(false)}
+        />
+      )}
 
       {/* Alt bar */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 16px 16px", zIndex: 50 }}>
@@ -3734,11 +3800,35 @@ export default function GurApp(props = {}) {
     [feed, selected]
   );
 
-  const nav = (to) => { setHistory(p => [...p, screen]); setScreen(to); };
-  const back = () => { if (history.length > 0) { setScreen(history[history.length - 1]); setHistory(h => h.slice(0, -1)); } };
+  // Cihazın/tarayıcının geri tuşu ile uygulama içi geri düğmesi aynı geçmişi
+  // kullanır: nav() her ileri gidişte bir tarayıcı kaydı iter, geri dönüş tek
+  // yoldan — popstate üzerinden — işlenir.
+  const historyRef = useRef(history);
+  useEffect(() => { historyRef.current = history; }, [history]);
+  const popScreen = () => {
+    const h = historyRef.current;
+    if (h.length === 0) return;
+    setScreen(h[h.length - 1]);
+    setHistory(h.slice(0, -1));
+  };
+  useEffect(() => {
+    const onPop = () => popScreen();
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const nav = (to) => {
+    setHistory(p => [...p, screen]);
+    setScreen(to);
+    window.history.pushState({ gur: to }, "");
+  };
+  const back = () => {
+    if (window.history.state?.gur) window.history.back(); // popstate geri kalanı yapar
+    else popScreen();
+  };
   const openDetail = (r) => { setSelected(r); nav("detail"); };
   const isFav = (r) => favorites.some(f => f.id === r?.id);
-  const toggleFav = () => { if (!selected) return; if (isFav(selected)) setFavorites(p => p.filter(f => f.id !== selected.id)); else setFavorites(p => [...p, selected]); };
+  const toggleFav = () => { if (!selected) return; haptic(12); if (isFav(selected)) setFavorites(p => p.filter(f => f.id !== selected.id)); else setFavorites(p => [...p, selected]); };
   const goExplore = () => { setFilterCat(null); nav("explore"); };
   const goSwipe = () => { nav("swipe"); };
   const goFav = () => { nav("fav"); };
@@ -3747,6 +3837,31 @@ export default function GurApp(props = {}) {
   const goMatch = () => { setMatchResults([]); nav("match-start"); };
   const startMatch = (code) => { setMatchCode(code); setMatchResults([]); nav("match-swipe"); };
   const finishMatch = (found) => { setMatchResults(found); nav("match-result"); };
+  // Hesap silme: yerel durumun tamamı temizlenir (kalıcılık yok, backend yok)
+  const deleteAccount = () => {
+    setUserReviews({});
+    setFavorites([]);
+    setSelected(null);
+    setMatchResults([]);
+    setHistory([]);
+    setScreen("welcome");
+  };
+
+  // Sanal klavye açıldığında görsel viewport küçülür; farkı bir CSS
+  // değişkenine yazıp ekranın altına o kadar boşluk ekliyoruz, böylece
+  // odaklı alan klavyenin altında kalmıyor.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const sync = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      document.documentElement.style.setProperty("--gur-kb", `${Math.round(inset)}px`);
+    };
+    sync();
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    return () => { vv.removeEventListener("resize", sync); vv.removeEventListener("scroll", sync); };
+  }, []);
 
   const render = () => {
     switch (screen) {
@@ -3767,13 +3882,13 @@ export default function GurApp(props = {}) {
       case "swipe": return <SwipeScreen onDetail={openDetail} onExplore={goExplore} onFavorites={goFav} favorites={favorites} setFavorites={setFavorites} filterCat={filterCat} restaurants={feed} dataSource={dataSource} />;
       case "detail": return <DetailScreen r={liveSelected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} userReviews={userReviews[liveSelected?.id] || []} onAddReview={addReview} />;
       case "fav": return <FavScreen onExplore={goExplore} onSwipe={goSwipe} onDetail={openDetail} favorites={favorites} setFavorites={setFavorites} onProfile={goProfile} />;
-      case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} userReviews={userReviews} restaurants={feed} onRemoveUserReview={removeUserReview} />;
+      case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} userReviews={userReviews} restaurants={feed} onRemoveUserReview={removeUserReview} onDeleteAccount={deleteAccount} />;
       default: return <SplashScreen onNext={() => setScreen("welcome")} />;
     }
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", colorScheme: "light" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
@@ -3784,6 +3899,27 @@ export default function GurApp(props = {}) {
         * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
         ::-webkit-scrollbar { display:none; }
         .gur-btn:focus-visible, .gur-icon-btn:focus-visible, .gur-dot:focus-visible { box-shadow: 0 0 0 3px rgba(255,102,0,0.6) !important; outline: none; }
+
+        /* Apple HIG: her dokunma hedefi en az 44×44pt. Küçük ikon butonların
+           görsel boyutu korunur, tıklama alanı görünmez bir katmanla büyür. */
+        .gur-icon-btn, .gur-dot { position: relative; }
+        .gur-icon-btn::after, .gur-dot::after {
+          content: ""; position: absolute; top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: max(100%, 44px); height: max(100%, 44px);
+        }
+
+        /* Çentik / ev çubuğu payı. Önizleme çerçevesinde env() 0 döner, tam
+           ekran cihazda ekranın kenarlarına taşan içerik olmaz. Ekranların
+           üst dolgusu zaten 44px; yalnızca bunu aşan çentikler için ek pay. */
+        .gur-frame {
+          padding-top: max(0px, calc(env(safe-area-inset-top, 0px) - 44px));
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+          padding-left: env(safe-area-inset-left, 0px);
+          padding-right: env(safe-area-inset-right, 0px);
+        }
+        /* Klavye açıkken kaydırma alanı klavye yüksekliği kadar uzar */
+        .gur-screen { padding-bottom: var(--gur-kb, 0px); }
 
         /* Erişilebilirlik tercihleri. Uygulama tamamen inline stille yazıldığı
            için cam yüzeyler .gur-glass sınıfıyla işaretlendi; hareket kuralları

@@ -429,7 +429,7 @@ function AdminLogin({ onLogin }) {
   };
 
   return (
-    <div style={{ height: '100vh', background: C.bg, fontFamily: F, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div style={{ height: '100vh', background: C.bg, fontFamily: F, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, colorScheme: 'dark' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
@@ -540,7 +540,7 @@ export default function GurAdmin() {
   if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />;
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: F, color: C.text, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: F, color: C.text, overflow: 'hidden', colorScheme: 'dark' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
