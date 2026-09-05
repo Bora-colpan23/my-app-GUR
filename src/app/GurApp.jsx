@@ -1014,9 +1014,9 @@ const INFO_FIELDS = [
   { key: "addr",  label: "Adres",         placeholder: "Mahalle, cadde, no" },
 ];
 
-// İşletmenin aldığı hizmetler — panel görünümü.
-// Tüketici tarafındaki ServiceBadges ile aynı veriyi okuyor; burada
-// işletmenin kendi diliyle, "neyi satın aldım" olarak gösteriliyor.
+// İşletmenin aldığı hizmetler — yalnızca Doyurucu panelinde.
+// Tüketici tarafında bilinçli olarak yok: kullanıcı bir mekânın hangi
+// paketi satın aldığını değil, mekânın kendisini görmeli.
 function OwnerServices({ restaurant }) {
   const [detail, setDetail] = useState(null);
   useEffect(() => {
@@ -2092,9 +2092,9 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 
                 {(
                   <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: "16px 18px" }}>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Rezervasyon ve Tadım Menüsü</p>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Rezervasyon</p>
                     <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
-                      Kullanıcı uygulamadan masa ayırtır veya tadım menüsü satın alır. Komisyon yalnızca gerçekleşen işlemden alınır.
+                      Kullanıcı uygulamadan masa ayırtır. Komisyon yalnızca gerçekleşen rezervasyondan alınır.
                     </p>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                       {[["Bu ay", "38"], ["Ciro", "₺52.400"], ["Komisyon", "₺4.192"]].map(([k, v]) => (
@@ -2759,38 +2759,45 @@ function VerifiedStar({ size = 14, title = "İşletme hesabı doğrulanmış" })
 
 // İşletmenin aldığı hizmetler. Sponsorluğu gizlemek yerine açıkça
 // yazıyoruz: kullanıcı bir kartın neden öne çıktığını görebilmeli.
-function ServiceBadges({ services, compact = false }) {
-  if (!services?.claimed) return null;
-  const items = [
-    services.plan && services.plan !== "free"
-      ? { label: services.plan === "pro" ? "Pro işletme" : "Premium işletme", tone: "#FF6600" }
-      : null,
-    ...(services.campaigns || []).map(c => ({ label: c.label, tone: "#0EA5E9" })),
-  ].filter(Boolean);
-  if (!items.length) return null;
+/**
+ * Galeri slaytları: şef tanıtımı restoran görselleriyle aynı diziye giriyor.
+ *
+ * İkinci sıraya konuyor — ilk kare mekânın kendi kapağı olarak kalsın ama
+ * video da ilk kaydırmada çıksın. Rozet yalnızca bu slaytta, sağ üstte:
+ * hangi karenin video olduğu bakışta anlaşılmalı.
+ */
+function galleryOf(r) {
+  const photos = (r.imgs || []).map(src => ({ src, chef: false }));
+  if (!(r.gastro && r.gastroVideo)) return photos;
+  const chef = { src: r.gastroVideo, chef: true, chefName: r.gastroChef };
+  return photos.length ? [photos[0], chef, ...photos.slice(1)] : [chef];
+}
 
+// Video slaytının üstündeki katman: oynat düğmesi, sağ üst rozet ve
+// altta şefin adı.
+function ChefOverlay({ chefName, compact = false }) {
   return (
-    <div style={{ marginBottom: compact ? 12 : 16 }}>
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#8A7A68", margin: "0 0 7px" }}>
-        İşletmenin aldığı hizmetler
-      </p>
-      <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-        {items.map((x, i) => (
-          <span key={i} style={{
-            display: "inline-flex", alignItems: "center", gap: 5,
-            background: `${x.tone}14`, border: `1px solid ${x.tone}33`, borderRadius: 999,
-            padding: "5px 12px", fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: x.tone,
-          }}>
-            <Icon n="sparkle" size={10} color={x.tone} />{x.label}
-          </span>
-        ))}
+    <>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.28)", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+        <div style={{ width: compact ? 44 : 52, height: compact ? 44 : 52, borderRadius: "50%", background: "rgba(255,255,255,0.92)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 18px rgba(0,0,0,0.35)" }}>
+          <svg width={compact ? 17 : 20} height={compact ? 17 : 20} viewBox="0 0 24 24" fill="#FF6600"><polygon points="6 3 20 12 6 21" /></svg>
+        </div>
       </div>
-      {services.campaigns?.length > 0 && (
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "#A8A29E", margin: "6px 0 0", lineHeight: 1.5 }}>
-          Bu mekan keşif akışında öne çıkan yerleşim satın aldı.
-        </p>
+      <div style={{
+        position: "absolute", top: compact ? 24 : 10, right: 10, pointerEvents: "none",
+        display: "inline-flex", alignItems: "center", gap: 5,
+        background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)",
+        border: "1px solid rgba(255,255,255,0.22)", borderRadius: 20, padding: "4px 10px",
+      }}>
+        <Icon n="sparkle" size={10} color="#FFA500" />
+        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 800, color: "#fff", letterSpacing: 0.2 }}>Şef Tanıtımı</span>
+      </div>
+      {chefName && (
+        <div style={{ position: "absolute", bottom: 10, left: 12, right: 12, pointerEvents: "none" }}>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.92)", margin: 0, textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>{chefName} · 15 sn</p>
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -2908,8 +2915,8 @@ function NotYetSheet({ r, onClose }) {
   return (
     <Sheet title="Bu mekan henüz GUR uldamadı" subtitle={r.name} onClose={onClose}>
       <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "#57534E", lineHeight: 1.6, margin: "0 0 8px" }}>
-        {r.name} GUR'daki kaydını henüz sahiplenmedi. Sahiplendiği gün menüsü,
-        masa ayırtma ve tadım menüsü tam burada açılacak.
+        {r.name} GUR'daki kaydını henüz sahiplenmedi. Sahiplendiği gün menüsü ve
+        masa ayırtma tam burada açılacak.
       </p>
       <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "#FF6600", margin: "0 0 16px" }}>
         Çok yakında.
@@ -3001,7 +3008,8 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
     animate(y, target, { type: "spring", bounce: 0.2, duration: 0.35, velocity });
   };
 
-  const imgs = r.imgs || [];
+  // Şef tanıtımı galerinin bir karesi (bkz. galleryOf); ayrı bölüm değil.
+  const gallery = galleryOf(r);
   const provider = defaultMapProvider(typeof navigator !== "undefined" ? navigator.userAgent : "");
   const place = { name: r.name, address: r.addr, lat: r.lat, lng: r.lng };
   const openMap = (p) => {
@@ -3039,16 +3047,17 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
             onClick={e => {
               const rect = e.currentTarget.getBoundingClientRect();
               const tx = e.clientX - rect.left;
-              if (tx > rect.width * 0.5) setIi(i => Math.min(i + 1, imgs.length - 1));
+              if (tx > rect.width * 0.5) setIi(i => Math.min(i + 1, gallery.length - 1));
               else setIi(i => Math.max(i - 1, 0));
             }}
             style={{ position: "relative", height: 190, borderRadius: 20, overflow: "hidden", marginBottom: 14, cursor: "pointer" }}
           >
-            <Img src={imgs[ii]} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" box={360} />
+            <Img src={gallery[ii]?.src} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" box={360} />
+            {gallery[ii]?.chef && <ChefOverlay chefName={gallery[ii].chefName} compact />}
             <div style={{ position: "absolute", top: 10, left: 12, right: 12, display: "flex", gap: 4 }}>
-              {imgs.map((_, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === ii ? "#fff" : "rgba(255,255,255,0.35)" }} />)}
+              {gallery.map((g, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === ii ? (g.chef ? "#FFA500" : "#fff") : "rgba(255,255,255,0.35)" }} />)}
             </div>
-            {ii < (r.ownerPhotoCount || 0) && (
+            {!gallery[ii]?.chef && ii < (r.ownerPhotoCount || 0) && (
               <div style={{ position: "absolute", bottom: 10, left: 12, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "4px 10px" }}>
                 <Icon n="camera" size={10} color="#FFA500" />
                 <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 700, color: "#fff" }}>İşletmeden</span>
@@ -3078,8 +3087,6 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
 
           <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "#57534E", lineHeight: 1.6, margin: "0 0 16px" }}>{r.desc}</p>
 
-          <ServiceBadges services={detail?.services} />
-
           {/* Popüler yemekler */}
           {r.popular?.length > 0 && (
             <div style={{ marginBottom: 16 }}>
@@ -3092,10 +3099,10 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
             </div>
           )}
 
-          {/* Menü, masa ayırtma ve tadım menüsü yalnızca kaydını sahiplenmiş
-              işletmelerde açık: menüyü güncelleyen, masayı tutan ve tadımı
-              hazırlayan taraf işletmenin kendisi. Sahiplenilmemiş kayıtta
-              bunları göstermek, karşılığı olmayan bir söz vermek olurdu. */}
+          {/* Menü ve masa ayırtma yalnızca kaydını sahiplenmiş işletmelerde
+              açık: menüyü güncelleyen ve masayı tutan taraf işletmenin
+              kendisi. Sahiplenilmemiş kayıtta bunları göstermek, karşılığı
+              olmayan bir söz vermek olurdu. */}
           {claimed ? (
             <>
               {r.menu?.length > 0 && (
@@ -3705,20 +3712,10 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
 }
 
 // ═══════════════════════════════════════════════
-// GELİR: REZERVASYON VE TADIM MENÜSÜ (Faz 2)
+// GELİR: REZERVASYON
 // ═══════════════════════════════════════════════
-// Kullanıcı keşifle kalmıyor, doğrudan masa ayırtıyor veya uygulamaya
-// özel tadım menüsünü satın alıyor. Platform işlem başına komisyon alır;
-// komisyon oranı onay ekranında açıkça gösterilir.
-const COMMISSION_RATE = 0.08;
-const TASTING_MENUS = {
-  default: { name: "Şef Tadım Menüsü", courses: 5, price: 1450, note: "Uygulamaya özel, 5 servis" },
-};
-function tastingMenuFor(r) {
-  const base = TASTING_MENUS.default;
-  const priceHint = parseInt(String(r.price).replace(/\D/g, ""), 10) || 600;
-  return { ...base, price: Math.round((priceHint * 1.9) / 50) * 50 };
-}
+// Kullanıcı keşifle kalmıyor, doğrudan masa ayırtıyor. Platform yalnızca
+// gerçekleşen rezervasyondan komisyon alır.
 
 // Sheet, aşağı sürüklenerek kapatılabilir. Kapanıp kapanmayacağına bırakma
 // noktası değil, momentumun taşıyacağı nokta karar verir; kapanış animasyonu
@@ -3887,52 +3884,6 @@ function ReservationSheet({ r, onClose, onConfirm }) {
       <Btn text={time ? `${day} ${time} • ${people} kişi — Onayla` : "Saat seçin"} onClick={() => time && onConfirm({ day, time, people, deal })} variant="filled" disabled={!time} />
       <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(45,36,25,0.4)", textAlign: "center", margin: "12px 0 0", lineHeight: 1.5 }}>
         Rezervasyon ücretsizdir. Restoran, gerçekleşen rezervasyon başına platforma komisyon öder.
-      </p>
-    </Sheet>
-  );
-}
-
-function TastingSheet({ r, onClose, onConfirm }) {
-  const menu = tastingMenuFor(r);
-  const [people, setPeople] = useState(2);
-  const deal = dealFor(r.id);
-  const gross = menu.price * people;
-  const discount = deal ? Math.round(gross * deal.pct / 100) : 0;
-  const total = gross - discount;
-  const commission = Math.round(total * COMMISSION_RATE);
-
-  const row = (label, value, strong, color) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "7px 0" }}>
-      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: strong ? 14 : 13, fontWeight: strong ? 800 : 500, color: color || (strong ? "#2D2419" : "rgba(45,36,25,0.6)") }}>{label}</span>
-      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: strong ? 16 : 13, fontWeight: strong ? 800 : 600, color: color || "#2D2419", fontVariantNumeric: "tabular-nums" }}>{value}</span>
-    </div>
-  );
-
-  return (
-    <Sheet title={menu.name} subtitle={`${r.name} • ${menu.note}`} onClose={onClose}>
-      <div style={{ borderRadius: 18, overflow: "hidden", height: 130, position: "relative", marginBottom: 18 }}>
-        <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent 60%)" }} />
-        <div style={{ position: "absolute", bottom: 10, left: 14 }}>
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#fff" }}>{menu.courses} servislik şef menüsü</span>
-        </div>
-      </div>
-
-      <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Kişi sayısı</label>
-      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
-        {[1, 2, 3, 4].map(n => <Chip key={n} label={String(n)} active={people === n} onClick={() => setPeople(n)} />)}
-      </div>
-
-      <div style={{ background: "#FBFAF8", borderRadius: 16, padding: "12px 16px", marginBottom: 18 }}>
-        {row(`${menu.name} × ${people}`, `₺${gross.toLocaleString("tr")}`)}
-        {deal && row(`Anlık fırsat (%${deal.pct})`, `−₺${discount.toLocaleString("tr")}`, false, "#16A34A")}
-        <div style={{ height: 1, background: "rgba(45,36,25,0.08)", margin: "6px 0" }} />
-        {row("Toplam", `₺${total.toLocaleString("tr")}`, true)}
-      </div>
-
-      <Btn text="Satın Al" onClick={() => onConfirm({ people, total, commission, menu })} variant="filled" />
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(45,36,25,0.4)", textAlign: "center", margin: "12px 0 0", lineHeight: 1.5 }}>
-        Demo ödeme — gerçek tahsilat yapılmaz. Platform komisyonu ₺{commission.toLocaleString("tr")} (%{Math.round(COMMISSION_RATE * 100)}).
       </p>
     </Sheet>
   );
@@ -4107,7 +4058,7 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
 // RESTORAN DETAY — Fotoğraf carousel + kaydırılabilir yorumlar
 // ═══════════════════════════════════════════════
 function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavorites, userReviews = [], onAddReview, onVerifyLocation }) {
-  const [sheet, setSheet] = useState(null);      // "reserve" | "tasting" | "soon" | null
+  const [sheet, setSheet] = useState(null);      // "reserve" | "soon" | null
   const [confirmed, setConfirmed] = useState(null);
   // İşletmenin aldığı hizmetler ve Google yorumları
   const [detail, setDetail] = useState(null);
@@ -4119,6 +4070,8 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
   const claimed = !!(detail?.services?.claimed ?? (r.claimed || r.ownerClaimed));
   const deal = dealFor(r.id);
   const [photoIdx, setPhotoIdx] = useState(0);
+  // Şef tanıtımı ayrı bir bölüm değil, galerinin bir karesi.
+  const gallery = useMemo(() => galleryOf(r), [r]);
   const [showMenu, setShowMenu] = useState(false);
   const photoRef = useRef(null);
 
@@ -4129,7 +4082,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
     const endX = e.changedTouches?.[0]?.clientX || e.clientX;
     const diff = photoTouch.current.startX - endX;
     if (Math.abs(diff) > 50) {
-      if (diff > 0 && photoIdx < r.imgs.length - 1) setPhotoIdx(i => i + 1);
+      if (diff > 0 && photoIdx < gallery.length - 1) setPhotoIdx(i => i + 1);
       if (diff < 0 && photoIdx > 0) setPhotoIdx(i => i - 1);
     }
   };
@@ -4211,19 +4164,20 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 display: "flex", transition: "transform 0.35s cubic-bezier(.4,0,.2,1)",
                 transform: `translateX(-${photoIdx * 100}%)`,
               }}>
-                {r.imgs.map((img, i) => (
-                  <div key={i} style={{ minWidth: "100%", flexShrink: 0 }}>
-                    <Img src={img} style={{ width: "100%", height: 210, borderRadius: 0 }} bg="#d4c8bc" />
+                {gallery.map((g, i) => (
+                  <div key={i} style={{ minWidth: "100%", flexShrink: 0, position: "relative" }}>
+                    <Img src={g.src} style={{ width: "100%", height: 210, borderRadius: 0 }} bg="#d4c8bc" />
+                    {g.chef && <ChefOverlay chefName={g.chefName} />}
                   </div>
                 ))}
               </div>
             </div>
             {/* Dot indicators */}
             <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
-              {r.imgs.map((_, i) => (
+              {gallery.map((g, i) => (
                 <div key={i} onClick={() => setPhotoIdx(i)} style={{
                   width: i === photoIdx ? 20 : 8, height: 8, borderRadius: 4,
-                  background: i === photoIdx ? "#fff" : "rgba(255,255,255,0.35)",
+                  background: i === photoIdx ? (g.chef ? "#FFA500" : "#fff") : "rgba(255,255,255,0.35)",
                   transition: "all 0.3s", cursor: "pointer",
                 }} />
               ))}
@@ -4232,13 +4186,19 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
           {/* Küçük thumbnail'lar */}
           <div style={{ display: "flex", gap: 10, paddingBottom: 16, overflowX: "auto", scrollbarWidth: "none" }}>
-            {r.imgs.map((img, i) => (
+            {gallery.map((g, i) => (
               <div key={i} onClick={() => setPhotoIdx(i)} style={{
                 flexShrink: 0, width: 80, height: 60, borderRadius: 12, overflow: "hidden",
                 border: i === photoIdx ? "3px solid #fff" : "3px solid rgba(255,255,255,0.2)",
                 opacity: i === photoIdx ? 1 : 0.6, transition: "all 0.2s", cursor: "pointer",
+                position: "relative",
               }}>
-                <Img src={img} style={{ width: "100%", height: "100%" }} bg="#d4c8bc" />
+                <Img src={g.src} style={{ width: "100%", height: "100%" }} bg="#d4c8bc" />
+                {g.chef && (
+                  <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><polygon points="6 3 20 12 6 21" /></svg>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -4333,8 +4293,6 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
             <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>🕐 {r.hours}</span>
           </div>
 
-          <ServiceBadges services={detail?.services} />
-
           {/* Anlık fırsat */}
           {deal && (
             <div style={{ margin: "0 16px 16px", display: "flex", alignItems: "center", gap: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", borderRadius: 18, padding: "13px 15px" }}>
@@ -4349,36 +4307,11 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
             </div>
           )}
 
-          {/* Şef tanıtımı: rozet tek başına yetmiyor, çekimin de yapılmış
-              olması gerekiyor. Rozetli ama videosu olmayan mekânda bölüm
-              hiç görünmüyor — boş bir oynatıcı göstermek yerine. */}
-          {r.gastro && r.gastroVideo && (
-            <div style={{ margin: "0 16px 16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <Icon n="sparkle" size={14} color="#FF6600" />
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#2D2419", margin: 0 }}>Şef tanıtımı</p>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 700, color: "#FF6600", background: "#FFF0E5", borderRadius: 6, padding: "2px 7px" }}>15 sn</span>
-              </div>
-              <div style={{ position: "relative", height: 160, borderRadius: 18, overflow: "hidden" }}>
-                <Img src={r.gastroVideo} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
-                <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(255,255,255,0.9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF6600"><polygon points="6 3 20 12 6 21" /></svg>
-                  </div>
-                </div>
-                <div style={{ position: "absolute", bottom: 10, left: 12, right: 12 }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.9)", margin: 0 }}>{r.gastroChef ? `${r.gastroChef} · Gastro Onaylı çekim` : "Gastro Onaylı şef çekimi"}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Masa ayırtma ve tadım menüsü işletmenin taahhüdü; kaydını
-              sahiplenmemiş bir mekan adına söz veremeyiz. */}
+          {/* Masa ayırtma işletmenin taahhüdü; kaydını sahiplenmemiş bir
+              mekan adına söz veremeyiz. */}
           {claimed && (
-            <div style={{ display: "flex", gap: 10, padding: "0 16px", marginBottom: 12 }}>
+            <div style={{ padding: "0 16px", marginBottom: 12 }}>
               <Btn text="Masa Ayırt" onClick={() => setSheet("reserve")} variant="filled" size="md" />
-              <Btn text="Tadım Menüsü" onClick={() => setSheet("tasting")} variant="outlineDark" size="md" />
             </div>
           )}
 
@@ -4425,10 +4358,6 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           {sheet === "reserve" && (
             <ReservationSheet r={r} onClose={() => setSheet(null)}
               onConfirm={(b) => { setSheet(null); setConfirmed({ title: "Masanız ayrıldı", lines: [["Restoran", r.name], ["Gün", b.day], ["Saat", b.time], ["Kişi", `${b.people}`], ...(b.deal ? [["Fırsat", `%${b.deal.pct} indirim`]] : [])] }); }} />
-          )}
-          {sheet === "tasting" && (
-            <TastingSheet r={r} onClose={() => setSheet(null)}
-              onConfirm={(t) => { setSheet(null); setConfirmed({ title: "Satın alındı", lines: [["Restoran", r.name], ["Menü", t.menu.name], ["Kişi", `${t.people}`], ["Ödenen", `₺${t.total.toLocaleString("tr")}`], ["Platform komisyonu", `₺${t.commission.toLocaleString("tr")}`]] }); }} />
           )}
           {confirmed && <ConfirmSheet title={confirmed.title} lines={confirmed.lines} onClose={() => setConfirmed(null)} />}
         </AnimatePresence>
