@@ -3,7 +3,7 @@ import { useClaims, decideClaim } from '../lib/b2b.js';
 
 import * as api from '../lib/api.js';
 import { motion, AnimatePresence } from 'motion/react';
-import { usePlatformSettings, toggleSetting } from '../lib/platform.js';
+import { usePlatformSettings, toggleSetting, setStoreFeature, FEATURES, PER_STORE_FEATURES } from '../lib/platform.js';
 
 // ═══════════════════════════════════════════════════════════════
 // GUR YÖNETİCİ PANELİ — Platform kontrol merkezi
@@ -82,12 +82,13 @@ const CAT_DIST = [
 const RESTAURANTS = [
   { id: 1, name: 'Nusr-Et Steakhouse', cat: 'Türk Mutfağı', district: 'Beşiktaş', rating: 4.8, reviews: 1240, status: 'active', gastro: true, plan: 'Premium', joined: '2024-03-12' },
   { id: 2, name: 'Mikla Restaurant', cat: 'Fine Dining', district: 'Beyoğlu', rating: 4.9, reviews: 890, status: 'active', gastro: true, plan: 'Premium', joined: '2024-01-08' },
-  { id: 3, name: 'Çiya Sofrası', cat: 'Türk Mutfağı', district: 'Kadıköy', rating: 4.7, reviews: 2100, status: 'active', gastro: true, plan: 'Pro', joined: '2024-02-20' },
+  { id: 9, name: 'Çiya Sofrası', cat: 'Türk Mutfağı', district: 'Kadıköy', rating: 4.7, reviews: 2100, status: 'active', gastro: true, plan: 'Pro', joined: '2024-02-20' },
+  { id: 3, name: 'La Sagrata Famila', cat: 'Uzak Doğu', district: 'Kadıköy', rating: 4.6, reviews: 620, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-05' },
   { id: 4, name: 'Green Bowl', cat: 'Sağlıklı', district: 'Şişli', rating: 4.5, reviews: 340, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2024-06-15' },
-  { id: 5, name: 'Klein Bistro', cat: 'Kafe', district: 'Beyoğlu', rating: 4.4, reviews: 560, status: 'suspended', gastro: false, plan: 'Ücretsiz', joined: '2024-05-02' },
-  { id: 6, name: 'The Burger Joint', cat: 'Fast Food', district: 'Nişantaşı', rating: 4.2, reviews: 780, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-18' },
-  { id: 7, name: 'Karaköy Güllüoğlu', cat: 'Tatlıcı', district: 'Karaköy', rating: 4.9, reviews: 3200, status: 'active', gastro: true, plan: 'Premium', joined: '2023-12-01' },
-  { id: 8, name: 'Lucca Lounge', cat: 'Gece Hayatı', district: 'Bebek', rating: 4.3, reviews: 450, status: 'active', gastro: false, plan: 'Pro', joined: '2024-07-22' },
+  { id: 6, name: 'Klein Bistro', cat: 'Kafe', district: 'Beyoğlu', rating: 4.4, reviews: 560, status: 'suspended', gastro: false, plan: 'Ücretsiz', joined: '2024-05-02' },
+  { id: 11, name: 'The Burger Joint', cat: 'Fast Food', district: 'Nişantaşı', rating: 4.2, reviews: 780, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-18' },
+  { id: 12, name: 'Karaköy Güllüoğlu', cat: 'Tatlıcı', district: 'Karaköy', rating: 4.9, reviews: 3200, status: 'active', gastro: true, plan: 'Premium', joined: '2023-12-01' },
+  { id: 7, name: 'Lucca Lounge', cat: 'Gece Hayatı', district: 'Bebek', rating: 4.3, reviews: 450, status: 'active', gastro: false, plan: 'Pro', joined: '2024-07-22' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -143,29 +144,34 @@ const STORE_SERVICES = {
     { key: 'reservations', monthly: 9600, since: '2025-09-15' },
     { key: 'analyticsSaas', monthly: 2900, since: '2025-09-15' },
   ],
-  3: [ // Çiya Sofrası
+  9: [ // Çiya Sofrası
     { key: 'rewardedAds', monthly: 5200, since: '2026-03-02' },
     { key: 'instantDeals', monthly: 3100, since: '2026-04-19' },
     { key: 'reservations', monthly: 4800, since: '2025-10-30' },
     { key: 'analyticsSaas', monthly: 2900, since: '2025-10-30' },
   ],
+  3: [ // La Sagrata Famila — Doyurucu panelinden yönetilen işletme
+    { key: 'reservations', monthly: 3900, since: '2026-01-16' },
+    { key: 'instantDeals', monthly: 2400, since: '2026-03-08' },
+    { key: 'analyticsSaas', monthly: 2900, since: '2026-01-16' },
+  ],
   4: [ // Green Bowl — ücretsiz planda tek kalem
     { key: 'secondChance', monthly: 1450, since: '2026-06-01' },
   ],
-  5: [], // Klein Bistro — askıda, satın alım yok
-  6: [ // The Burger Joint
+  6: [], // Klein Bistro — askıda, satın alım yok
+  11: [ // The Burger Joint
     { key: 'rewardedAds', monthly: 4300, since: '2026-02-27' },
     { key: 'instantDeals', monthly: 2600, since: '2026-05-14' },
     { key: 'secondChance', monthly: 1450, since: '2026-02-27' },
   ],
-  7: [ // Karaköy Güllüoğlu
+  12: [ // Karaköy Güllüoğlu
     { key: 'bannerAds', monthly: 9800, since: '2025-08-22' },
     { key: 'pushAds', monthly: 5200, since: '2026-03-30' },
     { key: 'contentLicense', monthly: 4200, since: '2025-12-05' },
     { key: 'reservations', monthly: 6100, since: '2025-08-22' },
     { key: 'analyticsSaas', monthly: 2900, since: '2025-08-22' },
   ],
-  8: [ // Lucca Lounge
+  7: [ // Lucca Lounge
     { key: 'pushAds', monthly: 4100, since: '2026-04-06' },
     { key: 'instantDeals', monthly: 3400, since: '2026-05-02' },
     { key: 'secondChance', monthly: 1450, since: '2026-04-06' },
@@ -1505,6 +1511,39 @@ function ReviewFeed({ reviews, hidden, onHide, onOpenRestaurant, empty }) {
   );
 }
 
+// Restoran bazlı özellik anahtarları.
+function StoreFeatures({ restaurant }) {
+  const settings = usePlatformSettings();
+  const overrides = settings.storeOverrides?.[String(restaurant.id)] || {};
+
+  return (
+    <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
+      <SectionHead title="Bu işletmede açık özellikler"
+        right={`${PER_STORE_FEATURES.filter(f => settings[f.key] && overrides[f.key] !== false).length} / ${PER_STORE_FEATURES.length} açık`} />
+      {PER_STORE_FEATURES.map(f => {
+        const globalOn = !!settings[f.key];
+        const on = globalOn && overrides[f.key] !== false;
+        return (
+          <div key={f.key} style={{ padding: '14px 18px', borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {f.label}
+                {!globalOn && <Badge text="platformda kapalı" color={C.yellow} soft={C.yellowSoft} />}
+              </div>
+              <div style={{ fontFamily: FB, fontSize: 12, color: C.dim, lineHeight: 1.5 }}>{f.desc}</div>
+            </div>
+            {/* Genel anahtar kapalıyken restoran bazlı açmak bir şey
+                değiştirmez; çalışmayan bir anahtar sunmuyoruz. */}
+            <Toggle on={on} disabled={!globalOn}
+              onChange={() => setStoreFeature(restaurant.id, f.key, !on)}
+              label={`${restaurant.name} · ${f.label}`} />
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
   const menus = useMemo(() => restaurantMenus(r), [r.id]);
   const reviews = useMemo(() => restaurantReviews(r), [r.id]);
@@ -1567,6 +1606,12 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
         <MetaCell label="Durum"><StatusBadge status={r.status} /></MetaCell>
         <MetaCell label="Katılım">{formatDate(r.joined)}</MetaCell>
       </div>
+
+      {/* ─── BU İŞLETMEDE AÇIK ÖZELLİKLER ───
+          Restoran bazlı kapatma. Genel anahtar (Ayarlar) her zaman üstün
+          gelir: platformda kapalı bir özelliği tek işletme için açmanın
+          anlamı yok, o yüzden genel kapalıysa satır da kilitli görünür. */}
+      <StoreFeatures restaurant={r} />
 
       {/* ─── MÜŞTERİNİN SATIN ALDIĞI ÜCRETLİ ÖZELLİKLER ───
           Bir işletmeyle konuşmadan önce bakılan ilk yer: neyi almış, ne
@@ -2343,11 +2388,13 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
 // (Gerçek dağıtımda bu bayrak sunucuda tutulur; istemcinin girişi
 // gizlemesi yetmez, uç de reddetmelidir.)
 // ═══════════════════════════════════════════════════════════════════════
-function Toggle({ on, onChange, label }) {
+function Toggle({ on, onChange, label, disabled }) {
   return (
     <motion.button
-      onClick={onChange} role="switch" aria-checked={on} aria-label={label}
-      whileTap={{ scale: 0.94 }}
+      onClick={disabled ? undefined : onChange} disabled={disabled}
+      role="switch" aria-checked={on} aria-label={label}
+      title={disabled ? 'Platform genelinde kapalı — önce Ayarlar’dan açın' : undefined}
+      whileTap={disabled ? undefined : { scale: 0.94 }}
       transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
       className="gur-admin-btn"
       style={{
@@ -2380,25 +2427,26 @@ function SettingsRow({ item, on, onChange, children }) {
   );
 }
 
+// Bir özelliğin kaç işletmede ayrıca kapatıldığı.
+function closedStores(settings, key) {
+  return Object.values(settings.storeOverrides || {}).filter(o => o?.[key] === false).length;
+}
+
 function SettingsPage() {
   const settings = usePlatformSettings();
   const flip = (key) => toggleSetting(key);
 
   const groups = [
     {
+      // Liste katalogdan geliyor (src/lib/platform.js → FEATURES): uygulamada
+      // kontrol edilen kapı ile paneldeki anahtar aynı kaynaktan beslenmezse
+      // anahtar er geç yalan söylemeye başlar.
       title: 'Uygulama özellikleri',
       note: 'Buradan kapatılan özellik tüketici uygulamasından da kalkar.',
-      items: [
-        {
-          key: 'matchEnabled', label: 'GUR Match — arkadaşla yan yana kaydırma',
-          desc: 'İki kişinin aynı desteyi kaydırıp ortak kararda buluştuğu arkadaş sistemi. Kapatıldığında Keşfet ekranındaki Match şeridi gizlenir, süren oturumlar Keşfet’e döner; kayıtlı eşleşmeler silinmez.',
-          feature: true,
-        },
-        {
-          key: 'gastroPublic', label: 'Gastro Onaylı rozetini göster',
-          desc: 'Onaylı restoranlar uygulamada rozetle öne çıkar ve şef tanıtım videosu galeride görünür.',
-        },
-      ],
+      items: FEATURES.map(f => ({
+        key: f.key, label: f.label, desc: f.desc, feature: true,
+        perStore: f.perStore,
+      })),
     },
     {
       title: 'Moderasyon',
@@ -2423,11 +2471,24 @@ function SettingsPage() {
           {g.items.map(it => (
             <SettingsRow key={it.key} item={it} on={!!settings[it.key]} onChange={() => flip(it.key)}>
               {it.feature && (
-                <div style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 8, background: settings[it.key] ? C.greenSoft : C.panel2, border: `1px solid ${settings[it.key] ? `${C.green}44` : C.border}`, borderRadius: R.pill, padding: '5px 12px' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: settings[it.key] ? C.green : C.faint }} />
-                  <span style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: settings[it.key] ? C.green : C.faint }}>
-                    {settings[it.key] ? 'Uygulamada açık' : 'Uygulamada kapalı'}
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: settings[it.key] ? C.greenSoft : C.panel2, border: `1px solid ${settings[it.key] ? `${C.green}44` : C.border}`, borderRadius: R.pill, padding: '5px 12px' }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: settings[it.key] ? C.green : C.faint }} />
+                    <span style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: settings[it.key] ? C.green : C.faint }}>
+                      {settings[it.key] ? 'Uygulamada açık' : 'Uygulamada kapalı'}
+                    </span>
                   </span>
+                  {it.perStore && (
+                    <span style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>
+                      Restoran bazında da kapatılabilir — Restoranlar → ilgili işletme
+                    </span>
+                  )}
+                  {/* Kapalı özelliğin kaç işletmede ayrıca kapatıldığı */}
+                  {it.perStore && closedStores(settings, it.key) > 0 && (
+                    <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.yellow, background: C.yellowSoft, borderRadius: R.pill, padding: '4px 10px' }}>
+                      {closedStores(settings, it.key)} işletmede ayrıca kapalı
+                    </span>
+                  )}
                 </div>
               )}
             </SettingsRow>

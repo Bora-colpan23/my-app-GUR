@@ -8,7 +8,8 @@ import { hydrateCampaigns } from '../lib/campaigns.js';
 import { submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles, saveOwnerProfile, OVERRIDABLE } from '../lib/b2b.js';
 import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
-import { usePlatformSettings } from '../lib/platform.js';
+import { usePlatformSettings, useFeature } from '../lib/platform.js';
+import * as reservations from '../lib/reservations.js';
 import * as geo from '../lib/geo.js';
 import { seenCampaigns, markShown } from '../lib/ad-frequency.js';
 import { signIn as socialSignIn, isAppleDevice, isConfigured as socialConfigured } from '../lib/social-auth.js';
@@ -1725,8 +1726,84 @@ function GrowthCard({ title, price, desc, active, locked, onBuy }) {
   );
 }
 
+// İşletmenin masa talebi kuyruğu. Sunucuda bunun karşılığı reservations
+// tablosu ve bildirim kuyruğudur; burada ortak depo (src/lib/reservations.js)
+// üzerinden çalışıyor.
+function TableRequests({ restaurant }) {
+  const all = reservations.useReservations();
+  const mine = all.filter(x => x.restaurantId === String(restaurant?.id));
+  const pending = mine.filter(x => x.status === "pending");
+  const past = mine.filter(x => x.status !== "pending");
+
+  // Panel açıldığında bekleyenler "görüldü" olur; rozet söner ama talep
+  // kuyrukta kalır — görmek cevap vermek değildir.
+  useEffect(() => {
+    if (restaurant?.id) reservations.markSeen(restaurant.id);
+  }, [restaurant?.id, mine.length]);
+
+  const row = (x, actionable) => (
+    <div key={x.id} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, padding: "14px 16px", marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: actionable ? 12 : 0 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 13, background: "rgba(255,102,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon n="clock" size={17} color="#FF9A4D" />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>
+            {x.day} · {x.time} · {x.people} kişi
+          </p>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0 }}>
+            {x.guestName}{x.dealPct ? ` · %${x.dealPct} fırsatla` : ""}
+          </p>
+        </div>
+        {!actionable && (
+          <span style={{
+            fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 800, borderRadius: 999, padding: "4px 11px",
+            color: x.status === "confirmed" ? "#4CAF50" : "rgba(255,255,255,0.4)",
+            background: x.status === "confirmed" ? "rgba(76,175,80,0.14)" : "rgba(255,255,255,0.06)",
+          }}>{x.status === "confirmed" ? "Onaylandı" : "Reddedildi"}</span>
+        )}
+      </div>
+      {actionable && (
+        <div style={{ display: "flex", gap: 9 }}>
+          <Btn text="Onayla" onClick={() => reservations.decideReservation(x.id, "confirmed")} variant="filled" size="sm" />
+          <Btn text="Reddet" onClick={() => reservations.decideReservation(x.id, "declined")} variant="destructiveSoft" size="sm" />
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Bekleyen talepler</p>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 12px", lineHeight: 1.5 }}>
+        Uygulamadan gelen masa talepleri. Onaylayana kadar misafire "iletildi"
+        görünür — masayı veren taraf sizsiniz.
+      </p>
+      {pending.length === 0 && (
+        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.1)", borderRadius: 18, padding: "22px 16px", textAlign: "center", marginBottom: 16 }}>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.38)", margin: 0 }}>Bekleyen talep yok</p>
+        </div>
+      )}
+      {pending.map(x => row(x, true))}
+
+      {past.length > 0 && (
+        <>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 800, color: "#fff", margin: "18px 0 10px" }}>Geçmiş</p>
+          {past.map(x => row(x, false))}
+        </>
+      )}
+    </div>
+  );
+}
+
 function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaurant }) {
   const [activeTab, setActiveTab] = useState("stats");
+  // Masa ayırtma yönetici panelinden kapatılabiliyor; kapalıysa sekme de
+  // talep de yok — işletmeye cevaplayamayacağı bir kuyruk göstermeyiz.
+  const canReserve = useFeature("reservationsEnabled", ownerRestaurant?.id);
+  const allReservations = reservations.useReservations();
+  const pendingCount = allReservations.filter(
+    x => x.restaurantId === String(ownerRestaurant?.id) && x.status === "pending").length;
   const [bought, setBought] = useState({});
   const [notice, setNotice] = useState(null);
   const buy = (key, label) => { setBought(p => ({ ...p, [key]: true })); setNotice(label); setTimeout(() => setNotice(null), 2200); };
@@ -1826,6 +1903,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
           <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: 16, overflow: "hidden", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
             {[
               { id: "stats", label: "İstatistikler" },
+              ...(canReserve ? [{ id: "tables", label: "Masalar", badge: pendingCount }] : []),
               { id: "info", label: "Bilgiler" },
               { id: "reviews", label: "Yorumlar" },
               { id: "menu", label: "Menü" },
@@ -1838,12 +1916,23 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                 borderBottom: activeTab === tab.id ? "2px solid #FF6600" : "2px solid transparent",
                 transition: "all 0.25s",
               }}>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 500, color: activeTab === tab.id ? "#FF6600" : "rgba(255,255,255,0.4)" }}>
+                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 500, color: activeTab === tab.id ? "#FF6600" : "rgba(255,255,255,0.4)", display: "inline-flex", alignItems: "center", gap: 4 }}>
                   {tab.label}
+                  {/* Bekleyen talep sayısı: işletmenin ilk bakacağı yer */}
+                  {tab.badge > 0 && (
+                    <span style={{ minWidth: 15, height: 15, borderRadius: 8, background: "#FF3B30", color: "#fff", fontSize: 9, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{tab.badge}</span>
+                  )}
                 </span>
               </div>
             ))}
           </div>
+
+          {/* ─── TAB: Masa talepleri ───
+              Kullanıcı uygulamadan masa ayırttığında talep buraya düşer.
+              Masayı verecek taraf işletme olduğu için karar da burada. */}
+          {activeTab === "tables" && canReserve && (
+            <TableRequests restaurant={ownerRestaurant} />
+          )}
 
           {/* ─── TAB: İşletme bilgileri ─── */}
           {activeTab === "info" && (
@@ -2311,7 +2400,7 @@ function HeroCarousel({ slides, intervalMs = 4500 }) {
   );
 }
 
-function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, onRoulette, matchEnabled = true, restaurants = [], onDetail }) {
+function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, onRoulette, matchEnabled = true, rouletteEnabled = true, restaurants = [], onDetail }) {
   // Marka slaytı her zaman ilk sırada, sponsor slaytları onu izler
   const slides = useMemo(() => [
     { id: "brand", img: I.hero, title: "İstanbul'un Lezzetleri", sub: "En popüler restoranları keşfet" },
@@ -2423,6 +2512,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         {/* Karar araçları yan yana: Match arkadaşla, Çark tek başına.
             Match yönetici panelinden kapatılabiliyor; kapalıyken Çark tüm
             genişliği alır, boş bir yer kalmaz. */}
+        {(matchEnabled || rouletteEnabled) && (
         <div style={{ display: "flex", gap: 10, marginBottom: 16, flexShrink: 0 }}>
           {matchEnabled && (
             <motion.div
@@ -2443,6 +2533,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             </motion.div>
           )}
 
+          {rouletteEnabled && (
           <motion.div
             onClick={onRoulette}
             whileTap={{ scale: 0.97 }}
@@ -2459,7 +2550,9 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Çark</p>
             <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.35 }}>Yakınından rastgele seçsin</p>
           </motion.div>
+          )}
         </div>
+        )}
 
         {/* Başlık */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -2789,9 +2882,9 @@ function VerifiedStar({ size = 14, title = "İşletme hesabı doğrulanmış" })
  * video da ilk kaydırmada çıksın. Rozet yalnızca bu slaytta, sağ üstte:
  * hangi karenin video olduğu bakışta anlaşılmalı.
  */
-function galleryOf(r) {
+function galleryOf(r, showChef = true) {
   const photos = (r.imgs || []).map(src => ({ src, chef: false }));
-  if (!(r.gastro && r.gastroVideo)) return photos;
+  if (!showChef || !(r.gastro && r.gastroVideo)) return photos;
   const chef = { src: r.gastroVideo, chef: true, chefName: r.gastroChef };
   return photos.length ? [photos[0], chef, ...photos.slice(1)] : [chef];
 }
@@ -2960,6 +3053,10 @@ const SHEET_PEEK = 0.46;    // ekranın üstünden bu oranda açılır
 const SHEET_FULL = 0.06;
 
 function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyLocation }) {
+  // Kapılar tam detay ekranıyla aynı kaynaktan: bir özellik iki ekranda
+  // farklı davranırsa kullanıcı hangisinin doğru olduğunu bilemez.
+  const canMenu = useFeature("menuEnabled", r?.id);
+  const chefVideoOn = useFeature("gastroVideoEnabled", r?.id);
   const panelRef = useRef(null);
   const [full, setFull] = useState(false);
   const [ii, setIi] = useState(0);
@@ -3032,7 +3129,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
   };
 
   // Şef tanıtımı galerinin bir karesi (bkz. galleryOf); ayrı bölüm değil.
-  const gallery = galleryOf(r);
+  const gallery = galleryOf(r, chefVideoOn);
   const provider = defaultMapProvider(typeof navigator !== "undefined" ? navigator.userAgent : "");
   const place = { name: r.name, address: r.addr, lat: r.lat, lng: r.lng };
   const openMap = (p) => {
@@ -3126,7 +3223,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
               açık: menüyü güncelleyen ve masayı tutan taraf işletmenin
               kendisi. Sahiplenilmemiş kayıtta bunları göstermek, karşılığı
               olmayan bir söz vermek olurdu. */}
-          {claimed ? (
+          {claimed && canMenu ? (
             <>
               {r.menu?.length > 0 && (
                 <div style={{ marginBottom: 16 }}>
@@ -4170,9 +4267,9 @@ function ReservationSheet({ r, onClose, onConfirm }) {
   );
 }
 
-function ConfirmSheet({ title, lines, onClose }) {
+function ConfirmSheet({ title, lines, note, onClose }) {
   return (
-    <Sheet title={title} subtitle="Onaylandı" onClose={onClose}>
+    <Sheet title={title} subtitle={note ? "İşletmeye iletildi" : "Onaylandı"} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "6px 0 18px" }}>
         <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#EAF7EC", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon n="check" color="#22A34D" size={26} strokeWidth={2.5} />
@@ -4186,6 +4283,9 @@ function ConfirmSheet({ title, lines, onClose }) {
           </div>
         ))}
       </div>
+      {note && (
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(45,36,25,0.5)", textAlign: "center", margin: "-6px 0 14px", lineHeight: 1.5 }}>{note}</p>
+      )}
       <Btn text="Tamam" onClick={onClose} variant="filled" />
     </Sheet>
   );
@@ -4339,6 +4439,12 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
 // RESTORAN DETAY — Fotoğraf carousel + kaydırılabilir yorumlar
 // ═══════════════════════════════════════════════
 function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavorites, userReviews = [], onAddReview, onVerifyLocation }) {
+  // Özellik kapıları: yönetici paneli hem platform genelinde hem tek bir
+  // işletme için kapatabiliyor (src/lib/platform.js → featureOn).
+  const canReserve = useFeature("reservationsEnabled", r?.id);
+  const canMenu = useFeature("menuEnabled", r?.id);
+  const chefVideoOn = useFeature("gastroVideoEnabled", r?.id);
+  const dealsOn = useFeature("instantDealsEnabled", r?.id);
   const [sheet, setSheet] = useState(null);      // "reserve" | "soon" | null
   const [confirmed, setConfirmed] = useState(null);
   // İşletmenin aldığı hizmetler ve Google yorumları
@@ -4349,10 +4455,10 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
     return () => { off = true; };
   }, [r]);
   const claimed = !!(detail?.services?.claimed ?? (r.claimed || r.ownerClaimed));
-  const deal = dealFor(r.id);
+  const deal = dealsOn ? dealFor(r.id) : null;
   const [photoIdx, setPhotoIdx] = useState(0);
   // Şef tanıtımı ayrı bir bölüm değil, galerinin bir karesi.
-  const gallery = useMemo(() => galleryOf(r), [r]);
+  const gallery = useMemo(() => galleryOf(r, chefVideoOn), [r, chefVideoOn]);
   const [showMenu, setShowMenu] = useState(false);
   const photoRef = useRef(null);
 
@@ -4589,8 +4695,9 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           )}
 
           {/* Masa ayırtma işletmenin taahhüdü; kaydını sahiplenmemiş bir
-              mekan adına söz veremeyiz. */}
-          {claimed && (
+              mekan adına söz veremeyiz. Yönetici paneli bu özelliği hem
+              platform genelinde hem tek bir işletme için kapatabilir. */}
+          {claimed && canReserve && (
             <div style={{ padding: "0 16px", marginBottom: 12 }}>
               <Btn text="Masa Ayırt" onClick={() => setSheet("reserve")} variant="filled" size="md" />
             </div>
@@ -4607,7 +4714,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
         {/* Alt bar — Explore ile aynı stil */}
         <div style={{ position: "sticky", bottom: 0, background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-around", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
-          <div onClick={() => (claimed ? setShowMenu(true) : setSheet("soon"))} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: claimed ? 0.5 : 0.35 }}>
+          <div onClick={() => (claimed && canMenu ? setShowMenu(true) : setSheet("soon"))} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: claimed ? 0.5 : 0.35 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /></svg>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Menü</span>
           </div>
@@ -4638,9 +4745,20 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           )}
           {sheet === "reserve" && (
             <ReservationSheet r={r} onClose={() => setSheet(null)}
-              onConfirm={(b) => { setSheet(null); setConfirmed({ title: "Masanız ayrıldı", lines: [["Restoran", r.name], ["Gün", b.day], ["Saat", b.time], ["Kişi", `${b.people}`], ...(b.deal ? [["Fırsat", `%${b.deal.pct} indirim`]] : [])] }); }} />
+              onConfirm={(b) => {
+                // Masa "ayrıldı" değil "talep edildi": masayı verecek olan
+                // taraf işletme. Talep işletmenin paneline bildirim düşer.
+                reservations.requestTable({
+                  restaurantId: r.id, restaurantName: r.name,
+                  day: b.day, time: b.time, people: b.people,
+                  dealPct: b.deal?.pct ?? null,
+                });
+                trackEvent("reservation_request", { restaurantId: r.id });
+                setSheet(null);
+                setConfirmed({ title: "Talebin iletildi", lines: [["Restoran", r.name], ["Gün", b.day], ["Saat", b.time], ["Kişi", `${b.people}`], ...(b.deal ? [["Fırsat", `%${b.deal.pct} indirim`]] : [])], note: "İşletme onaylayınca bildirim alacaksın." });
+              }} />
           )}
-          {confirmed && <ConfirmSheet title={confirmed.title} lines={confirmed.lines} onClose={() => setConfirmed(null)} />}
+          {confirmed && <ConfirmSheet title={confirmed.title} lines={confirmed.lines} note={confirmed.note} onClose={() => setConfirmed(null)} />}
         </AnimatePresence>
 
         {/* Yorum Yazma — yıldız, metin ve fotoğraf ekleme */}
@@ -5508,7 +5626,7 @@ export default function GurApp(props = {}) {
   const goProfile = () => { nav("profile"); };
   const catTap = (cat) => { setFilterCat(cat); nav("swipe"); };
   const goMatch = () => { if (!platform.matchEnabled) return; setMatchResults([]); nav("match-start"); };
-  const goRoulette = () => nav("roulette");
+  const goRoulette = () => { if (!platform.rouletteEnabled) return; nav("roulette"); };
   const startMatch = (code) => { setMatchCode(code); setMatchResults([]); nav("match-swipe"); };
   const finishMatch = (found) => { setMatchResults(found); nav("match-result"); };
   // Hesap silme: yerel durumun tamamı temizlenir (kalıcılık yok, backend yok)
@@ -5564,7 +5682,7 @@ export default function GurApp(props = {}) {
       case "rest2": return <RestRegStep2 onBack={back} onNext={() => nav("rest3")} />;
       case "rest3": return <RestRegStep3 onBack={back} onDone={() => nav("rest-dashboard")} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} />;
       case "rest-dashboard": return <RestaurantDashboard onLogout={() => { setHistory([]); setScreen("welcome"); }} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} ownerRestaurant={ownerRestaurant} />;
-      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} onRoulette={goRoulette} matchEnabled={platform.matchEnabled} restaurants={feed} onDetail={openDetail} />;
+      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} onRoulette={goRoulette} matchEnabled={platform.matchEnabled} rouletteEnabled={platform.rouletteEnabled} restaurants={feed} onDetail={openDetail} />;
       case "roulette": return <RouletteScreen onBack={back} restaurants={feed} onDetail={openDetail}
         onDirections={(r) => { backend.trackDirections(r.id); window.open(directionsUrl({ lat: r.lat, lng: r.lng, name: r.name, address: r.addr }, defaultMapProvider()), "_blank", "noopener,noreferrer"); }} />;
       case "match-start": return <MatchStartScreen onBack={back} onStart={startMatch} />;
