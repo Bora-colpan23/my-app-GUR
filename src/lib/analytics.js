@@ -52,3 +52,36 @@ export function track(name, params = {}) {
   if (!started || typeof window.gtag !== "function") return;
   window.gtag("event", name, params);
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Ürün olay akışı.
+//
+// Sunucudaki analytics_events tablosuna gidecek olayların istemci tarafı.
+// Rıza yoksa hiçbir şey gönderilmez; olaylar yalnızca tamponda toplanır ve
+// sayfa kapanınca kaybolur — böylece rıza sonradan verilirse geçmiş veri
+// sızmaz.
+// ═══════════════════════════════════════════════════════════════════════
+
+const buffer = [];
+const MAX_BUFFER = 200;
+
+/** Ürün olayı. name: swipe_right, detail_open, directions_open ... */
+export function trackEvent(name, props = {}) {
+  const event = { name, props, at: Date.now() };
+  buffer.push(event);
+  if (buffer.length > MAX_BUFFER) buffer.shift();
+
+  // GA4 yalnızca rıza varsa ve ölçüm kimliği tanımlıysa çalışır (track()
+  // ikisini de kontrol eder), sunucuya gönderim ayrı bir uçtan yapılır.
+  track(name, props);
+  return event;
+}
+
+/** Tamponu okur — sunucu ucuna toplu gönderim için. */
+export function drainEvents() {
+  return buffer.splice(0, buffer.length);
+}
+
+export function peekEvents() {
+  return buffer.slice();
+}

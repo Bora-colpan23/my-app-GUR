@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { PHASES, FEATURE_PHASE, usePhase, setPhase } from '../lib/phase.js';
+import { useClaims, decideClaim } from '../lib/b2b.js';
 import { motion, AnimatePresence } from 'motion/react';
 
 // ═══════════════════════════════════════════════════════════════
@@ -523,6 +523,8 @@ export default function GurAdmin() {
     { id: 'applications', label: 'Başvurular', icon: icons.inbox, count: apps.length, alert: apps.length > 0 },
     { id: 'gastro', label: 'Gastro Onaylı', icon: icons.star },
     { id: 'users', label: 'Kullanıcılar', icon: icons.users },
+    { id: 'campaigns', label: 'Kampanyalar', icon: icons.trend, count: 4 },
+    { id: 'growth', label: 'Büyüme & Kohort', icon: icons.chart },
     { id: 'revenue', label: 'Gelir & Reklam', icon: icons.money },
     { id: 'settings', label: 'Ayarlar', icon: icons.settings },
   ];
@@ -590,7 +592,6 @@ export default function GurAdmin() {
         {/* Üst bar */}
         <header style={{ height: 64, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 28px', gap: 20, flexShrink: 0, background: C.panel }}>
           <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{pageTitle}</h1>
-          <PhaseSwitch />
           <div style={{ flex: 1 }} />
           <div style={{ position: 'relative', width: 280 }}>
             <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}>
@@ -623,6 +624,8 @@ export default function GurAdmin() {
           {page === 'applications' && <ApplicationsPage apps={apps} onReview={setReviewDoc} onApprove={approveApp} onReject={rejectApp} />}
           {page === 'gastro' && <GastroPage restaurants={restaurants} onGoRestaurants={() => goPage('restaurants')} />}
           {page === 'users' && <UsersPage query={query} />}
+          {page === 'campaigns' && <CampaignsPage />}
+          {page === 'growth' && <GrowthPage />}
           {page === 'revenue' && <RevenuePage />}
           {page === 'settings' && <SettingsPage />}
         </div>
@@ -811,31 +814,249 @@ function TableShell({ headers, children }) {
   );
 }
 
-// Aktif gelir fazı. Buradan yapılan seçim hem yönetici panelini hem de
-// tüketici uygulamasını etkiler: kilitli fazın gelir kalemleri uygulamada
-// da görünmez (bkz. src/lib/phase.js).
-function PhaseSwitch() {
-  const phase = usePhase();
-  const info = PHASES.find(p => p.id === phase);
+// ═══════════════════════════════════════════════════════════════════════
+// KAMPANYALAR — sponsorlu kart açık artırması
+//
+// İşletme bütçe ve teklif belirler; deste kurulurken skor = teklif ×
+// kalite × ilgi ile sıralanır (shared/deck.js → rankCampaigns). Yalnız
+// paraya bakan bir sıralama deneyimi bozarak uzun vadede geliri düşürür,
+// bu yüzden kalite çarpanı burada da görünür.
+// ═══════════════════════════════════════════════════════════════════════
+const CAMPAIGN_SEED = [
+  { id: 'cmp-1', restaurant: 'Çiya Sofrası',      org: 'Çiya Gıda Ltd.',      label: 'Öne Çıkan',     pricing: 'cpe', bid: 240, daily: 180000, spent: 96400, impressions: 18420, clicks: 1120, engagements: 742, status: 'active' },
+  { id: 'cmp-2', restaurant: 'Balıkçı Sabahattin', org: 'Sabahattin Turizm',  label: 'Şefin Önerisi', pricing: 'cpc', bid: 180, daily: 90000,  spent: 41300, impressions: 11250, clicks: 690,  engagements: 318, status: 'active' },
+  { id: 'cmp-3', restaurant: "Nonna's Trattoria",  org: 'Nonna Gastro A.Ş.',   label: 'Öne Çıkan',     pricing: 'cpe', bid: 310, daily: 42000,  spent: 42000, impressions: 7600,  clicks: 512,  engagements: 401, status: 'exhausted' },
+  { id: 'cmp-4', restaurant: 'Klein Bistro',       org: 'Klein Kahve',         label: 'Öne Çıkan',     pricing: 'cpe', bid: 120, daily: 60000,  spent: 0,     impressions: 0,     clicks: 0,    engagements: 0,   status: 'paused' },
+];
+
+const CAMPAIGN_STATUS = {
+  active:    { label: 'Yayında',      color: C.green,  soft: C.greenSoft },
+  paused:    { label: 'Duraklatıldı', color: C.yellow, soft: C.yellowSoft },
+  exhausted: { label: 'Bütçe bitti',  color: C.faint,  soft: C.panel2 },
+};
+
+function CampaignsPage() {
+  const [rows, setRows] = useState(CAMPAIGN_SEED);
+  const [toast, setToast] = useState(null);
+
+  const say = (m) => { setToast(m); setTimeout(() => setToast(null), 2200); };
+  const toggle = (id) => setRows(rs => rs.map(r =>
+    r.id === id && r.status !== 'exhausted'
+      ? { ...r, status: r.status === 'active' ? 'paused' : 'active' } : r));
+  const bump = (id, delta) => setRows(rs => rs.map(r =>
+    r.id === id ? { ...r, bid: Math.max(20, r.bid + delta) } : r));
+
+  const money = (minor) => `₺${(minor / 100).toLocaleString('tr', { maximumFractionDigits: 0 })}`;
+  // Kalite = etkileşim oranı; skor açık artırmadaki gerçek sıralama ölçütü.
+  const scored = rows.map(r => {
+    const rate = r.impressions ? r.engagements / r.impressions : 0.02;
+    const quality = Math.min(1.5, Math.max(0.2, rate * 20));
+    return { ...r, rate, quality, score: r.bid * quality };
+  }).sort((a, b) => (b.status === 'active' ? b.score : -1) - (a.status === 'active' ? a.score : -1));
+
+  const activeRows = rows.filter(r => r.status === 'active');
+  const totalSpend = rows.reduce((a, r) => a + r.spent, 0);
+  const totalImp = rows.reduce((a, r) => a + r.impressions, 0);
+  const totalEng = rows.reduce((a, r) => a + r.engagements, 0);
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 18 }}>
-      <div style={{ display: 'flex', gap: 3, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: 3 }}>
-        {PHASES.map(p => {
-          const on = p.id === phase;
+    <div style={{ animation: 'fadeIn 0.2s' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+        <KpiCard label="Yayındaki Kampanya" value={`${activeRows.length}`} delta={`${rows.length} toplam`} deltaNeutral icon={icons.trend} accent={{ color: C.green, soft: C.greenSoft }} />
+        <KpiCard label="Bugünkü Harcama" value={money(totalSpend)} delta="12%" deltaUp icon={icons.money} accent={{ color: C.orange, soft: C.orangeSoft }} />
+        <KpiCard label="Gösterim" value={totalImp.toLocaleString('tr')} delta="8%" deltaUp icon={icons.chart} accent={{ color: C.blue, soft: C.blueSoft }} />
+        <KpiCard label="Etkileşim Oranı" value={`%${((totalEng / Math.max(totalImp, 1)) * 100).toFixed(1)}`} delta="sağa kaydırma" deltaNeutral icon={icons.star} accent={{ color: C.yellow, soft: C.yellowSoft }} />
+      </div>
+
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 18px', marginBottom: 20, display: 'flex', gap: 14, alignItems: 'center' }}>
+        <Icon path={icons.chart} size={16} color={C.blue} />
+        <span style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.55 }}>
+          Sponsorlu kart 5-7 organik kart arasına rastgele aralıkla giriyor; şablonu organik kartla
+          birebir aynı, tek fark küçük bir rozet. Sıralama <b style={{ color: C.text }}>teklif × kalite</b> skoruna göre —
+          yalnız teklife bakan bir sıralama etkileşimi ve uzun vadede geliri düşürüyor.
+        </span>
+      </div>
+
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+        <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.2fr 140px', gap: 12, fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          <span>Kampanya</span><span>Model</span><span>Teklif</span><span>Kalite</span><span>Bütçe</span><span style={{ textAlign: 'right' }}>Eylem</span>
+        </header>
+        {scored.map((r, i) => {
+          const st = CAMPAIGN_STATUS[r.status];
+          const pct = Math.min(100, (r.spent / r.daily) * 100);
           return (
-            <motion.button
-              key={p.id} onClick={() => setPhase(p.id)} className="gur-admin-btn"
-              data-phase={p.id} aria-pressed={on} title={p.name}
-              whileTap={{ scale: 0.97 }} transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
-              style={{
-                border: 'none', cursor: 'pointer', borderRadius: 7, padding: '5px 11px',
-                background: on ? C.orange : 'transparent', color: on ? '#fff' : C.dim,
-                fontFamily: F, fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', outline: 'none',
-              }}>{p.short}</motion.button>
+            <div key={r.id} style={{ padding: '14px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.2fr 140px', gap: 12, alignItems: 'center', opacity: r.status === 'active' ? 1 : 0.6 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 600 }}>{r.restaurant}</span>
+                  <Badge text={st.label} color={st.color} soft={st.soft} />
+                </div>
+                <div style={{ fontSize: 11.5, color: C.faint }}>{r.org} · rozet: “{r.label}”</div>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 700, color: r.pricing === 'cpe' ? C.green : C.blue, textTransform: 'uppercase' }}>{r.pricing}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button onClick={() => bump(r.id, -20)} className="gur-admin-btn" style={{ border: `1px solid ${C.border}`, background: C.bg, color: C.dim, borderRadius: 6, width: 22, height: 22, cursor: 'pointer', fontSize: 13, lineHeight: 1, outline: 'none' }}>−</button>
+                <span style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'center' }}>{money(r.bid)}</span>
+                <button onClick={() => bump(r.id, 20)} className="gur-admin-btn" style={{ border: `1px solid ${C.border}`, background: C.bg, color: C.dim, borderRadius: 6, width: 22, height: 22, cursor: 'pointer', fontSize: 13, lineHeight: 1, outline: 'none' }}>+</button>
+              </div>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: r.quality >= 1 ? C.green : C.yellow, fontVariantNumeric: 'tabular-nums' }}>×{r.quality.toFixed(2)}</div>
+                <div style={{ fontSize: 10.5, color: C.faint }}>skor {Math.round(r.score)}</div>
+              </div>
+              <div>
+                <div style={{ height: 5, borderRadius: 3, background: C.bg, overflow: 'hidden', marginBottom: 4 }}>
+                  <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: pct >= 100 ? C.red : C.orange }} />
+                </div>
+                <div style={{ fontSize: 10.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{money(r.spent)} / {money(r.daily)} günlük</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <Btn
+                  label={r.status === 'active' ? 'Duraklat' : r.status === 'exhausted' ? 'Bütçe bitti' : 'Yayınla'}
+                  onClick={() => { if (r.status === 'exhausted') { say('Bütçe dolmuş kampanya için önce bütçe artırılmalı'); return; } toggle(r.id); say(r.status === 'active' ? `${r.restaurant} duraklatıldı` : `${r.restaurant} yayına alındı`); }}
+                  variant={r.status === 'active' ? 'ghost' : 'filled'}
+                  tone={r.status === 'active' ? undefined : 'orange'} size="sm"
+                />
+              </div>
+            </div>
           );
         })}
       </div>
-      <span style={{ fontSize: 11, color: C.faint, maxWidth: 210, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={info.name}>{info.name}</span>
+
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 18px', fontSize: 13, color: C.text, boxShadow: '0 8px 30px rgba(0,0,0,0.5)', zIndex: 100 }}>
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// BÜYÜME — kohort, retention, ARPU ve LTV
+//
+// Sunucudaki cohort_retention / cohort_engagement / user_ltv tablolarının
+// panel karşılığı. Sorgular server/db/queries/cohorts.sql içinde.
+// ═══════════════════════════════════════════════════════════════════════
+const COHORTS = [
+  { week: '2026-07-06', size: 1840, d1: 46.2, d7: 28.4, d30: 15.1, swipes: 34.2, saves: 7.1, dirPct: 22.4, visitPct: 9.6, ltv: 4120 },
+  { week: '2026-07-13', size: 2210, d1: 48.8, d7: 30.1, d30: 16.8, swipes: 36.8, saves: 7.9, dirPct: 24.1, visitPct: 10.8, ltv: 4480 },
+  { week: '2026-07-20', size: 2640, d1: 51.3, d7: 32.6, d30: 18.2, swipes: 39.1, saves: 8.6, dirPct: 26.7, visitPct: 12.3, ltv: 4910 },
+  { week: '2026-07-27', size: 3110, d1: 53.9, d7: 34.2, d30: 19.6, swipes: 41.5, saves: 9.2, dirPct: 28.9, visitPct: 13.7, ltv: 5240 },
+  { week: '2026-08-03', size: 3480, d1: 55.1, d7: 35.8, d30: 20.4, swipes: 42.9, saves: 9.8, dirPct: 30.2, visitPct: 14.9, ltv: 5580 },
+  { week: '2026-08-10', size: 3920, d1: 56.4, d7: 36.9, d30: null, swipes: 44.1, saves: 10.3, dirPct: 31.6, visitPct: 15.8, ltv: 5810 },
+  { week: '2026-08-17', size: 4260, d1: 57.8, d7: 38.1, d30: null, swipes: 45.6, saves: 10.9, dirPct: 33.1, visitPct: 16.4, ltv: 6020 },
+  { week: '2026-08-24', size: 4610, d1: 58.9, d7: null, d30: null, swipes: 46.8, saves: 11.4, dirPct: 34.2, visitPct: 17.1, ltv: 6190 },
+];
+
+// Retention hücresi: renk yoğunluğu oranla artar, sayı okunaklı kalır.
+function HeatCell({ value }) {
+  if (value == null) {
+    return <span style={{ fontSize: 12, color: C.border }}>—</span>;
+  }
+  const alpha = Math.min(0.42, Math.max(0.05, value / 140));
+  return (
+    <span style={{
+      display: 'inline-block', minWidth: 52, textAlign: 'center',
+      padding: '4px 8px', borderRadius: 6,
+      background: `rgba(34,197,94,${alpha})`,
+      fontSize: 12, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums',
+    }}>%{value.toFixed(1)}</span>
+  );
+}
+
+function GrowthPage() {
+  const [metric, setMetric] = useState('retention');
+  const money = (minor) => `₺${(minor / 100).toFixed(2)}`;
+
+  const totalUsers = COHORTS.reduce((a, c) => a + c.size, 0);
+  const weightedLtv = COHORTS.reduce((a, c) => a + c.ltv * c.size, 0) / totalUsers;
+  const latest = COHORTS[COHORTS.length - 1];
+  // ARPU = LTV / ortalama yaşam süresi (ay). Sunucuda user_ltv.arpu_minor.
+  const AVG_LIFETIME_MONTHS = 14;
+
+  return (
+    <div style={{ animation: 'fadeIn 0.2s' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+        <KpiCard label="Toplam Kullanıcı" value={totalUsers.toLocaleString('tr')} delta={`+${latest.size.toLocaleString('tr')} bu hafta`} deltaUp icon={icons.users} accent={{ color: C.blue, soft: C.blueSoft }} />
+        <KpiCard label="Ortalama LTV" value={money(weightedLtv)} delta="11%" deltaUp icon={icons.money} accent={{ color: C.green, soft: C.greenSoft }} />
+        <KpiCard label="ARPU (aylık)" value={money(weightedLtv / AVG_LIFETIME_MONTHS)} delta={`${AVG_LIFETIME_MONTHS} ay ort. ömür`} deltaNeutral icon={icons.chart} accent={{ color: C.orange, soft: C.orangeSoft }} />
+        <KpiCard label="Kaydet → Git Dönüşümü" value={`%${latest.dirPct.toFixed(1)}`} delta={`ziyaret %${latest.visitPct.toFixed(1)}`} deltaUp icon={icons.trend} accent={{ color: C.yellow, soft: C.yellowSoft }} />
+      </div>
+
+      <TabBar
+        tabs={[
+          { id: 'retention', label: 'Retention' },
+          { id: 'engagement', label: 'Etkileşim' },
+          { id: 'conversion', label: 'Dönüşüm ve LTV' },
+        ]}
+        active={metric} onChange={setMetric}
+      />
+
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+        <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Kayıt haftasına göre kohortlar
+          </span>
+          <span style={{ fontSize: 11.5, color: C.faint }}>gecelik toplama · 04:00</span>
+        </header>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                {(metric === 'retention'
+                  ? ['Kohort', 'Kişi', 'Gün 1', 'Gün 7', 'Gün 30']
+                  : metric === 'engagement'
+                    ? ['Kohort', 'Kişi', 'Kaydırma / kişi', 'Kaydetme / kişi', 'Gün 7']
+                    : ['Kohort', 'Kişi', 'Yol tarifi', 'Fiziksel ziyaret', 'LTV']
+                ).map((h, i) => (
+                  <th key={h} style={{ textAlign: i === 0 ? 'left' : 'right', padding: '11px 18px', fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {COHORTS.slice().reverse().map((c, i) => (
+                <tr key={c.week} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                  <td style={{ padding: '11px 18px', fontSize: 13, fontWeight: 600 }}>{c.week}</td>
+                  <td style={{ padding: '11px 18px', textAlign: 'right', fontSize: 12.5, color: C.dim, fontVariantNumeric: 'tabular-nums' }}>{c.size.toLocaleString('tr')}</td>
+                  {metric === 'retention' && <>
+                    <td style={{ padding: '11px 18px', textAlign: 'right' }}><HeatCell value={c.d1} /></td>
+                    <td style={{ padding: '11px 18px', textAlign: 'right' }}><HeatCell value={c.d7} /></td>
+                    <td style={{ padding: '11px 18px', textAlign: 'right' }}><HeatCell value={c.d30} /></td>
+                  </>}
+                  {metric === 'engagement' && <>
+                    <td style={{ padding: '11px 18px', textAlign: 'right', fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{c.swipes.toFixed(1)}</td>
+                    <td style={{ padding: '11px 18px', textAlign: 'right', fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{c.saves.toFixed(1)}</td>
+                    <td style={{ padding: '11px 18px', textAlign: 'right' }}><HeatCell value={c.d7} /></td>
+                  </>}
+                  {metric === 'conversion' && <>
+                    <td style={{ padding: '11px 18px', textAlign: 'right' }}><HeatCell value={c.dirPct} /></td>
+                    <td style={{ padding: '11px 18px', textAlign: 'right' }}><HeatCell value={c.visitPct} /></td>
+                    <td style={{ padding: '11px 18px', textAlign: 'right', fontSize: 12.5, fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{money(c.ltv)}</td>
+                  </>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px 20px', marginTop: 20 }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700 }}>Bu tablo neyi ölçüyor</h3>
+        <div style={{ display: 'grid', gap: 7 }}>
+          {[
+            ['Retention', 'Kayıt gününden N gün sonra en az bir ürün olayı üreten kullanıcı oranı. Sadece uygulamayı açmak yetmiyor.'],
+            ['Etkileşim', 'Kohort başına kaydırma ve kaydetme sayısı; destenin doyup doymadığını gösterir.'],
+            ['Dönüşüm', 'Sağa kaydırılan mekân için yol tarifi alınma ve konumla doğrulanmış ziyaret oranı — ürünün gerçek dünyadaki karşılığı.'],
+            ['LTV', 'Reklam + abonelik + komisyon gelirinin kullanıcı başına kümülatif toplamı; ARPU bunun aylığa bölünmüşü.'],
+          ].map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: C.orange, minWidth: 74 }}>{k}</span>
+              <span style={{ fontSize: 12, color: C.faint, lineHeight: 1.55 }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -964,6 +1185,27 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
 
   // Yorum dağılımı — rozet kararını verirken bakılan asıl kanıt
   const dist = [5, 4, 3, 2, 1].map(star => ({ star, n: reviews.filter(v => v.stars === star).length }));
+
+  // Etkileşim hunisi: gösterimden fiziksel ziyarete. Sunucuda bu sayılar
+  // swipes / analytics_events / visits tablolarından geliyor
+  // (server/db/queries/cohorts.sql → 4. sorgu).
+  const engagement = useMemo(() => {
+    const rnd = seeded(r.id * 31);
+    const impressions = 3200 + Math.round(rnd() * 5400);
+    const details = Math.round(impressions * (0.24 + rnd() * 0.13));
+    const saves = Math.round(details * (0.38 + rnd() * 0.16));
+    const directions = Math.round(saves * (0.29 + rnd() * 0.14));
+    const visits = Math.round(directions * (0.35 + rnd() * 0.18));
+    return {
+      funnel: [
+        { label: 'Kartı gördü', value: impressions, tone: C.faint },
+        { label: 'Detayı açtı', value: details, tone: C.blue },
+        { label: 'Sağa kaydırdı', value: saves, tone: C.green },
+        { label: 'Yol tarifi aldı', value: directions, tone: C.orange },
+        { label: 'Ziyaret doğrulandı', value: visits, tone: C.yellow },
+      ],
+    };
+  }, [r.id]);
   const maxN = Math.max(1, ...dist.map(d => d.n));
   const flagged = reviews.filter(v => v.flagged).length;
 
@@ -995,6 +1237,32 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
         <MetaCell label="Durum"><StatusBadge status={r.status} /></MetaCell>
         <MetaCell label="Katılım">{formatDate(r.joined)}</MetaCell>
       </div>
+
+      {/* ─── ETKİLEŞİM ANALİZİ (B2B panelde işletmenin gördüğü sayılar) ─── */}
+      <section style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px 18px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Son 30 gün · etkileşim hunisi</span>
+          <span style={{ fontSize: 11.5, color: C.faint }}>işletme panelinde de görünür</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+          {engagement.funnel.map((f, i) => (
+            <div key={f.label}>
+              <div style={{ fontSize: 19, fontWeight: 800, color: f.tone, fontVariantNumeric: 'tabular-nums', marginBottom: 2 }}>
+                {f.value.toLocaleString('tr')}
+              </div>
+              <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 6 }}>{f.label}</div>
+              <div style={{ height: 4, borderRadius: 2, background: C.bg, overflow: 'hidden' }}>
+                <div style={{ width: `${(f.value / engagement.funnel[0].value) * 100}%`, height: '100%', borderRadius: 2, background: f.tone }} />
+              </div>
+              {i > 0 && (
+                <div style={{ fontSize: 10.5, color: C.faint, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
+                  önceki adımın %{((f.value / engagement.funnel[i - 1].value) * 100).toFixed(0)}'i
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: 16, alignItems: 'start' }}>
 
@@ -1195,20 +1463,63 @@ function RestaurantsWorkspace({ restaurants, query, tab, onTab, onSuspend, onOpe
   );
 }
 
+// Sahiplenme başvuruları. Tüketici uygulamasındaki ClaimScreen buraya
+// yazıyor (src/lib/b2b.js); onaylanınca işletme panel erişimi kazanır ve
+// girdiği alanlar dış API verisini ezmeye başlar.
+function ClaimsPanel() {
+  const claims = useClaims();
+  const pending = claims.filter(c => c.status === 'pending');
+  if (claims.length === 0) return null;
+
+  return (
+    <section style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 20 }}>
+      <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>İşletme sahiplenme başvuruları</span>
+        <Badge text={`${pending.length} bekliyor`} color={pending.length ? C.yellow : C.faint} soft={pending.length ? C.yellowSoft : C.panel2} />
+      </header>
+      {claims.map((c, i) => (
+        <div key={c.id} style={{ padding: '14px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{c.restaurantName}</span>
+              {c.status === 'approved' && <Badge text="Onaylandı" color={C.green} soft={C.greenSoft} />}
+              {c.status === 'rejected' && <Badge text="Reddedildi" color={C.red} soft={C.redSoft} />}
+              {c.status === 'pending' && <Badge text="Beklemede" color={C.yellow} soft={C.yellowSoft} />}
+            </div>
+            <div style={{ fontSize: 11.5, color: C.faint }}>
+              {c.legalName}{c.taxId ? ` · VKN ${c.taxId}` : ''} · {c.contactName} · {c.phone}
+            </div>
+          </div>
+          {c.status === 'pending' && (
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <Btn label="Onayla" onClick={() => decideClaim(c.id, 'approved')} variant="filled" tone="green" size="sm" />
+              <Btn label="Reddet" onClick={() => decideClaim(c.id, 'rejected', 'Belge doğrulanamadı')} variant="ghost" size="sm" />
+            </div>
+          )}
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
   if (apps.length === 0) {
     return (
-      <div style={{ animation: 'fadeIn 0.2s', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 60, textAlign: 'center' }}>
+      <div style={{ animation: 'fadeIn 0.2s' }}>
+      <ClaimsPanel />
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 60, textAlign: 'center' }}>
         <div style={{ display: 'inline-flex', width: 64, height: 64, borderRadius: 16, background: C.greenSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
           <Icon path={icons.check} size={30} color={C.green} />
         </div>
         <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700 }}>Bekleyen başvuru yok</h3>
         <p style={{ margin: 0, fontSize: 13.5, color: C.dim }}>Tüm restoran başvuruları değerlendirildi.</p>
       </div>
+      </div>
     );
   }
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
+      <ClaimsPanel />
       <div style={{ marginBottom: 16, padding: '12px 16px', background: C.yellowSoft, border: `1px solid ${C.yellow}44`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
         <Icon path={icons.inbox} size={18} color={C.yellow} />
         <span style={{ fontSize: 13, color: C.text }}><b>{apps.length} başvuru</b> vergi levhası doğrulaması bekliyor.</span>
@@ -1382,7 +1693,6 @@ const KIND_TONE = {
 };
 
 function RevenuePage() {
-  const phase = usePhase();
   const plans = [
     { name: 'Premium', price: 4999, count: 42, color: C.orange },
     { name: 'Pro', price: 1999, count: 118, color: C.blue },
@@ -1390,13 +1700,16 @@ function RevenuePage() {
   ];
   const subsRev = plans.reduce((a, p) => a + p.price * p.count, 0);
 
-  const streams = REVENUE_STREAMS.map(x => ({ ...x, phase: FEATURE_PHASE[x.key], live: phase >= FEATURE_PHASE[x.key] }));
-  const liveStreams = streams.filter(x => x.live);
-  const streamRev = liveStreams.reduce((a, x) => a + x.monthly, 0);
+  // Tüm gelir kalemleri canlı: aşamalı açılış kaldırıldı.
+  const streams = REVENUE_STREAMS.map(x => ({ ...x, live: true }));
+  const streamRev = streams.reduce((a, x) => a + x.monthly, 0);
   const total = subsRev + streamRev;
-  const locked = streams.length - liveStreams.length;
-  const potential = streams.reduce((a, x) => a + x.monthly, 0) + subsRev;
   const maxMonthly = Math.max(...streams.map(x => x.monthly));
+  const adRev = streams.filter(x => x.kind === 'Reklam' || x.kind === 'Sponsorluk').reduce((a, x) => a + x.monthly, 0);
+  // ARPU/LTV: sunucudaki user_ltv anlık görüntüsünün panel karşılığı.
+  const MAU = 41200;
+  const arpu = total / MAU;
+  const AVG_LIFETIME_MONTHS = 14;
 
   const money = (n) => `₺${(n / 1000).toFixed(0)}K`;
 
@@ -1406,48 +1719,35 @@ function RevenuePage() {
         <KpiCard label="Aylık Yinelenen Gelir" value={money(total)} delta="18%" deltaUp icon={icons.money} accent={{ color: C.green, soft: C.greenSoft }} />
         <KpiCard label="Abonelikten" value={money(subsRev)} delta="9%" deltaUp icon={icons.store} accent={{ color: C.orange, soft: C.orangeSoft }} />
         <KpiCard label="Diğer Gelir Kalemleri" value={money(streamRev)} delta="24%" deltaUp icon={icons.trend} accent={{ color: C.blue, soft: C.blueSoft }} />
-        <KpiCard label="Kilitli Kalem" value={`${locked}`} delta={`+${money(potential - total)} potansiyel`} deltaNeutral icon={icons.chart} accent={{ color: C.yellow, soft: C.yellowSoft }} />
+        <KpiCard label="ARPU (aylık)" value={`₺${arpu.toFixed(2)}`} delta={`LTV ₺${(arpu * AVG_LIFETIME_MONTHS).toFixed(0)}`} deltaNeutral icon={icons.chart} accent={{ color: C.yellow, soft: C.yellowSoft }} />
       </div>
 
-      {/* Faz planı */}
+      {/* Gelir kırılımı */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
-        {PHASES.map(p => {
-          const on = phase >= p.id;
-          const active = phase === p.id;
-          const rev = streams.filter(x => x.phase === p.id).reduce((a, x) => a + x.monthly, 0);
-          return (
-            <div key={p.id} style={{
-              background: C.panel,
-              border: `1px solid ${active ? C.orange + '77' : C.border}`,
-              borderLeft: `3px solid ${on ? C.orange : C.border}`,
-              borderRadius: 12, padding: '15px 17px', opacity: on ? 1 : 0.6,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 800, color: on ? C.orange : C.faint }}>{p.short}</span>
-                {active && <Badge text="Aktif" color={C.green} soft={C.greenSoft} />}
-                {!on && <Badge text="Kilitli" color={C.faint} soft={C.panel2} />}
-                <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: on ? C.text : C.faint, fontVariantNumeric: 'tabular-nums' }}>{money(rev)}</span>
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 5 }}>{p.name}</div>
-              <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.5, marginBottom: 10 }}>{p.summary}</div>
-              <div style={{ display: 'grid', gap: 4 }}>
-                {p.added.map(a => (
-                  <div key={a} style={{ display: 'flex', gap: 7, alignItems: 'flex-start' }}>
-                    <span style={{ color: on ? C.green : C.faint, fontSize: 11, lineHeight: 1.5 }}>+</span>
-                    <span style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.5 }}>{a}</span>
-                  </div>
-                ))}
-              </div>
+        {[
+          { label: 'Reklam ve sponsorluk', value: adRev, tone: C.blue, note: 'Sponsorlu kart, push, ödüllü video' },
+          { label: 'İşlem komisyonu', value: streams.filter(x => x.kind === 'İşlem' || x.kind === 'Performans').reduce((a, x) => a + x.monthly, 0), tone: C.green, note: 'Rezervasyon, kupon, anlık fırsat' },
+          { label: 'Abonelik', value: subsRev + streams.filter(x => x.kind === 'Abonelik' || x.kind === 'İçerik').reduce((a, x) => a + x.monthly, 0), tone: C.orange, note: 'İşletme planları, içerik lisansı, analiz SaaS' },
+        ].map(b => (
+          <div key={b.label} style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${b.tone}`, borderRadius: 12, padding: '15px 17px' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 5 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: b.tone }}>{b.label}</span>
+              <span style={{ fontSize: 14, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{money(b.value)}</span>
             </div>
-          );
-        })}
+            <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.5, marginBottom: 8 }}>{b.note}</div>
+            <div style={{ height: 5, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
+              <div style={{ width: `${(b.value / total) * 100}%`, height: '100%', borderRadius: 3, background: b.tone }} />
+            </div>
+            <div style={{ fontSize: 10.5, color: C.faint, marginTop: 5 }}>toplam gelirin %{((b.value / total) * 100).toFixed(0)}'i</div>
+          </div>
+        ))}
       </div>
 
       {/* Gelir kalemleri */}
       <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 20 }}>
         <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Gelir Kalemleri</span>
-          <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{liveStreams.length}/{streams.length} açık</span>
+          <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{streams.length} kalem · hepsi açık</span>
         </header>
         {streams.map((x, i) => (
           <div key={x.key} style={{ padding: '13px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14, opacity: x.live ? 1 : 0.45 }}>
@@ -1455,9 +1755,7 @@ function RevenuePage() {
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
                 <span style={{ fontSize: 13.5, fontWeight: 600 }}>{x.name}</span>
-                <Badge text={`Faz ${x.phase}`} color={x.live ? C.orange : C.faint} soft={x.live ? C.orangeSoft : C.panel2} />
                 <Badge text={x.kind} color={KIND_TONE[x.kind]} soft={C.panel2} />
-                {!x.live && <span style={{ fontSize: 11, color: C.faint }}>Faz {x.phase}'te açılıyor</span>}
               </div>
               <div style={{ fontSize: 11.5, color: C.faint }}>{x.note}</div>
             </div>
