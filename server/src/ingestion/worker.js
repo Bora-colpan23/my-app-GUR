@@ -9,7 +9,7 @@
 // dış kaynak yalnızca işletmenin doldurmadığı alanı doldurur.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { PROVIDERS } from "./providers.js";
+import { PROVIDERS, googlePlaces } from "./providers.js";
 import { normalize, dedupe } from "./normalize.js";
 
 // Kadıköy'den başlayan, genişletilebilir kapsama ızgarası.
@@ -123,6 +123,43 @@ export async function upsertPlace(db, place) {
   return restaurantId;
 }
 
+/**
+ * Bir mekânın dış kaynak yorumlarını tazeler.
+ *
+ * Google şartları önbelleklenen içeriğin güncel tutulmasını istiyor; bu
+ * yüzden upsert ederken fetched_at daima yenileniyor ve gecelik iş bayat
+ * satırları buradan buluyor.
+ */
+export async function syncExternalReviews(db, restaurantId) {
+  const { rows: [src] } = await db.query(
+    `SELECT external_id FROM restaurant_sources
+      WHERE restaurant_id = $1 AND provider = 'google_places' LIMIT 1`, [restaurantId]);
+  if (!src) return 0;
+
+  let reviews = [];
+  try {
+    reviews = await googlePlaces.fetchReviews(src.external_id);
+  } catch (err) {
+    console.error(`[ingest] yorum çekilemedi (${restaurantId}): ${err.message}`);
+    return 0;
+  }
+
+  for (const rv of reviews) {
+    await db.query(
+      `INSERT INTO restaurant_external_reviews
+         (restaurant_id, provider, external_id, author_name, author_photo, author_url,
+          rating, body, language, relative_time, published_at, source_url, fetched_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())
+       ON CONFLICT (provider, external_id) DO UPDATE SET
+         rating = EXCLUDED.rating, body = EXCLUDED.body,
+         relative_time = EXCLUDED.relative_time, fetched_at = now()`,
+      [restaurantId, rv.provider, rv.externalId, rv.authorName, rv.authorPhoto, rv.authorUrl,
+       rv.rating, rv.body, rv.language, rv.relativeTime, rv.publishedAt, rv.sourceUrl]
+    );
+  }
+  return reviews.length;
+}
+
 /** Bir tur: tüm hücreler, tüm sağlayıcılar. */
 export async function runIngestion(db, cells = COVERAGE) {
   const started = Date.now();
@@ -133,8 +170,14 @@ export async function runIngestion(db, cells = COVERAGE) {
     const places = dedupe(raw.map(normalize));
     for (const place of places) {
       try {
-        await upsertPlace(db, place);
+        const id = await upsertPlace(db, place);
         written++;
+        // Yorumlar ayrı bir Details çağrısı ve ayrı ücret; yalnızca Google
+        // kaynağı olan kayıtlarda ve mekan yazıldıktan sonra isteniyor.
+        if (place.sources.some(x => x.provider === "google_places")) {
+          await syncExternalReviews(db, id);
+          await sleep(400);
+        }
       } catch (err) {
         console.error(`[ingest] yazma hatası (${place.name}): ${err.message}`);
       }

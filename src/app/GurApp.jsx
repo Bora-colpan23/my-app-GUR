@@ -107,18 +107,18 @@ const I = {
 const GRAD = "#FF6600";
 
 const RESTAURANTS = [
-  { id:1, name:"Nusr-Et Steakhouse", cat:"Türk Mutfağı", rating:4.8, dist:"2.3 km", price:"₺2.500+", addr:"Etiler, Nispetiye Cd. No:87, Beşiktaş", desc:"Dünyaca ünlü et restoranı. Özel kesim etler ve eşsiz sunum.", imgs:[I.steak1,I.interior1,I.kebab1], menu:["https://picsum.photos/seed/menu-nusr1/600/900","https://picsum.photos/seed/menu-nusr2/600/900"], hours:"12:00 - 00:00", tags:["Fine Dining","Et"], lat:41.081, lng:29.033, popular:["Tomahawk","Ottoman Steak","Baklava"] },
+  { id:1, name:"Nusr-Et Steakhouse", cat:"Türk Mutfağı", rating:4.8, dist:"2.3 km", price:"₺2.500+", addr:"Etiler, Nispetiye Cd. No:87, Beşiktaş", desc:"Dünyaca ünlü et restoranı. Özel kesim etler ve eşsiz sunum.", imgs:[I.steak1,I.interior1,I.kebab1], menu:["https://picsum.photos/seed/menu-nusr1/600/900","https://picsum.photos/seed/menu-nusr2/600/900"], hours:"12:00 - 00:00", tags:["Fine Dining","Et"], lat:41.081, lng:29.033, popular:["Tomahawk","Ottoman Steak","Baklava"], gastro:true, gastroChef:'Şef Mehmet Gürs' },
   { id:2, name:"Mikla Restaurant", cat:"Fine Dining", rating:4.9, dist:"5.1 km", price:"₺3.000+", addr:"Beyoğlu, Meşrutiyet Cd. No:15", desc:"Skandinav-Türk mutfağı füzyonu. İstanbul manzarası eşliğinde.", imgs:[I.interior2,I.bosphorus,I.wine1], menu:["https://picsum.photos/seed/menu-mikla1/600/900","https://picsum.photos/seed/menu-mikla2/600/900","https://picsum.photos/seed/menu-mikla3/600/900"], hours:"18:00 - 01:00", tags:["Manzara","Romantik"], lat:41.0315, lng:28.976, popular:["Kuzu Sırtı","Deniz Börülcesi","Sakız Dondurması"] },
-  { id:3, name:"La Sagrata Famila", cat:"Uzak Doğu", rating:4.5, dist:"10 km", price:"₺800+", addr:"Kadıköy, Moda Cd. No:42", desc:"Geleneksel Japon lezzetini taze malzemelerle modern bir dokunuşla sunuyoruz.", imgs:[I.interior3,I.sushi1,I.sushi2], menu:["https://picsum.photos/seed/menu-sagr1/600/900","https://picsum.photos/seed/menu-sagr2/600/900"], hours:"11:00 - 23:00", tags:["Sushi","Japon"], lat:40.987, lng:29.027, popular:["Omakase","Uramaki","Miso Çorbası"] },
+  { id:3, name:"La Sagrata Famila", cat:"Uzak Doğu", rating:4.5, dist:"10 km", price:"₺800+", addr:"Kadıköy, Moda Cd. No:42", desc:"Geleneksel Japon lezzetini taze malzemelerle modern bir dokunuşla sunuyoruz.", imgs:[I.interior3,I.sushi1,I.sushi2], menu:["https://picsum.photos/seed/menu-sagr1/600/900","https://picsum.photos/seed/menu-sagr2/600/900"], hours:"11:00 - 23:00", tags:["Sushi","Japon"], lat:40.987, lng:29.027, popular:["Omakase","Uramaki","Miso Çorbası"], claimed:true },
   { id:4, name:"Green Bowl", cat:"Sağlıklı", rating:4.5, dist:"1.2 km", price:"₺350+", addr:"Şişli, Halaskargazi Cd. No:12", desc:"Organik ve sağlıklı tarifler. Vegan seçenekler.", imgs:[I.healthy1,I.healthy2,I.salad1], menu:["https://picsum.photos/seed/menu-green1/600/900"], hours:"08:00 - 22:00", tags:["Vegan","Organik"], lat:41.0555, lng:28.988, popular:["Acai Bowl","Falafel Tabağı","Yeşil Detoks"] },
   { id:5, name:"Ateş Mangal", cat:"Mangal", rating:4.7, dist:"4.5 km", price:"₺600+", addr:"Üsküdar, Bağlarbaşı Cd. No:88", desc:"Geleneksel odun ateşinde pişen lezzetler.", imgs:[I.bbq1,I.bbq2,I.kebab1], menu:["https://picsum.photos/seed/menu-ates1/600/900","https://picsum.photos/seed/menu-ates2/600/900"], hours:"11:00 - 00:00", tags:["Mangal","Aile"], lat:41.027, lng:29.018, popular:["Adana Kebap","Kuzu Şiş","Künefe"] },
-  { id:6, name:"Klein Bistro", cat:"Kafe", rating:4.4, dist:"0.8 km", price:"₺200+", addr:"Beyoğlu, İstiklal Cd. No:156", desc:"Butik kahve ve ev yapımı pastalar.", imgs:[I.cafe1,I.cafe2,I.barista1], menu:["https://picsum.photos/seed/menu-klein1/600/900"], hours:"07:30 - 23:00", tags:["Kahve","Brunch"], lat:41.0345, lng:28.978, popular:["Flat White","Cheesecake","Avokadolu Tost"] },
+  { id:6, name:"Klein Bistro", cat:"Kafe", rating:4.4, dist:"0.8 km", price:"₺200+", addr:"Beyoğlu, İstiklal Cd. No:156", desc:"Butik kahve ve ev yapımı pastalar.", imgs:[I.cafe1,I.cafe2,I.barista1], menu:["https://picsum.photos/seed/menu-klein1/600/900"], hours:"07:30 - 23:00", tags:["Kahve","Brunch"], lat:41.0345, lng:28.978, popular:["Flat White","Cheesecake","Avokadolu Tost"], claimed:true },
   { id:7, name:"Lucca Lounge", cat:"Gece Hayatı", rating:4.3, dist:"6.2 km", price:"₺1.200+", addr:"Bebek, Cevdetpaşa Cd. No:51", desc:"Boğaz manzaralı lounge. Canlı DJ.", imgs:[I.night1,I.cocktail1,I.rooftop1], menu:["https://picsum.photos/seed/menu-lucca1/600/900","https://picsum.photos/seed/menu-lucca2/600/900"], hours:"17:00 - 04:00", tags:["Lounge","Kokteyl"], lat:41.077, lng:29.043, popular:["Espresso Martini","Tuna Tartar","Trüf Patates"] },
   { id:8, name:"Nonna's Trattoria", cat:"İtalyan", rating:4.6, dist:"3.1 km", price:"₺500+", addr:"Karaköy, Kemankeş Cd. No:29", desc:"Napoli usulü pizza ve makarna.", imgs:[I.pasta1,I.pizza1,I.bread1], menu:["https://picsum.photos/seed/menu-nonna1/600/900","https://picsum.photos/seed/menu-nonna2/600/900","https://picsum.photos/seed/menu-nonna3/600/900"], hours:"12:00 - 23:30", tags:["Pizza","Makarna"], lat:41.0245, lng:28.976, popular:["Margherita","Cacio e Pepe","Tiramisu"] },
-  { id:9, name:"Çiya Sofrası", cat:"Türk Mutfağı", rating:4.7, dist:"4.0 km", price:"₺400+", addr:"Kadıköy, Güneşlibahçe Sk. No:43", desc:"Anadolu'nun dört köşesinden geleneksel tarifler.", imgs:[I.turkish1,I.turkish2,I.soup1], menu:["https://picsum.photos/seed/menu-ciya1/600/900","https://picsum.photos/seed/menu-ciya2/600/900"], hours:"11:00 - 22:00", tags:["Geleneksel","Anadolu"], lat:40.9903, lng:29.0264, popular:["Kuzu Kapama","Zeytinyağlılar","İrmik Helvası"] },
+  { id:9, name:"Çiya Sofrası", cat:"Türk Mutfağı", rating:4.7, dist:"4.0 km", price:"₺400+", addr:"Kadıköy, Güneşlibahçe Sk. No:43", desc:"Anadolu'nun dört köşesinden geleneksel tarifler.", imgs:[I.turkish1,I.turkish2,I.soup1], menu:["https://picsum.photos/seed/menu-ciya1/600/900","https://picsum.photos/seed/menu-ciya2/600/900"], hours:"11:00 - 22:00", tags:["Geleneksel","Anadolu"], lat:40.9903, lng:29.0264, popular:["Kuzu Kapama","Zeytinyağlılar","İrmik Helvası"], gastro:true, gastroChef:'Şef Didem Şenol', gastroVideo:'https://picsum.photos/seed/ciya-video/900/600', claimed:true },
   { id:10, name:"Mandarin Oriental", cat:"Uzak Doğu", rating:4.8, dist:"5.5 km", price:"₺1.500+", addr:"Kuruçeşme, Muallim Naci Cd.", desc:"Uzak Doğu'nun en rafine lezzetleri.", imgs:[I.dimsum1,I.ramen1,I.interior2], menu:["https://picsum.photos/seed/menu-mand1/600/900","https://picsum.photos/seed/menu-mand2/600/900"], hours:"12:00 - 23:00", tags:["Dim Sum","Ramen"], lat:41.057, lng:29.033, popular:["Peking Ördeği","Dim Sum Tabağı","Tonkotsu Ramen"] },
-  { id:11, name:"The Burger Joint", cat:"Fast Food", rating:4.2, dist:"1.5 km", price:"₺250+", addr:"Nişantaşı, Abdi İpekçi Cd. No:22", desc:"El yapımı burgerler ve özel soslar.", imgs:[I.burger1,I.taco1,I.icecream1], menu:["https://picsum.photos/seed/menu-burg1/600/900"], hours:"11:00 - 01:00", tags:["Burger","Casual"], lat:41.048, lng:28.994, popular:["Klasik Cheeseburger","Trüflü Patates","Milkshake"] },
-  { id:12, name:"Karaköy Güllüoğlu", cat:"Tatlıcı", rating:4.9, dist:"2.8 km", price:"₺150+", addr:"Kemankeş, Mumhane Cd. No:171", desc:"1820'den beri efsanevi baklava.", imgs:[I.dessert1,I.bread1,I.cafe1], menu:["https://picsum.photos/seed/menu-gull1/600/900","https://picsum.photos/seed/menu-gull2/600/900"], hours:"06:00 - 01:00", tags:["Baklava","Tatlı"], lat:41.025, lng:28.977, popular:["Fıstıklı Baklava","Şöbiyet","Kaymaklı Kadayıf"] },
+  { id:11, name:"The Burger Joint", cat:"Fast Food", rating:4.2, dist:"1.5 km", price:"₺250+", addr:"Nişantaşı, Abdi İpekçi Cd. No:22", desc:"El yapımı burgerler ve özel soslar.", imgs:[I.burger1,I.taco1,I.icecream1], menu:["https://picsum.photos/seed/menu-burg1/600/900"], hours:"11:00 - 01:00", tags:["Burger","Casual"], lat:41.048, lng:28.994, popular:["Klasik Cheeseburger","Trüflü Patates","Milkshake"], claimed:true },
+  { id:12, name:"Karaköy Güllüoğlu", cat:"Tatlıcı", rating:4.9, dist:"2.8 km", price:"₺150+", addr:"Kemankeş, Mumhane Cd. No:171", desc:"1820'den beri efsanevi baklava.", imgs:[I.dessert1,I.bread1,I.cafe1], menu:["https://picsum.photos/seed/menu-gull1/600/900","https://picsum.photos/seed/menu-gull2/600/900"], hours:"06:00 - 01:00", tags:["Baklava","Tatlı"], lat:41.025, lng:28.977, popular:["Fıstıklı Baklava","Şöbiyet","Kaymaklı Kadayıf"], gastro:true, gastroChef:'Şef Maksut Aşkar', gastroVideo:'https://picsum.photos/seed/gulluoglu-video/900/600', claimed:true },
   { id:13, name:"Balıkçı Sabahattin", cat:"Deniz Ürünleri", rating:4.6, dist:"6.0 km", price:"₺900+", addr:"Sultanahmet, Seyit Hasan Kuyu Sk.", desc:"1927'den beri taze deniz lezzetleri.", imgs:[I.seafood1,I.bosphorus,I.wine1], menu:["https://picsum.photos/seed/menu-bal1/600/900","https://picsum.photos/seed/menu-bal2/600/900","https://picsum.photos/seed/menu-bal3/600/900"], hours:"12:00 - 23:00", tags:["Balık","Tarihi"], lat:41.0055, lng:28.977, popular:["Levrek Buğulama","Ahtapot Izgara","Midye Dolma"] },
   { id:14, name:"Spice Market", cat:"Hint", rating:4.4, dist:"3.8 km", price:"₺450+", addr:"Cihangir, Akarsu Cd. No:15", desc:"Otantik Hint baharat dünyası.", imgs:[I.curry1,I.interior1,I.bread1], menu:["https://picsum.photos/seed/menu-spic1/600/900","https://picsum.photos/seed/menu-spic2/600/900"], hours:"12:00 - 23:00", tags:["Hint","Curry"], lat:41.033, lng:28.983, popular:["Butter Chicken","Lamb Vindaloo","Garlic Naan"] },
   { id:15, name:"Mövenpick Bosphorus", cat:"Fine Dining", rating:4.5, dist:"7.3 km", price:"₺1.800+", addr:"Örnektepe, İstanbul", desc:"Boğaz kenarında muhteşem manzara.", imgs:[I.bosphorus,I.interior3,I.seafood1], menu:["https://picsum.photos/seed/menu-mov1/600/900","https://picsum.photos/seed/menu-mov2/600/900"], hours:"07:00 - 00:00", tags:["Boğaz","Dünya Mutfağı"], lat:41.048, lng:29.011, popular:["Boğaz Kahvaltısı","Levrek Fileto","Çikolatalı Sufle"] },
@@ -398,7 +398,8 @@ function Btn({ text, onClick, disabled, variant = "onColor", size = "lg", fullWi
     outlineDark: { bg: "transparent", color: "#2D2419", border: "1.5px solid rgba(45,36,25,0.15)" },
     destructive: { bg: "#FF3B30", color: "#fff", shadow: "0 6px 18px rgba(255,59,48,0.3)" },
     destructiveSoft: { bg: "rgba(255,59,48,0.08)", color: "#FF3B30" },
-    plain: { bg: "transparent", color: "rgba(255,255,255,0.6)" },
+    plain: { bg: "transparent", color: "rgba(255,255,255,0.6)" },       // koyu/turuncu zemin
+    plainDark: { bg: "transparent", color: "#FF6600" },                  // beyaz zemin
   };
   const p = palettes[variant] || palettes.onColor;
   return (
@@ -483,11 +484,13 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
     animate(x, direction * 900, { type: "spring", bounce: 0, duration: 0.5, velocity })
       .then(() => (direction > 0 ? onRight() : onLeft()));
   };
+  // Yukarı kaydırma artık kartı uçurmuyor: restoranın sayfasını açıyor.
+  // Kart yerinde kaldığı için sayfa kapanınca destede aynı yerden devam
+  // ediliyor — karar vermeden bilgi almak mümkün.
   const commitSuper = (velocity = 0) => {
-    // Süper beğeni daha güçlü bir onay: titreşim de üç vuruşlu.
-    haptic([12, 30, 12, 30, 18]);
-    animate(y, -1000, { type: "spring", bounce: 0, duration: 0.5, velocity })
-      .then(() => (onSuper || onRight)());
+    haptic(14);
+    animate(y, 0, { type: "spring", bounce: 0.2, duration: 0.4, velocity });
+    (onSuper || onTap)?.();
   };
   React.useImperativeHandle(flingRef, () => ({
     fling: (direction) => commit(direction),
@@ -562,7 +565,7 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
               hareketin kendisiyle aynı eksende söylüyor (§8) */}
           <motion.div style={{ opacity: superOpacity, position: "absolute", top: 140, left: "50%", translateX: "-50%", zIndex: 10, border: "4px solid #38BDF8", borderRadius: 14, padding: "8px 22px", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", gap: 7 }}>
             <Icon n="sparkle" size={14} color="#38BDF8" />
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#38BDF8" }}>HEMEN GİDELİM</span>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#38BDF8" }}>RESTORANA GİT</span>
           </motion.div>
         </>
       )}
@@ -591,7 +594,10 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 30%, transparent 55%)", borderRadius: 24 }} />
       {/* Content */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
-        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{r.name}</h3>
+        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", gap: 7 }}>
+          {r.name}
+          {(r.claimed || r.ownerClaimed) && <VerifiedStar size={15} title="İşletme hesabı doğrulanmış" />}
+        </h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
           <span style={{ background: "#fff", borderRadius: 10, padding: "4px 12px", fontSize: 13, fontWeight: 700, color: "#1C1917", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="#F59E0B" size={12} />{r.rating}</span>
           <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "'Outfit', sans-serif" }}>{r.dist}</span>
@@ -927,6 +933,60 @@ const INFO_FIELDS = [
   { key: "addr",  label: "Adres",         placeholder: "Mahalle, cadde, no" },
 ];
 
+// İşletmenin aldığı hizmetler — panel görünümü.
+// Tüketici tarafındaki ServiceBadges ile aynı veriyi okuyor; burada
+// işletmenin kendi diliyle, "neyi satın aldım" olarak gösteriliyor.
+function OwnerServices({ restaurant }) {
+  const [detail, setDetail] = useState(null);
+  useEffect(() => {
+    if (!restaurant) return;
+    let off = false;
+    backend.loadRestaurantDetail(restaurant).then(d => { if (!off) setDetail(d); });
+    return () => { off = true; };
+  }, [restaurant]);
+
+  if (!restaurant) return null;
+  const svc = detail?.services;
+  const campaigns = svc?.campaigns || [];
+  const plan = svc?.plan && svc.plan !== "free"
+    ? (svc.plan === "pro" ? "Pro" : "Premium") : "Ücretsiz";
+
+  return (
+    <div style={{ background: "rgba(255,102,0,0.07)", border: "1px solid rgba(255,102,0,0.2)", borderRadius: 20, padding: "14px 16px", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 800, color: "#fff", margin: 0 }}>Aldığın hizmetler</p>
+        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 800, letterSpacing: 0.3, color: plan === "Ücretsiz" ? "rgba(255,255,255,0.5)" : "#FFA500", background: "rgba(255,255,255,0.07)", borderRadius: 6, padding: "3px 9px" }}>
+          {plan.toLocaleUpperCase("tr")} PLAN
+        </span>
+      </div>
+
+      {campaigns.length === 0 ? (
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.5)", lineHeight: 1.55, margin: 0 }}>
+          Yayında kampanyan yok. Büyüme sekmesinden öne çıkan kart, banner veya
+          push bildirimi satın alarak keşif akışında görünürlüğünü artırabilirsin.
+        </p>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {campaigns.map((c, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
+              <span style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 600, color: "#fff" }}>
+                {c.label} kartı
+              </span>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 800, color: "rgba(255,255,255,0.45)", letterSpacing: 0.3 }}>
+                {String(c.pricing || "").toLocaleUpperCase("tr")}
+              </span>
+            </div>
+          ))}
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.5, margin: "2px 0 0" }}>
+            Bu hizmetler restoran sayfanda kullanıcıya da açıkça gösteriliyor.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OwnerInfoTab({ restaurant }) {
   const profiles = useOwnerProfiles();
   const own = profiles[String(restaurant?.id)] || {};
@@ -949,6 +1009,10 @@ function OwnerInfoTab({ restaurant }) {
 
   return (
     <div>
+      {/* İşletmenin aldığı hizmetler — panelin en üstünde, hangi ürünün
+          açık olduğu tek bakışta görünsün. */}
+      <OwnerServices restaurant={restaurant} />
+
       <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "14px 16px", marginBottom: 16 }}>
         <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.55 }}>
           Kaydın harita servislerinden otomatik oluşturuldu. Doldurduğun alanlar bu veriyi
@@ -1105,7 +1169,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
                       <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" box={48} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</p>
+                      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
                       <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#8A7A68", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.addr}</p>
                     </div>
                     <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 700, flexShrink: 0, color: st === "approved" ? "#16A34A" : st === "pending" ? "#D97706" : "#FF6600" }}>
@@ -1125,7 +1189,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
                   <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "#1C1917", margin: 0 }}>{picked.name}</p>
                   <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#8A7A68", margin: 0 }}>{picked.addr}</p>
                 </div>
-                <Btn text="Değiştir" onClick={() => setPicked(null)} variant="plain" size="sm" fullWidth={false} />
+                <Btn text="Değiştir" onClick={() => setPicked(null)} variant="plainDark" size="sm" fullWidth={false} />
               </div>
 
               <InputField label="Ticaret unvanı" value={form.legalName} onChange={set("legalName")} placeholder="ör: Çiya Gıda San. Tic. Ltd. Şti." />
@@ -2593,6 +2657,169 @@ function VisitPrompt({ visit, onWrite, onDismiss }) {
 }
 
 // ═══════════════════════════════════════════════
+// PAYLAŞILAN RESTORAN PARÇALARI
+//
+// Aynı bilgi hem kaydırma kartındaki detay sayfasında hem tam detay
+// ekranında görünüyor. İki yerde ayrı yazmak, birinin sessizce geride
+// kalması demek — bu yüzden tek bileşen.
+// ═══════════════════════════════════════════════
+
+// İşletmenin GUR'da hesabı var: kaydını sahiplenmiş, bilgileri kendi
+// yönetiyor. Kullanıcı için anlamı "bu sayfa güncel".
+function VerifiedStar({ size = 14, title = "İşletme hesabı doğrulanmış" }) {
+  return (
+    <span title={title} aria-label={title} style={{ display: "inline-flex", flexShrink: 0, verticalAlign: "middle" }}>
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="#FF6600" aria-hidden="true">
+        <path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.1 6.1 20.2l1.2-6.6L2.5 9l6.6-.9L12 2z" />
+      </svg>
+    </span>
+  );
+}
+
+// İşletmenin aldığı hizmetler. Sponsorluğu gizlemek yerine açıkça
+// yazıyoruz: kullanıcı bir kartın neden öne çıktığını görebilmeli.
+function ServiceBadges({ services, compact = false }) {
+  if (!services?.claimed) return null;
+  const items = [
+    services.plan && services.plan !== "free"
+      ? { label: services.plan === "pro" ? "Pro işletme" : "Premium işletme", tone: "#FF6600" }
+      : null,
+    ...(services.campaigns || []).map(c => ({ label: c.label, tone: "#0EA5E9" })),
+  ].filter(Boolean);
+  if (!items.length) return null;
+
+  return (
+    <div style={{ marginBottom: compact ? 12 : 16 }}>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#8A7A68", margin: "0 0 7px" }}>
+        İşletmenin aldığı hizmetler
+      </p>
+      <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+        {items.map((x, i) => (
+          <span key={i} style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            background: `${x.tone}14`, border: `1px solid ${x.tone}33`, borderRadius: 999,
+            padding: "5px 12px", fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: x.tone,
+          }}>
+            <Icon n="sparkle" size={10} color={x.tone} />{x.label}
+          </span>
+        ))}
+      </div>
+      {services.campaigns?.length > 0 && (
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "#A8A29E", margin: "6px 0 0", lineHeight: 1.5 }}>
+          Bu mekan keşif akışında öne çıkan yerleşim satın aldı.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// YORUM KAPISI — uygulamanın her yerinde aynı
+//
+// Yorum yazma tek bir kuralla açılıyor: mekânda konumla doğrulanmış bir
+// ziyaret. Kart detayında da, tam detay ekranında da bu bileşen kullanılıyor
+// ki kilit, gerekçe ve doğrulama düğmesi her yerde aynı olsun.
+// ═══════════════════════════════════════════════
+function ReviewGate({ restaurant, onReview, onVerifyLocation, compact = false }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => visits.subscribeVisits(() => setTick(t => t + 1)), []);
+  const unlocked = tick >= 0 && visits.reviewPermission(restaurant.id).allowed;
+
+  return (
+    <div style={{
+      background: unlocked ? "rgba(34,197,94,0.07)" : "#FBFAF8",
+      border: `1px solid ${unlocked ? "rgba(34,197,94,0.2)" : "rgba(0,0,0,0.06)"}`,
+      borderRadius: 16, padding: compact ? "12px 14px" : "13px 15px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <Icon n={unlocked ? "check" : "shield"} size={14} color={unlocked ? "#16A34A" : "#A8A29E"} />
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#1C1917", margin: 0 }}>
+          {unlocked ? "Yorum yazabilirsin" : "Yorum konumla açılır"}
+        </p>
+      </div>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#8A7A68", lineHeight: 1.5, margin: "0 0 10px" }}>
+        {unlocked
+          ? "Bu mekânda geçirdiğin zaman doğrulandı; yorumun “Konumla doğrulandı” rozetiyle yayınlanır."
+          : "Mekânda en az 15 dakika kaldığında yorum alanı kendiliğinden açılır ve yorumun doğrulanmış sayılır."}
+      </p>
+      {unlocked
+        ? <Btn text="Deneyimini yaz" onClick={onReview} variant="filled" size="md" />
+        : <Btn text="Buradayım, konumumu doğrula" onClick={() => onVerifyLocation?.(restaurant)} variant="outlineDark" size="md" />}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// DIŞ KAYNAK YORUMLARI (Google Haritalar)
+//
+// Bu yorumlar bize ait değil: yazarın adı, bağlantısı ve kaynağı korunmak
+// zorunda. Sağlayıcı anahtarı tanımlı değilken örnek satırlar gösteriliyor
+// ve "örnek" etiketiyle işaretleniyor — Google yorumu gibi sunulmuyor.
+// ═══════════════════════════════════════════════
+function ExternalReviews({ reviews = [], restaurant, loading }) {
+  const [open, setOpen] = useState(false);
+  const shown = open ? reviews : reviews.slice(0, 2);
+  const sample = reviews.length > 0 && reviews.every(r => r.provider !== "google_places");
+  const mapsUrl = placeUrl({ name: restaurant.name, address: restaurant.addr, lat: restaurant.lat, lng: restaurant.lng }, "google");
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#4285F4" d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z" opacity=".9" />
+          <circle cx="12" cy="9" r="2.6" fill="#fff" />
+        </svg>
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#1C1917", margin: 0 }}>
+          Google Haritalar yorumları
+        </p>
+        {sample && (
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.3, color: "#B45309", background: "#FEF3C7", borderRadius: 6, padding: "2px 7px" }}>ÖRNEK</span>
+        )}
+      </div>
+
+      {loading ? (
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#A8A29E", margin: 0 }}>Yükleniyor…</p>
+      ) : reviews.length === 0 ? (
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#A8A29E", lineHeight: 1.55, margin: 0 }}>
+          Bu mekan için Google yorumu çekilmedi. Places anahtarı tanımlanınca besleme
+          turu yorumları otomatik getirir.
+        </p>
+      ) : (
+        <>
+          {shown.map((rv, i) => (
+            <div key={i} style={{ padding: "10px 0", borderBottom: i < shown.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                {rv.author_photo
+                  ? <img src={rv.author_photo} alt="" loading="lazy" decoding="async" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover" }} />
+                  : <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#EFE9E2", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 800, color: "#8A7A68" }}>{(rv.author_name || "?").charAt(0)}</div>}
+                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700, color: "#1C1917" }}>{rv.author_name || "Google kullanıcısı"}</span>
+                <span style={{ display: "flex", gap: 1, marginLeft: "auto" }}>
+                  {[1, 2, 3, 4, 5].map(n => <Icon key={n} n="star" size={10} color={n <= (rv.rating || 0) ? "#F59E0B" : "#E5E0D8"} />)}
+                </span>
+              </div>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#57534E", lineHeight: 1.5, margin: "0 0 3px" }}>{rv.body}</p>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "#A8A29E" }}>{rv.relative_time || ""}</span>
+            </div>
+          ))}
+          {reviews.length > 2 && (
+            <button type="button" className="gur-btn" onClick={() => setOpen(o => !o)}
+              style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
+              {open ? "Daha az göster" : `${reviews.length - 2} yorum daha`}
+            </button>
+          )}
+        </>
+      )}
+
+      <button type="button" className="gur-btn"
+        onClick={() => window.open(mapsUrl, "_blank", "noopener,noreferrer")}
+        style={{ display: "block", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 600, color: "#8A7A68", textDecoration: "underline" }}>
+        Google Haritalar'da aç
+      </button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
 // KART DETAY SAYFASI — Bumble kalıbı
 //
 // Detay ayrı bir ekrana gitmez: kartın üstünde açılan, iki durak noktalı
@@ -2602,11 +2829,21 @@ function VisitPrompt({ visit, onWrite, onDismiss }) {
 const SHEET_PEEK = 0.46;    // ekranın üstünden bu oranda açılır
 const SHEET_FULL = 0.06;
 
-function CardDetailSheet({ r, onClose, onSave, onSuper, onReview, reviewUnlocked, onDirections, onVerifyLocation }) {
+function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyLocation }) {
   const panelRef = useRef(null);
   const [full, setFull] = useState(false);
   const [ii, setIi] = useState(0);
   const [menuOpen, setMenuOpen] = useState(null);
+  const [soon, setSoon] = useState(false);
+  // İşletmenin aldığı hizmetler ve Google yorumları kartta yok; detay
+  // açıldığında ayrıca yükleniyor.
+  const [detail, setDetail] = useState(null);
+  useEffect(() => {
+    let off = false;
+    backend.loadRestaurantDetail(r).then(d => { if (!off) setDetail(d); });
+    return () => { off = true; };
+  }, [r]);
+  const claimed = !!(detail?.services?.claimed ?? (r.claimed || r.ownerClaimed));
   const y = useMotionValue(0);
   const drag = useRef(null);
   const [dragging, setDragging] = useState(false);
@@ -2634,6 +2871,9 @@ function CardDetailSheet({ r, onClose, onSave, onSuper, onReview, reviewUnlocked
   };
 
   const onPointerDown = (e) => {
+    // Düğmeden başlayan basış sürükleme değildir: pointer'ı yakalarsak
+    // tıklama butona hiç ulaşmıyor ve kapatma çalışmıyordu.
+    if (e.target.closest("button")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { startY: e.clientY, base: y.get(), hist: [[performance.now(), e.clientY]] };
     setDragging(true);
@@ -2717,7 +2957,10 @@ function CardDetailSheet({ r, onClose, onSave, onSuper, onReview, reviewUnlocked
           </div>
 
           {/* Başlık ve künye */}
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", color: "#1C1917", margin: "0 0 6px" }}>{r.name}</h2>
+          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", color: "#1C1917", margin: "0 0 6px", display: "flex", alignItems: "center", gap: 8 }}>
+            {r.name}
+            {claimed && <VerifiedStar size={16} />}
+          </h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#1C1917" }}>
               <Icon n="star" color="#F59E0B" size={13} />{r.rating}
@@ -2735,6 +2978,8 @@ function CardDetailSheet({ r, onClose, onSave, onSuper, onReview, reviewUnlocked
 
           <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "#57534E", lineHeight: 1.6, margin: "0 0 16px" }}>{r.desc}</p>
 
+          <ServiceBadges services={detail?.services} />
+
           {/* Popüler yemekler */}
           {r.popular?.length > 0 && (
             <div style={{ marginBottom: 16 }}>
@@ -2747,18 +2992,32 @@ function CardDetailSheet({ r, onClose, onSave, onSuper, onReview, reviewUnlocked
             </div>
           )}
 
-          {/* Canlı menü — görsel galeri */}
-          {r.menu?.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#1C1917", margin: "0 0 8px" }}>Menü</p>
-              <div style={{ display: "flex", gap: 9, overflowX: "auto", paddingBottom: 4 }}>
-                {r.menu.map((m, i) => (
-                  <div key={i} onClick={() => setMenuOpen(m)} style={{ width: 96, height: 132, borderRadius: 14, overflow: "hidden", flexShrink: 0, cursor: "pointer", border: "1px solid rgba(0,0,0,0.07)", position: "relative" }}>
-                    <Img src={m} style={{ position: "absolute", inset: 0 }} bg="#f2ede7" box={192} />
+          {/* Menü, masa ayırtma ve tadım menüsü yalnızca kaydını sahiplenmiş
+              işletmelerde açık: menüyü güncelleyen, masayı tutan ve tadımı
+              hazırlayan taraf işletmenin kendisi. Sahiplenilmemiş kayıtta
+              bunları göstermek, karşılığı olmayan bir söz vermek olurdu. */}
+          {claimed ? (
+            <>
+              {r.menu?.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#1C1917", margin: "0 0 8px" }}>Menü</p>
+                  <div style={{ display: "flex", gap: 9, overflowX: "auto", paddingBottom: 4 }}>
+                    {r.menu.map((m, i) => (
+                      <div key={i} onClick={() => setMenuOpen(m)} style={{ width: 96, height: 132, borderRadius: 14, overflow: "hidden", flexShrink: 0, cursor: "pointer", border: "1px solid rgba(0,0,0,0.07)", position: "relative" }}>
+                        <Img src={m} style={{ position: "absolute", inset: 0 }} bg="#f2ede7" box={192} />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <button type="button" className="gur-btn" onClick={() => setSoon(true)}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "1px dashed rgba(45,36,25,0.16)", background: "#FBFAF8", borderRadius: 16, padding: "13px 15px", marginBottom: 16, cursor: "pointer", outline: "none" }}>
+              <Icon n="doc" size={15} color="#A8A29E" />
+              <span style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600, color: "#57534E" }}>Menü ve masa ayırtma</span>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#A8A29E" }}>Çok yakında</span>
+            </button>
           )}
 
           {/* Yol tarifi — cihazın kendi haritasına doğrudan açılır */}
@@ -2777,41 +3036,40 @@ function CardDetailSheet({ r, onClose, onSave, onSuper, onReview, reviewUnlocked
             ))}
           </div>
 
-          {/* Yorum — yalnızca konumla doğrulanmış ziyaretten sonra */}
-          <div style={{ background: reviewUnlocked ? "rgba(34,197,94,0.07)" : "#FBFAF8", border: `1px solid ${reviewUnlocked ? "rgba(34,197,94,0.2)" : "rgba(0,0,0,0.06)"}`, borderRadius: 16, padding: "13px 15px", marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <Icon n={reviewUnlocked ? "check" : "shield"} size={14} color={reviewUnlocked ? "#16A34A" : "#A8A29E"} />
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#1C1917", margin: 0 }}>
-                {reviewUnlocked ? "Yorum yazabilirsin" : "Yorum konumla açılır"}
-              </p>
-            </div>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#8A7A68", lineHeight: 1.5, margin: reviewUnlocked ? "0 0 10px" : 0 }}>
-              {reviewUnlocked
-                ? "Bu mekânda geçirdiğin zaman doğrulandı; yorumun 'Konumla doğrulandı' rozetiyle yayınlanır."
-                : "Mekânda en az 15 dakika kaldığında yorum alanı kendiliğinden açılır ve yorumun doğrulanmış sayılır."}
-            </p>
-            {reviewUnlocked
-              ? <Btn text="Deneyimini yaz" onClick={onReview} variant="filled" size="md" />
-              : <div style={{ marginTop: 10 }}>
-                  <Btn text="Buradayım, konumumu doğrula" onClick={() => onVerifyLocation?.(r)} variant="outlineDark" size="md" />
-                </div>}
+          <ExternalReviews reviews={detail?.externalReviews || []} restaurant={r} loading={!detail} />
+
+          {/* Yorum kapısı — uygulamanın her yerinde aynı bileşen */}
+          <div style={{ marginBottom: 16 }}>
+            <ReviewGate restaurant={r} onReview={onReview} onVerifyLocation={onVerifyLocation} />
           </div>
 
-          {/* Karar düğmeleri — sayfayı kapatmadan kaydırma kararı verilebilir */}
-          <div style={{ display: "flex", gap: 9 }}>
-            <Btn text="Kaydet" onClick={() => { onSave?.(); close(); }} variant="filled" size="md" />
-            <Btn text="Hemen gidelim" onClick={() => { onSuper?.(); close(); }} variant="outlineDark" size="md" />
-          </div>
+          <Btn text="Kaydet" onClick={() => { onSave?.(); close(); }} variant="filled" size="md" />
         </div>
 
-        {/* Tam ekrana geç / geri dön */}
-        <button
-          type="button" className="gur-btn"
-          onClick={full ? collapse : expand}
-          style={{ position: "absolute", top: 8, right: 14, border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 6, fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: "#A8A29E" }}>
-          {full ? "Küçült" : "Tam ekran"}
-        </button>
+        {/* Tam ekrana geç / kapat. Sayfayı kapatmanın tek yolu aşağı
+            sürüklemekti; keşfedilmesi gereken bir jest, görünür bir düğmenin
+            yerini tutmuyor. */}
+        <div style={{ position: "absolute", top: 6, right: 10, display: "flex", alignItems: "center", gap: 2 }}>
+          <button
+            type="button" className="gur-btn"
+            onClick={full ? collapse : expand}
+            style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 6, fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FF6600" }}>
+            {full ? "Küçült" : "Tam ekran"}
+          </button>
+          <IconBtn onClick={close} tone="subtle" size={30} title="Kapat"
+            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2D2419" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+        </div>
       </motion.div>
+
+      {soon && (
+        <Sheet title="Çok yakında" subtitle={r.name} onClose={() => setSoon(false)}>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "#57534E", lineHeight: 1.6, margin: "0 0 16px" }}>
+            Bu işletme GUR'daki kaydını henüz sahiplenmedi. Menü, masa ayırtma ve tadım
+            menüsü özellikleri işletme paneline geçtiğinde açılıyor.
+          </p>
+          <Btn text="Anladım" onClick={() => setSoon(false)} variant="filled" />
+        </Sheet>
+      )}
 
       {/* Menü görseli tam ekran */}
       {menuOpen && (
@@ -2828,9 +3086,6 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   // genişleyebilir bir sayfa olarak gelir.
   const [sheetCard, setSheetCard] = useState(null);
   const [composing, setComposing] = useState(null);
-  // Yorum kilidi konumla doğrulanmış ziyarete bağlı (bkz. src/lib/visits.js)
-  const [visitTick, setVisitTick] = useState(0);
-  useEffect(() => visits.subscribeVisits(() => setVisitTick(t => t + 1)), []);
   const organic = filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants;
 
   // Sponsorlu kartlar organik akışa burada harmanlanır. Aynı fonksiyonu
@@ -2932,11 +3187,12 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
     show(r?.name + " favorilere eklendi!", "fav");
     next();
   };
-  const superLike = () => {
-    const r = deck[cursor];
-    save(r, true); sync(r, "up");
-    show(r?.name + " • hemen gitmek istiyorum", "super");
-    next();
+  // Yukarı kaydırma bir karar değil, bir istek: "bu mekânı bana anlat".
+  // Deste ilerlemiyor, kota harcanmıyor; yalnızca sayfa açılıyor.
+  const openSheet = (r) => {
+    if (!r) return;
+    setSheetCard(r);
+    trackEvent("detail_open", { restaurantId: r.id, source: "swipe_up" });
   };
   const left = () => {
     const r = deck[cursor];
@@ -3008,8 +3264,8 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
           ) : visible.map((r, i) => {
             const top = i === visible.length - 1;
             return <SwipeCard key={`${r.id}-${cursor}`} ref={top ? topCardRef : null} r={r} isTop={top && !outOfSwipes}
-              onRight={right} onLeft={left} onSuper={superLike}
-              onTap={() => setSheetCard(deck[cursor])} />;
+              onRight={right} onLeft={left} onSuper={() => openSheet(deck[cursor])}
+              onTap={() => openSheet(deck[cursor])} />;
           })}
         </div>
 
@@ -3022,8 +3278,8 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             />
 
             <IconBtn
-              onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.flingUp())}
-              tone="solidLight" size={46} title="Hemen gitmek istiyorum"
+              onClick={() => openSheet(deck[cursor])}
+              tone="solidLight" size={46} title="Restorana git"
               icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11" /><polyline points="17 18 12 13 7 18" /></svg>}
             />
 
@@ -3047,10 +3303,8 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             <CardDetailSheet
               key={sheetCard.id}
               r={sheetCard}
-              reviewUnlocked={visitTick >= 0 && visits.reviewPermission(sheetCard.id).allowed}
               onClose={() => setSheetCard(null)}
               onSave={() => { setSheetCard(null); right(); }}
-              onSuper={() => { setSheetCard(null); superLike(); }}
               onReview={() => setComposing(sheetCard)}
               onDirections={(provider) => {
                 trackEvent("directions_open", { restaurantId: sheetCard.id, provider });
@@ -3092,7 +3346,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
         {toast && (
           <div style={{
             position: "absolute", top: 120, left: "50%", transform: "translateX(-50%)",
-            background: toast.t === "fav" ? "#4CAF50" : toast.t === "super" ? "#0EA5E9" : "#FF3B30",
+            background: toast.t === "fav" ? "#4CAF50" : "#FF3B30",
             color: "#fff", padding: "10px 22px", borderRadius: 16,
             fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700,
             zIndex: 100, boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
@@ -3328,7 +3582,7 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
                 <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" box={74} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <h4 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14.5, fontWeight: 800, color: "#2D2419", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</h4>
+                <h4 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14.5, fontWeight: 800, color: "#2D2419", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</h4>
                 <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(45,36,25,0.5)", margin: "0 0 6px" }}>{r.cat} • {r.dist}</p>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,102,0,0.1)", borderRadius: 10, padding: "3px 9px", fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#FF6600" }}>
                   <Icon n="sparkle" size={10} color="#FF6600" /> Eşleşme
@@ -3407,6 +3661,9 @@ function Sheet({ title, subtitle, onClose, children }) {
   const height = () => panelRef.current?.offsetHeight || 420;
 
   const onPointerDown = (e) => {
+    // Düğmeden başlayan basış sürükleme değildir: pointer'ı yakalarsak
+    // tıklama butona hiç ulaşmıyor ve kapatma çalışmıyordu.
+    if (e.target.closest("button")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { startY: e.clientY, base: y.get(), hist: [[performance.now(), e.clientY]] };
     setDragging(true);
@@ -3753,9 +4010,17 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
 // ═══════════════════════════════════════════════
 // RESTORAN DETAY — Fotoğraf carousel + kaydırılabilir yorumlar
 // ═══════════════════════════════════════════════
-function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavorites, userReviews = [], onAddReview }) {
-  const [sheet, setSheet] = useState(null);      // "reserve" | "tasting" | null
+function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavorites, userReviews = [], onAddReview, onVerifyLocation }) {
+  const [sheet, setSheet] = useState(null);      // "reserve" | "tasting" | "soon" | null
   const [confirmed, setConfirmed] = useState(null);
+  // İşletmenin aldığı hizmetler ve Google yorumları
+  const [detail, setDetail] = useState(null);
+  useEffect(() => {
+    let off = false;
+    backend.loadRestaurantDetail(r).then(d => { if (!off) setDetail(d); });
+    return () => { off = true; };
+  }, [r]);
+  const claimed = !!(detail?.services?.claimed ?? (r.claimed || r.ownerClaimed));
   const deal = dealFor(r.id);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
@@ -3828,7 +4093,10 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           {/* Info chips */}
           <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 10, flexWrap: "wrap" }}>
             <span style={{ background: "#fff", borderRadius: 14, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: "#FF6600", fontFamily: "'Outfit', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>★ {r.rating}</span>
-            <span style={{ background: "#fff", borderRadius: 14, padding: "5px 14px", fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#333", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>{r.name}</span>
+            <span style={{ background: "#fff", borderRadius: 14, padding: "5px 14px", fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#333", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", display: "inline-flex", alignItems: "center", gap: 7 }}>
+              {r.name}
+              {claimed && <VerifiedStar size={14} />}
+            </span>
             <span style={{ background: "#FF6600", borderRadius: 14, padding: "5px 14px", fontSize: 13, color: "#fff", fontWeight: 700, fontFamily: "'Outfit', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>{r.dist}</span>
           </div>
 
@@ -3883,14 +4151,19 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
         {/* Beyaz alan */}
         <div style={{ padding: "18px 0 110px" }}>
 
+          {/* Google Haritalar yorumları ve yorum kapısı — kart detayıyla
+              birebir aynı bileşenler, aynı kural. */}
+          <div style={{ padding: "0 16px", marginBottom: 18 }}>
+            <ExternalReviews reviews={detail?.externalReviews || []} restaurant={r} loading={!detail} />
+            <ReviewGate restaurant={r} onReview={() => setComposing(true)} onVerifyLocation={onVerifyLocation} />
+          </div>
+
           {/* Yorumlar — tek tek gösterim */}
           <div style={{ marginBottom: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
 <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 700, color: "#333", margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icon n="chat" color="#333" size={16} />Yorumlar</p>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#bbb" }}>{revIdx + 1} / {reviews.length}</span>
-                <Btn text="Yorum Yaz" onClick={() => setComposing(true)} variant="filled" size="sm" fullWidth={false}
-                  icon={<Icon n="camera" size={13} color="#fff" />} />
               </div>
             </div>
 
@@ -3964,7 +4237,9 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
             <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>🕐 {r.hours}</span>
           </div>
 
-          {/* Anlık fırsat — Faz 2 */}
+          <ServiceBadges services={detail?.services} />
+
+          {/* Anlık fırsat */}
           {deal && (
             <div style={{ margin: "0 16px 16px", display: "flex", alignItems: "center", gap: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", borderRadius: 18, padding: "13px 15px" }}>
               <div style={{ background: "#22C55E", borderRadius: 10, padding: "6px 11px", flexShrink: 0 }}>
@@ -3978,8 +4253,10 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
             </div>
           )}
 
-          {/* Gastro şef videosu — Faz 3 (tanıtım paketi) */}
-          {r.gastro !== false && (
+          {/* Şef tanıtımı: rozet tek başına yetmiyor, çekimin de yapılmış
+              olması gerekiyor. Rozetli ama videosu olmayan mekânda bölüm
+              hiç görünmüyor — boş bir oynatıcı göstermek yerine. */}
+          {r.gastro && r.gastroVideo && (
             <div style={{ margin: "0 16px 16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <Icon n="sparkle" size={14} color="#FF6600" />
@@ -3987,21 +4264,22 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 700, color: "#FF6600", background: "#FFF0E5", borderRadius: 6, padding: "2px 7px" }}>15 sn</span>
               </div>
               <div style={{ position: "relative", height: 160, borderRadius: 18, overflow: "hidden" }}>
-                <Img src={r.imgs[1] || r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
+                <Img src={r.gastroVideo} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
                 <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(255,255,255,0.9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF6600"><polygon points="6 3 20 12 6 21" /></svg>
                   </div>
                 </div>
                 <div style={{ position: "absolute", bottom: 10, left: 12, right: 12 }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.9)", margin: 0 }}>Gastro Onaylı şef çekimi</p>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.9)", margin: 0 }}>{r.gastroChef ? `${r.gastroChef} · Gastro Onaylı çekim` : "Gastro Onaylı şef çekimi"}</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Rezervasyon ve tadım menüsü — Faz 2 (işlem komisyonu) */}
-          {(
+          {/* Masa ayırtma ve tadım menüsü işletmenin taahhüdü; kaydını
+              sahiplenmemiş bir mekan adına söz veremeyiz. */}
+          {claimed && (
             <div style={{ display: "flex", gap: 10, padding: "0 16px", marginBottom: 12 }}>
               <Btn text="Masa Ayırt" onClick={() => setSheet("reserve")} variant="filled" size="md" />
               <Btn text="Tadım Menüsü" onClick={() => setSheet("tasting")} variant="outlineDark" size="md" />
@@ -4019,7 +4297,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
         {/* Alt bar — Explore ile aynı stil */}
         <div style={{ position: "sticky", bottom: 0, background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-around", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-          <div onClick={() => setShowMenu(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.5 }}>
+          <div onClick={() => (claimed ? setShowMenu(true) : setSheet("soon"))} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: claimed ? 0.5 : 0.35 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /></svg>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Menü</span>
           </div>
@@ -4039,12 +4317,21 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
               ))}
               <Btn text="Haritada göster (yol tarifi olmadan)"
                 onClick={() => { window.open(placeUrl(place, mapDefault), "_blank", "noopener,noreferrer"); setMapSheet(false); }}
-                variant="plain" size="sm" />
+                variant="plainDark" size="sm" />
             </div>
           </Sheet>
         )}
 
         <AnimatePresence>
+          {sheet === "soon" && (
+            <Sheet title="Çok yakında" subtitle={r.name} onClose={() => setSheet(null)}>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "#57534E", lineHeight: 1.6, margin: "0 0 16px" }}>
+                Bu işletme GUR'daki kaydını henüz sahiplenmedi. Menü, masa ayırtma ve tadım
+                menüsü özellikleri işletme paneline geçtiğinde açılıyor.
+              </p>
+              <Btn text="Anladım" onClick={() => setSheet(null)} variant="filled" />
+            </Sheet>
+          )}
           {sheet === "reserve" && (
             <ReservationSheet r={r} onClose={() => setSheet(null)}
               onConfirm={(b) => { setSheet(null); setConfirmed({ title: "Masanız ayrıldı", lines: [["Restoran", r.name], ["Gün", b.day], ["Saat", b.time], ["Kişi", `${b.people}`], ...(b.deal ? [["Fırsat", `%${b.deal.pct} indirim`]] : [])] }); }} />
@@ -4062,7 +4349,16 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           <ReviewComposer
             restaurantName={r.name}
             onCancel={() => setComposing(false)}
-            onSubmit={(review) => { onAddReview?.(r.id, review); setComposing(false); setRevIdx(0); }}
+            onSubmit={async (review) => {
+              // Kart detayındaki akışın aynısı: yerel kayıt + sunucuya
+              // gönderim + ziyaretin tüketilmesi. Tek fark yok.
+              onAddReview?.(r.id, { ...review, verified: true });
+              trackEvent("review_submit", { restaurantId: r.id, verified: true });
+              setComposing(false);
+              setRevIdx(0);
+              try { await backend.submitReview(r.id, review); }
+              catch { /* sunucu doğrulanmış ziyaret görmedi; yerel kopya kalır */ }
+            }}
           />
         )}
         </AnimatePresence>
@@ -4122,7 +4418,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 <div style={{ background: "rgba(255,102,0,0.1)", borderRadius: 18, padding: "14px 16px", marginTop: 20, display: "flex", alignItems: "center", gap: 12, border: "1px solid rgba(255,102,0,0.15)" }}>
 <Icon n="plate" color="#FF6600" size={16} />
                   <div>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#FF6600", margin: 0 }}>{r.name}</p>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#FF6600", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
                     <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.4)", margin: 0 }}>{r.cat} • {r.addr}</p>
                   </div>
                 </div>
@@ -4484,7 +4780,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
                   <Img src={r.imgs[0]} style={{ width: "100%", height: "100%" }} bg="#e8e0d8" box={46} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 2px" }}>{r.name}</p>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 2px", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
                   <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#8A7A68", margin: 0 }}>{r.cat} · {r.dist}</p>
                 </div>
                 <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
@@ -4876,13 +5172,7 @@ export default function GurApp(props = {}) {
   };
   const demoVerify = () => {
     const r = rationale && rationale !== true ? rationale : feed[0];
-    if (r) {
-      // Mekânın tam koordinatında, hızlandırılmış kalış süresiyle.
-      // İki örnek: biri geçmişte, biri şimdi — kalış süresi böyle oluşuyor.
-      // Canlı modda ikisi de sunucuya gider ve karar orada da verilir.
-      backend.pushLocationSample([r], { lat: r.lat, lng: r.lng, accuracyM: 12, at: Date.now() - 1800000 }, { accelerate: true });
-      backend.pushLocationSample([r], { lat: r.lat, lng: r.lng, accuracyM: 12, at: Date.now() }, { accelerate: true });
-    }
+    if (r) backend.demoVerifyVisit(r);
     setRationale(null);
   };
 
@@ -4953,7 +5243,7 @@ export default function GurApp(props = {}) {
       case "match-result": return <MatchResultScreen code={matchCode} matches={matchResults} onDetail={openDetail} onRestart={goMatch} onExplore={goExplore} />;
       case "swipe": return <SwipeScreen onDetail={openDetail} onExplore={goExplore} onFavorites={goFav} favorites={favorites} setFavorites={setFavorites} filterCat={filterCat} restaurants={feed} dataSource={dataSource}
         onPremium={() => setShowPlus(true)} onAddReview={addReview} onVerifyLocation={verifyLocation} />;
-      case "detail": return <DetailScreen r={liveSelected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} userReviews={userReviews[liveSelected?.id] || []} onAddReview={addReview} />;
+      case "detail": return <DetailScreen r={liveSelected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} userReviews={userReviews[liveSelected?.id] || []} onAddReview={addReview} onVerifyLocation={verifyLocation} />;
       case "fav": return <FavScreen onExplore={goExplore} onSwipe={goSwipe} onDetail={openDetail} favorites={favorites} setFavorites={setFavorites} onProfile={goProfile} />;
       case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} userReviews={userReviews} restaurants={feed} onRemoveUserReview={removeUserReview} onDeleteAccount={deleteAccount} onLegal={() => nav("legal")} />;
       case "legal": return <LegalScreen onBack={back} />;

@@ -93,6 +93,8 @@ CREATE TABLE restaurants (
   tags           text[] NOT NULL DEFAULT '{}',
   gastro_approved boolean NOT NULL DEFAULT false,
   gastro_chef    text,
+  -- Rozet var ama video çekilmemiş olabilir; ayrı alan bu ayrımı taşıyor.
+  gastro_video_url text,
   -- Sahiplenilmiş kayıtta işletmenin girdiği alanlar dış kaynağı ezer.
   claimed_by_org uuid,
   is_active      boolean NOT NULL DEFAULT true,
@@ -277,6 +279,31 @@ CREATE TABLE reviews (
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX reviews_restaurant_idx ON reviews (restaurant_id, created_at DESC) WHERE hidden_at IS NULL;
+
+-- Dış kaynak yorumları kendi tablosunda: bize ait değiller, kaynağına atıf
+-- zorunlu ve saklama süresi sağlayıcının şartlarına tabi. Kendi yorumlarımızla
+-- aynı tabloya karıştırmak ikisini de yanlış yönetmek olurdu.
+CREATE TABLE restaurant_external_reviews (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id  uuid NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+  provider       ingest_provider NOT NULL,
+  external_id    text NOT NULL,
+  author_name    text,
+  author_photo   text,
+  author_url     text,
+  rating         smallint CHECK (rating BETWEEN 1 AND 5),
+  body           text,
+  language       text,
+  relative_time  text,
+  published_at   timestamptz,
+  source_url     text,
+  fetched_at     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (provider, external_id)
+);
+CREATE INDEX restaurant_external_reviews_idx
+  ON restaurant_external_reviews (restaurant_id, provider, published_at DESC NULLS LAST);
+CREATE INDEX restaurant_external_reviews_stale_idx
+  ON restaurant_external_reviews (fetched_at);
 CREATE INDEX reviews_low_star_idx   ON reviews (created_at DESC) WHERE stars <= 2 AND hidden_at IS NULL;
 ALTER TABLE visits ADD CONSTRAINT visits_review_fkey
   FOREIGN KEY (review_id) REFERENCES reviews(id) ON DELETE SET NULL;

@@ -183,7 +183,8 @@ export function buildRouter() {
   r.get("/api/restaurants/:id", async ({ db, params }) => {
     const { rows: [r] } = await db.query(`SELECT * FROM restaurants WHERE id = $1`, [params.id]);
     if (!r) throw bad("Restoran yok", 404);
-    const [{ rows: photos }, { rows: menu }, { rows: reviews }] = await Promise.all([
+    const [{ rows: photos }, { rows: menu }, { rows: reviews },
+           { rows: services }, { rows: external }] = await Promise.all([
       db.query(`SELECT url, is_owner FROM restaurant_photos WHERE restaurant_id = $1
                  ORDER BY is_owner DESC, position`, [params.id]),
       db.query(`SELECT name, description, price_minor, photo_url, is_popular
@@ -192,10 +193,31 @@ export function buildRouter() {
                   FROM reviews rv JOIN users u ON u.id = rv.user_id
                  WHERE rv.restaurant_id = $1 AND rv.hidden_at IS NULL
                  ORDER BY rv.is_verified DESC, rv.created_at DESC LIMIT 20`, [params.id]),
+      // İşletmenin aldığı hizmetler: plan + yayındaki kampanyalar.
+      // Sponsorluğu görünür kılmak şeffaflık gereği, gizlemek değil.
+      db.query(`SELECT o.plan, o.legal_name, c.label, c.pricing, c.status
+                  FROM restaurants rr
+                  JOIN organizations o ON o.id = rr.claimed_by_org
+                  LEFT JOIN campaigns c ON c.restaurant_id = rr.id AND c.status = 'active'
+                 WHERE rr.id = $1`, [params.id]),
+      db.query(`SELECT provider, author_name, author_photo, author_url, rating, body,
+                       relative_time, published_at, source_url
+                  FROM restaurant_external_reviews
+                 WHERE restaurant_id = $1
+                 ORDER BY published_at DESC NULLS LAST LIMIT 8`, [params.id]),
     ]);
+
+    const plan = services[0]?.plan || null;
     return {
       restaurant: shapeCard(r),
       photos, menu, reviews,
+      externalReviews: external,
+      services: {
+        claimed: !!r.claimed_by_org,
+        plan,
+        orgName: services[0]?.legal_name || null,
+        campaigns: services.filter(x => x.label).map(x => ({ label: x.label, pricing: x.pricing })),
+      },
       ownerPhotoCount: photos.filter(p => p.is_owner).length,
     };
   });
@@ -435,6 +457,9 @@ function shapeCard(r) {
     tags: r.tags || [],
     gastro: r.gastro_approved,
     gastroChef: r.gastro_chef,
+    gastroVideo: r.gastro_video_url || null,
+    // İşletme kaydını sahiplenmişse arayüzde doğrulama yıldızı çıkar.
+    claimed: !!r.claimed_by_org,
     dist: r.distance_m == null ? null : `${(Number(r.distance_m) / 1000).toFixed(1)} km`,
     isSuper: r.is_super ?? undefined,
     sponsored: r.sponsored ?? null,

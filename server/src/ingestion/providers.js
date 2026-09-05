@@ -67,6 +67,40 @@ export const googlePlaces = {
   },
 };
 
+/**
+ * Google Places Details → yorumlar.
+ *
+ * Places API en fazla 5 yorum döndürür ve bunlar bize ait değildir:
+ * gösterimde yazarın adı, fotoğrafı ve Google Haritalar bağlantısı
+ * korunmak zorunda. Bu yüzden ayrı tabloda, atıf alanlarıyla saklıyoruz.
+ */
+googlePlaces.fetchReviews = async function fetchReviews(placeId) {
+  const key = process.env.GOOGLE_PLACES_API_KEY;
+  if (!keyed("google_places", key)) return [];
+
+  const data = await getJson(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
+    headers: {
+      "X-Goog-Api-Key": key,
+      "X-Goog-FieldMask": "id,googleMapsUri,reviews",
+    },
+  });
+
+  return (data.reviews || []).map(rv => ({
+    provider: "google_places",
+    // "places/X/reviews/Y" — sağlayıcı kimliği benzersizlik anahtarımız
+    externalId: rv.name || `${placeId}:${rv.publishTime}`,
+    authorName: rv.authorAttribution?.displayName || null,
+    authorPhoto: rv.authorAttribution?.photoUri || null,
+    authorUrl: rv.authorAttribution?.uri || null,
+    rating: rv.rating ?? null,
+    body: rv.originalText?.text || rv.text?.text || null,
+    language: rv.originalText?.languageCode || rv.text?.languageCode || null,
+    relativeTime: rv.relativePublishTimeDescription || null,
+    publishedAt: rv.publishTime || null,
+    sourceUrl: rv.googleMapsUri || data.googleMapsUri || null,
+  }));
+};
+
 // ─── Foursquare Places ────────────────────────────────────────────────
 export const foursquare = {
   id: "foursquare",

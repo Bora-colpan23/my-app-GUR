@@ -68,14 +68,49 @@ async function seedRestaurants(db) {
 
 async function seedGastro(db) {
   // Gastro rozeti: yüksek puanlı ve çok yorumlu üç mekan.
+  // Video yalnızca ilk ikisinde: "rozet var ama çekim yok" durumu da
+  // temsil edilsin ki arayüz doğru koşulla test edilebilsin.
   const { rows } = await db.query(
     `SELECT id, name FROM restaurants WHERE rating >= 4.6 ORDER BY rating_count DESC LIMIT 3`);
   for (const [i, r] of rows.entries()) {
     await db.query(
-      `UPDATE restaurants SET gastro_approved = true, gastro_chef = $2 WHERE id = $1`,
-      [r.id, ["Şef Mehmet Gürs", "Şef Didem Şenol", "Şef Maksut Aşkar"][i]]);
+      `UPDATE restaurants SET gastro_approved = true, gastro_chef = $2, gastro_video_url = $3
+        WHERE id = $1`,
+      [r.id, ["Şef Mehmet Gürs", "Şef Didem Şenol", "Şef Maksut Aşkar"][i],
+       i < 2 ? `https://picsum.photos/seed/${slug(r.name)}-video/900/600` : null]);
   }
   return rows.length;
+}
+
+// Örnek dış kaynak yorumları.
+//
+// Gerçek Google Places yorumları GOOGLE_PLACES_API_KEY tanımlıyken besleme
+// turunda çekilir (worker.js → syncExternalReviews). Anahtar yokken bölümün
+// boş kalmaması için 'manual' kaynaklı örnekler yazılıyor; arayüz bunları
+// "örnek" etiketiyle gösteriyor, Google yorumu gibi sunmuyor.
+const SAMPLE_EXTERNAL = [
+  { author: "Ahmet Y.", rating: 5, when: "2 hafta önce", body: "Porsiyonlar bol, fiyat performans çok iyi. Garsonlar ilgili." },
+  { author: "Selin K.", rating: 4, when: "1 ay önce", body: "Lezzet güzel ama akşamüstü kalabalık oluyor, rezervasyon şart." },
+  { author: "Murat D.", rating: 5, when: "1 ay önce", body: "Yıllardır geliyoruz, kalite hiç düşmedi. Tatlıları ayrı güzel." },
+  { author: "Elif A.", rating: 3, when: "2 ay önce", body: "Yemek iyiydi fakat servis biraz yavaştı. Yine de tavsiye ederim." },
+];
+
+async function seedExternalReviews(db) {
+  const { rows } = await db.query(`SELECT id, name FROM restaurants ORDER BY rating_count DESC LIMIT 6`);
+  let n = 0;
+  for (const r of rows) {
+    for (const [i, rv] of SAMPLE_EXTERNAL.entries()) {
+      await db.query(
+        `INSERT INTO restaurant_external_reviews
+           (restaurant_id, provider, external_id, author_name, rating, body, relative_time, source_url)
+         VALUES ($1,'manual',$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (provider, external_id) DO NOTHING`,
+        [r.id, `sample:${slug(r.name)}:${i}`, rv.author, rv.rating, rv.body, rv.when,
+         `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name)}`]);
+      n++;
+    }
+  }
+  return n;
 }
 
 async function seedPlatformAdmin(db) {
@@ -115,6 +150,11 @@ async function seedCampaigns(db) {
   for (const w of wanted) {
     const { rows: [r] } = await db.query(`SELECT id FROM restaurants WHERE name = $1`, [w.restaurant]);
     if (!r) continue;
+    // Tekrar çalıştırmada kampanya çoğaltma: aynı mekân için zaten bir
+    // kampanya varsa atla.
+    const { rows: [dupe] } = await db.query(
+      `SELECT 1 FROM campaigns WHERE restaurant_id = $1 LIMIT 1`, [r.id]);
+    if (dupe) continue;
     const { rows: [org] } = await db.query(
       `INSERT INTO organizations (legal_name, plan) VALUES ($1,'pro') RETURNING id`, [w.org]);
     await db.query(`UPDATE restaurants SET claimed_by_org = $2 WHERE id = $1`, [r.id, org.id]);
@@ -174,11 +214,12 @@ export async function seed(db, { reset = false, tryIngestion = true } = {}) {
 
   const seeded = await seedRestaurants(db);
   const gastro = await seedGastro(db);
+  const external = await seedExternalReviews(db);
   const admin = await seedPlatformAdmin(db);
   const campaigns = await seedCampaigns(db);
   const demo = await seedDemoUser(db);
 
-  return { fromApi, seeded, gastro, campaigns, adminCreated: admin.created, demoCreated: demo.created };
+  return { fromApi, seeded, gastro, external, campaigns, adminCreated: admin.created, demoCreated: demo.created };
 }
 
 // Doğrudan çalıştırıldığında

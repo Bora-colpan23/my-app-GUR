@@ -10,6 +10,7 @@
 import * as api from "./api.js";
 import * as visits from "./visits.js";
 import * as b2b from "./b2b.js";
+import { DEMO_CAMPAIGNS } from "./campaigns.js";
 
 export const { subscribeApi, apiMode, isLive } = api;
 
@@ -96,6 +97,41 @@ function hydrate(r) {
   };
 }
 
+// Yerel modda dış kaynak yorumları örnek: sunucu yokken bölüm boş kalmasın.
+// Arayüz bunları "ÖRNEK" etiketiyle gösteriyor, Google yorumu gibi sunmuyor.
+const SAMPLE_EXTERNAL = [
+  { provider: "manual", author_name: "Ahmet Y.", rating: 5, relative_time: "2 hafta önce",
+    body: "Porsiyonlar bol, fiyat performans çok iyi. Garsonlar ilgili." },
+  { provider: "manual", author_name: "Selin K.", rating: 4, relative_time: "1 ay önce",
+    body: "Lezzet güzel ama akşamüstü kalabalık oluyor, rezervasyon şart." },
+  { provider: "manual", author_name: "Murat D.", rating: 5, relative_time: "1 ay önce",
+    body: "Yıllardır geliyoruz, kalite hiç düşmedi. Tatlıları ayrı güzel." },
+  { provider: "manual", author_name: "Elif A.", rating: 3, relative_time: "2 ay önce",
+    body: "Yemek iyiydi fakat servis biraz yavaştı. Yine de tavsiye ederim." },
+];
+
+/**
+ * Restoran detayının kart verisinde olmayan kısmı: işletmenin aldığı
+ * hizmetler ve dış kaynak yorumları. Canlı modda sunucudan, yerel modda
+ * demo kampanya envanterinden türetilir.
+ */
+export async function loadRestaurantDetail(restaurant) {
+  if (isLive()) {
+    try {
+      const d = await api.getRestaurant(restaurant.id);
+      return { services: d.services, externalReviews: d.externalReviews || [] };
+    } catch { /* yerele düş */ }
+  }
+  const claimed = !!(restaurant.claimed || restaurant.ownerClaimed);
+  const campaigns = DEMO_CAMPAIGNS
+    .filter(c => String(c.restaurantId) === String(restaurant.id))
+    .map(c => ({ label: c.label, pricing: c.pricing }));
+  return {
+    services: { claimed, plan: claimed ? (campaigns.length ? "pro" : "premium") : null, campaigns },
+    externalReviews: claimed || restaurant.gastro ? SAMPLE_EXTERNAL : [],
+  };
+}
+
 export async function recordSwipe({ restaurantId, direction, campaignId, deckPosition, dwellMs }) {
   if (!isLive() || !api.getToken()) return;
   try { await api.postSwipe({ restaurantId, direction, campaignId, deckPosition, dwellMs }); }
@@ -122,6 +158,36 @@ export async function pushLocationSample(restaurants, sample, opts) {
   const local = visits.ingestSample(restaurants, sample, opts);
   if (isLive() && api.getToken()) {
     try { await api.postLocationSample(sample); } catch { /* yerel karar geçerli kalır */ }
+  }
+  return local;
+}
+
+/**
+ * Demo doğrulaması: "buradayım" düğmesi.
+ *
+ * İki taraf farklı zaman ölçeğinde çalışıyor ve bunu birleştirmek hatalıydı:
+ * sunucu gerçek kuralı (15 dk kalış) uyguluyor, bu yüzden ona aralarında
+ * 30 dakika olan iki örnek gidiyor. Yerel kopyada ise aynı boşluk ziyareti
+ * "kullanıcı ayrılmış" sayıp kapatıyordu — orada örnekler bitişik gönderilip
+ * hızlandırılmış eşik kullanılıyor.
+ */
+export async function demoVerifyVisit(restaurant) {
+  if (!restaurant || !Number.isFinite(restaurant.lat)) return null;
+  const at = Date.now();
+  const point = { lat: restaurant.lat, lng: restaurant.lng, accuracyM: 12 };
+
+  // Yerel: aradaki boşluk hızlandırılmış eşiği (DEMO_DWELL_SECONDS) aşmalı
+  // ama ziyareti "kullanıcı ayrıldı" saydıracak gapSeconds'ın altında kalmalı.
+  const LOCAL_SPREAD_MS = (visits.DEMO_DWELL_SECONDS + 12) * 1000;
+  visits.ingestSample([restaurant], { ...point, at: at - LOCAL_SPREAD_MS }, { accelerate: true });
+  const local = visits.ingestSample([restaurant], { ...point, at }, { accelerate: true });
+
+  // Sunucu: gerçek kural, gerçek aralık
+  if (isLive() && api.getToken()) {
+    try {
+      await api.postLocationSample({ ...point, at: new Date(at - 30 * 60 * 1000).toISOString() });
+      await api.postLocationSample({ ...point, at: new Date(at).toISOString() });
+    } catch { /* yerel doğrulama yine geçerli */ }
   }
   return local;
 }

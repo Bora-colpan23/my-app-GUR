@@ -126,10 +126,16 @@ export function applyOwnerProfile(restaurant, profiles = getOwnerProfiles()) {
   const own = profiles[String(restaurant.id)];
   const fieldSource = {};
   for (const f of OVERRIDABLE) fieldSource[f] = own?.[f] ? "owner" : "api";
-  if (!own) return { ...restaurant, fieldSource, ownerClaimed: false };
+  // Onaylanmış sahiplenme başvurusu da doğrulanmış sayılır: işletme
+  // bilgilerini henüz doldurmamış olabilir ama hesabı var.
+  const approved = getClaims().some(c =>
+    String(c.restaurantId) === String(restaurant.id) && c.status === "approved");
+
+  if (!own) return { ...restaurant, fieldSource, ownerClaimed: approved, claimed: restaurant.claimed || approved };
 
   return {
     ...restaurant,
+    claimed: true,
     ...Object.fromEntries(OVERRIDABLE.filter(f => own[f]).map(f => [f, own[f]])),
     popular: own.popular?.length ? own.popular : restaurant.popular,
     fieldSource,
