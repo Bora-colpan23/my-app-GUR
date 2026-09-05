@@ -8,16 +8,24 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint src --ext .js,.jsx"
+    "lint": "eslint src server shared --ext .js,.jsx",
+    "dev:api": "node server/index.js",
+    "dev:all": "npm run db:setup && npm run db:seed && concurrently -n api,web -c magenta,cyan \"npm:dev:api\" \"npm:dev\"",
+    "db:setup": "./server/db/setup.sh",
+    "db:reset": "./server/db/setup.sh --reset && npm run db:seed",
+    "db:seed": "node server/db/seed.js"
   },
   "dependencies": {
     "motion": "^13.1.1",
+    "node-cron": "^4.6.0",
+    "pg": "^8.23.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^10.0.5",
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.35.0",
     "vite": "^5.4.0"

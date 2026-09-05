@@ -39,6 +39,12 @@ async function organicCandidates(db, userId, { lat, lng, category, radiusM = 800
         AND NOT EXISTS (SELECT 1 FROM swipes s
                          WHERE s.user_id = $1 AND s.restaurant_id = r.id
                            AND s.created_at > now() - interval '30 days')
+        -- Aktif kampanyası olan mekan organik akışta çıkmaz: aynı kartı hem
+        -- bedava hem ücretli göstermek reklamvereni bedavaya ödetmek olur.
+        AND NOT EXISTS (SELECT 1 FROM campaigns c
+                         WHERE c.restaurant_id = r.id AND c.status = 'active'
+                           AND c.starts_at <= now()
+                           AND (c.ends_at IS NULL OR c.ends_at > now()))
       ORDER BY r.gastro_approved DESC, distance_m ASC
       LIMIT $6`,
     [userId, lat, lng, category ?? null, radiusM, DECK_SIZE]

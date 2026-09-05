@@ -10,7 +10,10 @@
 --   5. Konum doğrulamalı ziyaret    10. Kohort tabloları
 -- ═══════════════════════════════════════════════════════════════════════
 
+-- Eklentiler süper kullanıcı ister; setup.sh bunları uygulama rolünden
+-- ÖNCE, postgres olarak kurar. Buradaki IF NOT EXISTS kurulmuşsa sessiz geçer.
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";   -- gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS "citext";     -- büyük/küçük harf duyarsız e-posta
 CREATE EXTENSION IF NOT EXISTS "cube";
 CREATE EXTENSION IF NOT EXISTS "earthdistance";  -- ll_to_earth / earth_box yakınlık sorguları
 

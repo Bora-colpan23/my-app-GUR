@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useClaims, decideClaim } from '../lib/b2b.js';
+
+import * as api from '../lib/api.js';
 import { motion, AnimatePresence } from 'motion/react';
 
 // ═══════════════════════════════════════════════════════════════
@@ -423,8 +425,23 @@ function AdminLogin({ onLogin }) {
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
 
-  const submit = () => {
-    if (user.trim() === DEMO_USER && pass === DEMO_PASS) { setError(''); onLogin(); }
+  const [busy, setBusy] = useState(false);
+  const [live, setLive] = useState(false);
+  useEffect(() => { api.ensureMode().then(({ mode }) => setLive(mode === 'live')); }, []);
+
+  // Canlı modda parola sunucuda scrypt özetiyle doğrulanır ve dönen
+  // belirteç 'admin' rolü taşır; yönetici uçları bu rolü arıyor.
+  // Sunucu yoksa panel yalnızca demo veriyle açılır ve bunu söyler.
+  const submit = async () => {
+    setError('');
+    if (live) {
+      setBusy(true);
+      try { await api.loginAdmin(user.trim(), pass); onLogin(); }
+      catch (err) { setError(err.message || 'Giriş yapılamadı.'); }
+      finally { setBusy(false); }
+      return;
+    }
+    if (user.trim() === DEMO_USER && pass === DEMO_PASS) onLogin();
     else setError('Kullanıcı adı veya parola hatalı.');
   };
 
@@ -458,7 +475,7 @@ function AdminLogin({ onLogin }) {
             </div>
           )}
 
-          <Btn label="Giriş yap" onClick={submit} variant="filled" tone="orange" size="md" fullWidth />
+          <Btn label={busy ? 'Bağlanıyor…' : 'Giriş yap'} onClick={submit} variant="filled" tone="orange" size="md" fullWidth />
 
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: C.yellowSoft, border: `1px solid ${C.yellow}33`, borderRadius: 6, padding: '3px 8px', marginBottom: 8 }}>
@@ -467,7 +484,9 @@ function AdminLogin({ onLogin }) {
             <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
               Kullanıcı adı <code style={{ color: C.dim, background: C.panel2, padding: '1px 5px', borderRadius: 4 }}>{DEMO_USER}</code>
               {' · '}Parola <code style={{ color: C.dim, background: C.panel2, padding: '1px 5px', borderRadius: 4 }}>{DEMO_PASS}</code>
-              <br />Doğrulama tarayıcıda yapılır; gerçek koruma için backend gerekir.
+              <br />{live
+                ? 'Sunucuya bağlı: parola scrypt özetiyle sunucuda doğrulanıyor.'
+                : 'Sunucu yok — doğrulama tarayıcıda, gerçek koruma sağlamaz.'}
             </div>
           </div>
         </div>
@@ -829,6 +848,17 @@ const CAMPAIGN_SEED = [
   { id: 'cmp-4', restaurant: 'Klein Bistro',       org: 'Klein Kahve',         label: 'Öne Çıkan',     pricing: 'cpe', bid: 120, daily: 60000,  spent: 0,     impressions: 0,     clicks: 0,    engagements: 0,   status: 'paused' },
 ];
 
+// Sunucudan gelen kampanya satırını tablonun beklediği şekle indirger.
+function fromApi(c) {
+  return {
+    id: c.id, restaurant: c.restaurant, org: c.org, label: c.label,
+    pricing: c.pricing, bid: c.bid_minor,
+    daily: c.daily_budget_minor, spent: c.today_spent,
+    impressions: c.impressions, clicks: c.clicks, engagements: c.engagements,
+    status: c.status,
+  };
+}
+
 const CAMPAIGN_STATUS = {
   active:    { label: 'Yayında',      color: C.green,  soft: C.greenSoft },
   paused:    { label: 'Duraklatıldı', color: C.yellow, soft: C.yellowSoft },
@@ -838,13 +868,35 @@ const CAMPAIGN_STATUS = {
 function CampaignsPage() {
   const [rows, setRows] = useState(CAMPAIGN_SEED);
   const [toast, setToast] = useState(null);
+  const [live, setLive] = useState(false);
+
+  // Sunucu varsa kampanyalar oradan; yoksa tohum listesi. Şekil aynı
+  // olduğu için aşağıdaki hesaplar iki durumda da çalışıyor.
+  useEffect(() => {
+    let off = false;
+    api.ensureMode().then(({ mode }) => {
+      if (mode !== 'live' || off) return;
+      setLive(true);
+      api.getCampaigns()
+        .then(({ campaigns }) => { if (!off) setRows(campaigns.map(fromApi)); })
+        .catch(() => { /* tohum listesi kalır */ });
+    });
+    return () => { off = true; };
+  }, []);
 
   const say = (m) => { setToast(m); setTimeout(() => setToast(null), 2200); };
-  const toggle = (id) => setRows(rs => rs.map(r =>
-    r.id === id && r.status !== 'exhausted'
-      ? { ...r, status: r.status === 'active' ? 'paused' : 'active' } : r));
-  const bump = (id, delta) => setRows(rs => rs.map(r =>
-    r.id === id ? { ...r, bid: Math.max(20, r.bid + delta) } : r));
+  const toggle = (id) => setRows(rs => rs.map(r => {
+    if (r.id !== id || r.status === 'exhausted') return r;
+    const status = r.status === 'active' ? 'paused' : 'active';
+    if (live) api.patchCampaign(id, { status }).catch(() => {});
+    return { ...r, status };
+  }));
+  const bump = (id, delta) => setRows(rs => rs.map(r => {
+    if (r.id !== id) return r;
+    const bid = Math.max(20, r.bid + delta);
+    if (live) api.patchCampaign(id, { bidMinor: bid }).catch(() => {});
+    return { ...r, bid };
+  }));
 
   const money = (minor) => `₺${(minor / 100).toLocaleString('tr', { maximumFractionDigits: 0 })}`;
   // Kalite = etkileşim oranı; skor açık artırmadaki gerçek sıralama ölçütü.
@@ -966,11 +1018,43 @@ function HeatCell({ value }) {
 
 function GrowthPage() {
   const [metric, setMetric] = useState('retention');
+  const [cohorts, setCohorts] = useState(COHORTS);
+  const [platform, setPlatform] = useState(null);
   const money = (minor) => `₺${(minor / 100).toFixed(2)}`;
 
-  const totalUsers = COHORTS.reduce((a, c) => a + c.size, 0);
-  const weightedLtv = COHORTS.reduce((a, c) => a + c.ltv * c.size, 0) / totalUsers;
-  const latest = COHORTS[COHORTS.length - 1];
+  // Canlı kohortlar gecelik toplamadan gelir. Henüz hiç toplama
+  // çalışmadıysa tablo boş döner; o durumda örnek veri gösterilir ki
+  // panel boş bir iskelet gibi görünmesin.
+  useEffect(() => {
+    let off = false;
+    api.ensureMode().then(({ mode }) => {
+      if (mode !== 'live' || off) return;
+      api.getGrowth(12).then(d => {
+        if (off) return;
+        setPlatform(d.platform);
+        if (d.cohorts?.length) {
+          setCohorts(d.cohorts.map(c => ({
+            week: String(c.cohort_week).slice(0, 10),
+            size: c.cohort_size,
+            d1: c.d1 == null ? null : Number(c.d1),
+            d7: c.d7 == null ? null : Number(c.d7),
+            d30: c.d30 == null ? null : Number(c.d30),
+            swipes: Number(c.swipes_per_user),
+            saves: Number(c.saves_per_user),
+            dirPct: Number(c.save_to_directions_pct),
+            visitPct: Number(c.save_to_visit_pct),
+            ltv: c.ltv_minor_avg,
+          })));
+        }
+      }).catch(() => { /* örnek veri kalır */ });
+    });
+    return () => { off = true; };
+  }, []);
+
+  const COHORTS_VIEW = cohorts;
+  const totalUsers = COHORTS_VIEW.reduce((a, c) => a + c.size, 0);
+  const weightedLtv = platform?.ltv_minor || (COHORTS_VIEW.reduce((a, c) => a + c.ltv * c.size, 0) / Math.max(totalUsers, 1));
+  const latest = COHORTS_VIEW[COHORTS_VIEW.length - 1] || { dirPct: 0, visitPct: 0, size: 0 };
   // ARPU = LTV / ortalama yaşam süresi (ay). Sunucuda user_ltv.arpu_minor.
   const AVG_LIFETIME_MONTHS = 14;
 
@@ -1015,7 +1099,7 @@ function GrowthPage() {
               </tr>
             </thead>
             <tbody>
-              {COHORTS.slice().reverse().map((c, i) => (
+              {COHORTS_VIEW.slice().reverse().map((c, i) => (
                 <tr key={c.week} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}>
                   <td style={{ padding: '11px 18px', fontSize: 13, fontWeight: 600 }}>{c.week}</td>
                   <td style={{ padding: '11px 18px', textAlign: 'right', fontSize: 12.5, color: C.dim, fontVariantNumeric: 'tabular-nums' }}>{c.size.toLocaleString('tr')}</td>
@@ -1467,7 +1551,38 @@ function RestaurantsWorkspace({ restaurants, query, tab, onTab, onSuspend, onOpe
 // yazıyor (src/lib/b2b.js); onaylanınca işletme panel erişimi kazanır ve
 // girdiği alanlar dış API verisini ezmeye başlar.
 function ClaimsPanel() {
-  const claims = useClaims();
+  const localClaims = useClaims();
+  const [remote, setRemote] = useState(null);
+
+  const load = () => api.getClaims()
+    .then(({ claims }) => setRemote(claims.map(c => ({
+      id: c.id, status: c.status,
+      restaurantName: c.restaurant_name,
+      legalName: c.legal_name, taxId: c.tax_id,
+      contactName: c.evidence?.contactName, phone: c.evidence?.phone,
+    }))))
+    .catch(() => {});
+
+  useEffect(() => {
+    let off = false;
+    api.ensureMode().then(({ mode }) => { if (mode === 'live' && !off) load(); });
+    return () => { off = true; };
+     
+  }, []);
+
+  const claims = remote ?? localClaims;
+  const decide = async (id, status) => {
+    if (remote) {
+      // Canlı modda karar sunucuda: onay aynı zamanda mekânın sahipliğini
+      // bağlıyor, sonra listeyi tazeliyoruz.
+      try { await api.decideClaimRemote(id, status, status === 'rejected' ? 'Belge doğrulanamadı' : null); }
+      catch { /* liste tazelendiğinde gerçek durum görünür */ }
+      await load();
+      return;
+    }
+    decideClaim(id, status, status === 'rejected' ? 'Belge doğrulanamadı' : null);
+  };
+
   const pending = claims.filter(c => c.status === 'pending');
   if (claims.length === 0) return null;
 
@@ -1492,8 +1607,8 @@ function ClaimsPanel() {
           </div>
           {c.status === 'pending' && (
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-              <Btn label="Onayla" onClick={() => decideClaim(c.id, 'approved')} variant="filled" tone="green" size="sm" />
-              <Btn label="Reddet" onClick={() => decideClaim(c.id, 'rejected', 'Belge doğrulanamadı')} variant="ghost" size="sm" />
+              <Btn label="Onayla" onClick={() => decide(c.id, 'approved')} variant="filled" tone="green" size="sm" />
+              <Btn label="Reddet" onClick={() => decide(c.id, 'rejected')} variant="ghost" size="sm" />
             </div>
           )}
         </div>

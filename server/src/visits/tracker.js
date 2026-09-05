@@ -74,10 +74,13 @@ export async function ingestLocationSample(db, userId, sample) {
     );
     if (recent) return { matched: near.id, reason: "cooldown" };
 
+    // Örneğin kendi zaman damgası kullanılır: cihaz çevrimdışıyken biriken
+    // örnekler toplu gönderildiğinde now() almak kalış süresini sıfırlardı.
     const { rows: [created] } = await db.query(
-      `INSERT INTO visits (user_id, restaurant_id, min_distance_m, best_accuracy_m, sample_count)
-       VALUES ($1,$2,$3,$4,1) RETURNING id`,
-      [userId, near.id, near.distance_m, accuracyM ?? null]
+      `INSERT INTO visits (user_id, restaurant_id, min_distance_m, best_accuracy_m,
+                           sample_count, first_seen_at, last_seen_at)
+       VALUES ($1,$2,$3,$4,1,$5,$5) RETURNING id`,
+      [userId, near.id, near.distance_m, accuracyM ?? null, at]
     );
     return { matched: near.id, visitId: created.id, status: "open" };
   }

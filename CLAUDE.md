@@ -32,15 +32,32 @@ Gelir modeli tek ve bütüncül bir sistemdir — **aşamalı faz yapısı kald�
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run db:setup && npm run db:seed   # PostgreSQL + şema + tohum veri
+npm run dev:all                       # API (8787) + arayüz (5173)
 ```
 
+Yalnız arayüz: `npm run dev`. Yalnız API: `npm run dev:api`.
+
 - `/`       → Tüketici + Doyurucu uygulaması (telefon çerçevesi içinde önizlenir)
-- `/admin`  → Yönetici paneli (tam ekran masaüstü, demo giriş: `admin` / `gur2026`)
+- `/admin`  → Yönetici paneli (tam ekran masaüstü)
 
-Derleme: `npm run build` → `dist/`. Lint: `npm run lint`.
+Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
+`demo@gur.app` / `gur1234`.
 
-Sunucu ayrı kurulur — bkz. `server/README.md`.
+Derleme: `npm run build` → `dist/`. Lint: `npm run lint` (src + server + shared).
+
+### İki mod: canlı ve yerel
+
+Uygulama açılışta `/api/health` yoklar ve sağ üstte hangi modda olduğunu
+gösterir:
+
+- **CANLI** — sunucu ayakta. Kimlik, deste, kaydırma, ziyaret, yorum ve
+  sahiplenme PostgreSQL'e yazılır; kota ve kampanya ücretlendirmesi sunucuda.
+- **YEREL** — sunucu yok (artifact önizlemesi, çevrimdışı). Aynı akışlar
+  localStorage üzerinde yürür, hiçbir ekran kilitlenmez.
+
+Dallanma tek yerde: `src/lib/backend.js`. Ekranlar "sunucu var mı" diye
+sormaz, bu cepheyi çağırır.
 
 ## Proje yapısı
 
@@ -50,13 +67,21 @@ gur/
 ├── shared/                    # İSTEMCİ VE SUNUCUNUN ORTAK KULLANDIĞI SAF MODÜLLER
 │   ├── deck.js                # buildDeck / rankCampaigns / quotaState
 │   └── deeplink.js            # harita derin bağlantıları, Haversine
-├── server/                    # Node tarafı (ayrı kurulum, bkz. server/README.md)
-│   ├── db/schema.sql          # tam şema (tek migration)
+├── server/                    # Node tarafı (bkz. server/README.md)
+│   ├── index.js               # giriş: HTTP + cron + ilk besleme
+│   ├── db/setup.sh            # rol + veritabanı + eklenti + şema
+│   ├── db/schema.sql          # tam şema (tek migration, 26 tablo)
+│   ├── db/seed.js             # tohum veri; önce gerçek beslemeyi dener
 │   ├── db/queries/cohorts.sql # retention / kohort / LTV toplama sorguları
-│   └── src/{ingestion,swipe,visits,notifications,analytics,auth}, cron.js
+│   └── src/
+│       ├── http/{server,routes}.js   # çerçevesiz router + API uçları
+│       ├── auth/{session,password,social}.js
+│       └── {ingestion,swipe,visits,notifications,analytics}/, cron.js
 └── src/
     ├── main.jsx               # React kökü + router; /admin ayrı parçaya alındı
     ├── lib/
+    │   ├── api.js             # API istemcisi + mod ölçümü
+    │   ├── backend.js         # canlı/yerel cephesi — tek dallanma noktası
     │   ├── analytics.js       # rıza kapılı GA4 + ürün olay akışı
     │   ├── visits.js          # konum doğrulamalı ziyaret (sunucu kurallarının aynısı)
     │   ├── b2b.js             # sahiplenme başvuruları + işletmenin girdiği alanlar
@@ -123,9 +148,16 @@ Google Places + Foursquare + Tripadvisor + OSM'den cron ile beslenir.
 
 ## Bilinen kısıtlar
 
-- Frontend tarafında veri mock/yerel; `server/` ayrı kurulmadıkça kalıcılık yok.
-  (Ziyaretler, sahiplenme başvuruları ve rıza localStorage'da tutulur.)
-- Kimlik doğrulama gerçek değil. Google/Apple akışı istemci kimliği tanımlanınca
-  gerçek SDK'ya geçer; belirteç doğrulaması sunucuda (`server/src/auth/social.js`).
-- Yönetici girişi istemci tarafında — **güvenlik sınırı değildir**, sunucu auth şart.
+- **Push taşıması yok.** Bildirim kuyruğu, tavan, sessiz saat ve tekrar
+  engelleme çalışıyor; `server/index.js` içindeki `push` konsola yazıyor.
+  APNs/FCM sarmalayıcısı oraya verilecek.
+- **Google/Apple girişi anahtar bekliyor.** Akış ve sunucu tarafı doğrulama
+  hazır; `VITE_GOOGLE_CLIENT_ID` / `APPLE_SERVICE_ID` tanımsızken düğmeler
+  demo profiliyle tamamlanır ve bunu ekranda söyler.
+- **Besleme dış ağ ister.** Anahtarsız OSM yolu bile giden HTTPS gerektirir;
+  kapalı ağda tohum listesi devreye girer.
+- **Ödeme entegrasyonu yok** (iyzico/Stripe). GUR Plus ve işletme abonelikleri
+  arayüzde var, tahsilat yok.
 - Yasal metinlerdeki işletme bilgileri yer tutucu; yayına çıkmadan doldurulmalı.
+- Artifact önizlemesi tanımı gereği YEREL modda çalışır: statik tek dosya,
+  arkasında sunucu yok.

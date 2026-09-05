@@ -13,12 +13,18 @@ const QUERIES = path.join(
 
 // Dosya "-- ─── n. Başlık ───" ayraçlarıyla bölünür; her blok ayrı çalışır
 // ki biri patlarsa diğerleri yine yazılsın.
+//
+// Bloğun gerçekten çalıştırılacak bir ifade içerip içermediğine bakılır:
+// ilk satıra bakmak, açıklama satırıyla başlayan gerçek sorguları da
+// eliyordu (retention ve LTV blokları böyle atlanmıştı).
+const RUNNABLE = /^\s*(INSERT|UPDATE|DELETE|SELECT|WITH)\b/im;
+
 async function blocks() {
   const sql = await readFile(QUERIES, "utf8");
   return sql
     .split(/^-- ─── /m).slice(1)
     .map(b => ({ title: b.split("\n")[0].replace(/─+$/, "").trim(), body: b.slice(b.indexOf("\n")) }))
-    .filter(b => b.body.trim() && !b.body.trim().startsWith("--"));
+    .filter(b => RUNNABLE.test(b.body.replace(/^\s*--.*$/gm, "")));
 }
 
 export async function runRollups(db, { retentionOffsets = [1, 7, 30] } = {}) {
@@ -61,10 +67,11 @@ export async function cohortTable(db, { weeks = 12 } = {}) {
 /** Platform geneli ARPU — panel başlığındaki tek sayı. */
 export async function platformArpu(db) {
   const { rows: [r] } = await db.query(
-    `SELECT count(*)                          AS users,
+    // count/sum bigint döner ve pg bunu string yapar; panel sayı bekliyor.
+    `SELECT count(*)::int                     AS users,
             coalesce(avg(arpu_minor), 0)::int AS arpu_minor,
             coalesce(avg(ltv_minor), 0)::int  AS ltv_minor,
-            coalesce(sum(ad_revenue_minor), 0)::bigint AS ad_revenue_minor
+            coalesce(sum(ad_revenue_minor), 0)::int AS ad_revenue_minor
        FROM user_ltv`);
   return r;
 }

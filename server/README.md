@@ -35,10 +35,34 @@ ayrı ayrı tutulmasın diye.
 ## Kurulum
 
 ```bash
-createdb gur
-psql gur -f server/db/schema.sql
-npm install pg node-cron          # sunucu bağımlılıkları
+npm install                       # pg ve node-cron package.json'da
+npm run db:setup                  # rol + veritabanı + eklentiler + şema
+npm run db:seed                   # 15 mekan, 3 kampanya, yönetici, demo kullanıcı
+cp .env.example .env              # DATABASE_URL ve SESSION_SECRET
 ```
+
+`db:setup` eklentileri (pgcrypto, citext, cube, earthdistance) süper
+kullanıcı olarak kurar, şemayı ise uygulama rolüyle çalıştırır — uygulama
+rolü hiçbir zaman süper kullanıcı olmuyor. Sıfırdan kurmak için
+`npm run db:reset`.
+
+## Çalıştırma
+
+```bash
+npm run dev:api    # API — http://localhost:8787
+npm run dev        # arayüz — http://localhost:5173 (/api oraya proxy'lenir)
+npm run dev:all    # ikisi birden (kurulum + tohumlama dahil)
+```
+
+Sağlık kontrolü:
+
+```bash
+curl localhost:8787/api/health
+# {"ok":true,"restaurants":15,"users":2,"active_campaigns":3}
+```
+
+Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
+`demo@gur.app` / `gur1234`. İkisi de `.env` ile değiştirilebilir.
 
 Ortam değişkenleri:
 
@@ -54,7 +78,28 @@ Ortam değişkenleri:
 Hiçbir mekan anahtarı yoksa besleme yalnızca OpenStreetMap ile çalışır;
 anahtarsız ve ücretsizdir, havuz daha sığ olur ama sistem ayakta kalır.
 
-## Çalıştırma
+## API uçları
+
+| Uç | Yetki | Ne yapar |
+| --- | --- | --- |
+| `POST /api/auth/password` | — | Giriş ya da kayıt (aynı uç) |
+| `POST /api/auth/social` | — | Google/Apple id_token doğrulama |
+| `POST /api/auth/admin` | — | Yönetici girişi, `admin` rollü belirteç |
+| `GET /api/deck` | kullanıcı | Sponsorlu enjeksiyonlu deste + kota baskısı |
+| `POST /api/swipes` | kullanıcı | Kaydırma, kota düşümü, CPE ücretlendirme |
+| `POST /api/visits/sample` | kullanıcı | Konum örneği → ziyaret durumu |
+| `GET /api/visits/permission/:id` | kullanıcı | Yorum kilidi açık mı |
+| `POST /api/reviews` | kullanıcı | Yalnızca doğrulanmış ziyaretle |
+| `POST /api/claims` | kullanıcı | İşletme sahiplenme başvurusu |
+| `PATCH /api/restaurants/:id/owner` | işletme | Kendi alanlarını yazar |
+| `GET /api/admin/growth` | yönetici | Kohort, retention, ARPU/LTV |
+| `GET /api/admin/campaigns` | yönetici | Kampanya envanteri |
+| `POST /api/admin/jobs/:name` | yönetici | Cron'u elle tetikler |
+
+Kullanıcı kimliği daima imzalı belirteçten okunur; istemcinin gönderdiği
+bir `user_id` hiçbir yerde kullanılmaz.
+
+## Programatik kullanım
 
 ```js
 import pg from "pg";
@@ -96,3 +141,11 @@ hassasiyet ve süre özeti tutulur; koordinat dizisi hiç yazılmaz.
 **Yorum kilidi doğrulanmış ziyarete bağlıdır.** 120 m yarıçapta 15 dakika
 kalış + 100 m'den iyi konum hassasiyeti. Bu olmadan yorum yazılamaz;
 yazılan yorum `is_verified` rozetini alır.
+
+**Push taşıması bağlanmadı.** Kuyruk, tavan, sessiz saat ve tekrar
+engelleme çalışıyor; `server/index.js` içindeki `push` fonksiyonu şimdilik
+konsola yazıyor. APNs/FCM sarmalayıcınızı oraya vermek yeterli.
+
+**Besleme dış ağa çıkabilmeli.** Anahtarsız OpenStreetMap yolu bile giden
+HTTPS gerektirir; kapalı ağda `runIngestion` sıfır kayıt yazar ve tohum
+listesi devreye girer. Bu bir hata değil, tasarlanmış geri düşüş.

@@ -7,6 +7,7 @@ import { directionsUrl, placeUrl, defaultMapProvider, MAP_PROVIDERS } from '../.
 import { hydrateCampaigns } from '../lib/campaigns.js';
 import { submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles, saveOwnerProfile, OVERRIDABLE } from '../lib/b2b.js';
 import * as visits from '../lib/visits.js';
+import * as backend from '../lib/backend.js';
 import { signIn as socialSignIn, isAppleDevice, isConfigured as socialConfigured } from '../lib/social-auth.js';
 
 // Apple "Designing Fluid Interfaces" momentum projection: nereye bırakılacağını
@@ -843,14 +844,27 @@ function SocialAuthRow({ onDone, tone = "light" }) {
   );
 }
 
-function LoginScreen({ onBack, onLogin, onRegister }) {
+function LoginScreen({ onBack, onLogin, onRegister, live }) {
   const [e, setE] = useState(""); const [p, setP] = useState("");
-  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>Giriş yap</h2><p onClick={onRegister} style={{ textAlign: "center", color: "rgba(255,255,255,0.85)", fontSize: 14, marginBottom: 32, cursor: "pointer", textDecoration: "underline", fontFamily: "'Outfit', sans-serif" }}>Üyeliğiniz yoksa lütfen kayıt için dokununuz</p><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR uldamaya başla" onClick={onLogin} /></div><SocialAuthRow tone="light" onDone={onLogin} /></div></Screen>;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Canlı modda hesap sunucuda; yerel modda giriş ekranı bir formalite ve
+  // bunu kullanıcıya söylüyoruz, sessizce "başarılı" göstermek yerine.
+  const submit = async () => {
+    if (!live) return onLogin();
+    if (!e.includes("@") || p.length < 6) { setError("E-posta ve en az 6 karakter parola gerekli."); return; }
+    setBusy(true); setError(null);
+    try { await backend.signIn({ email: e.trim(), password: p }); onLogin(); }
+    catch (err) { setError(err.message || "Giriş yapılamadı"); }
+    finally { setBusy(false); }
+  };
+  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>Giriş yap</h2><p onClick={onRegister} style={{ textAlign: "center", color: "rgba(255,255,255,0.85)", fontSize: 14, marginBottom: 32, cursor: "pointer", textDecoration: "underline", fontFamily: "'Outfit', sans-serif" }}>Üyeliğiniz yoksa lütfen kayıt için dokununuz</p><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text={busy ? "Bağlanıyor…" : "GUR uldamaya başla"} onClick={submit} disabled={busy} /></div>{error && <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="light" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
 }
 
-function RegisterScreen({ onBack, onDone, onLegal }) {
+function RegisterScreen({ onBack, onDone, onLegal, live }) {
   const [n,setN]=useState(""); const [e,setE]=useState(""); const [p,setP]=useState(""); const [d,setD]=useState(""); const [a,setA]=useState(false);
-  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "'Outfit', sans-serif", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "#FF6600", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" onClick={onDone} /><SocialAuthRow tone="dark" onDone={onDone} /></div></Screen>;
+  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "'Outfit', sans-serif", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "#FF6600", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" onClick={async () => { if (live) { try { await backend.signIn({ email: e, password: p, name: n }); } catch { /* var olan hesap: giriş ekranı denenmeli */ } } onDone(); }} /><SocialAuthRow tone="dark" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onDone(); }} /></div></Screen>;
 }
 
 // ═══════════════════════════════════════════════
@@ -924,8 +938,8 @@ function OwnerInfoTab({ restaurant }) {
     return <LockedCard text="Önce bir işletme sahiplen; bilgiler o kayda yazılır." />;
   }
 
-  const save = () => {
-    saveOwnerProfile(restaurant.id, draft);
+  const save = async () => {
+    await backend.saveOwnerFields(restaurant.id, draft);
     haptic(12);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -1015,15 +1029,25 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
   const statusFor = (id) => claims.find(c => String(c.restaurantId) === String(id))?.status;
   const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }));
 
-  const submit = () => {
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
     if (!form.legalName.trim() || !form.contactName.trim() || !form.phone.trim()) {
       setError("Ticaret unvanı, yetkili adı ve telefon zorunlu.");
       return;
     }
-    const res = submitClaim({
+    setBusy(true); setError(null);
+    // Canlı modda başvuru veritabanına, yerelde localStorage'a düşer;
+    // her iki durumda da yönetici panelinde görünür.
+    const res = await backend.submitClaim({
       restaurantId: picked.id, restaurantName: picked.name, ...form,
     });
-    if (!res.ok) { setError("Bu işletme için zaten bekleyen bir başvuru var."); return; }
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.reason === "already_pending"
+        ? "Bu işletme için zaten bekleyen bir başvuru var."
+        : res.reason || "Başvuru gönderilemedi.");
+      return;
+    }
     haptic([12, 30, 18]);
     onDone(picked);
   };
@@ -1120,7 +1144,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
               {error && (
                 <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#FF3B30", margin: "0 0 12px" }}>{error}</p>
               )}
-              <Btn text="Sahiplenme başvurusu gönder" onClick={submit} variant="filled" />
+              <Btn text={busy ? "Gönderiliyor…" : "Sahiplenme başvurusu gönder"} onClick={submit} disabled={busy} variant="filled" />
             </>
           )}
         </div>
@@ -2845,6 +2869,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
     setPlayingAd(null);
     setAdIdx(i => i + 1);
     setBonus(b => b + REWARD_SWIPES);
+    backend.rewardedAdDone();
     // Kazanılan hak sayısı da söylenmez; yalnızca akışın açıldığı bildirilir.
     show("Keşfe devam", "fav");
   };
@@ -2883,8 +2908,6 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
     if (!favorites.find(f => f.id === r.id)) {
       setFavorites(p => [...p, superLike ? { ...r, isSuper: true } : r]);
     }
-    // Sponsorlu kartta etkileşim ücretlendirilir (CPE) — sunucuda
-    // recordSwipe bunu yapar, burada yalnızca olay akışına düşer.
     if (r.sponsored) {
       trackEvent(r.sponsored.pricing === "cpe" ? "ad_engagement" : "ad_click", {
         campaignId: r.sponsored.campaignId, restaurantId: r.id, bidMinor: r.sponsored.bidMinor,
@@ -2892,21 +2915,33 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
     }
   };
 
+  // Her karar sunucuya da yazılır: kota, kampanya ücretlendirmesi ve
+  // 30 günlük hatırlatmanın çıpası olan saved_places orada tutuluyor.
+  const sync = (r, direction) => {
+    if (!r) return;
+    backend.recordSwipe({
+      restaurantId: r.id, direction,
+      campaignId: r.sponsored?.campaignId ?? null,
+      deckPosition: r.deckPosition ?? null,
+    });
+  };
+
   const right = () => {
     const r = deck[cursor];
-    save(r, false);
+    save(r, false); sync(r, "right");
     show(r?.name + " favorilere eklendi!", "fav");
     next();
   };
   const superLike = () => {
     const r = deck[cursor];
-    save(r, true);
+    save(r, true); sync(r, "up");
     show(r?.name + " • hemen gitmek istiyorum", "super");
     next();
   };
   const left = () => {
     const r = deck[cursor];
     if (r && !encore) setPassed(p => (p.find(x => x.id === r.id) ? p : [...p, r]));
+    sync(r, "left");
     show("Geçildi", "nope");
     next();
   };
@@ -3017,7 +3052,10 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
               onSave={() => { setSheetCard(null); right(); }}
               onSuper={() => { setSheetCard(null); superLike(); }}
               onReview={() => setComposing(sheetCard)}
-              onDirections={(provider) => trackEvent("directions_open", { restaurantId: sheetCard.id, provider })}
+              onDirections={(provider) => {
+                trackEvent("directions_open", { restaurantId: sheetCard.id, provider });
+                backend.trackDirections(sheetCard.id, provider);
+              }}
               onVerifyLocation={onVerifyLocation}
             />
           )}
@@ -3027,13 +3065,19 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
           <ReviewComposer
             restaurantName={composing.name}
             onCancel={() => setComposing(null)}
-            onSubmit={(review) => {
+            onSubmit={async (review) => {
               onAddReview?.(composing.id, { ...review, verified: true });
-              visits.markReviewed(composing.id);
               trackEvent("review_submit", { restaurantId: composing.id, verified: true });
               setComposing(null);
               setSheetCard(null);
-              show("Yorumun yayınlandı • Konumla doğrulandı", "fav");
+              try {
+                await backend.submitReview(composing.id, review);
+                show("Yorumun yayınlandı • Konumla doğrulandı", "fav");
+              } catch (err) {
+                // Sunucu doğrulanmış ziyaret görmüyorsa yorum yayımlanmaz;
+                // sessizce başarılı göstermek yerine sebebini söylüyoruz.
+                show(err.message || "Yorum gönderilemedi", "nope");
+              }
             }}
           />
         )}
@@ -3751,6 +3795,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
   const mapDefault = defaultMapProvider(typeof navigator !== "undefined" ? navigator.userAgent : "");
   const openMapWith = (provider) => {
     trackEvent("directions_open", { restaurantId: r.id, provider });
+    backend.trackDirections(r.id, provider);
     // noopener: açılan sayfa window.opener üzerinden bu sekmeyi yönlendiremez
     window.open(directionsUrl(place, provider), "_blank", "noopener,noreferrer");
     setMapSheet(false);
@@ -4719,13 +4764,20 @@ export default function GurApp(props = {}) {
   // null = henüz sorulmadı; "granted" | "denied" = karar verilmiş
   const [consent, setConsentState] = useState(() => getConsent());
   useEffect(() => { initAnalytics(); }, []);
-  const decideConsent = (value) => { setConsent(value); setConsentState(value); };
+  const decideConsent = (value) => {
+    setConsent(value); setConsentState(value);
+    backend.syncConsent(value === "granted", value === "granted");
+  };
 
   // Konum doğrulamalı ziyaret. İzin alınana kadar hiçbir konum okunmaz.
   const [locationOn, setLocationOn] = useState(false);
   const [rationale, setRationale] = useState(null);   // doğrulanacak restoran
   const [visitPrompt, setVisitPrompt] = useState(null);
   const [showPlus, setShowPlus] = useState(false);
+  // Sunucu ayakta mı? Ölçüm bir kez yapılır; sonuç her ekranın davranışını
+  // değil, yalnızca kalıcılığı belirler (bkz. src/lib/backend.js).
+  const [session, setSession] = useState({ mode: "unknown", user: null, info: null });
+  useEffect(() => { backend.boot().then(setSession); }, []);
 
   const addReview = (restaurantId, review) =>
     setUserReviews(prev => ({ ...prev, [restaurantId]: [review, ...(prev[restaurantId] || [])] }));
@@ -4746,14 +4798,23 @@ export default function GurApp(props = {}) {
     [restaurants, ownerRestaurant, ownerMedia, ownerProfiles]
   );
 
-  // Canlı veri dene — başarısızsa sessizce mock ile devam
+  // Veri kaynağı sırası: kendi sunucumuz → Overpass → mock.
+  // Kendi sunucumuz varsa oradaki kayıt otoritedir; sahiplenilmiş
+  // işletmelerin girdiği bilgiler yalnızca orada.
   useEffect(() => {
     let cancelled = false;
+    if (session.mode === "live") {
+      backend.loadRestaurants({ lat: 41.0082, lng: 28.9784 })
+        .then(list => { if (!cancelled && list?.length) { setRestaurants(list); setDataSource("api"); } })
+        .catch(() => { /* mock veri zaten yüklü */ });
+      return () => { cancelled = true; };
+    }
+    if (session.mode !== "local") return;   // ölçüm bitmeden dış API'ye gitme
     fetchLiveRestaurants()
       .then(list => { if (!cancelled) { setRestaurants(list); setDataSource("live"); } })
       .catch(() => { /* mock veri zaten yüklü */ });
     return () => { cancelled = true; };
-  }, []);
+  }, [session.mode]);
 
   // Detay ekranı seçim anındaki kopyayı değil güncel kaydı gösterir; böylece
   // panelden yeni fotoğraf eklenince açık detay da tazelenir.
@@ -4783,7 +4844,7 @@ export default function GurApp(props = {}) {
   useEffect(() => {
     if (!locationOn) return;
     return visits.watchLocation(
-      sample => visits.ingestSample(feed, sample),
+      sample => backend.pushLocationSample(feed, sample),
       () => setLocationOn(false)          // izin geri alındıysa sessizce dur
     );
   }, [locationOn, feed]);
@@ -4817,8 +4878,10 @@ export default function GurApp(props = {}) {
     const r = rationale && rationale !== true ? rationale : feed[0];
     if (r) {
       // Mekânın tam koordinatında, hızlandırılmış kalış süresiyle.
-      visits.ingestSample([r], { lat: r.lat, lng: r.lng, accuracyM: 12, at: Date.now() - 60000 }, { accelerate: true });
-      visits.ingestSample([r], { lat: r.lat, lng: r.lng, accuracyM: 12, at: Date.now() }, { accelerate: true });
+      // İki örnek: biri geçmişte, biri şimdi — kalış süresi böyle oluşuyor.
+      // Canlı modda ikisi de sunucuya gider ve karar orada da verilir.
+      backend.pushLocationSample([r], { lat: r.lat, lng: r.lng, accuracyM: 12, at: Date.now() - 1800000 }, { accelerate: true });
+      backend.pushLocationSample([r], { lat: r.lat, lng: r.lng, accuracyM: 12, at: Date.now() }, { accelerate: true });
     }
     setRationale(null);
   };
@@ -4845,6 +4908,7 @@ export default function GurApp(props = {}) {
   const finishMatch = (found) => { setMatchResults(found); nav("match-result"); };
   // Hesap silme: yerel durumun tamamı temizlenir (kalıcılık yok, backend yok)
   const deleteAccount = () => {
+    backend.removeAccount();
     setUserReviews({});
     setFavorites([]);
     setSelected(null);
@@ -4873,8 +4937,8 @@ export default function GurApp(props = {}) {
     switch (screen) {
       case "splash": return <SplashScreen onNext={() => setScreen("welcome")} />;
       case "welcome": return <WelcomeScreen onStart={() => nav("login")} onDoyurucu={() => nav("doyurucu-auth")} />;
-      case "login": return <LoginScreen onBack={back} onLogin={() => nav("explore")} onRegister={() => nav("register")} />;
-      case "register": return <RegisterScreen onBack={back} onDone={() => nav("explore")} onLegal={() => nav("legal")} />;
+      case "login": return <LoginScreen onBack={back} onLogin={() => nav("explore")} onRegister={() => nav("register")} live={session.mode === "live"} />;
+      case "register": return <RegisterScreen onBack={back} onDone={() => nav("explore")} onLegal={() => nav("legal")} live={session.mode === "live"} />;
       case "doyurucu-auth": return <DoyurucuAuthScreen onBack={back} onLogin={() => nav("doyurucu-login")} onRegister={() => nav("rest1")} onClaim={() => nav("claim")} />;
       case "claim": return <ClaimScreen onBack={back} restaurants={feed}
         onDone={(r) => { setClaimedRestaurant(r); nav("rest-dashboard"); }} />;
@@ -4984,6 +5048,23 @@ export default function GurApp(props = {}) {
           )}
         </AnimatePresence>
         {showPlus && <PremiumSheet onClose={() => setShowPlus(false)} />}
+        {/* Hangi modda çalışıldığı gizlenmiyor: yerel modda yazılanlar
+            yalnızca bu tarayıcıda kalıyor, bunu söylemek dürüstlük. */}
+        {session.mode !== "unknown" && screen !== "splash" && (
+          <div style={{
+            position: "absolute", top: 8, right: 10, zIndex: 700,
+            display: "inline-flex", alignItems: "center", gap: 5,
+            background: "rgba(0,0,0,0.42)", backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.14)", borderRadius: 20, padding: "3px 9px",
+          }} title={session.mode === "live"
+            ? `Sunucuya bağlı — ${session.info?.restaurants ?? 0} mekan`
+            : "Sunucu yok: veriler yalnızca bu tarayıcıda saklanıyor"}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: session.mode === "live" ? "#22C55E" : "#F59E0B" }} />
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+              {session.mode === "live" ? "CANLI" : "YEREL"}
+            </span>
+          </div>
+        )}
       </PhoneFrame>
     </div>
   );
