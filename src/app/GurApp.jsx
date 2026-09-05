@@ -2435,15 +2435,21 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
     [nearby]
   );
 
+  // Restoran arama. Önce isim eşleşmeleri, sonra mutfak/etiket: kullanıcı
+  // "ismini arattığı restoranı" en üstte görmeli.
   const [query, setQuery] = useState("");
+  const searching = query.trim().length > 0;
   const results = useMemo(() => {
     const q = query.trim().toLocaleLowerCase("tr");
-    if (q.length < 2) return [];
-    return nearby.filter(r =>
-      r.name.toLocaleLowerCase("tr").includes(q) ||
-      r.cat.toLocaleLowerCase("tr").includes(q) ||
-      (r.tags || []).some(t => t.toLocaleLowerCase("tr").includes(q))
-    ).slice(0, 8);
+    if (!q) return [];
+    const byName = [];
+    const byOther = [];
+    for (const r of nearby) {
+      if (r.name.toLocaleLowerCase("tr").includes(q)) byName.push(r);
+      else if (r.cat.toLocaleLowerCase("tr").includes(q) ||
+               (r.tags || []).some(t => t.toLocaleLowerCase("tr").includes(q))) byOther.push(r);
+    }
+    return [...byName, ...byOther];
   }, [nearby, query]);
 
   // Başlıkta gösterilen semt: koordinattan değil, en yakın kaydın adresinden
@@ -2539,7 +2545,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             <Icon n="search" size={17} color="rgba(45,36,25,0.35)" />
             <input
               value={query} onChange={e => setQuery(e.target.value)}
-              placeholder="Ne yemek istersin?"
+              placeholder="Restoran ara"
               style={{
                 flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent",
                 fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 500, color: "#2D2419", padding: "10px 0",
@@ -2553,32 +2559,49 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             )}
           </div>
 
-          {results.length > 0 && (
-            <div style={{
-              position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 30,
-              background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: ELEV.floatLight,
-              maxHeight: 296, overflowY: "auto",
-            }}>
-              {results.map(r => (
-                <div key={r.id} onClick={() => { setQuery(""); onDetail?.(r); }}
-                  style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid rgba(45,36,25,0.05)" }}>
-                  <Img src={r.imgs?.[0]} box={46} style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0 }} bg="#e8e0d8" />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "#2D2419", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</p>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#8A7A68", margin: 0 }}>{r.cat} · {distText(r)}</p>
-                  </div>
-                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#F59E0B", flexShrink: 0 }}>★ {r.rating}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {query.trim().length >= 2 && results.length === 0 && (
-            <div style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 30, background: "#fff", borderRadius: 20, padding: "16px 18px", boxShadow: ELEV.floatLight }}>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8A7A68", margin: 0 }}>"{query}" için sonuç yok</p>
-            </div>
-          )}
         </div>
 
+        {/* Arama sonuçları — açılır kutu değil, sayfanın kendisi. Aranan
+            restoranın kartını görmek, listeyi kaydırmak ve karşılaştırmak
+            küçük bir katmanda zor. */}
+        {searching && (
+          <div style={{ marginBottom: 16, flexShrink: 0 }}>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#8A7A68", margin: "0 0 10px" }}>
+              {results.length > 0
+                ? `"${query.trim()}" için ${results.length} restoran`
+                : `"${query.trim()}" için sonuç yok`}
+            </p>
+            {results.map(r => (
+              <motion.div key={r.id} onClick={() => onDetail?.(r)}
+                whileTap={{ scale: 0.985 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                style={{ display: "flex", alignItems: "center", gap: 12, background: "#fff", borderRadius: 20, padding: "10px 12px", marginBottom: 9, cursor: "pointer", boxShadow: ELEV.restLight }}>
+                <Img src={r.imgs?.[0]} box={112} style={{ width: 56, height: 56, borderRadius: 16, flexShrink: 0 }} bg="#e8e0d8" />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#2D2419", margin: "0 0 3px", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                    {(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}
+                  </p>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#8A7A68", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
+                    <Icon n="star" size={11} color="#F59E0B" />{r.rating} · {r.cat} · {distText(r)}
+                  </p>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D6D0C4" strokeWidth="2.4" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
+              </motion.div>
+            ))}
+            {results.length === 0 && (
+              <div style={{ background: "#fff", borderRadius: 20, padding: "18px 18px", textAlign: "center", boxShadow: ELEV.restLight }}>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#8A7A68", margin: 0, lineHeight: 1.5 }}>
+                  Başka bir isim ya da mutfak deneyebilirsin.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Arama açıkken keşif akışı gizlenir: kullanıcı bir şey aradığında
+            sayfanın geri kalanı gürültüdür. */}
+        {!searching && (
+        <>
         {/* Dönen banner — marka slaytı + sponsor reklamları, ekranın en üstünde */}
         <HeroCarousel slides={slides} />
 
@@ -2750,6 +2773,8 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           </div>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
         </div>
+        </>
+        )}
 
         </div>
 
@@ -2999,6 +3024,44 @@ function VisitPrompt({ visit, onWrite, onDismiss }) {
           <div style={{ display: "flex", gap: 8 }}>
             <Btn text="Yorum yaz" onClick={onWrite} variant="filled" size="sm" fullWidth={false} />
             <Btn text="Sonra" onClick={onDismiss} variant="plain" size="sm" fullWidth={false} />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// İşletme masa talebini karara bağladığında misafire çıkan şerit.
+// VisitPrompt ile aynı yerde ve aynı biçimde duruyor: bildirim tek bir
+// dille konuşsun, kullanıcı "bu da ne" diye düşünmesin.
+function ReservationNotice({ record, onOpen, onDismiss }) {
+  const ok = record.status === "confirmed";
+  return (
+    <motion.div
+      initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
+      transition={{ type: "spring", bounce: 0.2, duration: 0.45 }}
+      style={{
+        position: "absolute", left: 12, right: 12, bottom: 92, zIndex: 800,
+        background: "rgba(20,14,8,0.94)", backdropFilter: "blur(14px)",
+        border: `1px solid ${ok ? "rgba(76,175,80,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: 22,
+        padding: "14px 15px", boxShadow: "0 14px 44px rgba(0,0,0,0.45)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 11, background: ok ? "rgba(76,175,80,0.18)" : "rgba(255,59,48,0.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon n={ok ? "check" : "cross"} size={15} color={ok ? "#4CAF50" : "#FF7A70"} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "#fff", margin: "0 0 3px" }}>
+            {ok ? "Rezervasyonun kabul edildi" : "Rezervasyonun kabul edilmedi"}
+          </p>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45, margin: "0 0 11px" }}>
+            {record.restaurantName} · {record.day} {record.time} · {record.people} kişi
+            {ok ? " — masan hazır." : " — başka bir saat deneyebilirsin."}
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn text={ok ? "Yol tarifi al" : "Başka saat seç"} onClick={onOpen} variant="filled" size="sm" fullWidth={false} />
+            <Btn text="Tamam" onClick={onDismiss} variant="plain" size="sm" fullWidth={false} />
           </div>
         </div>
       </div>
@@ -5212,6 +5275,10 @@ const BADGES = [
 
 function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onDetail, accentColor = "#FF6600", showBadges = true, badgeSpeed = 14, userReviews = {}, restaurants = [], onRemoveUserReview, onDeleteAccount, onLegal }) {
   const [tab, setTab] = useState("reviews");
+  // Rezervasyonlar: şerit geçici, burası kalıcı kayıt. Kullanıcı "onay
+  // geldi mi" diye bakacağı bir yer olmadan bildirim tek başına yetmez.
+  const myTables = reservations.useReservations();
+  const pendingTables = myTables.filter(x => x.status === "pending").length;
   // Silme geri alınamıyor; her ikisi de önce onay ister
   const [pendingDelete, setPendingDelete] = useState(null);
   const [confirmAccount, setConfirmAccount] = useState(false);
@@ -5292,13 +5359,17 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
 
         {/* Tab seçici — alt çizgi stili */}
         <div style={{ display: "flex", gap: 0, margin: "24px 20px 0", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
-          {[{ id: "reviews", label: "Yorumlarım" }, { id: "favorites", label: "Beğendiğim Yerler" }].map(t => (
+          {[{ id: "reviews", label: "Yorumlarım" }, { id: "tables", label: "Rezervasyonlarım", badge: pendingTables }, { id: "favorites", label: "Beğendiğim Yerler" }].map(t => (
             <div key={t.id} onClick={() => setTab(t.id)} style={{
               padding: "0 0 12px", marginRight: 28, cursor: "pointer",
               borderBottom: tab === t.id ? "2px solid #FF6600" : "2px solid transparent",
-              transition: "all 0.2s",
+              transition: "all 0.2s", display: "flex", alignItems: "center", gap: 5,
             }}>
               <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, color: tab === t.id ? "#1C1917" : "#A8A29E" }}>{t.label}</span>
+              {/* Bekleyen talep sayısı: cevap bekleyen bir şey varsa görünsün */}
+              {t.badge > 0 && (
+                <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: "#FF6600", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 9.5, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{t.badge}</span>
+              )}
             </div>
           ))}
         </div>
@@ -5361,6 +5432,34 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
               </div>
             ))
           )}
+          {tab === "tables" && (
+            myTables.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#8A7A68", margin: 0 }}>Henüz masa talebin yok</p>
+              </div>
+            ) : myTables.map((x, i) => {
+              const tone = x.status === "confirmed" ? "#16A34A" : x.status === "declined" ? "#D93A2F" : "#B4530A";
+              const soft = x.status === "confirmed" ? "rgba(34,197,94,0.1)" : x.status === "declined" ? "rgba(255,59,48,0.09)" : "rgba(255,102,0,0.09)";
+              const label = x.status === "confirmed" ? "Kabul edildi" : x.status === "declined" ? "Kabul edilmedi" : "İşletme onayında";
+              const rest = restaurants.find(r => String(r.id) === String(x.restaurantId));
+              return (
+                <div key={x.id} onClick={() => rest && onDetail(rest)}
+                  style={{ display: "flex", gap: 12, alignItems: "center", padding: "14px 0", borderBottom: i < myTables.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", cursor: rest ? "pointer" : "default" }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 14, background: soft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon n="clock" size={18} color={tone} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.restaurantName}</p>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#8A7A68", margin: 0 }}>
+                      {x.day} · {x.time} · {x.people} kişi{x.dealPct ? ` · %${x.dealPct} fırsat` : ""}
+                    </p>
+                  </div>
+                  <span style={{ flexShrink: 0, fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 800, color: tone, background: soft, borderRadius: 999, padding: "5px 11px" }}>{label}</span>
+                </div>
+              );
+            })
+          )}
+
           {/* Hesap — geri alınamayan işlem, listelerden ayrı ve en altta */}
           <div style={{ marginTop: 30, paddingTop: 18, borderTop: "1px solid rgba(0,0,0,0.07)" }}>
             <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#1C1917", margin: "0 0 4px" }}>Hesap</p>
@@ -5654,6 +5753,13 @@ export default function GurApp(props = {}) {
   const [locationOn, setLocationOn] = useState(false);
   const [rationale, setRationale] = useState(null);   // doğrulanacak restoran
   const [visitPrompt, setVisitPrompt] = useState(null);
+  const [reservationNotice, setReservationNotice] = useState(null);
+  // Bildirimler yalnızca giriş yapmış tüketici ekranlarında çıkar: işletme
+  // panelinin üstünde (önizlemede iki taraf aynı tarayıcıyı paylaşıyor,
+  // gerçekte ayrı kişiler) ve giriş öncesi ekranlarda yeri yok.
+  const NON_GUEST_SCREENS = ["splash", "welcome", "login", "register", "legal",
+    "doyurucu-auth", "doyurucu-login", "claim", "rest1", "rest2", "rest3", "rest-dashboard"];
+  const onOwnerScreen = NON_GUEST_SCREENS.includes(screen);
   const [showPlus, setShowPlus] = useState(false);
   // Sunucu ayakta mı? Ölçüm bir kez yapılır; sonuç her ekranın davranışını
   // değil, yalnızca kalıcılığı belirler (bkz. src/lib/backend.js).
@@ -5748,6 +5854,36 @@ export default function GurApp(props = {}) {
     const off = visits.subscribeVisits(check);
     return () => { clearInterval(t); off(); };
   }, []);
+
+  // İşletmenin masa talebi kararı misafire burada iletiliyor. Karar
+  // uygulama kapalıyken verilmiş olabilir; bayrak kararla değil bildirimle
+  // düşüyor, yani açılışta bekleyen kararlar da duyuluyor.
+  useEffect(() => {
+    // İşletme panelindeyken tüketilmez: bayrağı düşürüp şeridi göstermemek,
+    // kararı misafirin hiç duymaması demek olurdu. Ekran değişince tekrar
+    // bakılıyor.
+    if (onOwnerScreen) return;
+    const check = () => {
+      const [next] = reservations.pendingGuestNotices();
+      if (!next) return;
+      reservations.markGuestNotified(next.id);
+      setReservationNotice(next);
+      visits.pushLocalNotification(
+        next.status === "confirmed" ? "Rezervasyonun kabul edildi" : "Rezervasyonun kabul edilmedi",
+        `${next.restaurantName} · ${next.day} ${next.time} · ${next.people} kişi`,
+        `rsv-${next.id}`
+      );
+    };
+    check();
+    // Aynı sekmede depo olayı, başka sekmede storage olayı uyandırıyor.
+    const onStore = () => check();
+    window.addEventListener("gur:reservations", onStore);
+    window.addEventListener("storage", onStore);
+    return () => {
+      window.removeEventListener("gur:reservations", onStore);
+      window.removeEventListener("storage", onStore);
+    };
+  }, [onOwnerScreen]);
 
   // Gerçek konum yoksa (önizleme, izin reddi) demo doğrulaması akışı kurtarır.
   const verifyLocation = (restaurant) => setRationale(restaurant || true);
@@ -5960,7 +6096,20 @@ export default function GurApp(props = {}) {
           <LocationRationale onAllow={allowLocation} onDemo={demoVerify} onClose={() => setRationale(null)} />
         )}
         <AnimatePresence>
-          {visitPrompt && screen !== "splash" && (
+          {reservationNotice && screen !== "splash" && !onOwnerScreen && (
+            <ReservationNotice
+              record={reservationNotice}
+              onOpen={() => {
+                const r = feed.find(x => String(x.id) === String(reservationNotice.restaurantId));
+                setReservationNotice(null);
+                if (r) { setSelected(r); nav("detail"); }
+              }}
+              onDismiss={() => setReservationNotice(null)}
+            />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {visitPrompt && screen !== "splash" && !onOwnerScreen && !reservationNotice && (
             <VisitPrompt
               visit={visitPrompt}
               onWrite={() => {

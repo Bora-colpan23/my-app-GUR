@@ -69,9 +69,31 @@ export function requestTable({ restaurantId, restaurantName, day, time, people, 
   return record;
 }
 
-/** İşletmenin kararı. */
+/**
+ * İşletmenin kararı. Karar anında misafire bildirim borcu doğar:
+ * guestNotified false kalır, uygulama bunu görüp haber verir ve
+ * işaretler. Bayrağı burada true yapmak, uygulama kapalıyken verilen
+ * kararın hiç duyulmaması demek olurdu.
+ */
 export function decideReservation(id, status) {
-  write(getReservations().map(r => (r.id === id ? { ...r, status, decidedAt: Date.now(), seenByOwner: true } : r)));
+  write(getReservations().map(r => (
+    r.id === id
+      ? { ...r, status, decidedAt: Date.now(), seenByOwner: true, guestNotified: false }
+      : r)));
+}
+
+/** Misafire henüz iletilmemiş kararlar — en yenisi başta. */
+export function pendingGuestNotices() {
+  return getReservations()
+    .filter(r => r.status !== "pending" && !r.guestNotified)
+    .sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0));
+}
+
+/** Karar misafire iletildi. */
+export function markGuestNotified(id) {
+  const list = getReservations();
+  if (!list.some(r => r.id === id && !r.guestNotified)) return;
+  write(list.map(r => (r.id === id ? { ...r, guestNotified: true } : r)));
 }
 
 /** Panel açıldığında bekleyen talepler "görüldü" işaretlenir; rozet söner. */
