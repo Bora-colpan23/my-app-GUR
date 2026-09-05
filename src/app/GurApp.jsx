@@ -296,45 +296,10 @@ function Icon({ n, size = 18, color = "currentColor", strokeWidth = 2 }) {
   return <svg {...p}>{paths[n] || null}</svg>;
 }
 
-// ─── Icon-only buton — Apple HIG: dairesel/rounded "glass" veya opak hedef, min 40pt dokunma alanı ───
-function IconBtn({ onClick, icon, children, tone = "glassDark", shape = "circle", size = 40, title }) {
-  const tones = {
-    glassDark: { bg: "rgba(0,0,0,0.35)", blur: true, glass: "dark" },
-    glassLight: { bg: "rgba(255,255,255,0.16)", blur: true, glass: "dark" },
-    solidLight: { bg: "#fff", shadow: "0 2px 10px rgba(0,0,0,0.08)" },
-    subtle: { bg: "rgba(45,36,25,0.06)" },
-    dangerSoft: { bg: "rgba(255,59,48,0.1)" },
-    plain: { bg: "transparent" },
-  };
-  const t = tones[tone] || tones.glassDark;
-  return (
-    <motion.button
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      whileTap={{ scale: 0.88 }}
-      transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-      className={`gur-icon-btn${t.glass ? ` gur-glass gur-glass-${t.glass}` : ""}`}
-      style={{
-        width: size, height: size, minWidth: size, minHeight: size, flexShrink: 0,
-        borderRadius: shape === "circle" ? "50%" : 14,
-        border: "none", background: t.bg,
-        backdropFilter: t.blur ? "blur(8px)" : undefined,
-        boxShadow: t.shadow || "none",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        cursor: "pointer", padding: 0, position: "relative",
-        WebkitTapHighlightColor: "transparent", outline: "none",
-      }}>
-      {children || icon}
-    </motion.button>
-  );
-}
-
-// Geri butonu: her arka planda görünür
 function BackBtn({ onClick, variant = "dark" }) {
   const stroke = variant === "dark" ? "#fff" : "#FF6600";
   return (
-    <IconBtn onClick={onClick} tone={variant === "dark" ? "glassDark" : "solidLight"} size={40} title="Geri">
+    <IconBtn onClick={onClick} tone={variant === "dark" ? "glassDark" : "solidLight"} size={40} elevated={variant !== "dark"} title="Geri">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
     </IconBtn>
   );
@@ -387,40 +352,156 @@ function SelectField({ label, value, onChange, options }) {
   </div>;
 }
 
-// ─── Ana buton — Apple HIG "filled" kapsül: tam yuvarlak köşe, tek tip basılma geri bildirimi ───
-function Btn({ text, onClick, disabled, variant = "onColor", size = "lg", fullWidth = true, icon }) {
+// ═══════════════════════════════════════════════
+// BUTON SİSTEMİ
+//
+// Üç karar burada toplanıyor:
+//
+// 1. DURUMLAR. Her buton altı durumu taşır: varsayılan, üzerine gelme,
+//    basılı, odaklı, yükleniyor, devre dışı. Renk geçişleri CSS'te,
+//    basılma hareketi Motion'da: ikisi aynı özelliği yazarsa biri
+//    diğerini sessizce eziyor (bu projede iki kez yaşandı).
+//
+// 2. RENK KURALI. Beyaz zeminde turuncu, turuncu zeminde beyaz.
+//    Varyantlar bu kurala göre adlandırıldı.
+//
+// 3. YÜZEY DİLİ. Yumuşak kabartma: dışta geniş ve düşük opaklıkta gölge,
+//    üst kenarda ince bir ışık çizgisi, basılınca gölgenin içeri dönmesi.
+//    Renk paleti markanın turuncusu; referanstaki mor yerine GUR'un kendi
+//    rengiyle aynı ışık mantığı kuruluyor.
+// ═══════════════════════════════════════════════
+
+// Kabartma katmanları. Yüzeyin üstünde mi altında mı olduğumuzu gölgenin
+// yönü söylüyor; basılı durumda gölge içeri dönüyor.
+const ELEV = {
+  restLight: "0 6px 18px rgba(45,36,25,0.10), 0 1px 2px rgba(45,36,25,0.06), inset 0 1px 0 rgba(255,255,255,0.9)",
+  // Koyu zeminde havada duran disk: açık gölge okunmaz, o yüzden
+  // derinlik ışıkla kuruluyor — dışta yumuşak bir hâle, üst kenarda
+  // parlama, altta ince bir iç gölge.
+  floatLight: "0 14px 34px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06), 0 0 22px rgba(255,255,255,0.05), inset 0 2px 0 rgba(255,255,255,0.95), inset 0 -3px 6px rgba(45,36,25,0.10)",
+  restDark:  "0 10px 26px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.14)",
+  restBrand: "0 8px 22px rgba(255,102,0,0.34), inset 0 1px 0 rgba(255,255,255,0.34)",
+  pressLight: "inset 0 3px 8px rgba(45,36,25,0.18), inset 0 -1px 0 rgba(255,255,255,0.7)",
+  pressDark:  "inset 0 3px 10px rgba(0,0,0,0.55)",
+  pressBrand: "inset 0 3px 10px rgba(120,40,0,0.45)",
+};
+
+// Marka gradyanı — referanstaki gradyan dolgunun GUR karşılığı.
+const BRAND_GRAD = "linear-gradient(145deg, #FF7A1A 0%, #FF6600 55%, #F04E00 100%)";
+const BRAND_GRAD_HOVER = "linear-gradient(145deg, #FF8A33 0%, #FF7311 55%, #FF5A05 100%)";
+
+// Kaydırma aksiyonlarının ortak ölçüsü. Apple HIG alt sınırı 44pt;
+// 64pt tek elle başparmak erişiminde rahat, üçü 390pt genişliğe sığıyor
+// (3×64 + 2×20 = 232) ve üç eylem de eşit güvenle basılabiliyor.
+const ACTION_SIZE = 64;
+
+function Spinner({ size = 15, color = "currentColor" }) {
+  return (
+    <span aria-hidden="true" style={{
+      width: size, height: size, flexShrink: 0, display: "inline-block",
+      border: `2px solid ${color}`, borderTopColor: "transparent",
+      borderRadius: "50%", animation: "spin 0.7s linear infinite", opacity: 0.9,
+    }} />
+  );
+}
+
+function Btn({ text, onClick, disabled, loading, variant = "onColor", size = "lg", fullWidth = true, icon }) {
   const paddings = { lg: "16px 0", md: "13px 22px", sm: "9px 16px" };
   const fontSizes = { lg: 16, md: 14, sm: 12.5 };
+
+  // Her varyant üç renk verir: duruş, üzerine gelme, basılı. CSS bu üçünü
+  // değişkenlerden okuyor; inline background yazsaydık :hover'ı ezerdi.
   const palettes = {
-    onColor: { bg: "#fff", color: "#FF6600", shadow: "0 6px 20px rgba(0,0,0,0.15)" },
-    filled: { bg: GRAD, color: "#fff", shadow: "0 6px 20px rgba(255,69,0,0.3)" },
-    outline: { bg: "rgba(255,255,255,0.08)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.55)" },
-    outlineDark: { bg: "transparent", color: "#2D2419", border: "1.5px solid rgba(45,36,25,0.15)" },
-    destructive: { bg: "#FF3B30", color: "#fff", shadow: "0 6px 18px rgba(255,59,48,0.3)" },
-    destructiveSoft: { bg: "rgba(255,59,48,0.08)", color: "#FF3B30" },
-    plain: { bg: "transparent", color: "rgba(255,255,255,0.6)" },       // koyu/turuncu zemin
-    plainDark: { bg: "transparent", color: "#FF6600" },                  // beyaz zemin
+    onColor:   { bg: "#fff", hover: "#FFF4EC", press: "#FFE8D8", color: "#FF6600", elev: "restLight", pressElev: "pressLight" },
+    filled:    { bg: BRAND_GRAD, hover: BRAND_GRAD_HOVER, press: BRAND_GRAD, color: "#fff", elev: "restBrand", pressElev: "pressBrand" },
+    outline:   { bg: "rgba(255,255,255,0.08)", hover: "rgba(255,255,255,0.16)", press: "rgba(255,255,255,0.06)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.55)", elev: "restDark", pressElev: "pressDark" },
+    outlineDark: { bg: "#fff", hover: "#FFF6F0", press: "#FFEFE4", color: "#2D2419", border: "1.5px solid rgba(45,36,25,0.14)", elev: "restLight", pressElev: "pressLight" },
+    destructive: { bg: "linear-gradient(145deg, #FF5449, #FF3B30)", hover: "linear-gradient(145deg, #FF6B61, #FF4A40)", press: "linear-gradient(145deg, #E8352B, #D62F26)", color: "#fff", elev: "0 8px 20px rgba(255,59,48,0.32), inset 0 1px 0 rgba(255,255,255,0.3)", pressElev: "inset 0 3px 10px rgba(140,20,15,0.45)" },
+    destructiveSoft: { bg: "rgba(255,59,48,0.08)", hover: "rgba(255,59,48,0.14)", press: "rgba(255,59,48,0.2)", color: "#FF3B30" },
+    plain:     { bg: "transparent", hover: "rgba(255,255,255,0.08)", press: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.6)" },   // koyu/turuncu zemin
+    plainDark: { bg: "transparent", hover: "rgba(255,102,0,0.08)", press: "rgba(255,102,0,0.14)", color: "#FF6600" },                      // beyaz zemin
   };
   const p = palettes[variant] || palettes.onColor;
+  const busy = !!loading;
+  const off = !!disabled || busy;
+  const shadow = ELEV[p.elev] || p.elev || "none";
+  const pressShadow = ELEV[p.pressElev] || p.pressElev || shadow;
+
   return (
     <motion.button
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      whileTap={disabled ? undefined : { scale: 0.96 }}
+      onClick={off ? undefined : onClick}
+      disabled={off}
+      aria-busy={busy || undefined}
+      data-state={busy ? "loading" : disabled ? "disabled" : "default"}
+      // Basılma hareketi Motion'da, renk CSS'te: aynı özelliği iki yerden
+      // yazmamak için bilinçli iş bölümü.
+      whileTap={off ? undefined : { scale: 0.965 }}
       transition={{ type: "spring", bounce: 0, duration: 0.3 }}
       className="gur-btn"
       style={{
+        "--btn-bg": p.bg,
+        "--btn-bg-hover": p.hover,
+        "--btn-bg-press": p.press,
+        "--btn-shadow": shadow,
+        "--btn-shadow-press": pressShadow,
         width: fullWidth ? "100%" : "auto",
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
         padding: paddings[size], borderRadius: 999,
-        border: p.border || "none", background: p.bg, color: p.color,
+        border: p.border || "none", color: p.color,
         fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: fontSizes[size],
-        cursor: disabled ? "not-allowed" : "pointer",
-        boxShadow: disabled ? "none" : (p.shadow || "none"),
-        opacity: disabled ? 0.4 : 1,
         WebkitTapHighlightColor: "transparent", outline: "none", whiteSpace: "nowrap",
+        position: "relative",
       }}>
-      {icon}{text}
+      {busy ? <Spinner size={fontSizes[size]} color={p.color} /> : icon}
+      {busy ? "Yükleniyor…" : text}
+    </motion.button>
+  );
+}
+
+// ─── İkon buton ──────────────────────────────────────────────────────
+// Aynı durum sistemi; ek olarak `elevated` yüzeyi kabartıyor. Kaydırma
+// aksiyonları bu yüzeyi kullanıyor: siyah zeminde havada duran üç disk.
+function IconBtn({ onClick, icon, children, tone = "glassDark", shape = "circle", size = 40, title, disabled, loading, elevated }) {
+  const tones = {
+    glassDark:  { bg: "rgba(0,0,0,0.35)", hover: "rgba(0,0,0,0.5)", press: "rgba(0,0,0,0.62)", blur: true, glass: "dark", elev: "restDark", pressElev: "pressDark" },
+    glassLight: { bg: "rgba(255,255,255,0.16)", hover: "rgba(255,255,255,0.26)", press: "rgba(255,255,255,0.1)", blur: true, glass: "dark", elev: "restDark", pressElev: "pressDark" },
+    solidLight: { bg: "linear-gradient(145deg, #ffffff, #f1ece7)", hover: "linear-gradient(145deg, #ffffff, #fff2e8)", press: "linear-gradient(145deg, #f2ece6, #ffffff)", elev: "floatLight", pressElev: "pressLight" },
+    subtle:     { bg: "rgba(45,36,25,0.06)", hover: "rgba(45,36,25,0.11)", press: "rgba(45,36,25,0.16)" },
+    dangerSoft: { bg: "rgba(255,59,48,0.1)", hover: "rgba(255,59,48,0.18)", press: "rgba(255,59,48,0.24)" },
+    plain:      { bg: "transparent", hover: "rgba(45,36,25,0.07)", press: "rgba(45,36,25,0.12)" },
+  };
+  const t = tones[tone] || tones.glassDark;
+  const busy = !!loading;
+  const off = !!disabled || busy;
+  const rest = elevated ? (ELEV[t.elev] || ELEV.restLight) : "none";
+  const press = elevated ? (ELEV[t.pressElev] || ELEV.pressLight) : "none";
+
+  return (
+    <motion.button
+      onClick={off ? undefined : onClick}
+      disabled={off}
+      title={title}
+      aria-label={title}
+      aria-busy={busy || undefined}
+      data-state={busy ? "loading" : disabled ? "disabled" : "default"}
+      whileTap={off ? undefined : { scale: 0.9 }}
+      transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+      className={`gur-icon-btn${t.glass ? ` gur-glass gur-glass-${t.glass}` : ""}`}
+      style={{
+        "--btn-bg": t.bg,
+        "--btn-bg-hover": t.hover,
+        "--btn-bg-press": t.press,
+        "--btn-shadow": rest,
+        "--btn-shadow-press": press,
+        width: size, height: size, minWidth: size, minHeight: size, flexShrink: 0,
+        borderRadius: shape === "circle" ? "50%" : 18,
+        border: "none",
+        backdropFilter: t.blur ? "blur(8px)" : undefined,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 0, position: "relative",
+        WebkitTapHighlightColor: "transparent", outline: "none",
+      }}>
+      {busy ? <Spinner size={Math.round(size * 0.38)} color="#FF6600" /> : (children || icon)}
     </motion.button>
   );
 }
@@ -865,7 +946,7 @@ function LoginScreen({ onBack, onLogin, onRegister, live }) {
     catch (err) { setError(err.message || "Giriş yapılamadı"); }
     finally { setBusy(false); }
   };
-  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>Giriş yap</h2><p onClick={onRegister} style={{ textAlign: "center", color: "rgba(255,255,255,0.85)", fontSize: 14, marginBottom: 32, cursor: "pointer", textDecoration: "underline", fontFamily: "'Outfit', sans-serif" }}>Üyeliğiniz yoksa lütfen kayıt için dokununuz</p><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text={busy ? "Bağlanıyor…" : "GUR uldamaya başla"} onClick={submit} disabled={busy} /></div>{error && <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="light" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
+  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>Giriş yap</h2><p onClick={onRegister} style={{ textAlign: "center", color: "rgba(255,255,255,0.85)", fontSize: 14, marginBottom: 32, cursor: "pointer", textDecoration: "underline", fontFamily: "'Outfit', sans-serif" }}>Üyeliğiniz yoksa lütfen kayıt için dokununuz</p><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR uldamaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="light" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
 }
 
 function RegisterScreen({ onBack, onDone, onLegal, live }) {
@@ -1208,7 +1289,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
               {error && (
                 <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#FF3B30", margin: "0 0 12px" }}>{error}</p>
               )}
-              <Btn text={busy ? "Gönderiliyor…" : "Sahiplenme başvurusu gönder"} onClick={submit} disabled={busy} variant="filled" />
+              <Btn text="Sahiplenme başvurusu gönder" onClick={submit} loading={busy} variant="filled" />
             </>
           )}
         </div>
@@ -2386,7 +2467,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         <div onClick={() => setShowAll(true)} style={{
           margin: "14px 0", background: "#fff", borderRadius: 20, padding: "14px 20px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+          cursor: "pointer", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9)",
           transition: "transform 0.15s",
         }}
           onMouseDown={e => e.currentTarget.style.transform = "scale(0.97)"}
@@ -2404,7 +2485,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         </div>
 
         {/* Alt bar — beyaz, sabit */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", margin: "0 0 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", margin: "0 0 16px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9)", flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF6600" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
@@ -3284,21 +3365,23 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
 
         {/* Aksiyon butonları — kartı sürüklemekle aynı fiziksel çıkışı tetikler */}
         {!done && deck.length > 0 && (
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 18, padding: "10px 16px 16px", zIndex: 10 }}>
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 20, padding: "10px 16px 16px", zIndex: 10 }}>
             <IconBtn
-              onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.fling(-1))} tone="solidLight" size={56} title="Geç"
-              icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
+              onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.fling(-1))}
+              tone="solidLight" size={ACTION_SIZE} elevated title="Geç"
+              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
             />
 
             <IconBtn
               onClick={() => openSheet(deck[cursor])}
-              tone="solidLight" size={46} title="Restorana git"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11" /><polyline points="17 18 12 13 7 18" /></svg>}
+              tone="solidLight" size={ACTION_SIZE} elevated title="Restorana git"
+              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11" /><polyline points="17 18 12 13 7 18" /></svg>}
             />
 
             <IconBtn
-              onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.fling(1))} tone="solidLight" size={68} title="Favorilere ekle"
-              icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>}
+              onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.fling(1))}
+              tone="solidLight" size={ACTION_SIZE} elevated title="Favorilere ekle"
+              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>}
             />
           </div>
         )}
@@ -3372,7 +3455,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
         )}
 
         {/* Alt bar — beyaz, keşfet sayfası ile aynı */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9)", flexShrink: 0 }}>
           <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
@@ -3525,10 +3608,10 @@ function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
 
         {/* Aksiyonlar */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 22, padding: "10px 16px 20px", zIndex: 10 }}>
-          <IconBtn onClick={() => topCardRef.current?.fling(-1)} tone="solidLight" size={56} title="Geç"
-            icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
-          <IconBtn onClick={() => topCardRef.current?.fling(1)} tone="solidLight" size={68} title="Beğen"
-            icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>} />
+          <IconBtn onClick={() => topCardRef.current?.fling(-1)} tone="solidLight" size={ACTION_SIZE} elevated title="Geç"
+            icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+          <IconBtn onClick={() => topCardRef.current?.fling(1)} tone="solidLight" size={ACTION_SIZE} elevated title="Beğen"
+            icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>} />
         </div>
 
         {/* Eşleşme anı */}
@@ -3589,7 +3672,7 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
           {matches.map((r, i) => (
             <div key={r.id} onClick={() => onDetail(r)} style={{
               display: "flex", gap: 12, alignItems: "center", background: "#fff", borderRadius: 20, padding: 10, marginBottom: 10,
-              boxShadow: "0 4px 16px rgba(0,0,0,0.06)", cursor: "pointer", animation: `fadeInUp 0.35s ease-out ${i * 0.05}s both`,
+              boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9)", cursor: "pointer", animation: `fadeInUp 0.35s ease-out ${i * 0.05}s both`,
             }}>
               <div style={{ width: 74, height: 74, borderRadius: 16, overflow: "hidden", flexShrink: 0, position: "relative" }}>
                 <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" box={74} />
@@ -4309,7 +4392,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
         </div>
 
         {/* Alt bar — Explore ile aynı stil */}
-        <div style={{ position: "sticky", bottom: 0, background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-around", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+        <div style={{ position: "sticky", bottom: 0, background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-around", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
           <div onClick={() => (claimed ? setShowMenu(true) : setSheet("soon"))} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: claimed ? 0.5 : 0.35 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /></svg>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Menü</span>
@@ -4613,7 +4696,7 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
       </div>
       {/* Alt bar — beyaz, keşfet sayfası ile aynı */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 16px 16px", zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
           <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
@@ -4832,7 +4915,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
 
       {/* Alt bar */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 16px 16px", zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
           <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <Icon n="search" color="#FF6600" size={22} />
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
@@ -5269,7 +5352,42 @@ export default function GurApp(props = {}) {
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
         * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
         ::-webkit-scrollbar { display:none; }
-        .gur-btn:focus-visible, .gur-icon-btn:focus-visible, .gur-dot:focus-visible { box-shadow: 0 0 0 3px rgba(255,102,0,0.6) !important; outline: none; }
+        /* ── BUTON DURUMLARI ──────────────────────────────────────────
+           Renkler değişkenlerden okunuyor; buton bunları inline veriyor.
+           Arka planı inline yazsaydık :hover ve :active hiç devreye
+           giremezdi — satır içi stil sınıf kuralını yener. Basılma
+           hareketi (scale) Motion'da; burada yalnızca renk ve gölge var,
+           böylece iki sistem aynı özelliği yazmıyor. */
+        .gur-btn, .gur-icon-btn {
+          background: var(--btn-bg, transparent);
+          box-shadow: var(--btn-shadow, none);
+          cursor: pointer;
+          transition: background 160ms ease, box-shadow 200ms ease, opacity 160ms ease, filter 160ms ease;
+        }
+        /* Üzerine gelme yalnızca gerçek imleçli cihazlarda: dokunmatikte
+           :hover basıştan sonra takılı kalıyor. */
+        @media (hover: hover) and (pointer: fine) {
+          .gur-btn:not(:disabled):hover, .gur-icon-btn:not(:disabled):hover {
+            background: var(--btn-bg-hover, var(--btn-bg));
+            filter: brightness(1.02);
+          }
+        }
+        .gur-btn:not(:disabled):active, .gur-icon-btn:not(:disabled):active {
+          background: var(--btn-bg-press, var(--btn-bg));
+          box-shadow: var(--btn-shadow-press, var(--btn-shadow, none));
+        }
+        .gur-btn:focus-visible, .gur-icon-btn:focus-visible, .gur-dot:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(255,102,0,0.65), var(--btn-shadow, 0 0 0 0 transparent);
+        }
+        /* Devre dışı: soluk ve tepkisiz. İmleç de bunu söylüyor. */
+        .gur-btn:disabled, .gur-icon-btn:disabled {
+          opacity: 0.42; cursor: not-allowed; box-shadow: none; filter: grayscale(0.35);
+        }
+        /* Yükleniyor: tıklanamaz ama soluk değil — iş sürüyor, kapalı değil. */
+        .gur-btn[data-state="loading"], .gur-icon-btn[data-state="loading"] {
+          opacity: 0.9; cursor: progress; filter: none;
+        }
 
         /* Apple HIG: her dokunma hedefi en az 44×44pt. Küçük ikon butonların
            görsel boyutu korunur, tıklama alanı görünmez bir katmanla büyür. */
