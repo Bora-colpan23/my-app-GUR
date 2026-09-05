@@ -46,6 +46,12 @@ Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
 
 Derleme: `npm run build` → `dist/`. Lint: `npm run lint` (src + server + shared).
 
+**Artifact önizlemesi:** `npm run artifact` → `dist/gur-preview.html` (tek dosya).
+Elle derlemeyin: yönetici paneli `src/main.jsx` içinde `React.lazy` ile
+yükleniyor, tek dosyalık artifact o ayrı chunk'ı bulamaz ve panel açılmaz.
+Betik `GUR_ARTIFACT=1` ile tek parça derliyor ve çıktıda birden fazla JS
+dosyası kalırsa hata veriyor.
+
 ### İki mod: canlı ve yerel
 
 Uygulama açılışta `/api/health` yoklar ve sağ üstte hangi modda olduğunu

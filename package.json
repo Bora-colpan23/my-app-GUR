@@ -13,7 +13,8 @@
     "dev:all": "npm run db:setup && npm run db:seed && concurrently -n api,web -c magenta,cyan \"npm:dev:api\" \"npm:dev\"",
     "db:setup": "./server/db/setup.sh",
     "db:reset": "./server/db/setup.sh --reset && npm run db:seed",
-    "db:seed": "node server/db/seed.js"
+    "db:seed": "node server/db/seed.js",
+    "artifact": "node scripts/build-artifact.mjs"
   },
   "dependencies": {
     "motion": "^13.1.1",
