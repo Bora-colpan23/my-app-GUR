@@ -3,6 +3,7 @@ import { useClaims, decideClaim } from '../lib/b2b.js';
 
 import * as api from '../lib/api.js';
 import { motion, AnimatePresence } from 'motion/react';
+import { usePlatformSettings, toggleSetting } from '../lib/platform.js';
 
 // ═══════════════════════════════════════════════════════════════
 // GUR YÖNETİCİ PANELİ — Platform kontrol merkezi
@@ -30,6 +31,28 @@ const C = {
 };
 
 const F = "'Poppins', system-ui, sans-serif";
+// Gövde ve sayılar uygulamanın gövde yazı tipiyle aynı: iki panel yan yana
+// açıldığında aynı ürüne ait olduğu okunmalı.
+const FB = "'Outfit', system-ui, sans-serif";
+
+// ─── Uygulamayla ortak tasarım dili ──────────────────────────────────────
+// GurApp.jsx'teki ELEV/BRAND_GRAD kalıbının koyu zemin karşılığı. Değerler
+// birebir aynı olamaz (orası beyaz kâğıt, burası koyu masaüstü) ama sistem
+// aynı: her yüzeyin bir duruş gölgesi, her butonun bir basılma gölgesi var.
+const BRAND_GRAD = 'linear-gradient(145deg, #FF7A1A 0%, #FF6600 55%, #F04E00 100%)';
+const BRAND_GRAD_HOVER = 'linear-gradient(145deg, #FF8A33 0%, #FF7311 55%, #FF5A05 100%)';
+const ELEV = {
+  card:      '0 10px 26px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.045)',
+  raised:    '0 14px 34px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07)',
+  brand:     '0 8px 22px rgba(255,102,0,0.30), inset 0 1px 0 rgba(255,255,255,0.28)',
+  pressDark: 'inset 0 3px 10px rgba(0,0,0,0.55)',
+  pressBrand:'inset 0 3px 10px rgba(120,40,0,0.45)',
+};
+// Köşe yarıçapları uygulamayla aynı ölçekte: kart 18, kontrol 12, pill 999.
+const R = { card: 18, control: 12, pill: 999 };
+// Panellerin tamamı tek bir kart tarifinden geçiyor — 20 ayrı yerde
+// tekrarlanan literal, tek yerden değişebilen bir jetona indi.
+const CARD = { background: C.panel, border: `1px solid ${C.border}`, borderRadius: R.card, boxShadow: ELEV.card };
 
 // ─── Mock veri ───
 const STATS = {
@@ -39,7 +62,6 @@ const STATS = {
   totalUsers: 18420,
   dailyActive: 4230,
   totalSwipes: 892400,
-  monthlyRevenue: 284500,
   gastroApproved: 47,
 };
 
@@ -67,6 +89,110 @@ const RESTAURANTS = [
   { id: 7, name: 'Karaköy Güllüoğlu', cat: 'Tatlıcı', district: 'Karaköy', rating: 4.9, reviews: 3200, status: 'active', gastro: true, plan: 'Premium', joined: '2023-12-01' },
   { id: 8, name: 'Lucca Lounge', cat: 'Gece Hayatı', district: 'Bebek', rating: 4.3, reviews: 450, status: 'active', gastro: false, plan: 'Pro', joined: '2024-07-22' },
 ];
+
+// ═══════════════════════════════════════════════════════════════════════
+// GELİR KALEMLERİ VE MÜŞTERİ BAZLI SATIN ALIMLAR
+//
+// Katalog (REVENUE_STREAMS) platformun sattığı ücretli özelliklerin
+// tamamıdır. STORE_SERVICES ise bunların hangi müşteride açık olduğunu
+// tutar — panelin her yerinde "bu mağaza neyi satın almış" sorusunun tek
+// cevabı burasıdır. Sunucudaki karşılığı subscriptions + campaign_orders
+// tablolarının işletme kırılımıdır.
+// ═══════════════════════════════════════════════════════════════════════
+const REVENUE_STREAMS = [
+  { key: 'bannerAds', short: 'Banner', name: 'Dönen keşfet banner\'ı', kind: 'Reklam', monthly: 128000, unit: '42 aktif kampanya', note: 'Keşfet ekranının üstündeki marka + sponsor karuseli.' },
+  { key: 'pushAds', short: 'Push', name: 'Push bildirim reklamları', kind: 'Reklam', monthly: 74000, unit: '41 gönderim / ay', note: 'Semt bazlı tek seferlik bildirim satışı.' },
+  { key: 'rewardedAds', short: 'Ödüllü video', name: 'Ödüllü video reklam (kaydırma hakkı)', kind: 'Sponsorluk', monthly: 96000, unit: '~%78 tamamlanma', note: '10 kaydırma sonrası izlenen video, +5 hak kazandırır.' },
+  { key: 'secondChance', short: 'İkinci Şans', name: 'İkinci Şans yerleşimi', kind: 'Performans', monthly: 41000, unit: '86 restoran', note: 'Geçilen restoranın desteye geri girmesi.' },
+  { key: 'instantDeals', short: 'Anlık fırsat', name: 'Anlık fırsat bildirimleri', kind: 'Performans', monthly: 63000, unit: '140 yayın / ay', note: 'Ölü saat doldurma; yayın başına ücret.' },
+  { key: 'reservations', short: 'Rezervasyon', name: 'Rezervasyon ve menü komisyonu', kind: 'İşlem', monthly: 88000, unit: '%8 komisyon', note: 'Gerçekleşen işlem başına alınır.' },
+  { key: 'chefVideo', short: 'Şef videosu', name: 'Gastro şefli video paketi', kind: 'İçerik', monthly: 52000, unit: '8 çekim / ay', note: 'Üç büyük semtte VIP marka algısı.' },
+  { key: 'contentLicense', short: 'İçerik lisansı', name: 'Gastro içerik lisanslama', kind: 'İçerik', monthly: 39000, unit: '6 lisans / ay', note: '15 sn dikey videonun restorana devri.' },
+  { key: 'analyticsSaas', short: 'Analiz paneli', name: 'Restoran Analiz Paneli (SaaS)', kind: 'Abonelik', monthly: 145000, unit: '50 abone', note: 'Tıklama, kaydetme ve konum ilgisi verisi.' },
+];
+
+const KIND_TONE = {
+  'Reklam': C.blue, 'Sponsorluk': C.orange, 'Performans': C.green,
+  'İşlem': C.yellow, 'İçerik': C.red, 'Abonelik': C.orange,
+};
+
+// İşletme abonelik paketleri. Adetler STATS.totalRestaurants ile uyumlu.
+const PLANS = [
+  { id: 'Premium', price: 4999, count: 42,  color: C.orange },
+  { id: 'Pro',     price: 1999, count: 118, color: C.blue },
+  { id: 'Ücretsiz', price: 0,   count: 182, color: C.faint },
+];
+const PLAN_COLOR = Object.fromEntries(PLANS.map(p => [p.id, p.color]));
+const PLAN_PRICE = Object.fromEntries(PLANS.map(p => [p.id, p.price]));
+const STREAM_BY_KEY = Object.fromEntries(REVENUE_STREAMS.map(x => [x.key, x]));
+
+// Hangi müşteri hangi ücretli özelliği almış. monthly: o işletmenin o kalem
+// için ödediği aylık tutar (kampanyalarda harcanan bütçenin aylık karşılığı).
+const STORE_SERVICES = {
+  1: [ // Nusr-Et Steakhouse
+    { key: 'bannerAds', monthly: 14000, since: '2025-11-04' },
+    { key: 'pushAds', monthly: 6500, since: '2026-02-11' },
+    { key: 'chefVideo', monthly: 9000, since: '2025-12-20' },
+    { key: 'reservations', monthly: 7400, since: '2025-11-04' },
+    { key: 'analyticsSaas', monthly: 2900, since: '2025-11-04' },
+  ],
+  2: [ // Mikla
+    { key: 'bannerAds', monthly: 11000, since: '2025-09-15' },
+    { key: 'chefVideo', monthly: 9000, since: '2026-01-08' },
+    { key: 'contentLicense', monthly: 4200, since: '2026-01-08' },
+    { key: 'reservations', monthly: 9600, since: '2025-09-15' },
+    { key: 'analyticsSaas', monthly: 2900, since: '2025-09-15' },
+  ],
+  3: [ // Çiya Sofrası
+    { key: 'rewardedAds', monthly: 5200, since: '2026-03-02' },
+    { key: 'instantDeals', monthly: 3100, since: '2026-04-19' },
+    { key: 'reservations', monthly: 4800, since: '2025-10-30' },
+    { key: 'analyticsSaas', monthly: 2900, since: '2025-10-30' },
+  ],
+  4: [ // Green Bowl — ücretsiz planda tek kalem
+    { key: 'secondChance', monthly: 1450, since: '2026-06-01' },
+  ],
+  5: [], // Klein Bistro — askıda, satın alım yok
+  6: [ // The Burger Joint
+    { key: 'rewardedAds', monthly: 4300, since: '2026-02-27' },
+    { key: 'instantDeals', monthly: 2600, since: '2026-05-14' },
+    { key: 'secondChance', monthly: 1450, since: '2026-02-27' },
+  ],
+  7: [ // Karaköy Güllüoğlu
+    { key: 'bannerAds', monthly: 9800, since: '2025-08-22' },
+    { key: 'pushAds', monthly: 5200, since: '2026-03-30' },
+    { key: 'contentLicense', monthly: 4200, since: '2025-12-05' },
+    { key: 'reservations', monthly: 6100, since: '2025-08-22' },
+    { key: 'analyticsSaas', monthly: 2900, since: '2025-08-22' },
+  ],
+  8: [ // Lucca Lounge
+    { key: 'pushAds', monthly: 4100, since: '2026-04-06' },
+    { key: 'instantDeals', monthly: 3400, since: '2026-05-02' },
+    { key: 'secondChance', monthly: 1450, since: '2026-04-06' },
+  ],
+};
+
+/** Bir mağazanın satın aldığı ücretli özellikler, katalog bilgisiyle birlikte. */
+function storeServices(r) {
+  return (STORE_SERVICES[r.id] || [])
+    .map(x => ({ ...STREAM_BY_KEY[x.key], ...x }))
+    .filter(x => x.name)
+    .sort((p, q) => q.monthly - p.monthly);
+}
+/** Hizmetlerden gelen aylık tutar (abonelik hariç). */
+function storeServiceRevenue(r) {
+  return storeServices(r).reduce((a, x) => a + x.monthly, 0);
+}
+/** Abonelik + hizmet: mağazanın platforma aylık toplam katkısı. */
+function storeMonthly(r) {
+  return (PLAN_PRICE[r.plan] || 0) + storeServiceRevenue(r);
+}
+
+// Katalogdaki her kalemin platform geneli aylık toplamı; adı geçen sekiz
+// müşteri bu toplamın içinden çıkar, kalanı "diğer işletmeler" satırıdır.
+const STREAM_TOTAL = REVENUE_STREAMS.reduce((a, x) => a + x.monthly, 0);
+const SUBS_TOTAL = PLANS.reduce((a, p) => a + p.price * p.count, 0);
+const PLATFORM_TOTAL = STREAM_TOTAL + SUBS_TOTAL;
 
 const APPLICATIONS = [
   { id: 101, name: 'Balıkçı Deniz', cat: 'Deniz Ürünleri', district: 'Sarıyer', owner: 'Deniz Yılmaz', taxNo: '4820193756', taxOffice: 'Sarıyer VD', submitted: '2 saat önce', docStatus: 'yüklendi' },
@@ -286,7 +412,7 @@ const icons = {
 // ─── Küçük bileşenler ───
 function Badge({ text, color, soft }) {
   return (
-    <span style={{ fontFamily: F, fontSize: 11, fontWeight: 600, color, background: soft, padding: '3px 10px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+    <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color, background: soft, padding: '3px 10px', borderRadius: R.pill, display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
       {text}
     </span>
   );
@@ -302,43 +428,116 @@ function StatusBadge({ status }) {
   return <Badge {...s} />;
 }
 
+// ─── Para biçimi — panelin her yerinde aynı ───────────────────────────
+// Büyük tutarlar K/M kısaltmasıyla, küçükler tam yazılır: bir kolonda
+// "₺1.2M" ile "₺1.450" yan yana durduğunda ölçek okunur kalsın.
+function money(n) {
+  if (n >= 1000000) return `₺${(n / 1000000).toFixed(2)}M`;
+  if (n >= 10000) return `₺${Math.round(n / 1000)}K`;
+  return `₺${Math.round(n).toLocaleString('tr')}`;
+}
+
+// ─── Mağazanın satın aldığı ücretli özellikler, rozet dizisi ──────────
+// Aynı bileşen listede (kısa) ve detayda (tam) kullanılıyor ki bir
+// müşterinin neyi aldığı panelin her yerinde aynı görünsün.
+function ServiceChips({ services, max = 0, size = 'sm' }) {
+  if (!services?.length) {
+    return <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>ücretli özellik yok</span>;
+  }
+  const shown = max ? services.slice(0, max) : services;
+  const rest = services.length - shown.length;
+  const pad = size === 'sm' ? '3px 9px' : '5px 12px';
+  const fs = size === 'sm' ? 10.5 : 12;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+      {shown.map(x => (
+        <span key={x.key} title={`${x.name} · ${money(x.monthly)}/ay`} style={{
+          fontFamily: FB, fontSize: fs, fontWeight: 700, whiteSpace: 'nowrap',
+          color: KIND_TONE[x.kind], background: `${KIND_TONE[x.kind]}1F`,
+          border: `1px solid ${KIND_TONE[x.kind]}33`, borderRadius: R.pill, padding: pad,
+        }}>{x.short || x.name}</span>
+      ))}
+      {rest > 0 && (
+        <span style={{ fontFamily: FB, fontSize: fs, fontWeight: 700, color: C.faint, background: C.panel2, borderRadius: R.pill, padding: pad }}>+{rest}</span>
+      )}
+    </div>
+  );
+}
+
+// ─── Bölüm başlığı — panel genelinde tek tip ─────────────────────────
+function SectionHead({ title, right }) {
+  return (
+    <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</span>
+      {right && <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{right}</span>}
+    </header>
+  );
+}
+
 // ─── Buton — Apple HIG tonlu: filled/soft/outline/ghost/plain, tutarlı hover + basılma geri bildirimi ───
 const TONE_COLOR = { neutral: C.text, orange: C.orange, green: C.green, red: C.red, blue: C.blue, yellow: C.yellow };
 const TONE_SOFT = { neutral: C.panel2, orange: C.orangeSoft, green: C.greenSoft, red: C.redSoft, blue: C.blueSoft, yellow: C.yellowSoft };
 
-function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size = 'md', fullWidth = false, disabled, title }) {
+function Spinner({ size = 14, color = 'currentColor' }) {
+  return (
+    <span aria-hidden="true" style={{
+      width: size, height: size, flexShrink: 0, display: 'inline-block',
+      border: `2px solid ${color}`, borderTopColor: 'transparent',
+      borderRadius: '50%', animation: 'spin 0.7s linear infinite', opacity: 0.9,
+    }} />
+  );
+}
+
+// Renk ve gölge CSS değişkenlerinden okunuyor (uygulamadaki .gur-btn ile aynı
+// iş bölümü): satır içi background yazsaydık :hover ve :active hiç devreye
+// giremezdi. Basılma hareketi (scale) Motion'da, renk/gölge CSS'te.
+function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size = 'md', fullWidth = false, disabled, loading, title }) {
   const toneColor = TONE_COLOR[tone] || C.text;
   const toneSoft = TONE_SOFT[tone] || C.panel2;
-  const paddings = { sm: '7px 12px', md: '9px 14px', lg: '12px 18px' };
+  const paddings = { sm: '7px 13px', md: '9px 15px', lg: '12px 19px' };
   const fontSizes = { sm: 12, md: 12.5, lg: 14 };
+  const brand = tone === 'orange';
   const variants = {
-    filled: { background: toneColor, color: tone === 'yellow' ? '#241c00' : '#fff', border: '1px solid transparent' },
-    soft: { background: toneSoft, color: toneColor, border: `1px solid ${toneColor}44` },
-    outline: { background: C.bg, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}` },
-    ghost: { background: 'transparent', color: toneColor, border: `1px solid ${C.border}` },
-    plain: { background: 'transparent', color: toneColor, border: '1px solid transparent' },
+    filled: {
+      bg: brand ? BRAND_GRAD : toneColor,
+      hover: brand ? BRAND_GRAD_HOVER : toneColor,
+      press: brand ? BRAND_GRAD : toneColor,
+      color: tone === 'yellow' ? '#241c00' : '#fff', border: '1px solid transparent',
+      elev: brand ? ELEV.brand : `0 6px 16px ${toneColor}33`, pressElev: brand ? ELEV.pressBrand : ELEV.pressDark,
+    },
+    soft:    { bg: toneSoft, hover: toneSoft.replace('0.12', '0.2'), press: toneSoft.replace('0.12', '0.26'), color: toneColor, border: `1px solid ${toneColor}44` },
+    outline: { bg: C.bg, hover: C.panel2, press: C.panel, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}`, elev: ELEV.card, pressElev: ELEV.pressDark },
+    ghost:   { bg: 'transparent', hover: C.panel2, press: C.bg, color: toneColor, border: `1px solid ${C.border}` },
+    plain:   { bg: 'transparent', hover: C.panel2, press: C.bg, color: toneColor, border: '1px solid transparent' },
   };
-  const base = variants[variant] || variants.outline;
+  const p = variants[variant] || variants.outline;
+  const busy = !!loading;
+  const off = !!disabled || busy;
   return (
     <motion.button
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
+      onClick={off ? undefined : onClick}
+      disabled={off}
       title={title}
-      whileHover={disabled ? undefined : { filter: 'brightness(1.15)' }}
-      whileTap={disabled ? undefined : { scale: 0.98, filter: 'brightness(0.9)' }}
-      transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
+      aria-busy={busy || undefined}
+      data-state={busy ? 'loading' : disabled ? 'disabled' : 'default'}
+      whileTap={off ? undefined : { scale: 0.97 }}
+      transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
       className="gur-admin-btn"
       style={{
+        '--btn-bg': p.bg,
+        '--btn-bg-hover': p.hover,
+        '--btn-bg-press': p.press,
+        '--btn-shadow': p.elev || 'none',
+        '--btn-shadow-press': p.pressElev || p.elev || 'none',
         width: fullWidth ? '100%' : 'auto',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        padding: paddings[size], borderRadius: 9,
-        fontFamily: F, fontSize: fontSizes[size], fontWeight: variant === 'filled' ? 700 : 600,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.45 : 1,
-        ...base,
-        whiteSpace: 'nowrap', outline: 'none',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+        padding: paddings[size], borderRadius: R.pill,
+        fontFamily: FB, fontSize: fontSizes[size], fontWeight: variant === 'filled' ? 700 : 600,
+        border: p.border, color: p.color,
+        whiteSpace: 'nowrap', outline: 'none', position: 'relative',
       }}>
-      {icon}{label}
+      {busy ? <Spinner size={fontSizes[size]} color={p.color} /> : icon}
+      {busy ? 'Yükleniyor…' : label}
     </motion.button>
   );
 }
@@ -356,7 +555,7 @@ function NavItem({ item, active, onClick }) {
         width: '100%', display: 'flex', alignItems: 'center', gap: 12,
         padding: '10px 12px', marginBottom: 2, borderRadius: 10, border: 'none',
         backgroundColor: active ? C.orangeSoft : 'transparent', cursor: 'pointer',
-        color: active ? C.orange : C.dim, fontFamily: F, fontSize: 13.5, fontWeight: active ? 600 : 500,
+        color: active ? C.orange : C.dim, fontFamily: FB, fontSize: 13.5, fontWeight: active ? 600 : 500,
         textAlign: 'left', outline: 'none',
       }}>
       <Icon path={item.icon} size={18} color={active ? C.orange : C.dim} />
@@ -373,21 +572,23 @@ function NavItem({ item, active, onClick }) {
 }
 
 // ─── Icon-only buton — sabit kare hedef, ince kenarlık, hover'da panel rengi ───
-function IconBtn({ onClick, icon, size = 38, title, danger }) {
+function IconBtn({ onClick, icon, size = 38, title, danger, disabled }) {
   return (
     <motion.button
-      onClick={onClick} title={title} aria-label={title}
-      whileHover={{ backgroundColor: danger ? C.redSoft : C.panel2, borderColor: danger ? C.red : C.border }}
-      whileTap={{ scale: 0.92 }}
-      transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
-      className="gur-admin-btn"
+      onClick={disabled ? undefined : onClick} title={title} aria-label={title} disabled={disabled}
+      whileTap={disabled ? undefined : { scale: 0.92 }}
+      transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
+      className="gur-admin-btn gur-admin-icon"
       style={{
-        width: size, height: size, minWidth: size, borderRadius: 10,
-        borderWidth: 1, borderStyle: 'solid', borderColor: C.border,
-        backgroundColor: C.bg,
+        '--btn-bg': C.bg,
+        '--btn-bg-hover': danger ? C.redSoft : C.panel2,
+        '--btn-bg-press': danger ? 'rgba(248,81,73,0.22)' : C.panel,
+        '--btn-shadow': ELEV.card,
+        '--btn-shadow-press': ELEV.pressDark,
+        width: size, height: size, minWidth: size, borderRadius: R.control,
+        borderWidth: 1, borderStyle: 'solid', borderColor: danger ? `${C.red}55` : C.border,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', flexShrink: 0, position: 'relative', padding: 0,
-        outline: 'none',
+        flexShrink: 0, position: 'relative', padding: 0, outline: 'none',
       }}>
       {icon}
     </motion.button>
@@ -411,7 +612,7 @@ function AdminField({ label, value, onChange, type = 'text', autoFocus, onEnter 
         onKeyDown={e => { if (e.key === 'Enter') onEnter?.(); }}
         style={{
           width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9,
-          padding: '11px 13px', fontSize: 13.5, color: C.text, fontFamily: F, outline: 'none',
+          padding: '11px 13px', fontSize: 13.5, color: C.text, fontFamily: FB, outline: 'none',
         }}
         onFocus={e => e.currentTarget.style.borderColor = C.orange}
         onBlur={e => e.currentTarget.style.borderColor = C.border}
@@ -446,7 +647,7 @@ function AdminLogin({ onLogin }) {
   };
 
   return (
-    <div style={{ height: '100vh', background: C.bg, fontFamily: F, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, colorScheme: 'dark' }}>
+    <div lang="tr" style={{ height: '100vh', background: C.bg, fontFamily: FB, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, colorScheme: 'dark' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
@@ -464,7 +665,7 @@ function AdminLogin({ onLogin }) {
           <div style={{ fontSize: 11.5, color: C.faint, marginTop: 3 }}>Devam etmek için giriş yapın</div>
         </div>
 
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '22px 20px' }}>
+        <div style={{ ...CARD, padding: '22px 20px' }}>
           <AdminField label="Kullanıcı adı" value={user} onChange={v => { setUser(v); setError(''); }} autoFocus onEnter={submit} />
           <AdminField label="Parola" value={pass} onChange={v => { setPass(v); setError(''); }} type="password" onEnter={submit} />
 
@@ -554,6 +755,8 @@ export default function GurAdmin() {
   const pageTitle = openRestaurant ? openRestaurant.name : (nav.find(n => n.id === page)?.label || 'Genel Bakış');
 
   const goPage = (id) => { setOpenRestaurantId(null); setPage(id); };
+  // Gelir tablosundan müşteriye geçiş: aynı işletme kaydı, tek tıkla.
+  const openStore = (id) => { setPage('restaurants'); setRestTab('list'); setOpenRestaurantId(id); };
 
   const logout = () => { setAuthed(false); setPage('dashboard'); setQuery(''); setReviewDoc(null); setOpenRestaurantId(null); setRestTab('list'); };
 
@@ -561,17 +764,56 @@ export default function GurAdmin() {
   if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />;
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: F, color: C.text, overflow: 'hidden', colorScheme: 'dark' }}>
+    // lang: Türkçe büyük harf kuralı (i→İ). Artifact kabuğunda <html lang>
+    // bize ait değil, o yüzden kökte bildiriyoruz.
+    <div lang="tr" style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: FB, color: C.text, overflow: 'hidden', colorScheme: 'dark' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #2A3341; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #3A4453; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .row-hover:hover { background: ${C.panel2} !important; }
-        .gur-admin-btn:focus-visible { box-shadow: 0 0 0 3px ${C.orange}55 !important; }
+        h1, h2, h3 { font-family: ${FB}; font-weight: 800; letter-spacing: -0.02em; }
+
+        /* ── BUTON DURUMLARI — uygulamadaki .gur-btn ile aynı sistem ──
+           Renk ve gölge değişkenlerden okunuyor; buton bunları inline
+           veriyor. Böylece :hover / :active / :disabled kuralları satır içi
+           stile ezilmeden çalışıyor. */
+        .gur-admin-btn {
+          background: var(--btn-bg, transparent);
+          box-shadow: var(--btn-shadow, none);
+          cursor: pointer;
+          transition: background 160ms ease, box-shadow 200ms ease, opacity 160ms ease, border-color 160ms ease;
+        }
+        @media (hover: hover) and (pointer: fine) {
+          .gur-admin-btn:not(:disabled):hover {
+            background: var(--btn-bg-hover, var(--btn-bg));
+            filter: brightness(1.03);
+          }
+        }
+        .gur-admin-btn:not(:disabled):active {
+          background: var(--btn-bg-press, var(--btn-bg));
+          box-shadow: var(--btn-shadow-press, var(--btn-shadow, none));
+        }
+        .gur-admin-btn:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 3px ${C.orange}88, var(--btn-shadow, 0 0 0 0 transparent);
+        }
+        .gur-admin-btn:disabled { opacity: 0.42; cursor: not-allowed; box-shadow: none; filter: grayscale(0.35); }
+        .gur-admin-btn[data-state="loading"] { opacity: 0.9; cursor: progress; filter: none; }
+
+        /* Apple HIG: dokunma hedefi en az 44×44. İkon butonun görsel boyutu
+           korunur, tıklama alanı görünmez bir katmanla büyür. */
+        .gur-admin-icon::after {
+          content: ""; position: absolute; top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: max(100%, 44px); height: max(100%, 44px);
+        }
         @media (prefers-reduced-motion: reduce) { .gur-admin-btn { transition: none !important; } }
       `}</style>
 
@@ -618,7 +860,7 @@ export default function GurAdmin() {
             </div>
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Ara..." style={{
               width: '100%', height: 38, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10,
-              padding: '0 12px 0 36px', color: C.text, fontFamily: F, fontSize: 13, outline: 'none',
+              padding: '0 12px 0 36px', color: C.text, fontFamily: FB, fontSize: 13, outline: 'none',
             }} />
           </div>
           <IconBtn
@@ -645,7 +887,7 @@ export default function GurAdmin() {
           {page === 'users' && <UsersPage query={query} />}
           {page === 'campaigns' && <CampaignsPage />}
           {page === 'growth' && <GrowthPage />}
-          {page === 'revenue' && <RevenuePage />}
+          {page === 'revenue' && <RevenuePage restaurants={restaurants} onOpenStore={openStore} />}
           {page === 'settings' && <SettingsPage />}
         </div>
       </main>
@@ -711,7 +953,7 @@ export default function GurAdmin() {
         <motion.div
           initial={{ opacity: 0, y: 16, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.95 }}
           transition={{ type: 'spring', bounce: 0.2, duration: 0.35 }}
-          style={{ position: 'fixed', bottom: 24, right: 24, background: toast.type === 'error' ? C.red : C.green, color: '#fff', padding: '12px 20px', borderRadius: 12, fontFamily: F, fontSize: 13.5, fontWeight: 600, zIndex: 200, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 30px rgba(0,0,0,0.4)' }}>
+          style={{ position: 'fixed', bottom: 24, right: 24, background: toast.type === 'error' ? C.red : C.green, color: '#fff', padding: '12px 20px', borderRadius: 12, fontFamily: FB, fontSize: 13.5, fontWeight: 600, zIndex: 200, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 30px rgba(0,0,0,0.4)' }}>
           <Icon path={toast.type === 'error' ? icons.x : icons.check} size={16} color="#fff" />
           {toast.msg}
         </motion.div>
@@ -725,7 +967,7 @@ export default function GurAdmin() {
 
 function KpiCard({ label, value, delta, deltaUp, deltaNeutral, icon, accent }) {
   return (
-    <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+    <div style={{ ...CARD, padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
         <div style={{ width: 40, height: 40, borderRadius: 11, background: accent.soft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon path={icon} size={20} color={accent.color} />
@@ -754,12 +996,13 @@ function DashboardPage() {
         <KpiCard label="Toplam Restoran" value={STATS.totalRestaurants} delta="8%" deltaUp icon={icons.store} accent={{ color: C.orange, soft: C.orangeSoft }} />
         <KpiCard label="Günlük Aktif Kullanıcı" value={STATS.dailyActive.toLocaleString('tr')} delta="12%" deltaUp icon={icons.users} accent={{ color: C.blue, soft: C.blueSoft }} />
         <KpiCard label="Bekleyen Başvuru" value={STATS.pendingApps} icon={icons.inbox} accent={{ color: C.yellow, soft: C.yellowSoft }} />
-        <KpiCard label="Aylık Gelir" value={`₺${(STATS.monthlyRevenue / 1000).toFixed(0)}K`} delta="18%" deltaUp icon={icons.money} accent={{ color: C.green, soft: C.greenSoft }} />
+        {/* Ciro tek yerden: Gelir sayfasıyla aynı toplam (PLATFORM_TOTAL) */}
+        <KpiCard label="Aylık Ciro" value={money(PLATFORM_TOTAL)} delta="18%" deltaUp icon={icons.money} accent={{ color: C.green, soft: C.greenSoft }} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16, marginBottom: 20 }}>
         {/* Kaydırma trendi */}
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 22 }}>
+        <div style={{ ...CARD, padding: 22 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <div>
               <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Haftalık Kaydırma Aktivitesi</h3>
@@ -779,7 +1022,7 @@ function DashboardPage() {
         </div>
 
         {/* Kategori dağılımı */}
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 22 }}>
+        <div style={{ ...CARD, padding: 22 }}>
           <h3 style={{ margin: '0 0 20px', fontSize: 15, fontWeight: 700 }}>Kategori Dağılımı</h3>
           {CAT_DIST.map((c, i) => (
             <div key={i} style={{ marginBottom: 14 }}>
@@ -803,7 +1046,7 @@ function DashboardPage() {
           { label: 'Toplam Kullanıcı', value: STATS.totalUsers.toLocaleString('tr'), icon: icons.users, color: C.blue },
           { label: 'Toplam Kaydırma', value: `${(STATS.totalSwipes / 1000).toFixed(0)}K`, icon: icons.trend, color: C.yellow },
         ].map((s, i) => (
-          <div key={i} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div key={i} style={{ ...CARD, padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <Icon path={s.icon} size={22} color={s.color} />
             <div>
               <div style={{ fontSize: 19, fontWeight: 800 }}>{s.value}</div>
@@ -818,7 +1061,7 @@ function DashboardPage() {
 
 function TableShell({ headers, children }) {
   return (
-    <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+    <div style={{ ...CARD, overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ borderBottom: `1px solid ${C.border}` }}>
@@ -920,7 +1163,7 @@ function CampaignsPage() {
         <KpiCard label="Etkileşim Oranı" value={`%${((totalEng / Math.max(totalImp, 1)) * 100).toFixed(1)}`} delta="sağa kaydırma" deltaNeutral icon={icons.star} accent={{ color: C.yellow, soft: C.yellowSoft }} />
       </div>
 
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 18px', marginBottom: 20, display: 'flex', gap: 14, alignItems: 'center' }}>
+      <div style={{ ...CARD, padding: '14px 18px', marginBottom: 20, display: 'flex', gap: 14, alignItems: 'center' }}>
         <Icon path={icons.chart} size={16} color={C.blue} />
         <span style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.55 }}>
           Sponsorlu kart 5-7 organik kart arasına rastgele aralıkla giriyor; şablonu organik kartla
@@ -929,7 +1172,7 @@ function CampaignsPage() {
         </span>
       </div>
 
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ ...CARD, overflow: 'hidden' }}>
         <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.2fr 140px', gap: 12, fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           <span>Kampanya</span><span>Model</span><span>Teklif</span><span>Kalite</span><span>Bütçe</span><span style={{ textAlign: 'right' }}>Eylem</span>
         </header>
@@ -1076,7 +1319,7 @@ function GrowthPage() {
         active={metric} onChange={setMetric}
       />
 
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ ...CARD, overflow: 'hidden' }}>
         <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>
             Kayıt haftasına göre kohortlar
@@ -1125,7 +1368,7 @@ function GrowthPage() {
         </div>
       </div>
 
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px 20px', marginTop: 20 }}>
+      <div style={{ ...CARD, padding: '16px 20px', marginTop: 20 }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700 }}>Bu tablo neyi ölçüyor</h3>
         <div style={{ display: 'grid', gap: 7 }}>
           {[
@@ -1158,7 +1401,7 @@ function TabBar({ tabs, active, onChange }) {
             style={{
               border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 14px',
               background: on ? C.panel2 : 'transparent', color: on ? C.text : C.dim,
-              fontFamily: F, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap',
+              fontFamily: FB, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap',
               display: 'inline-flex', alignItems: 'center', gap: 7, outline: 'none',
             }}>
             {t.label}
@@ -1209,7 +1452,7 @@ function ReviewCard({ v, showRestaurant, onOpenRestaurant, hidden, onHide }) {
         {showRestaurant && (
           <button
             onClick={() => onOpenRestaurant?.(v.restId)} className="gur-admin-btn"
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: F, fontSize: 12.5, fontWeight: 600, color: C.blue, outline: 'none' }}>
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: FB, fontSize: 12.5, fontWeight: 600, color: C.blue, outline: 'none' }}>
             {v.restName}
           </button>
         )}
@@ -1247,13 +1490,13 @@ function ReviewCard({ v, showRestaurant, onOpenRestaurant, hidden, onHide }) {
 function ReviewFeed({ reviews, hidden, onHide, onOpenRestaurant, empty }) {
   if (reviews.length === 0) {
     return (
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '40px 20px', textAlign: 'center', color: C.faint, fontSize: 13 }}>
+      <div style={{ ...CARD, padding: '40px 20px', textAlign: 'center', color: C.faint, fontSize: 13 }}>
         {empty}
       </div>
     );
   }
   return (
-    <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+    <div style={{ ...CARD, overflow: 'hidden' }}>
       {reviews.map(v => (
         <ReviewCard key={v.key} v={v} showRestaurant onOpenRestaurant={onOpenRestaurant}
           hidden={hidden.has(v.key)} onHide={onHide} />
@@ -1265,7 +1508,9 @@ function ReviewFeed({ reviews, hidden, onHide, onOpenRestaurant, empty }) {
 function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
   const menus = useMemo(() => restaurantMenus(r), [r.id]);
   const reviews = useMemo(() => restaurantReviews(r), [r.id]);
-  const planColor = { Premium: C.orange, Pro: C.blue, 'Ücretsiz': C.faint };
+  const services = storeServices(r);
+  const serviceRev = storeServiceRevenue(r);
+  const planFee = PLAN_PRICE[r.plan] || 0;
 
   // Yorum dağılımı — rozet kararını verirken bakılan asıl kanıt
   const dist = [5, 4, 3, 2, 1].map(star => ({ star, n: reviews.filter(v => v.stars === star).length }));
@@ -1314,16 +1559,59 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
       </div>
 
       {/* Özet şeridi — listedeki bölge/puan/plan/durum bilgileri burada da görünür */}
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', marginBottom: 16, overflow: 'hidden' }}>
+      <div style={{ ...CARD, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', marginBottom: 16, overflow: 'hidden' }}>
         <MetaCell label="Bölge">{r.district}</MetaCell>
         <MetaCell label="Puan"><span style={{ color: C.orange }}>★</span> {r.rating} <span style={{ color: C.faint, fontWeight: 500, fontSize: 12 }}>({r.reviews.toLocaleString('tr')})</span></MetaCell>
-        <MetaCell label="Plan"><span style={{ color: planColor[r.plan] }}>{r.plan}</span></MetaCell>
+        <MetaCell label="Plan"><span style={{ color: PLAN_COLOR[r.plan] }}>{r.plan}</span></MetaCell>
+        <MetaCell label="Aylık ciro">{money(storeMonthly(r))}</MetaCell>
         <MetaCell label="Durum"><StatusBadge status={r.status} /></MetaCell>
         <MetaCell label="Katılım">{formatDate(r.joined)}</MetaCell>
       </div>
 
+      {/* ─── MÜŞTERİNİN SATIN ALDIĞI ÜCRETLİ ÖZELLİKLER ───
+          Bir işletmeyle konuşmadan önce bakılan ilk yer: neyi almış, ne
+          zamandır ödüyor, aylık ne ediyor. Katalog REVENUE_STREAMS'ten,
+          hangi kalemin açık olduğu STORE_SERVICES'ten geliyor. */}
+      <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
+        <SectionHead title="Aldığı ücretli özellikler"
+          right={`${services.length} kalem · ${money(serviceRev + planFee)} / ay`} />
+        <div style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: PLAN_COLOR[r.plan], flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700 }}>{r.plan} abonelik</div>
+            <div style={{ fontSize: 11.5, color: C.faint }}>
+              {planFee ? 'İşletme paneli, analiz ve öncelikli destek' : 'Ücretsiz plan — yalnızca temel kayıt'}
+            </div>
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: planFee ? C.text : C.faint }}>
+            {planFee ? `${money(planFee)}/ay` : '—'}
+          </div>
+        </div>
+        {services.map(x => (
+          <div key={x.key} style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: KIND_TONE[x.kind], flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 2 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>{x.name}</span>
+                <Badge text={x.kind} color={KIND_TONE[x.kind]} soft={C.panel2} />
+              </div>
+              <div style={{ fontSize: 11.5, color: C.faint }}>{x.note}</div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(x.monthly)}/ay</div>
+              <div style={{ fontSize: 10.5, color: C.faint }}>{formatDate(x.since)}'ten beri</div>
+            </div>
+          </div>
+        ))}
+        {services.length === 0 && (
+          <div style={{ padding: '20px 18px', fontSize: 12.5, color: C.faint, textAlign: 'center' }}>
+            Bu işletme henüz ücretli bir özellik almadı — satış için uygun aday.
+          </div>
+        )}
+      </section>
+
       {/* ─── ETKİLEŞİM ANALİZİ (B2B panelde işletmenin gördüğü sayılar) ─── */}
-      <section style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px 18px', marginBottom: 16 }}>
+      <section style={{ ...CARD, padding: '16px 18px', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Son 30 gün · etkileşim hunisi</span>
           <span style={{ fontSize: 11.5, color: C.faint }}>işletme panelinde de görünür</span>
@@ -1351,7 +1639,7 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: 16, alignItems: 'start' }}>
 
         {/* ─── MENÜLER ─── */}
-        <section style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+        <section style={{ ...CARD, overflow: 'hidden' }}>
           <header style={{ padding: '13px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Menüler</span>
             <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{menus.length}</span>
@@ -1380,7 +1668,7 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
         </section>
 
         {/* ─── YORUMLAR (rozet ataması bu bölümün başında) ─── */}
-        <section style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+        <section style={{ ...CARD, overflow: 'hidden' }}>
           <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Yorumlar</span>
             <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
@@ -1455,10 +1743,9 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
 
 function RestaurantsPage({ restaurants, query, onSuspend, onOpen }) {
   const filtered = restaurants.filter(r => r.name.toLowerCase().includes(query.toLowerCase()) || r.cat.toLowerCase().includes(query.toLowerCase()));
-  const planColor = { Premium: C.orange, Pro: C.blue, 'Ücretsiz': C.faint };
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
-      <TableShell headers={['Restoran', 'Kategori', 'Bölge', 'Puan', 'Plan', 'Durum', { label: 'İşlemler', right: true }]}>
+      <TableShell headers={['Restoran', 'Bölge', 'Puan', 'Plan', 'Ücretli Özellikler', { label: 'Aylık', right: true }, 'Durum', { label: 'İşlemler', right: true }]}>
         {filtered.map(r => (
           <tr key={r.id} className="row-hover" onClick={() => onOpen(r.id)} title={`${r.name} detayını aç`}
             style={{ borderBottom: `1px solid ${C.border}`, transition: 'background 0.1s', cursor: 'pointer' }}>
@@ -1466,18 +1753,26 @@ function RestaurantsPage({ restaurants, query, onSuspend, onOpen }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: C.orange }}>{r.name[0]}</div>
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {/* Rozet adın hemen ardında kalsın: flex satırında ad
+                      sarılınca yıldız hücrenin ucuna kaçıyordu. */}
+                  <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.35 }}>
                     {r.name}
-                    {r.gastro && <span title="Gastro Onaylı" style={{ color: C.orange, display: 'inline-flex' }}><Icon path={icons.star} size={13} color={C.orange} fill={C.orange} /></span>}
+                    {r.gastro && <span title="Gastro Onaylı" style={{ color: C.orange, display: 'inline-block', marginLeft: 5, verticalAlign: '-1px' }}><Icon path={icons.star} size={13} color={C.orange} fill={C.orange} /></span>}
                   </div>
                   <div style={{ fontSize: 11, color: C.faint }}>{r.reviews.toLocaleString('tr')} yorum</div>
                 </div>
               </div>
             </td>
-            <td style={{ padding: '14px 18px', fontSize: 13, color: C.dim }}>{r.cat}</td>
             <td style={{ padding: '14px 18px', fontSize: 13, color: C.dim }}>{r.district}</td>
             <td style={{ padding: '14px 18px', fontSize: 13, fontWeight: 600 }}>★ {r.rating}</td>
-            <td style={{ padding: '14px 18px' }}><span style={{ fontSize: 12, fontWeight: 600, color: planColor[r.plan] }}>{r.plan}</span></td>
+            <td style={{ padding: '14px 18px' }}><span style={{ fontSize: 12, fontWeight: 700, color: PLAN_COLOR[r.plan] }}>{r.plan}</span></td>
+            {/* Mağaza bazlı ücretli özellikler — hangi müşterinin neyi
+                satın aldığı listede de görünsün, detaya girmeye gerek kalmasın */}
+            <td style={{ padding: '14px 18px', maxWidth: 260 }}><ServiceChips services={storeServices(r)} max={3} /></td>
+            <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(storeMonthly(r))}</div>
+              <div style={{ fontSize: 10.5, color: C.faint }}>{storeServices(r).length} özellik</div>
+            </td>
             <td style={{ padding: '14px 18px' }}><StatusBadge status={r.status} /></td>
             <td style={{ padding: '14px 18px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
               <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
@@ -1587,7 +1882,7 @@ function ClaimsPanel() {
   if (claims.length === 0) return null;
 
   return (
-    <section style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 20 }}>
+    <section style={{ ...CARD, overflow: 'hidden', marginBottom: 20 }}>
       <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>İşletme sahiplenme başvuruları</span>
         <Badge text={`${pending.length} bekliyor`} color={pending.length ? C.yellow : C.faint} soft={pending.length ? C.yellowSoft : C.panel2} />
@@ -1622,7 +1917,7 @@ function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
     return (
       <div style={{ animation: 'fadeIn 0.2s' }}>
       <ClaimsPanel />
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 60, textAlign: 'center' }}>
+      <div style={{ ...CARD, padding: 60, textAlign: 'center' }}>
         <div style={{ display: 'inline-flex', width: 64, height: 64, borderRadius: 16, background: C.greenSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
           <Icon path={icons.check} size={30} color={C.green} />
         </div>
@@ -1641,7 +1936,7 @@ function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
       </div>
       <div style={{ display: 'grid', gap: 12 }}>
         {apps.map(a => (
-          <div key={a.id} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div key={a.id} style={{ ...CARD, padding: 18, display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ width: 46, height: 46, borderRadius: 12, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18, color: C.orange, flexShrink: 0 }}>{a.name[0]}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 3 }}>{a.name}</div>
@@ -1695,7 +1990,7 @@ function GastroPage({ restaurants, onGoRestaurants }) {
               key={c.id} onClick={() => setChefId(on ? 'all' : c.id)} className="gur-admin-btn"
               whileTap={{ scale: 0.99 }} transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
               style={{
-                textAlign: 'left', cursor: 'pointer', fontFamily: F, outline: 'none',
+                textAlign: 'left', cursor: 'pointer', fontFamily: FB, outline: 'none',
                 background: on ? C.panel2 : C.panel,
                 border: `1px solid ${on ? C.orange + '77' : C.border}`,
                 borderRadius: 12, padding: 15,
@@ -1726,7 +2021,7 @@ function GastroPage({ restaurants, onGoRestaurants }) {
         </span>
       </div>
 
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ ...CARD, overflow: 'hidden' }}>
         {shown.map((v, i) => (
           <article key={v.key} style={{ padding: '14px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
             {/* Puan rozeti */}
@@ -1790,151 +2085,355 @@ function UsersPage({ query }) {
 // açıldığını ve aktif fazda çalışıp çalışmadığını gösterir; toplam MRR
 // yalnızca açık kalemlerden hesaplanır, böylece faz anahtarı gerçek bir
 // senaryo farkı yaratır.
-const REVENUE_STREAMS = [
-  { key: 'bannerAds', name: 'Dönen keşfet banner\'ı', kind: 'Reklam', monthly: 128000, unit: '42 aktif kampanya', note: 'Keşfet ekranının üstündeki marka + sponsor karuseli.' },
-  { key: 'pushAds', name: 'Push bildirim reklamları', kind: 'Reklam', monthly: 74000, unit: '41 gönderim / ay', note: 'Semt bazlı tek seferlik bildirim satışı.' },
-  { key: 'rewardedAds', name: 'Ödüllü video reklam (kaydırma hakkı)', kind: 'Sponsorluk', monthly: 96000, unit: '~%78 tamamlanma', note: '10 kaydırma sonrası izlenen video, +5 hak kazandırır.' },
-  { key: 'secondChance', name: 'İkinci Şans yerleşimi', kind: 'Performans', monthly: 41000, unit: '86 restoran', note: 'Geçilen restoranın desteye geri girmesi.' },
-  { key: 'instantDeals', name: 'Anlık fırsat bildirimleri', kind: 'Performans', monthly: 63000, unit: '140 yayın / ay', note: 'Ölü saat doldurma; yayın başına ücret.' },
-  { key: 'reservations', name: 'Rezervasyon ve menü komisyonu', kind: 'İşlem', monthly: 88000, unit: '%8 komisyon', note: 'Gerçekleşen işlem başına alınır.' },
-  { key: 'chefVideo', name: 'Gastro şefli video paketi', kind: 'İçerik', monthly: 52000, unit: '8 çekim / ay', note: 'Üç büyük semtte VIP marka algısı.' },
-  { key: 'contentLicense', name: 'Gastro içerik lisanslama', kind: 'İçerik', monthly: 39000, unit: '6 lisans / ay', note: '15 sn dikey videonun restorana devri.' },
-  { key: 'analyticsSaas', name: 'Restoran Analiz Paneli (SaaS)', kind: 'Abonelik', monthly: 145000, unit: '50 abone', note: 'Tıklama, kaydetme ve konum ilgisi verisi.' },
-];
+// ═══════════════════════════════════════════════════════════════════════
+// GELİR VE REKLAM
+//
+// Üç katman, hep aynı sırayla: (1) en üstte platformun bu hizmetlerden
+// toplam cirosu, (2) bu cironun müşteri bazlı kırılımı, (3) kalem bazlı
+// katalog. Toplam ile müşteri tablosu birbirini tutar: adı geçen sekiz
+// işletmenin dışında kalan tutar "diğer işletmeler" satırında durur, hiçbir
+// kuruş görünmez bir yerde kaybolmaz.
+// ═══════════════════════════════════════════════════════════════════════
+function RevenuePage({ restaurants = [], onOpenStore }) {
+  const [sort, setSort] = useState('revenue');   // 'revenue' | 'services' | 'name'
+  const [kind, setKind] = useState(null);        // kalem türü filtresi
 
-const KIND_TONE = {
-  'Reklam': C.blue, 'Sponsorluk': C.orange, 'Performans': C.green,
-  'İşlem': C.yellow, 'İçerik': C.red, 'Abonelik': C.orange,
-};
-
-function RevenuePage() {
-  const plans = [
-    { name: 'Premium', price: 4999, count: 42, color: C.orange },
-    { name: 'Pro', price: 1999, count: 118, color: C.blue },
-    { name: 'Ücretsiz', price: 0, count: 182, color: C.faint },
-  ];
-  const subsRev = plans.reduce((a, p) => a + p.price * p.count, 0);
-
-  // Tüm gelir kalemleri canlı: aşamalı açılış kaldırıldı.
-  const streams = REVENUE_STREAMS.map(x => ({ ...x, live: true }));
-  const streamRev = streams.reduce((a, x) => a + x.monthly, 0);
-  const total = subsRev + streamRev;
+  const streams = REVENUE_STREAMS;
+  const total = PLATFORM_TOTAL;
   const maxMonthly = Math.max(...streams.map(x => x.monthly));
-  const adRev = streams.filter(x => x.kind === 'Reklam' || x.kind === 'Sponsorluk').reduce((a, x) => a + x.monthly, 0);
+
+  const group = (...kinds) => streams.filter(x => kinds.includes(x.kind)).reduce((a, x) => a + x.monthly, 0);
+  const adRev = group('Reklam', 'Sponsorluk');
+  const txRev = group('İşlem', 'Performans');
+  const subRev = SUBS_TOTAL + group('Abonelik', 'İçerik');
+
   // ARPU/LTV: sunucudaki user_ltv anlık görüntüsünün panel karşılığı.
   const MAU = 41200;
-  const arpu = total / MAU;
   const AVG_LIFETIME_MONTHS = 14;
+  const arpu = total / MAU;
 
-  const money = (n) => `₺${(n / 1000).toFixed(0)}K`;
+  // ── Müşteri bazlı kırılım ──
+  const customers = useMemo(() => {
+    const rows = restaurants.map(r => {
+      const services = storeServices(r);
+      return {
+        id: r.id, name: r.name, district: r.district, plan: r.plan,
+        gastro: r.gastro, status: r.status, services,
+        monthly: storeMonthly(r),
+      };
+    });
+    const shown = kind ? rows.filter(r => r.services.some(x => x.kind === kind)) : rows;
+    const sorters = {
+      revenue: (a, b) => b.monthly - a.monthly,
+      services: (a, b) => b.services.length - a.services.length || b.monthly - a.monthly,
+      name: (a, b) => a.name.localeCompare(b.name, 'tr'),
+    };
+    return shown.sort(sorters[sort]);
+  }, [restaurants, sort, kind]);
+
+  const namedTotal = restaurants.reduce((a, r) => a + storeMonthly(r), 0);
+  const otherCount = STATS.totalRestaurants - restaurants.length;
+  const otherTotal = Math.max(0, total - namedTotal);
+  const payingCount = restaurants.filter(r => storeServices(r).length > 0 || PLAN_PRICE[r.plan] > 0).length;
+  const maxCustomer = Math.max(1, ...customers.map(c => c.monthly));
+
+  const kinds = [...new Set(streams.map(x => x.kind))];
 
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
-        <KpiCard label="Aylık Yinelenen Gelir" value={money(total)} delta="18%" deltaUp icon={icons.money} accent={{ color: C.green, soft: C.greenSoft }} />
-        <KpiCard label="Abonelikten" value={money(subsRev)} delta="9%" deltaUp icon={icons.store} accent={{ color: C.orange, soft: C.orangeSoft }} />
-        <KpiCard label="Diğer Gelir Kalemleri" value={money(streamRev)} delta="24%" deltaUp icon={icons.trend} accent={{ color: C.blue, soft: C.blueSoft }} />
-        <KpiCard label="ARPU (aylık)" value={`₺${arpu.toFixed(2)}`} delta={`LTV ₺${(arpu * AVG_LIFETIME_MONTHS).toFixed(0)}`} deltaNeutral icon={icons.chart} accent={{ color: C.yellow, soft: C.yellowSoft }} />
-      </div>
 
-      {/* Gelir kırılımı */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
-        {[
-          { label: 'Reklam ve sponsorluk', value: adRev, tone: C.blue, note: 'Sponsorlu kart, push, ödüllü video' },
-          { label: 'İşlem komisyonu', value: streams.filter(x => x.kind === 'İşlem' || x.kind === 'Performans').reduce((a, x) => a + x.monthly, 0), tone: C.green, note: 'Rezervasyon, kupon, anlık fırsat' },
-          { label: 'Abonelik', value: subsRev + streams.filter(x => x.kind === 'Abonelik' || x.kind === 'İçerik').reduce((a, x) => a + x.monthly, 0), tone: C.orange, note: 'İşletme planları, içerik lisansı, analiz SaaS' },
-        ].map(b => (
-          <div key={b.label} style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${b.tone}`, borderRadius: 12, padding: '15px 17px' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 5 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: b.tone }}>{b.label}</span>
-              <span style={{ fontSize: 14, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{money(b.value)}</span>
+      {/* ─── 1. DASHBOARD — platformun bu hizmetlerden toplam cirosu ─── */}
+      <section style={{
+        ...CARD, boxShadow: ELEV.raised, padding: '22px 24px', marginBottom: 16,
+        background: `linear-gradient(135deg, ${C.panel} 0%, #1B1710 62%, #241A10 100%)`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 28, flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 240 }}>
+            <div style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+              Platform cirosu · bu ay
             </div>
-            <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.5, marginBottom: 8 }}>{b.note}</div>
-            <div style={{ height: 5, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
-              <div style={{ width: `${(b.value / total) * 100}%`, height: '100%', borderRadius: 3, background: b.tone }} />
-            </div>
-            <div style={{ fontSize: 10.5, color: C.faint, marginTop: 5 }}>toplam gelirin %{((b.value / total) * 100).toFixed(0)}'i</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Gelir kalemleri */}
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 20 }}>
-        <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Gelir Kalemleri</span>
-          <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{streams.length} kalem · hepsi açık</span>
-        </header>
-        {streams.map((x, i) => (
-          <div key={x.key} style={{ padding: '13px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14, opacity: x.live ? 1 : 0.45 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: x.live ? KIND_TONE[x.kind] : C.border, flexShrink: 0 }} />
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
-                <span style={{ fontSize: 13.5, fontWeight: 600 }}>{x.name}</span>
-                <Badge text={x.kind} color={KIND_TONE[x.kind]} soft={C.panel2} />
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                ₺{total.toLocaleString('tr')}
               </div>
-              <div style={{ fontSize: 11.5, color: C.faint }}>{x.note}</div>
+              <span style={{ fontFamily: FB, fontSize: 13, fontWeight: 700, color: C.green }}>↑ 18%</span>
             </div>
-            <div style={{ width: 120, flexShrink: 0 }}>
+            <div style={{ fontFamily: FB, fontSize: 12.5, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
+              Yıllıklandırılmış {money(total * 12)} · {STATS.totalRestaurants} işletmenin
+              abonelik ve ücretli özelliklerinden.
+            </div>
+          </div>
+
+          {/* Cironun nereden geldiği — üç kalem tek bakışta */}
+          <div style={{ flex: 1, minWidth: 320, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+            {[
+              { label: 'Reklam ve sponsorluk', value: adRev, tone: C.blue, note: 'Banner, push, ödüllü video' },
+              { label: 'Abonelik ve içerik', value: subRev, tone: C.orange, note: 'Planlar, analiz paneli, lisans' },
+              { label: 'İşlem komisyonu', value: txRev, tone: C.green, note: 'Rezervasyon, anlık fırsat' },
+            ].map(b => (
+              <div key={b.label} style={{ background: 'rgba(255,255,255,0.035)', border: `1px solid ${C.border}`, borderRadius: R.control, padding: '13px 15px' }}>
+                <div style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: b.tone, marginBottom: 5 }}>{b.label}</div>
+                <div style={{ fontSize: 19, fontWeight: 800, fontVariantNumeric: 'tabular-nums', marginBottom: 7 }}>{money(b.value)}</div>
+                <div style={{ height: 5, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
+                  <div style={{ width: `${(b.value / total) * 100}%`, height: '100%', borderRadius: 3, background: b.tone }} />
+                </div>
+                <div style={{ fontFamily: FB, fontSize: 10.5, color: C.faint, marginTop: 6, lineHeight: 1.4 }}>
+                  toplamın %{((b.value / total) * 100).toFixed(0)}'i · {b.note}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Alt şerit: ciroyu okumaya yarayan dört sayı */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14, marginTop: 20, paddingTop: 18, borderTop: `1px solid ${C.border}` }}>
+          {[
+            ['Ücretli özellik geliri', money(STREAM_TOTAL), `${streams.length} kalem`],
+            ['Abonelik geliri', money(SUBS_TOTAL), `${PLANS[0].count + PLANS[1].count} ödeyen işletme`],
+            ['ARPU (aylık)', `₺${arpu.toFixed(2)}`, `LTV ₺${(arpu * AVG_LIFETIME_MONTHS).toFixed(0)}`],
+            ['İşletme başına ort.', money(total / STATS.totalRestaurants), 'aylık katkı'],
+          ].map(([k, v, n]) => (
+            <div key={k}>
+              <div style={{ fontFamily: FB, fontSize: 11, color: C.faint, marginBottom: 4 }}>{k}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
+              <div style={{ fontFamily: FB, fontSize: 11, color: C.dim, marginTop: 2 }}>{n}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── 2. MÜŞTERİ BAZLI GELİR ─── */}
+      <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
+        <SectionHead title="Müşteri bazlı gelir"
+          right={`${payingCount} ödeyen müşteri · ${money(namedTotal)} / ay`} />
+
+        {/* Filtre ve sıralama */}
+        <div style={{ padding: '12px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, marginRight: 2 }}>Kalem:</span>
+          <Btn label="Hepsi" onClick={() => setKind(null)} size="sm" variant={kind === null ? 'soft' : 'ghost'} tone={kind === null ? 'orange' : 'neutral'} />
+          {kinds.map(k => (
+            <Btn key={k} label={k} onClick={() => setKind(kind === k ? null : k)} size="sm"
+              variant={kind === k ? 'soft' : 'ghost'} tone={kind === k ? 'orange' : 'neutral'} />
+          ))}
+          <div style={{ flex: 1 }} />
+          <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, marginRight: 2 }}>Sırala:</span>
+          {[['revenue', 'Ciro'], ['services', 'Özellik'], ['name', 'İsim']].map(([id, label]) => (
+            <Btn key={id} label={label} onClick={() => setSort(id)} size="sm"
+              variant={sort === id ? 'soft' : 'ghost'} tone={sort === id ? 'orange' : 'neutral'} />
+          ))}
+        </div>
+
+        {customers.map(c => (
+          <div key={c.id} className="row-hover" onClick={() => onOpenStore?.(c.id)}
+            title={`${c.name} detayını aç`}
+            style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: C.orange, flexShrink: 0 }}>{c.name[0]}</div>
+            <div style={{ width: 190, flexShrink: 0, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {c.name}
+                {c.gastro && <Icon path={icons.star} size={12} color={C.orange} fill={C.orange} />}
+              </div>
+              <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>
+                {c.district} · <span style={{ color: PLAN_COLOR[c.plan], fontWeight: 700 }}>{c.plan}</span>
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <ServiceChips services={c.services} />
+            </div>
+            <div style={{ width: 110, flexShrink: 0 }}>
               <div style={{ height: 5, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
-                <div style={{ width: `${(x.monthly / maxMonthly) * 100}%`, height: '100%', borderRadius: 3, background: x.live ? KIND_TONE[x.kind] : C.border }} />
+                <div style={{ width: `${(c.monthly / maxCustomer) * 100}%`, height: '100%', borderRadius: 3, background: C.orange }} />
               </div>
             </div>
             <div style={{ textAlign: 'right', minWidth: 96, flexShrink: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: x.live ? C.text : C.faint, fontVariantNumeric: 'tabular-nums' }}>{money(x.monthly)}</div>
-              <div style={{ fontSize: 10.5, color: C.faint }}>{x.unit}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(c.monthly)}</div>
+              <div style={{ fontFamily: FB, fontSize: 10.5, color: C.faint }}>toplamın %{((c.monthly / total) * 100).toFixed(1)}'i</div>
             </div>
           </div>
         ))}
-      </div>
+        {customers.length === 0 && (
+          <div style={{ padding: '22px 18px', fontFamily: FB, fontSize: 12.5, color: C.faint, textAlign: 'center' }}>
+            Bu kalemi satın alan müşteri yok.
+          </div>
+        )}
 
-      {/* Abonelikler */}
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 22 }}>
-        <h3 style={{ margin: '0 0 20px', fontSize: 15, fontWeight: 700 }}>Abonelik Paketleri</h3>
-        {plans.map((p, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 0', borderBottom: i < plans.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: p.color }} />
+        {/* Toplamı kapatan satır: listede adı geçmeyen işletmeler */}
+        {!kind && otherCount > 0 && (
+          <div style={{ padding: '13px 18px', display: 'flex', alignItems: 'center', gap: 14, background: 'rgba(255,255,255,0.015)' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: C.panel2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon path={icons.store} size={15} color={C.faint} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.dim }}>Diğer {otherCount} işletme</div>
+              <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>Listede tek tek gösterilmeyen portföy</div>
+            </div>
+            <div style={{ textAlign: 'right', minWidth: 96 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.dim, fontVariantNumeric: 'tabular-nums' }}>{money(otherTotal)}</div>
+              <div style={{ fontFamily: FB, fontSize: 10.5, color: C.faint }}>toplamın %{((otherTotal / total) * 100).toFixed(0)}'i</div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ─── 3. KALEM BAZLI KATALOG ─── */}
+      <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
+        <SectionHead title="Gelir kalemleri" right={`${streams.length} kalem · ${money(STREAM_TOTAL)} / ay`} />
+        {streams.map((x, i) => {
+          // Bu kalemi kaç adlandırılmış müşteri almış — satış konuşmasının başlangıcı
+          const buyers = restaurants.filter(r => storeServices(r).some(sv => sv.key === x.key));
+          return (
+            <div key={x.key} style={{ padding: '13px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: KIND_TONE[x.kind], flexShrink: 0 }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 600 }}>{x.name}</span>
+                  <Badge text={x.kind} color={KIND_TONE[x.kind]} soft={C.panel2} />
+                </div>
+                <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+                  {x.note}
+                  {buyers.length > 0 && <> · listedeki müşteriler: {buyers.map(bR => bR.name).join(', ')}</>}
+                </div>
+              </div>
+              <div style={{ width: 120, flexShrink: 0 }}>
+                <div style={{ height: 5, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
+                  <div style={{ width: `${(x.monthly / maxMonthly) * 100}%`, height: '100%', borderRadius: 3, background: KIND_TONE[x.kind] }} />
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', minWidth: 96, flexShrink: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(x.monthly)}</div>
+                <div style={{ fontFamily: FB, fontSize: 10.5, color: C.faint }}>{x.unit}</div>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      {/* ─── 4. ABONELİK PAKETLERİ ─── */}
+      <section style={{ ...CARD, overflow: 'hidden' }}>
+        <SectionHead title="Abonelik paketleri" right={`${money(SUBS_TOTAL)} / ay`} />
+        {PLANS.map((p, i) => (
+          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 18px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</div>
-              <div style={{ fontSize: 12, color: C.faint }}>{p.price === 0 ? 'Ücretsiz plan' : `₺${p.price.toLocaleString('tr')}/ay`}</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{p.id}</div>
+              <div style={{ fontFamily: FB, fontSize: 12, color: C.faint }}>{p.price === 0 ? 'Ücretsiz plan' : `₺${p.price.toLocaleString('tr')}/ay`}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>{p.count}</div>
-              <div style={{ fontSize: 11, color: C.faint }}>restoran</div>
+              <div style={{ fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{p.count}</div>
+              <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>işletme</div>
             </div>
             <div style={{ textAlign: 'right', minWidth: 90 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: p.color }}>{money(p.price * p.count)}</div>
-              <div style={{ fontSize: 11, color: C.faint }}>aylık</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: p.color, fontVariantNumeric: 'tabular-nums' }}>{money(p.price * p.count)}</div>
+              <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>aylık</div>
             </div>
           </div>
         ))}
+      </section>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// AYARLAR
+//
+// Buradaki anahtarlar yalnız paneli değil uygulamayı da etkiliyor:
+// src/lib/platform.js ortak depoya yazıyor, tüketici uygulaması aynı
+// depodan okuyor. GUR Match kapatıldığında Keşfet'teki giriş şeridi
+// kaybolur ve açık bir Match oturumu varsa akış Keşfet'e döner.
+// (Gerçek dağıtımda bu bayrak sunucuda tutulur; istemcinin girişi
+// gizlemesi yetmez, uç de reddetmelidir.)
+// ═══════════════════════════════════════════════════════════════════════
+function Toggle({ on, onChange, label }) {
+  return (
+    <motion.button
+      onClick={onChange} role="switch" aria-checked={on} aria-label={label}
+      whileTap={{ scale: 0.94 }}
+      transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
+      className="gur-admin-btn"
+      style={{
+        '--btn-bg': on ? BRAND_GRAD : C.border,
+        '--btn-bg-hover': on ? BRAND_GRAD_HOVER : C.panel2,
+        '--btn-bg-press': on ? BRAND_GRAD : C.border,
+        '--btn-shadow': on ? ELEV.brand : 'inset 0 2px 5px rgba(0,0,0,0.45)',
+        '--btn-shadow-press': ELEV.pressDark,
+        width: 48, height: 28, borderRadius: R.pill, border: 'none',
+        position: 'relative', flexShrink: 0, padding: 0, outline: 'none',
+      }}>
+      <motion.span
+        animate={{ x: on ? 22 : 3 }}
+        transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
+        style={{ position: 'absolute', top: 3, left: 0, width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.35)' }} />
+    </motion.button>
+  );
+}
+
+function SettingsRow({ item, on, onChange, children }) {
+  return (
+    <div style={{ padding: '16px 20px', borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>{item.label}</div>
+        <div style={{ fontFamily: FB, fontSize: 12.5, color: C.dim, lineHeight: 1.55 }}>{item.desc}</div>
+        {children}
       </div>
+      <Toggle on={on} onChange={onChange} label={item.label} />
     </div>
   );
 }
 
 function SettingsPage() {
-  const [toggles, setToggles] = useState({ autoApprove: false, gastroPublic: true, newReviews: true, maintenance: false });
-  const items = [
-    { key: 'autoApprove', label: 'Otomatik başvuru onayı', desc: 'Vergi levhası yüklenen başvurular otomatik onaylanır (önerilmez)' },
-    { key: 'gastroPublic', label: 'Gastro Onaylı rozetini göster', desc: 'Onaylı restoranlar uygulamada rozet ile öne çıkar' },
-    { key: 'newReviews', label: 'Yeni yorum bildirimleri', desc: 'Şikayet edilen yorumlar için anlık bildirim al' },
-    { key: 'maintenance', label: 'Bakım modu', desc: 'Uygulamayı geçici olarak kullanıma kapat' },
+  const settings = usePlatformSettings();
+  const flip = (key) => toggleSetting(key);
+
+  const groups = [
+    {
+      title: 'Uygulama özellikleri',
+      note: 'Buradan kapatılan özellik tüketici uygulamasından da kalkar.',
+      items: [
+        {
+          key: 'matchEnabled', label: 'GUR Match — arkadaşla yan yana kaydırma',
+          desc: 'İki kişinin aynı desteyi kaydırıp ortak kararda buluştuğu arkadaş sistemi. Kapatıldığında Keşfet ekranındaki Match şeridi gizlenir, süren oturumlar Keşfet’e döner; kayıtlı eşleşmeler silinmez.',
+          feature: true,
+        },
+        {
+          key: 'gastroPublic', label: 'Gastro Onaylı rozetini göster',
+          desc: 'Onaylı restoranlar uygulamada rozetle öne çıkar ve şef tanıtım videosu galeride görünür.',
+        },
+      ],
+    },
+    {
+      title: 'Moderasyon',
+      items: [
+        { key: 'autoApprove', label: 'Otomatik başvuru onayı', desc: 'Vergi levhası yüklenen başvurular incelenmeden onaylanır (önerilmez).' },
+        { key: 'newReviews', label: 'Yeni yorum bildirimleri', desc: 'Şikayet edilen yorumlar için anlık bildirim al.' },
+      ],
+    },
+    {
+      title: 'Sistem',
+      items: [
+        { key: 'maintenance', label: 'Bakım modu', desc: 'Uygulamayı geçici olarak kullanıma kapat.' },
+      ],
+    },
   ];
+
   return (
-    <div style={{ animation: 'fadeIn 0.2s', maxWidth: 680 }}>
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-        {items.map((it, i) => (
-          <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '18px 20px', borderBottom: i < items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{it.label}</div>
-              <div style={{ fontSize: 12.5, color: C.dim }}>{it.desc}</div>
-            </div>
-            <button onClick={() => setToggles(t => ({ ...t, [it.key]: !t[it.key] }))} className="gur-admin-btn" style={{ width: 46, height: 26, borderRadius: 13, border: 'none', background: toggles[it.key] ? C.orange : C.border, cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0, outline: 'none' }}>
-              <div style={{ position: 'absolute', top: 3, left: toggles[it.key] ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-            </button>
-          </div>
-        ))}
-      </div>
+    <div style={{ animation: 'fadeIn 0.2s', maxWidth: 760 }}>
+      {groups.map(g => (
+        <section key={g.title} style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
+          <SectionHead title={g.title} right={g.note} />
+          {g.items.map(it => (
+            <SettingsRow key={it.key} item={it} on={!!settings[it.key]} onChange={() => flip(it.key)}>
+              {it.feature && (
+                <div style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 8, background: settings[it.key] ? C.greenSoft : C.panel2, border: `1px solid ${settings[it.key] ? `${C.green}44` : C.border}`, borderRadius: R.pill, padding: '5px 12px' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: settings[it.key] ? C.green : C.faint }} />
+                  <span style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: settings[it.key] ? C.green : C.faint }}>
+                    {settings[it.key] ? 'Uygulamada açık' : 'Uygulamada kapalı'}
+                  </span>
+                </div>
+              )}
+            </SettingsRow>
+          ))}
+        </section>
+      ))}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { hydrateCampaigns } from '../lib/campaigns.js';
 import { submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles, saveOwnerProfile, OVERRIDABLE } from '../lib/b2b.js';
 import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
+import { usePlatformSettings } from '../lib/platform.js';
 import { signIn as socialSignIn, isAppleDevice, isConfigured as socialConfigured } from '../lib/social-auth.js';
 
 // Apple "Designing Fluid Interfaces" momentum projection: nereye bırakılacağını
@@ -2308,7 +2309,7 @@ function HeroCarousel({ slides, intervalMs = 4500 }) {
   );
 }
 
-function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, restaurants = [], onDetail }) {
+function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, matchEnabled = true, restaurants = [], onDetail }) {
   // Marka slaytı her zaman ilk sırada, sponsor slaytları onu izler
   const slides = useMemo(() => [
     { id: "brand", img: I.hero, title: "İstanbul'un Lezzetleri", sub: "En popüler restoranları keşfet" },
@@ -2417,7 +2418,10 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           </div>
         )}
 
-        {/* GUR Match girişi */}
+        {/* GUR Match girişi — yönetici panelinden kapatılabilir bir özellik.
+            Kapalıyken şerit hiç çizilmiyor: tıklanınca "kapalı" diyen bir
+            giriş, olmayan girişten daha kötü. */}
+        {matchEnabled && (
         <motion.div
           onClick={onMatch}
           whileTap={{ scale: 0.97 }}
@@ -2437,6 +2441,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           </div>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
         </motion.div>
+        )}
 
         {/* Başlık */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -5073,6 +5078,8 @@ export default function GurApp(props = {}) {
   // GUR Match oturumu
   const [matchCode, setMatchCode] = useState("");
   const [matchResults, setMatchResults] = useState([]);
+  // Yönetici panelinin açıp kapattığı özellik kapıları (src/lib/platform.js).
+  const platform = usePlatformSettings();
   // Kullanıcının yazdığı yorumlar restoran id'sine göre — hem restoran
   // detayında hem profildeki "Yorumlarım" listesinde aynı kaynaktan okunur
   const [userReviews, setUserReviews] = useState({});
@@ -5212,7 +5219,7 @@ export default function GurApp(props = {}) {
   const goFav = () => { nav("fav"); };
   const goProfile = () => { nav("profile"); };
   const catTap = (cat) => { setFilterCat(cat); nav("swipe"); };
-  const goMatch = () => { setMatchResults([]); nav("match-start"); };
+  const goMatch = () => { if (!platform.matchEnabled) return; setMatchResults([]); nav("match-start"); };
   const startMatch = (code) => { setMatchCode(code); setMatchResults([]); nav("match-swipe"); };
   const finishMatch = (found) => { setMatchResults(found); nav("match-result"); };
   // Hesap silme: yerel durumun tamamı temizlenir (kalıcılık yok, backend yok)
@@ -5242,6 +5249,18 @@ export default function GurApp(props = {}) {
     return () => { vv.removeEventListener("resize", sync); vv.removeEventListener("scroll", sync); };
   }, []);
 
+  // Özellik kapatıldığı anda açık bir Match oturumu varsa akış Keşfet'e
+  // döner. Yönetici paneli başka bir sekmede kapatabilir; ekranda kalıp
+  // çalışmayan bir akış bırakmak kullanıcıyı çıkmaza sokardı.
+  useEffect(() => {
+    if (platform.matchEnabled) return;
+    if (screen === "match-start" || screen === "match-swipe" || screen === "match-result") {
+      setMatchResults([]);
+      nav("explore");
+    }
+    // nav kimliği her çizimde değişiyor; bağımlılığa alınırsa döngü olur.
+  }, [platform.matchEnabled, screen]);
+
   const render = () => {
     switch (screen) {
       case "splash": return <SplashScreen onNext={() => setScreen("welcome")} />;
@@ -5256,7 +5275,7 @@ export default function GurApp(props = {}) {
       case "rest2": return <RestRegStep2 onBack={back} onNext={() => nav("rest3")} />;
       case "rest3": return <RestRegStep3 onBack={back} onDone={() => nav("rest-dashboard")} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} />;
       case "rest-dashboard": return <RestaurantDashboard onLogout={() => { setHistory([]); setScreen("welcome"); }} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} ownerRestaurant={ownerRestaurant} />;
-      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} restaurants={feed} onDetail={openDetail} />;
+      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} matchEnabled={platform.matchEnabled} restaurants={feed} onDetail={openDetail} />;
       case "match-start": return <MatchStartScreen onBack={back} onStart={startMatch} />;
       case "match-swipe": return <MatchSwipeScreen code={matchCode} restaurants={feed} onExit={goExplore} onFinish={finishMatch} />;
       case "match-result": return <MatchResultScreen code={matchCode} matches={matchResults} onDetail={openDetail} onRestart={goMatch} onExplore={goExplore} />;
