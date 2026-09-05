@@ -15,6 +15,10 @@ export const DECK_RULES = {
   leadIn: 3,
   // Bir destede aynı kampanya en fazla bir kez.
   maxPerCampaign: 1,
+  // Bir KULLANICIYA aynı kampanya ömür boyu en fazla bir kez. Deste her
+  // açılışta yeniden kurulduğu için deste içi sınır yetmiyor; daha önce
+  // gösterilmiş kampanyalar havuzdan tamamen çıkarılır.
+  maxPerUser: 1,
 };
 
 /** Deterministik PRNG — aynı kullanıcı+gün aynı yerleşimi görür. */
@@ -60,13 +64,23 @@ export function rankCampaigns(campaigns, { category = null } = {}) {
  * organic: [{ id, ... }]
  * campaigns: rankCampaigns çıktısı — her biri { id, restaurant, label, bidMinor, pricing }
  * seed: kullanıcı/gün — aynı desteyi tekrar üretebilmek için
+ * seenCampaigns: bu kullanıcıya daha önce gösterilmiş kampanya kimlikleri;
+ *   sıklık sınırı (frequency cap) burada uygulanır. Aynı reklamı ikinci kez
+ *   göstermek hem kullanıcıyı yorar hem reklamvereni ölü gösterime boğar.
+ *
+ * Sponsorlu kartlar KONUMDAN BAĞIMSIZDIR: organik liste yakından uzağa
+ * sıralanmış olsa bile kampanya kartı sırasını mesafe değil, açık artırma
+ * skoru ve boşluk kuralı belirler. Reklamveren mesafeye göre elenmez.
  *
  * Dönen kartlar organikle aynı şekle sahiptir; tek fark `sponsored` alanı.
  * Böylece kart bileşeni sponsorlu/organik ayrımı yapmadan aynı şablonu çizer.
  */
-export function buildDeck(organic, campaigns = [], { seed = 1, rules = DECK_RULES } = {}) {
+export function buildDeck(organic, campaigns = [], { seed = 1, rules = DECK_RULES, seenCampaigns = [] } = {}) {
   const rand = mulberry32(hashSeed(seed));
-  const pool = campaigns.slice();
+  const seen = new Set((seenCampaigns || []).map(String));
+  const pool = rules.maxPerUser
+    ? campaigns.filter(c => !seen.has(String(c.id)))
+    : campaigns.slice();
   const used = new Map();
   const deck = [];
 
@@ -123,4 +137,116 @@ export function quotaState({ plan = "free", used = 0, bonus = 0 }) {
     // Ham sayı arayüze asla sızmaz.
     pressure: left <= 0 ? "exhausted" : left <= 5 ? "near" : "free",
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// KONUM BAZLI SIRALAMA — deste yakından başlar, kaydırdıkça açılır
+//
+// Kullanıcı önce yürüme mesafesindeki mekânları görmeli; kaydırmaya devam
+// ettikçe yarıçap büyümeli. Düz mesafe sıralaması bunu yapar ama sıkıcıdır
+// ve her açılışta aynı diziyi verir — bu yüzden halkalar hâlinde
+// çalışıyoruz: her halkanın İÇİ deterministik olarak karışık, halkalar
+// yakından uzağa diziliyor. Sonuç: "gitgide uzaklaşan" bir akış, ama
+// tahmin edilebilir olmayan bir sıra.
+//
+// Saf fonksiyon: istemci ve sunucu aynı sırayı üretsin diye burada.
+// ═══════════════════════════════════════════════════════════════════════
+
+export const RADIUS_RULES = {
+  firstRingKm: 1.5,   // ilk halka: yürüme mesafesi
+  stepKm: 2.5,        // her halkada eklenen yarıçap
+  maxRings: 8,        // bundan uzağı tek bir "daha uzak" halkasında toplanır
+};
+
+const EARTH_R_KM = 6371;
+
+/** İki koordinat arası mesafe (km) — Haversine. */
+export function distanceKm(a, b) {
+  if (!a || !b) return null;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_R_KM * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+
+/** Bir mesafenin hangi halkaya düştüğü (0 = en yakın). */
+export function ringOf(km, rules = RADIUS_RULES) {
+  if (!Number.isFinite(km)) return rules.maxRings;           // koordinatsız kayıt en sona
+  if (km <= rules.firstRingKm) return 0;
+  const n = 1 + Math.floor((km - rules.firstRingKm) / rules.stepKm);
+  return Math.min(n, rules.maxRings);
+}
+
+/** Halkanın üst sınırı — arayüzde "≤3 km" gibi göstermek için. */
+export function ringLabel(ring, rules = RADIUS_RULES) {
+  if (ring >= rules.maxRings) return "daha uzak";
+  const outer = rules.firstRingKm + ring * rules.stepKm;
+  return `${outer % 1 === 0 ? outer : outer.toFixed(1)} km içinde`;
+}
+
+/**
+ * Listeyi yakından uzağa, halka halka sıralar.
+ *
+ * origin yoksa (konum izni verilmemiş) liste olduğu gibi döner — konum
+ * bilmediğimizde uydurma bir yakınlık iddia etmek, yanlış sıralamadan
+ * daha kötü.
+ *
+ * Her kayda `distanceKm` ve `ring` eklenir; kart bunları olduğu gibi
+ * gösterebilir.
+ */
+export function orderByProximity(list, origin, { seed = 1, rules = RADIUS_RULES } = {}) {
+  if (!origin || !Number.isFinite(origin.lat) || !Number.isFinite(origin.lng)) {
+    return list.map(r => ({ ...r, distanceKm: null, ring: null }));
+  }
+  const rand = mulberry32(hashSeed(seed));
+  const withRing = list.map(r => {
+    const km = Number.isFinite(r.lat) && Number.isFinite(r.lng)
+      ? distanceKm(origin, { lat: r.lat, lng: r.lng })
+      : null;
+    return { ...r, distanceKm: km, ring: ringOf(km, rules) };
+  });
+
+  // Halka içi karıştırma: sıralama deterministik ama mesafeye göre
+  // "en yakın ilk" değil — aynı sokaktaki iki mekândan hangisinin önce
+  // geleceği her gün aynı olmasın diye.
+  const buckets = new Map();
+  for (const r of withRing) {
+    if (!buckets.has(r.ring)) buckets.set(r.ring, []);
+    buckets.get(r.ring).push(r);
+  }
+  const out = [];
+  for (const ring of [...buckets.keys()].sort((a, b) => a - b)) {
+    const bucket = buckets.get(ring);
+    for (let i = bucket.length - 1; i > 0; i--) {       // Fisher-Yates
+      const j = Math.floor(rand() * (i + 1));
+      [bucket[i], bucket[j]] = [bucket[j], bucket[i]];
+    }
+    out.push(...bucket);
+  }
+  return out;
+}
+
+/**
+ * Çark için aday havuzu: en yakın dolu halkadan başlayıp yeterli aday
+ * bulana kadar genişler. Çark "rastgele" hissettirmeli ama kullanıcıyı
+ * şehrin öbür ucuna atmamalı.
+ */
+export function rouletteCandidates(list, origin, { category = null, minPool = 6, rules = RADIUS_RULES } = {}) {
+  const pool = category
+    ? list.filter(r => r.cat === category || (r.tags || []).includes(category))
+    : list.slice();
+  if (!pool.length) return [];
+  const ranked = orderByProximity(pool, origin, { seed: "roulette", rules });
+  if (!origin) return ranked;
+  // Havuz yeterince dolana kadar halka ekle: tek bir yakın mekan varsa
+  // çarkın her dönüşünde aynı yeri vermesin.
+  const out = [];
+  let ring = 0;
+  while (out.length < minPool && ring <= rules.maxRings) {
+    out.push(...ranked.filter(r => r.ring === ring));
+    ring++;
+  }
+  return out.length ? out : ranked;
 }

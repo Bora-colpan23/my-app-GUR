@@ -2,13 +2,15 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 're
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { animate } from 'motion';
 import { getConsent, setConsent, initAnalytics, trackEvent } from '../lib/analytics.js';
-import { buildDeck, rankCampaigns, quotaState } from '../../shared/deck.js';
+import { buildDeck, rankCampaigns, quotaState, orderByProximity, ringLabel, rouletteCandidates } from '../../shared/deck.js';
 import { directionsUrl, placeUrl, defaultMapProvider, MAP_PROVIDERS } from '../../shared/deeplink.js';
 import { hydrateCampaigns } from '../lib/campaigns.js';
 import { submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles, saveOwnerProfile, OVERRIDABLE } from '../lib/b2b.js';
 import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
 import { usePlatformSettings } from '../lib/platform.js';
+import * as geo from '../lib/geo.js';
+import { seenCampaigns, markShown } from '../lib/ad-frequency.js';
 import { signIn as socialSignIn, isAppleDevice, isConfigured as socialConfigured } from '../lib/social-auth.js';
 
 // Apple "Designing Fluid Interfaces" momentum projection: nereye bırakılacağını
@@ -682,7 +684,7 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
         </h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
           <span style={{ background: "#fff", borderRadius: 10, padding: "4px 12px", fontSize: 13, fontWeight: 700, color: "#1C1917", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="#F59E0B" size={12} />{r.rating}</span>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "'Outfit', sans-serif" }}>{r.dist}</span>
+          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "'Outfit', sans-serif" }}>{distText(r)}</span>
           <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "'Outfit', sans-serif" }}>•  {r.price}</span>
         </div>
         <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(255,255,255,0.85)", margin: "0 0 12px", lineHeight: 1.45 }}>{r.desc}</p>
@@ -2309,7 +2311,7 @@ function HeroCarousel({ slides, intervalMs = 4500 }) {
   );
 }
 
-function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, matchEnabled = true, restaurants = [], onDetail }) {
+function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, onRoulette, matchEnabled = true, restaurants = [], onDetail }) {
   // Marka slaytı her zaman ilk sırada, sponsor slaytları onu izler
   const slides = useMemo(() => [
     { id: "brand", img: I.hero, title: "İstanbul'un Lezzetleri", sub: "En popüler restoranları keşfet" },
@@ -2418,30 +2420,46 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           </div>
         )}
 
-        {/* GUR Match girişi — yönetici panelinden kapatılabilir bir özellik.
-            Kapalıyken şerit hiç çizilmiyor: tıklanınca "kapalı" diyen bir
-            giriş, olmayan girişten daha kötü. */}
-        {matchEnabled && (
-        <motion.div
-          onClick={onMatch}
-          whileTap={{ scale: 0.97 }}
-          transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-          style={{
-            display: "flex", alignItems: "center", gap: 12, marginBottom: 16, cursor: "pointer",
-            background: "linear-gradient(100deg, #FF6600, #FF3B30)", borderRadius: 18, padding: "12px 14px",
-            boxShadow: "0 6px 20px rgba(255,69,0,0.28)", flexShrink: 0,
-          }}
-        >
-          <div style={{ width: 38, height: 38, borderRadius: 13, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <Icon n="sparkle" size={18} color="#fff" />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Match</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.8)", margin: 0 }}>Arkadaşınla birlikte kaydır, birlikte karar ver</p>
-          </div>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
-        </motion.div>
-        )}
+        {/* Karar araçları yan yana: Match arkadaşla, Çark tek başına.
+            Match yönetici panelinden kapatılabiliyor; kapalıyken Çark tüm
+            genişliği alır, boş bir yer kalmaz. */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexShrink: 0 }}>
+          {matchEnabled && (
+            <motion.div
+              onClick={onMatch}
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+              style={{
+                flex: 1, minWidth: 0, cursor: "pointer",
+                background: "linear-gradient(140deg, #FF6600, #FF3B30)", borderRadius: 18, padding: "13px 14px",
+                boxShadow: "0 6px 20px rgba(255,69,0,0.28)",
+              }}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: 12, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 9 }}>
+                <Icon n="sparkle" size={17} color="#fff" />
+              </div>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Match</p>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.82)", margin: 0, lineHeight: 1.35 }}>Arkadaşınla birlikte kaydır</p>
+            </motion.div>
+          )}
+
+          <motion.div
+            onClick={onRoulette}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+            style={{
+              flex: 1, minWidth: 0, cursor: "pointer",
+              background: "linear-gradient(140deg, #2D2419, #4A3418)", borderRadius: 18, padding: "13px 14px",
+              border: "1px solid rgba(255,165,0,0.28)", boxShadow: "0 6px 20px rgba(45,36,25,0.22)",
+            }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: 12, background: "rgba(255,165,0,0.18)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 9 }}>
+              <span style={{ fontSize: 17, lineHeight: 1 }}>🎲</span>
+            </div>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Çark</p>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.35 }}>Yakınından rastgele seçsin</p>
+          </motion.div>
+        </div>
 
         {/* Başlık */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -3080,7 +3098,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
               <Icon n="star" color="#F59E0B" size={13} />{r.rating}
             </span>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8A7A68" }}>{r.cat}</span>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8A7A68" }}>· {r.dist}</span>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8A7A68" }}>· {distText(r)}</span>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8A7A68" }}>· {r.price}</span>
           </div>
 
@@ -3192,17 +3210,55 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   // genişleyebilir bir sayfa olarak gelir.
   const [sheetCard, setSheetCard] = useState(null);
   const [composing, setComposing] = useState(null);
-  const organic = filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants;
+  const inCategory = filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants;
+
+  // Konum: kaba doğrulukta, yalnızca sıralama için. İzin zaten verilmişse
+  // sessizce alınır; verilmemişse istem açılmaz, varsayılan merkez kullanılır
+  // ve kullanıcıya bunu söyleyen bir şerit çizilir.
+  const loc = geo.useUserLocation();
+  useEffect(() => { geo.requestLocation({ silent: true }); }, []);
+  const precise = loc.source === "device";
+  const origin = precise ? { lat: loc.lat, lng: loc.lng } : geo.DEFAULT_ORIGIN;
+
+  // Bu kullanıcıya daha önce gösterilmiş kampanyalar destede yeniden
+  // çıkmaz. Sınır destenin KURULDUĞU ANDA okunuyor, canlı dinlenmiyor:
+  // kart üstte göründüğü an depo değişiyor, canlı dinlesek deste
+  // kullanıcının parmağının altında yeniden kurulur ve kartlar tekrar
+  // eder. Deste sıfırlanınca (kategori/veri değişimi) yeniden okunur.
+  const [seenAds, setSeenAds] = useState(() => seenCampaigns());
+
+  // Sıklık sınırından geçen kampanyalar. Sınırı burada uyguluyoruz ki
+  // elenen kampanyanın restoranı organik havuza geri dönsün.
+  const campaigns = useMemo(
+    () => rankCampaigns(hydrateCampaigns(restaurants), { category: filterCat })
+      .filter(c => !seenAds.includes(String(c.id))),
+    [restaurants, filterCat, seenAds]
+  );
+
+  // Aktif kampanyası olan mekan organik destede görünmez: reklamverenin
+  // parasını ödediği kartı bir de bedava göstermek olurdu. Kampanya sıklık
+  // sınırına takılıp elenince mekan organik havuza geri döner.
+  const organic = useMemo(() => {
+    const adIds = new Set(campaigns.map(c => String(c.restaurant.id)));
+    const pool = inCategory.filter(r => !adIds.has(String(r.id)));
+    // Kategori içinde yakından uzağa: ilk kartlar yürüme mesafesinde,
+    // kaydırma sürdükçe yarıçap halka halka büyüyor
+    // (shared/deck.js → orderByProximity).
+    return orderByProximity(pool, origin, { seed: `${filterCat || "all"}:${origin.lat.toFixed(3)},${origin.lng.toFixed(3)}` });
+    // origin nesnesi her çizimde yeni; kimliğine değil koordinatına bakıyoruz.
+  }, [inCategory, campaigns, origin.lat, origin.lng, filterCat]);
 
   // Sponsorlu kartlar organik akışa burada harmanlanır. Aynı fonksiyonu
   // sunucu da çağırıyor (shared/deck.js) — yerleşim hissi iki tarafta
-  // birebir aynı olsun diye.
-  const allCards = useMemo(() => {
-    const campaigns = rankCampaigns(hydrateCampaigns(restaurants), { category: filterCat });
-    return buildDeck(organic, campaigns, {
+  // birebir aynı olsun diye. Sponsorlu kart mesafeye BAKMAZ: reklamveren
+  // uzakta diye elenmez, sırasını açık artırma ve boşluk kuralı belirler.
+  const allCards = useMemo(
+    () => buildDeck(organic, campaigns, {
       seed: `${filterCat || "all"}:${new Date().toISOString().slice(0, 10)}`,
-    });
-  }, [restaurants, filterCat, organic]);
+      seenCampaigns: seenAds,
+    }),
+    [organic, campaigns, filterCat, seenAds]
+  );
 
   const [idx, setIdx] = useState(0);
   const [toast, setToast] = useState(null);
@@ -3236,7 +3292,10 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   };
   const abortAd = () => { setPlayingAd(null); setGate(true); };
 
-  useEffect(() => { setIdx(0); setDone(false); setPassed([]); setEncore(null); }, [filterCat, restaurants]);
+  useEffect(() => {
+    setIdx(0); setDone(false); setPassed([]); setEncore(null);
+    setSeenAds(seenCampaigns());
+  }, [filterCat, restaurants]);
 
   const deck = encore ? encore.cards : allCards;
   const cursor = encore ? encore.idx : idx;
@@ -3308,6 +3367,18 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
     next();
   };
 
+  // Sponsorlu kart EKRANDA ÜSTTE göründüğü an gösterim sayılır ve bir daha
+  // bu kullanıcıya çıkmaz. Deste kurulurken saymak, görülmeyen kartı da
+  // harcamak olurdu.
+  const topCard = deck[cursor];
+  useEffect(() => {
+    if (!done && topCard?.sponsored?.campaignId) markShown(topCard.sponsored.campaignId);
+  }, [topCard, done]);
+
+  // Kaydırma ilerledikçe hangi halkadayız — kullanıcı yarıçapın büyüdüğünü
+  // görsün, "neden birden uzak yerler geliyor" sorusu doğmasın.
+  const ringNow = topCard && topCard.ring != null && !topCard.sponsored ? topCard.ring : null;
+
   const progress = deck.length > 0 ? ((cursor + (done ? 1 : 0)) / deck.length) * 100 : 0;
 
   return (
@@ -3332,6 +3403,22 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
               />
             </div>
           )}
+          {/* Mesafe halkası — deste yakından uzağa açıldıkça değişir */}
+          {ringNow != null && !done && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "3px 12px" }}>
+              <Icon n="pin" size={11} color={precise ? "#FF9A4D" : "rgba(255,255,255,0.45)"} />
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,0.72)" }}>
+                {precise ? ringLabel(ringNow) : `${ringLabel(ringNow)} · İstanbul merkezine göre`}
+              </span>
+              {!precise && (
+                <button type="button" className="gur-btn" onClick={() => geo.requestLocation()}
+                  style={{ border: "none", background: "transparent", padding: 0, marginLeft: 2, cursor: "pointer", outline: "none", fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#FF9A4D" }}>
+                  Konumumu kullan
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Progress bar */}
           {deck.length > 0 && !done && (
             <div style={{ width: "60%", height: 3, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
@@ -3486,6 +3573,195 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
 // ═══════════════════════════════════════════════
 // GUR MATCH — Arkadaşınla birlikte kaydır
 // ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// ÇARK — "nereye gideceğime karar veremiyorum" ekranı
+//
+// Kategori seçilir, çark çevrilir, konuma yakın adaylardan biri çıkar.
+// Aday havuzu en yakın halkadan başlar ve yeterli seçenek bulana kadar
+// genişler (shared/deck.js → rouletteCandidates): çark rastgele
+// hissettirmeli ama kullanıcıyı şehrin öbür ucuna atmamalı.
+//
+// Aynı sonucu üst üste vermemek için son çıkanlar kısa süre hatırlanıyor.
+// ═══════════════════════════════════════════════════════════════════════
+function RouletteScreen({ onBack, onDetail, restaurants = [], onDirections }) {
+  const [cat, setCat] = useState(null);
+  const [spinning, setSpinning] = useState(false);
+  const [pick, setPick] = useState(null);
+  const [recent, setRecent] = useState([]);      // son çıkanlar, tekrarı azaltmak için
+  const reelRef = useRef(null);
+
+  const loc = geo.useUserLocation();
+  useEffect(() => { geo.requestLocation({ silent: true }); }, []);
+  const precise = loc.source === "device";
+  const origin = precise ? { lat: loc.lat, lng: loc.lng } : geo.DEFAULT_ORIGIN;
+
+  // Uygulamada gerçekten karşılığı olan kategoriler — boş kategori
+  // göstermek, çeviremeyeceğin bir çark sunmak olur.
+  const cats = useMemo(() => {
+    const counts = new Map();
+    for (const r of restaurants) {
+      for (const key of [r.cat, ...(r.tags || [])]) {
+        if (key) counts.set(key, (counts.get(key) || 0) + 1);
+      }
+    }
+    return CATEGORIES.map(c => c.name).filter(n => (counts.get(n) || 0) > 0);
+  }, [restaurants]);
+
+  const pool = useMemo(
+    () => rouletteCandidates(restaurants, origin, { category: cat, minPool: 6 }),
+    // origin nesnesi her çizimde yeni; kimliğine değil koordinatına bakıyoruz.
+    [restaurants, cat, origin.lat, origin.lng]
+  );
+
+  const spin = () => {
+    if (!pool.length || spinning) return;
+    haptic(14);
+    setSpinning(true);
+    setPick(null);
+
+    // Son üç sonucu ele: küçük havuzda aynı yeri üst üste vermek çarkı
+    // "bozuk" gösterir. Havuz zaten küçükse eleme uygulanmaz.
+    const fresh = pool.filter(r => !recent.includes(r.id));
+    const from = fresh.length >= 2 ? fresh : pool;
+    const chosen = from[Math.floor(Math.random() * from.length)];
+
+    // Makara: isimler hızla akar, sonra yavaşlayıp durur. Sonucu hemen
+    // basmak "çark" hissini tamamen kaldırırdı.
+    const frames = 18;
+    let i = 0;
+    const tick = () => {
+      i++;
+      if (reelRef.current) {
+        const r = pool[Math.floor(Math.random() * pool.length)];
+        reelRef.current.textContent = r?.name || "";
+      }
+      if (i < frames) {
+        setTimeout(tick, 45 + i * 9);   // yavaşlayarak duruyor
+      } else {
+        setSpinning(false);
+        setPick(chosen);
+        setRecent(p => [chosen.id, ...p].slice(0, 3));
+        haptic(22);
+        trackEvent("roulette_spin", { restaurantId: chosen.id, category: cat || "all" });
+      }
+    };
+    setTimeout(tick, 60);
+  };
+
+  return (
+    <Screen grad={false}>
+      <div style={{ height: "100%", background: "linear-gradient(160deg, #1a0f00, #2b1400 55%, #1a0f00)", display: "flex", flexDirection: "column", padding: "44px 20px 20px", overflowY: "auto" }} className="gur-screen">
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+          <IconBtn onClick={onBack} tone="glassLight" title="Geri"
+            icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>} />
+          <GurLogo size={42} pill />
+          <div style={{ width: 40 }} />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 5px" }}>GUR Çark</h2>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.5 }}>
+            Kategoriyi seç, çarkı çevir. Yakınındaki mekânlardan biri çıksın.
+          </p>
+        </div>
+
+        {/* Konum durumu — "yakınında" derken neresi olduğunu saklamıyoruz */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "9px 13px", marginBottom: 16 }}>
+          <Icon n="pin" size={14} color={precise ? "#FFA500" : "rgba(255,255,255,0.4)"} />
+          <span style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.4 }}>
+            {precise ? "Bulunduğun konuma göre sıralanıyor" : "Konum kapalı — İstanbul merkezine göre sıralanıyor"}
+          </span>
+          {!precise && (
+            <Btn text="Konumu aç" onClick={() => geo.requestLocation()} variant="outline" size="sm" fullWidth={false} />
+          )}
+        </div>
+
+        {/* Kategori seçimi */}
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 9px" }}>Kategori</p>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 18, flexShrink: 0 }}>
+          {[null, ...cats].map(c => {
+            const active = cat === c;
+            return (
+              <button key={c || "all"} type="button" className="gur-btn"
+                onClick={() => { setCat(c); setPick(null); }}
+                style={{
+                  "--btn-bg": active ? BRAND_GRAD : "rgba(255,255,255,0.06)",
+                  "--btn-bg-hover": active ? BRAND_GRAD_HOVER : "rgba(255,255,255,0.12)",
+                  "--btn-bg-press": active ? BRAND_GRAD : "rgba(255,255,255,0.04)",
+                  "--btn-shadow": active ? ELEV.restBrand : "none",
+                  "--btn-shadow-press": active ? ELEV.pressBrand : "none",
+                  flexShrink: 0, border: active ? "none" : "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 999, padding: "9px 16px", outline: "none",
+                  fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700,
+                  color: active ? "#fff" : "rgba(255,255,255,0.7)", whiteSpace: "nowrap",
+                }}>
+                {c || "Farketmez"}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Çark kartı */}
+        <div style={{ background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 26, padding: "24px 20px", textAlign: "center", marginBottom: 14 }}>
+          {pick ? (
+            <motion.div
+              key={pick.id}
+              initial={{ opacity: 0, scale: 0.94, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: "spring", bounce: 0.2, duration: 0.45 }}>
+              <div onClick={() => onDetail(pick)} style={{ borderRadius: 20, overflow: "hidden", height: 150, position: "relative", marginBottom: 14, cursor: "pointer" }}>
+                <Img src={pick.imgs?.[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" box={360} />
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75), transparent 55%)" }} />
+                <div style={{ position: "absolute", left: 14, right: 14, bottom: 12, textAlign: "left" }}>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>{pick.name}</p>
+                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.75)", margin: 0 }}>
+                    ★ {pick.rating} · {pick.cat} · {distText(pick)}
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 9 }}>
+                <Btn text="Detayı aç" onClick={() => onDetail(pick)} variant="filled" size="md" />
+                <Btn text="Yol tarifi" onClick={() => onDirections?.(pick)} variant="outline" size="md" />
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <Btn text="Tekrar çevir" onClick={spin} variant="plain" size="sm" />
+              </div>
+            </motion.div>
+          ) : (
+            <>
+              <div style={{ width: 74, height: 74, borderRadius: "50%", background: "rgba(255,102,0,0.14)", border: "1px solid rgba(255,102,0,0.28)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                <motion.div
+                  animate={spinning ? { rotate: 360 } : { rotate: 0 }}
+                  transition={spinning ? { repeat: Infinity, ease: "linear", duration: 0.9 } : { type: "spring", bounce: 0.2, duration: 0.4 }}>
+                  <Icon n="sparkle" size={28} color="#FFA500" />
+                </motion.div>
+              </div>
+              <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px", lineHeight: 1.25 }}>
+                Nereye gideceğine<br />karar veremedin mi?
+              </h3>
+              {/* Makara: çevirirken isimler akar */}
+              <p ref={reelRef} style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600, color: spinning ? "#FFA500" : "rgba(255,255,255,0.45)", margin: "0 0 18px", minHeight: 20, lineHeight: 1.5 }}>
+                {spinning ? "" : (pool.length
+                  ? `${pool.length} yakın mekan arasından seçilecek`
+                  : "Bu kategoride yakında mekan bulunamadı")}
+              </p>
+              <Btn text={spinning ? "Çevriliyor…" : "Çarkı Çevir 🎲"} onClick={spin}
+                variant="filled" size="lg" disabled={!pool.length} loading={spinning} />
+            </>
+          )}
+        </div>
+
+        {pool.length > 0 && (
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.3)", textAlign: "center", margin: 0, lineHeight: 1.5 }}>
+            Havuz en yakın çevreden başlar; yeterli seçenek çıkana kadar
+            yarıçap büyür.
+          </p>
+        )}
+      </div>
+    </Screen>
+  );
+}
+
 function MatchStartScreen({ onBack, onStart }) {
   const [mode, setMode] = useState(null); // null | "create" | "join"
   const [code] = useState(() => makeInviteCode());
@@ -4151,7 +4427,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
               {r.name}
               {claimed && <VerifiedStar size={14} />}
             </span>
-            <span style={{ background: "#FF6600", borderRadius: 14, padding: "5px 14px", fontSize: 13, color: "#fff", fontWeight: 700, fontFamily: "'Outfit', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>{r.dist}</span>
+            <span style={{ background: "#FF6600", borderRadius: 14, padding: "5px 14px", fontSize: 13, color: "#fff", fontWeight: 700, fontFamily: "'Outfit', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>{distText(r)}</span>
           </div>
 
           {/* Açıklama */}
@@ -5014,6 +5290,18 @@ const CAT_MAP = {
   bar: "Gece Hayatı", pub: "Gece Hayatı",
 };
 
+// Kartlarda gösterilen mesafe. orderByProximity hesapladıysa gerçek değer
+// kullanılır; hesaplamadıysa (konum yok, liste sıralanmamış) kaydın kendi
+// metni. İki kaynak arasında seçim tek yerde yapılsın ki ekranlar ayrışmasın.
+function distText(r) {
+  if (Number.isFinite(r?.distanceKm)) {
+    return r.distanceKm < 1
+      ? `${Math.round(r.distanceKm * 1000)} m`
+      : `${r.distanceKm.toFixed(1)} km`;
+  }
+  return r?.dist || "";
+}
+
 function osmToRestaurant(el, idx) {
   const t = el.tags || {};
   const cuisineRaw = (t.cuisine || "").split(";")[0].trim().toLowerCase();
@@ -5220,6 +5508,7 @@ export default function GurApp(props = {}) {
   const goProfile = () => { nav("profile"); };
   const catTap = (cat) => { setFilterCat(cat); nav("swipe"); };
   const goMatch = () => { if (!platform.matchEnabled) return; setMatchResults([]); nav("match-start"); };
+  const goRoulette = () => nav("roulette");
   const startMatch = (code) => { setMatchCode(code); setMatchResults([]); nav("match-swipe"); };
   const finishMatch = (found) => { setMatchResults(found); nav("match-result"); };
   // Hesap silme: yerel durumun tamamı temizlenir (kalıcılık yok, backend yok)
@@ -5275,7 +5564,9 @@ export default function GurApp(props = {}) {
       case "rest2": return <RestRegStep2 onBack={back} onNext={() => nav("rest3")} />;
       case "rest3": return <RestRegStep3 onBack={back} onDone={() => nav("rest-dashboard")} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} />;
       case "rest-dashboard": return <RestaurantDashboard onLogout={() => { setHistory([]); setScreen("welcome"); }} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} ownerRestaurant={ownerRestaurant} />;
-      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} matchEnabled={platform.matchEnabled} restaurants={feed} onDetail={openDetail} />;
+      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} onRoulette={goRoulette} matchEnabled={platform.matchEnabled} restaurants={feed} onDetail={openDetail} />;
+      case "roulette": return <RouletteScreen onBack={back} restaurants={feed} onDetail={openDetail}
+        onDirections={(r) => { backend.trackDirections(r.id); window.open(directionsUrl({ lat: r.lat, lng: r.lng, name: r.name, address: r.addr }, defaultMapProvider()), "_blank", "noopener,noreferrer"); }} />;
       case "match-start": return <MatchStartScreen onBack={back} onStart={startMatch} />;
       case "match-swipe": return <MatchSwipeScreen code={matchCode} restaurants={feed} onExit={goExplore} onFinish={finishMatch} />;
       case "match-result": return <MatchResultScreen code={matchCode} matches={matchResults} onDetail={openDetail} onRestart={goMatch} onExplore={goExplore} />;
