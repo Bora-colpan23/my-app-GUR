@@ -2819,6 +2819,25 @@ function ExternalReviews({ reviews = [], restaurant, loading }) {
   );
 }
 
+// Sahiplenilmemiş mekânda menüye basılınca çıkan sayfa.
+//
+// Metin iki ekranda birebir aynı olmalı; kopyalayıp yapıştırmak ikisinin
+// zamanla ayrışması demek, o yüzden tek bileşen.
+function NotYetSheet({ r, onClose }) {
+  return (
+    <Sheet title="Bu mekan henüz GUR uldamadı" subtitle={r.name} onClose={onClose}>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "#57534E", lineHeight: 1.6, margin: "0 0 8px" }}>
+        {r.name} GUR'daki kaydını henüz sahiplenmedi. Sahiplendiği gün menüsü,
+        masa ayırtma ve tadım menüsü tam burada açılacak.
+      </p>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "#FF6600", margin: "0 0 16px" }}>
+        Çok yakında.
+      </p>
+      <Btn text="Tamam, beklerim" onClick={onClose} variant="filled" />
+    </Sheet>
+  );
+}
+
 // ═══════════════════════════════════════════════
 // KART DETAY SAYFASI — Bumble kalıbı
 //
@@ -3016,7 +3035,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "1px dashed rgba(45,36,25,0.16)", background: "#FBFAF8", borderRadius: 16, padding: "13px 15px", marginBottom: 16, cursor: "pointer", outline: "none" }}>
               <Icon n="doc" size={15} color="#A8A29E" />
               <span style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600, color: "#57534E" }}>Menü ve masa ayırtma</span>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#A8A29E" }}>Çok yakında</span>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#A8A29E" }}>Henüz GUR uldamadı</span>
             </button>
           )}
 
@@ -3062,13 +3081,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
       </motion.div>
 
       {soon && (
-        <Sheet title="Çok yakında" subtitle={r.name} onClose={() => setSoon(false)}>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "#57534E", lineHeight: 1.6, margin: "0 0 16px" }}>
-            Bu işletme GUR'daki kaydını henüz sahiplenmedi. Menü, masa ayırtma ve tadım
-            menüsü özellikleri işletme paneline geçtiğinde açılıyor.
-          </p>
-          <Btn text="Anladım" onClick={() => setSoon(false)} variant="filled" />
-        </Sheet>
+        <NotYetSheet r={r} onClose={() => setSoon(false)} />
       )}
 
       {/* Menü görseli tam ekran */}
@@ -4324,13 +4337,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
         <AnimatePresence>
           {sheet === "soon" && (
-            <Sheet title="Çok yakında" subtitle={r.name} onClose={() => setSheet(null)}>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "#57534E", lineHeight: 1.6, margin: "0 0 16px" }}>
-                Bu işletme GUR'daki kaydını henüz sahiplenmedi. Menü, masa ayırtma ve tadım
-                menüsü özellikleri işletme paneline geçtiğinde açılıyor.
-              </p>
-              <Btn text="Anladım" onClick={() => setSheet(null)} variant="filled" />
-            </Sheet>
+            <NotYetSheet r={r} onClose={() => setSheet(null)} />
           )}
           {sheet === "reserve" && (
             <ReservationSheet r={r} onClose={() => setSheet(null)}
