@@ -2414,10 +2414,46 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
     .map(d => ({ ...d, r: restaurants.find(x => x.id === d.restaurantId) }))
     .filter(d => d.r);
   const [showAll, setShowAll] = useState(false);
-  const [randomCats] = useState(() => {
-    const shuffled = [...CATEGORIES].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 4);
-  });
+  // ── Konum: başlıktaki satır ve "yakınında" sıralaması için ──
+  const loc = geo.useUserLocation();
+  useEffect(() => { geo.requestLocation({ silent: true }); }, []);
+  const precise = loc.source === "device";
+  const origin = precise ? { lat: loc.lat, lng: loc.lng } : geo.DEFAULT_ORIGIN;
+
+  // Yakınlık sırası bir kez hesaplanıp hem arama hem "yakınında popüler"
+  // için kullanılıyor: iki liste aynı mesafeyi iki türlü söylemesin.
+  const nearby = useMemo(
+    () => orderByProximity(restaurants, origin, { seed: "explore" }),
+    // origin nesnesi her çizimde yeni; kimliğine değil koordinatına bakıyoruz.
+    [restaurants, origin.lat, origin.lng]
+  );
+
+  // "Yakınında popüler": önce yakınlık, sonra puan. Tersi olsaydı şehrin
+  // öbür ucundaki 4.9'luk mekan hep başa gelirdi.
+  const popular = useMemo(
+    () => nearby.slice(0, 10).sort((a, b) => b.rating - a.rating).slice(0, 6),
+    [nearby]
+  );
+
+  const [query, setQuery] = useState("");
+  const results = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase("tr");
+    if (q.length < 2) return [];
+    return nearby.filter(r =>
+      r.name.toLocaleLowerCase("tr").includes(q) ||
+      r.cat.toLocaleLowerCase("tr").includes(q) ||
+      (r.tags || []).some(t => t.toLocaleLowerCase("tr").includes(q))
+    ).slice(0, 8);
+  }, [nearby, query]);
+
+  // Başlıkta gösterilen semt: koordinattan değil, en yakın kaydın adresinden
+  // türetiliyor — ters coğrafi kodlama için ağa çıkmaya değmez.
+  const districtLabel = useMemo(() => {
+    if (!precise) return "İstanbul merkezi";
+    const closest = nearby.find(r => Number.isFinite(r.distanceKm));
+    const part = closest?.addr?.split(",").map(x => x.trim()).filter(Boolean);
+    return part?.[part.length - 2] || part?.[0] || "Yakınındakiler";
+  }, [precise, nearby]);
 
   // Tüm Kategoriler overlay
   if (showAll) {
@@ -2463,16 +2499,84 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
   // Ana keşfet ekranı — 4 rastgele kategori
   return (
     <Screen>
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: "44px 16px 0" }}>
+      <div className="gur-screen" style={{ height: "100%", display: "flex", flexDirection: "column", padding: "44px 16px 0" }}>
 
-        {/* Logo + profil */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, position: "relative", animation: "fadeInUp 0.6s ease-out" }}>
-          <GurLogo size={42} pill />
-          <div style={{ position: "absolute", right: 0 }}>
+        {/* Gövde kayar, alt bar sabit kalır */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", margin: "0 -16px", padding: "0 16px" }}>
+
+        {/* Başlık: solda konum, ortada logo, sağda profil.
+            Konum satırı yeni: "yakınında" diyen bir uygulamanın nereye göre
+            konuştuğunu söylemesi gerekir. Dokununca hassas konum istenir. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, animation: "fadeInUp 0.6s ease-out" }}>
+          <button type="button" className="gur-btn" onClick={() => geo.requestLocation()}
+            style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, border: "none", background: "transparent", padding: 0, cursor: precise ? "default" : "pointer", outline: "none", textAlign: "left" }}>
+            <div style={{ width: 34, height: 34, borderRadius: 12, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon n="pin" size={16} color="#FF6600" />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 600, color: "rgba(45,36,25,0.45)", margin: 0, letterSpacing: 0.3 }}>
+                {precise ? "Konumun" : "Konum kapalı"}
+              </p>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#2D2419", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {districtLabel}{!precise && " ▾"}
+              </p>
+            </div>
+          </button>
+          <GurLogo size={38} pill />
+          <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
             <IconBtn onClick={onProfile} tone="solidLight" size={40} title="Profil">
               <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 800 }}>B</div>
             </IconBtn>
           </div>
+        </div>
+
+        {/* Arama — yazınca sonuçlar hemen altında açılır, ayrı ekrana gitmez */}
+        <div style={{ position: "relative", marginBottom: 14, flexShrink: 0 }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10, background: "#fff", borderRadius: 999,
+            padding: "6px 6px 6px 16px", boxShadow: ELEV.restLight,
+          }}>
+            <Icon n="search" size={17} color="rgba(45,36,25,0.35)" />
+            <input
+              value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="Ne yemek istersin?"
+              style={{
+                flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent",
+                fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 500, color: "#2D2419", padding: "10px 0",
+              }} />
+            {query ? (
+              <IconBtn onClick={() => setQuery("")} tone="subtle" size={36} title="Temizle"
+                icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8A7A68" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+            ) : (
+              <IconBtn onClick={onSwipe} tone="solidLight" size={36} title="Kaydırarak keşfet" elevated
+                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="13" height="16" rx="3" /><path d="M19 8v8" /></svg>} />
+            )}
+          </div>
+
+          {results.length > 0 && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 30,
+              background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: ELEV.floatLight,
+              maxHeight: 296, overflowY: "auto",
+            }}>
+              {results.map(r => (
+                <div key={r.id} onClick={() => { setQuery(""); onDetail?.(r); }}
+                  style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid rgba(45,36,25,0.05)" }}>
+                  <Img src={r.imgs?.[0]} box={46} style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0 }} bg="#e8e0d8" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "#2D2419", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</p>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#8A7A68", margin: 0 }}>{r.cat} · {distText(r)}</p>
+                  </div>
+                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#F59E0B", flexShrink: 0 }}>★ {r.rating}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {query.trim().length >= 2 && results.length === 0 && (
+            <div style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 30, background: "#fff", borderRadius: 20, padding: "16px 18px", boxShadow: ELEV.floatLight }}>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8A7A68", margin: 0 }}>"{query}" için sonuç yok</p>
+            </div>
+          )}
         </div>
 
         {/* Dönen banner — marka slaytı + sponsor reklamları, ekranın en üstünde */}
@@ -2554,30 +2658,77 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         </div>
         )}
 
-        {/* Başlık */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "#2D2419", margin: 0 }}>Senin İçin Öneriler</h3>
+        {/* Kategoriler — yuvarlak simge şeridi. 2×2 ızgaranın yerine geçti:
+            aynı işlev, daha az yer, tek bakışta daha çok seçenek. */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, flexShrink: 0 }}>
+          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "#2D2419", margin: 0 }}>Ne canın çekti?</h3>
+          <button type="button" className="gur-btn" onClick={() => setShowAll(true)}
+            style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
+            Tümü
+          </button>
         </div>
-
-        {/* 4 Rastgele Kategori — 2x2 grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, flex: 1, minHeight: 0 }}>
-          {randomCats.map((c, i) => (
-            <div key={c.name} onClick={() => onCategoryTap(c.name)} style={{
-              borderRadius: 20, overflow: "hidden", position: "relative", cursor: "pointer",
-              transition: "transform 0.15s", boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-              animation: `fadeInUp 0.4s ease-out ${i * 0.08}s both`,
-            }}
-              onMouseDown={e => e.currentTarget.style.transform = "scale(0.95)"}
-              onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
-              <Img src={c.img} style={{ position: "absolute", inset: 0 }} bg="#d4c8bc" />
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.05) 55%)" }} />
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px 14px" }}>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{c.name}</span>
+        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6, marginBottom: 16, flexShrink: 0 }}>
+          {CATEGORIES.slice(0, 8).map((c, i) => (
+            <motion.div key={c.name} onClick={() => onCategoryTap(c.name)}
+              whileTap={{ scale: 0.94 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+              style={{ flexShrink: 0, width: 66, cursor: "pointer", textAlign: "center", animation: `fadeInUp 0.4s ease-out ${i * 0.03}s both` }}>
+              <div style={{
+                width: 62, height: 62, borderRadius: "50%", overflow: "hidden", position: "relative",
+                margin: "0 auto 7px", border: "2px solid rgba(255,102,0,0.18)", boxShadow: ELEV.restLight,
+              }}>
+                <Img src={c.img} box={124} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" />
               </div>
-            </div>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#2D2419", lineHeight: 1.25, display: "block" }}>{c.name}</span>
+            </motion.div>
           ))}
         </div>
+
+        {/* Yakınında popüler — önce yakınlık, sonra puan */}
+        {popular.length > 0 && (
+          <div style={{ marginBottom: 16, flexShrink: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+              <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "#2D2419", margin: 0 }}>Yakınında popüler</h3>
+              <button type="button" className="gur-btn" onClick={onSwipe}
+                style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
+                Kaydırarak gez
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6 }}>
+              {popular.map(r => (
+                <motion.div key={r.id} onClick={() => onDetail?.(r)}
+                  whileTap={{ scale: 0.97 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                  style={{ flexShrink: 0, width: 208, background: "#fff", borderRadius: 22, overflow: "hidden", cursor: "pointer", boxShadow: ELEV.restLight }}>
+                  <div style={{ position: "relative", height: 116 }}>
+                    <Img src={r.imgs?.[0]} box={416} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" />
+                    {r.claimed && (
+                      <div style={{ position: "absolute", top: 9, right: 9, background: "rgba(255,255,255,0.92)", borderRadius: 999, padding: "3px 5px", display: "flex", alignItems: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }}>
+                        <VerifiedStar size={12} />
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ padding: "11px 13px 13px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 3 }}>
+                      <p style={{ flex: 1, minWidth: 0, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#2D2419", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</p>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0, fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 800, color: "#2D2419" }}>
+                        <Icon n="star" size={12} color="#F59E0B" />{r.rating}
+                      </span>
+                    </div>
+                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#8A7A68", margin: "0 0 10px" }}>{r.cat}</p>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0, fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#8A7A68" }}>
+                        <Icon n="pin" size={11} color="#A8A29E" />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{distText(r)}</span>
+                      </span>
+                      <span style={{ flexShrink: 0, fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 800, color: "#fff", background: BRAND_GRAD, borderRadius: 999, padding: "6px 13px", boxShadow: ELEV.restBrand }}>
+                        Aç
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Tüm Kategoriler butonu */}
         <div onClick={() => setShowAll(true)} style={{
@@ -2600,8 +2751,10 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
         </div>
 
+        </div>
+
         {/* Alt bar — beyaz, sabit */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", margin: "0 0 16px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", margin: "12px 0 16px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9)", flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF6600" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
