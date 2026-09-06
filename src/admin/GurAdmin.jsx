@@ -117,15 +117,14 @@ const REVENUE_STREAMS = [
   { key: 'rewardedAds', short: 'Ödüllü video', name: 'Ödüllü video reklam (kaydırma hakkı)', kind: 'Sponsorluk', monthly: 96000, unit: '~%78 tamamlanma', note: '10 kaydırma sonrası izlenen video, +5 hak kazandırır.' },
   { key: 'secondChance', short: 'İkinci Şans', name: 'İkinci Şans yerleşimi', kind: 'Performans', monthly: 41000, unit: '86 restoran', note: 'Geçilen restoranın desteye geri girmesi.' },
   { key: 'instantDeals', short: 'Anlık fırsat', name: 'Anlık fırsat bildirimleri', kind: 'Performans', monthly: 63000, unit: '140 yayın / ay', note: 'Ölü saat doldurma; yayın başına ücret.' },
-  { key: 'reservations', short: 'Rezervasyon', name: 'Rezervasyon ve menü komisyonu', kind: 'İşlem', monthly: 88000, unit: '%8 komisyon', note: 'Gerçekleşen işlem başına alınır.' },
-  { key: 'chefVideo', short: 'Şef videosu', name: 'Gastro şefli video paketi', kind: 'İçerik', monthly: 52000, unit: '8 çekim / ay', note: 'Üç büyük semtte VIP marka algısı.' },
-  { key: 'contentLicense', short: 'İçerik lisansı', name: 'Gastro içerik lisanslama', kind: 'İçerik', monthly: 39000, unit: '6 lisans / ay', note: '15 sn dikey videonun restorana devri.' },
-  { key: 'analyticsSaas', short: 'Analiz paneli', name: 'Restoran Analiz Paneli (SaaS)', kind: 'Abonelik', monthly: 145000, unit: '50 abone', note: 'Tıklama, kaydetme ve konum ilgisi verisi.' },
+  // Şef videosu ile içerik lisansı tek pakettir: video çekilmeden lisanslanacak
+  // içerik yok, çekildiğinde de zaten restorana devrediliyor. Bu paketi alan
+  // mekan Gastro Onaylı kategorisine girer — rozetin karşılığı bu çekimdir.
+  { key: 'gastroPackage', short: 'Gastro paketi', name: 'Gastro şef videosu paketi', kind: 'İçerik', monthly: 91000, unit: '8 çekim / ay', note: 'Şef çekimi + 15 sn dikey videonun süresiz kullanım hakkı. Gastro Onaylı rozetini getirir.' },
 ];
 
 const KIND_TONE = {
-  'Reklam': C.blue, 'Sponsorluk': C.orange, 'Performans': C.green,
-  'İşlem': C.yellow, 'İçerik': C.red, 'Abonelik': C.orange,
+  'Reklam': C.blue, 'Sponsorluk': C.orange, 'Performans': C.green, 'İçerik': C.red,
 };
 
 // İşletme abonelik paketleri. Adetler STATS.totalRestaurants ile uyumlu.
@@ -144,27 +143,20 @@ const STORE_SERVICES = {
   1: [ // Nusr-Et Steakhouse
     { key: 'bannerAds', monthly: 14000, since: '2025-11-04' },
     { key: 'pushAds', monthly: 6500, since: '2026-02-11' },
-    { key: 'chefVideo', monthly: 9000, since: '2025-12-20' },
-    { key: 'reservations', monthly: 7400, since: '2025-11-04' },
-    { key: 'analyticsSaas', monthly: 2900, since: '2025-11-04' },
+    { key: 'gastroPackage', monthly: 13200, since: '2025-12-20' },
   ],
   2: [ // Mikla
     { key: 'bannerAds', monthly: 11000, since: '2025-09-15' },
-    { key: 'chefVideo', monthly: 9000, since: '2026-01-08' },
-    { key: 'contentLicense', monthly: 4200, since: '2026-01-08' },
-    { key: 'reservations', monthly: 9600, since: '2025-09-15' },
-    { key: 'analyticsSaas', monthly: 2900, since: '2025-09-15' },
+    { key: 'gastroPackage', monthly: 13200, since: '2026-01-08' },
   ],
   9: [ // Çiya Sofrası
     { key: 'rewardedAds', monthly: 5200, since: '2026-03-02' },
     { key: 'instantDeals', monthly: 3100, since: '2026-04-19' },
-    { key: 'reservations', monthly: 4800, since: '2025-10-30' },
-    { key: 'analyticsSaas', monthly: 2900, since: '2025-10-30' },
+    { key: 'gastroPackage', monthly: 13200, since: '2026-02-10' },
   ],
   3: [ // La Sagrata Famila — Doyurucu panelinden yönetilen işletme
-    { key: 'reservations', monthly: 3900, since: '2026-01-16' },
     { key: 'instantDeals', monthly: 2400, since: '2026-03-08' },
-    { key: 'analyticsSaas', monthly: 2900, since: '2026-01-16' },
+    { key: 'secondChance', monthly: 1450, since: '2026-01-16' },
   ],
   4: [],  // Green Bowl — sahiplenilmemiş kayıt, satın alım yok
   6: [], // Klein Bistro — askıda, satın alım yok
@@ -176,9 +168,7 @@ const STORE_SERVICES = {
   12: [ // Karaköy Güllüoğlu
     { key: 'bannerAds', monthly: 9800, since: '2025-08-22' },
     { key: 'pushAds', monthly: 5200, since: '2026-03-30' },
-    { key: 'contentLicense', monthly: 4200, since: '2025-12-05' },
-    { key: 'reservations', monthly: 6100, since: '2025-08-22' },
-    { key: 'analyticsSaas', monthly: 2900, since: '2025-08-22' },
+    { key: 'gastroPackage', monthly: 13200, since: '2025-12-05' },
   ],
   7: [ // Lucca Lounge
     { key: 'pushAds', monthly: 4100, since: '2026-04-06' },
@@ -1418,7 +1408,7 @@ function GrowthPage() {
             ['Retention', 'Kayıt gününden N gün sonra en az bir ürün olayı üreten kullanıcı oranı. Sadece uygulamayı açmak yetmiyor.'],
             ['Etkileşim', 'Kohort başına kaydırma ve kaydetme sayısı; destenin doyup doymadığını gösterir.'],
             ['Dönüşüm', 'Sağa kaydırılan mekân için yol tarifi alınma ve konumla doğrulanmış ziyaret oranı — ürünün gerçek dünyadaki karşılığı.'],
-            ['LTV', 'Reklam + abonelik + komisyon gelirinin kullanıcı başına kümülatif toplamı; ARPU bunun aylığa bölünmüşü.'],
+            ['LTV', 'Reklam + abonelik gelirinin kullanıcı başına kümülatif toplamı; ARPU bunun aylığa bölünmüşü.'],
           ].map(([k, v]) => (
             <div key={k} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{ fontSize: 11.5, fontWeight: 700, color: C.orange, minWidth: 74 }}>{k}</span>
@@ -2396,8 +2386,8 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
 
   const group = (...kinds) => streams.filter(x => kinds.includes(x.kind)).reduce((a, x) => a + x.monthly, 0);
   const adRev = group('Reklam', 'Sponsorluk');
-  const txRev = group('İşlem', 'Performans');
-  const subRev = SUBS_TOTAL + group('Abonelik', 'İçerik');
+  const txRev = group('Performans');
+  const subRev = SUBS_TOTAL + group('İçerik');   // abonelik planları + Gastro paketi
 
   // ARPU/LTV: sunucudaki user_ltv anlık görüntüsünün panel karşılığı.
   const MAU = 41200;
@@ -2463,8 +2453,8 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
           <div style={{ flex: 1, minWidth: 320, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
             {[
               { label: 'Reklam ve sponsorluk', value: adRev, tone: C.blue, note: 'Banner, push, ödüllü video' },
-              { label: 'Abonelik ve içerik', value: subRev, tone: C.orange, note: 'Planlar, analiz paneli, lisans' },
-              { label: 'İşlem komisyonu', value: txRev, tone: C.green, note: 'Rezervasyon, anlık fırsat' },
+              { label: 'Abonelik ve içerik', value: subRev, tone: C.orange, note: 'İşletme planları, Gastro paketi' },
+              { label: 'Performans', value: txRev, tone: C.green, note: 'Anlık fırsat, İkinci Şans' },
             ].map(b => (
               <div key={b.label} style={{ background: 'rgba(255,255,255,0.035)', border: `1px solid ${C.border}`, borderRadius: R.control, padding: '13px 15px' }}>
                 <div style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: b.tone, marginBottom: 5 }}>{b.label}</div>

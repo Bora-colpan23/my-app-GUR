@@ -2319,10 +2319,11 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
 }
 
 // ═══════════════════════════════════════════════
-// GELİR: REZERVASYON
+// REZERVASYON
 // ═══════════════════════════════════════════════
-// Kullanıcı keşifle kalmıyor, doğrudan masa ayırtıyor. Platform yalnızca
-// gerçekleşen rezervasyondan komisyon alır.
+// Kullanıcı keşifle kalmıyor, doğrudan masa ayırtıyor. Ne kullanıcıdan ne
+// işletmeden ücret alınıyor: rezervasyon platformun gelir kalemi değil,
+// keşfin sonucu.
 
 function ReservationSheet({ r, onClose, onConfirm }) {
   const [people, setPeople] = useState(2);
@@ -2359,7 +2360,7 @@ function ReservationSheet({ r, onClose, onConfirm }) {
 
       <Btn text={time ? `${day} ${time} • ${people} kişi — Onayla` : "Saat seçin"} onClick={() => time && onConfirm({ day, time, people, deal })} variant="filled" disabled={!time} />
       <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(45,36,25,0.4)", textAlign: "center", margin: "12px 0 0", lineHeight: 1.5 }}>
-        Rezervasyon ücretsizdir. Restoran, gerçekleşen rezervasyon başına platforma komisyon öder.
+        Rezervasyon ücretsizdir. Ne senden ne restorandan komisyon alınır.
       </p>
     </Sheet>
   );

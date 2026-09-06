@@ -1377,7 +1377,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
             <div>
               <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
                 <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>
-                  Görünürlüğünüzü artıran ve doğrudan gelir getiren paketler. Platform bunların bir kısmında işlem başına komisyon alır.
+                  Görünürlüğünüzü artıran paketler. Rezervasyon ve menü ücretsizdir — GUR bunlardan komisyon almaz.
                 </p>
               </div>
 
@@ -1443,10 +1443,10 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                   <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: "16px 18px" }}>
                     <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Rezervasyon</p>
                     <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
-                      Kullanıcı uygulamadan masa ayırtır. Komisyon yalnızca gerçekleşen rezervasyondan alınır.
+                      Kullanıcı uygulamadan masa ayırtır, talep panelinize düşer. Ücretsizdir — GUR rezervasyondan komisyon almaz.
                     </p>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                      {[["Bu ay", "38"], ["Ciro", "₺52.400"], ["Komisyon", "₺4.192"]].map(([k, v]) => (
+                      {[["Bu ay", "38"], ["Ciro", "₺52.400"], ["GUR payı", "₺0"]].map(([k, v]) => (
                         <div key={k} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "11px 12px" }}>
                           <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 3px" }}>{k}</p>
                           <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "#fff", margin: 0 }}>{v}</p>
@@ -1457,16 +1457,11 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                 )}
               </GrowthSection>
 
-              <GrowthSection title="İçerik Lisansı ve Analiz">
+              <GrowthSection title="Gastro Paketi">
                 <GrowthCard
-                  title="Gastro Video Lisansı" price="₺6.500 / video" active={bought.license}
-                  desc="Şefin çektiği 15 sn dikey videoyu kendi sosyal medya hesaplarınızda süresiz kullanma hakkı."
-                  onBuy={() => buy("license", "Video lisansı satın alındı")}
-                />
-                <GrowthCard
-                  title="Analiz Paneli" price="₺2.900 / ay" active={bought.saas}
-                  desc="Tıklama, kaydetme ve konum bazlı ilgi verisi; rakip semt kıyaslaması ve haftalık rapor."
-                  onBuy={() => buy("saas", "Analiz Paneli aboneliği başlatıldı")}
+                  title="Gastro Şef Videosu Paketi" price="₺13.200 / ay" active={bought.license}
+                  desc="Tanınmış bir şef mekânınızda 15 sn dikey video çeker; video hem uygulamada galeride yayınlanır hem de kendi sosyal medyanızda süresiz kullanılır. Paketi alan mekan Gastro Onaylı kategorisine girer."
+                  onBuy={() => buy("license", "Gastro paketi satın alındı")}
                 />
               </GrowthSection>
             </div>
