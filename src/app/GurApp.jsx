@@ -22,7 +22,6 @@ import { usePlatformSettings, useFeature } from '../lib/platform.js';
 import * as reservations from '../lib/reservations.js';
 import * as pricing from '../lib/pricing.js';
 import * as geo from '../lib/geo.js';
-import { useApplyTheme, useTheme } from '../lib/theme.js';
 import { seenCampaigns, markShown } from '../lib/ad-frequency.js';
 import { signIn as socialSignIn, isAppleDevice, isConfigured as socialConfigured } from '../lib/social-auth.js';
 
@@ -3147,44 +3146,6 @@ const BADGES = [
   { icon: "flame", label: "Sadık Müşteri" },
 ];
 
-// Tema seçici: üç durumlu segment. İki durumlu bir anahtar "sistem"i
-// söyleyemez; kullanıcının cihazına verdiği karar da bir seçenektir.
-function ThemePicker() {
-  const { mode, setMode } = useTheme();
-  const items = [
-    { id: "system", label: "Sistem", icon: "sparkle" },
-    { id: "light", label: "Açık", icon: "sun" },
-    { id: "dark", label: "Koyu", icon: "moon" },
-  ];
-  return (
-    <div role="radiogroup" aria-label="Tema"
-      style={{ display: "flex", gap: 8, background: "var(--c-subtle)", border: "1px solid var(--c-border)", borderRadius: 999, padding: 4 }}>
-      {items.map(it => {
-        const active = mode === it.id;
-        return (
-          <button
-            key={it.id} type="button" className="gur-btn"
-            role="radio" aria-checked={active}
-            onClick={() => setMode(it.id)}
-            style={{
-              "--btn-bg": active ? BRAND_GRAD : "transparent",
-              "--btn-bg-hover": active ? BRAND_GRAD : "var(--c-brand-soft)",
-              "--btn-bg-press": active ? BRAND_GRAD : "var(--c-border)",
-              "--btn-shadow": active ? ELEV.restBrand : "none",
-              flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
-              border: "none", borderRadius: 999, padding: "9px 10px", outline: "none",
-              fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700,
-              color: active ? "#fff" : "var(--c-ink-2)",
-            }}>
-            <Icon n={it.icon} size={13} color={active ? "#fff" : "var(--c-muted)"} />
-            {it.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onDetail, accentColor = "#FF6600", showBadges = true, badgeSpeed = 14, userReviews = {}, restaurants = [], onRemoveUserReview, onDeleteAccount, onLegal }) {
   const [tab, setTab] = useState("reviews");
   // Rezervasyonlar: şerit geçici, burası kalıcı kayıt. Kullanıcı "onay
@@ -3371,15 +3332,6 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
               );
             })
           )}
-
-          {/* Görünüm — geri alınabilir tercihler bir arada */}
-          <div style={{ marginTop: 30, paddingTop: 18, borderTop: "1px solid var(--c-border)" }}>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 4px" }}>Görünüm</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
-              Sistem seçiliyken uygulama telefonunun gece moduyla birlikte değişir.
-            </p>
-            <ThemePicker />
-          </div>
 
           {/* Hesap — geri alınamayan işlem, listelerden ayrı ve en altta */}
           <div style={{ marginTop: 30, paddingTop: 18, borderTop: "1px solid var(--c-border)" }}>
@@ -3592,7 +3544,6 @@ export default function GurApp(props = {}) {
   const [matchResults, setMatchResults] = useState([]);
   // Yönetici panelinin açıp kapattığı özellik kapıları (src/lib/platform.js).
   const platform = usePlatformSettings();
-  useApplyTheme();   // seçilen tema kök öğeye yazılır
   // Kullanıcının yazdığı yorumlar restoran id'sine göre — hem restoran
   // detayında hem profildeki "Yorumlarım" listesinde aynı kaynaktan okunur
   const [userReviews, setUserReviews] = useState({});

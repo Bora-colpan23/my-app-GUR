@@ -84,8 +84,6 @@ export function Icon({ n, size = 18, color = "currentColor", strokeWidth = 2 }) 
     palette: <><path d="M12 21a9 9 0 010-18 5 5 0 010 10h-1a2 2 0 000 4h1" /><circle cx="8.5" cy="10.5" r="1" fill={color} stroke="none" /><circle cx="12" cy="7.5" r="1" fill={color} stroke="none" /><circle cx="15.5" cy="10.5" r="1" fill={color} stroke="none" /></>,
     doc: <><path d="M6 2h9l5 5v15H6z" /><path d="M15 2v5h5" /></>,
     camera: <><path d="M4 8h3l2-3h6l2 3h3v12H4z" /><circle cx="12" cy="14" r="3.5" /></>,
-    sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>,
-    moon: <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />,
     sparkle: <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18" />,
     check: <polyline points="20 6 9 17 4 12" />,
     clock: <><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 16 14" /></>,
@@ -473,7 +471,7 @@ export function GurStyles() {
         /* ── TEMA JETONLARI ────────────────────────────────────────────
            Uygulama satır içi stille yazıldığı için renkler CSS
            değişkenlerinden okunuyor: satır içi stil sınıf kuralını yener
-           ama var() değerini okur. Tema değişimi tek yerden.
+           ama var() değerini okur. Palet tek yerden değişir.
 
            Açık temadaki gri tonları WCAG AA için koyulaştırıldı:
            eski #A8A29E beyaz üstünde 2.6:1 idi (metin için geçersiz),
@@ -494,25 +492,8 @@ export function GurStyles() {
           --c-brand-ink: #B4530A;       /* turuncu zemin üstünde metin */
           --shadow-bar: 0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9);
         }
-        :root[data-theme="dark"] {
-          --c-bg: #0E0C10;
-          --c-bg-2: #17141A;
-          --c-card: #1A171E;
-          --c-subtle: #221E27;
-          --c-ink: #F4F1EE;
-          --c-ink-2: #C9C2BA;
-          --c-muted: #9A9189;
-          --c-line: #2E2933;
-          --c-border: rgba(255,255,255,0.10);
-          --c-img-bg: #2A2530;
-          --c-shadow: rgba(0,0,0,0.55);
-          --c-brand-soft: rgba(255,102,0,0.16);
-          --c-brand-ink: #FFB170;
-          --shadow-bar: 0 10px 30px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
-        }
-        /* Tarayıcı de form denetimlerini ve kaydırma çubuğunu temaya uydursun */
+        /* Tarayıcı form denetimlerini ve kaydırma çubuğunu açık temaya uydursun */
         :root { color-scheme: light; }
-        :root[data-theme="dark"] { color-scheme: dark; }
 
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');

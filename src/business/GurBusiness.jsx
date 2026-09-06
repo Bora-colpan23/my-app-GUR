@@ -31,7 +31,6 @@ import { fileToSquareDataUrl } from '../lib/image.js';
 import { useFeature } from '../lib/platform.js';
 import * as reservations from '../lib/reservations.js';
 import * as pricing from '../lib/pricing.js';
-import { useApplyTheme } from '../lib/theme.js';
 import * as backend from '../lib/backend.js';
 import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
@@ -1698,7 +1697,6 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 // ═══════════════════════════════════════════════════════════════════════
 export default function GurBusiness() {
   const [screen, setScreen] = useState("auth");   // auth | login | claim | reg1..3 | dashboard
-  useApplyTheme();   // tüketici uygulamasıyla aynı tema
   const [history, setHistory] = useState([]);
   // Yüklenen menü ve fotoğraflar: panelde girilen medya tüketici tarafına
   // da gidiyor (withOwnerMedia), o yüzden kökte duruyor.

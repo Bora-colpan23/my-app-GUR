@@ -123,11 +123,11 @@ Bir mekanın kimliği tek yerde: `account` alanı işletmenin hesabı olup
 olmadığını söyler. Hesabı olmayan (yalnız dış beslemeden gelen) mekanlar
 fiyatlandırma panelinde görünmez — teklif gönderilecek muhatap yoktur.
 
-### Tema: açık / koyu / sistem
-Uygulama satır içi stille yazıldığı için renkler CSS değişkenlerinden
+### Renk paleti: tek açık tema
+Uygulamanın tek bir açık teması var; koyu tema **bilinçli olarak yok**.
+Uygulama satır içi stille yazıldığı için renkler yine CSS değişkenlerinden
 okunuyor (`src/ui/kit.jsx` → `GurStyles`): satır içi stil sınıf kuralını
-yener ama `var()` değerini okur. Tema `data-theme` özniteliğiyle kök öğeye
-yazılır (`src/lib/theme.js`), üç seçenek var — sistem varsayılan.
+yener ama `var()` değerini okur. Böylece palet tek yerden değişir.
 
 Yeni renk yazarken **jeton kullan**: `var(--c-card)`, `var(--c-ink)`,
 `var(--c-ink-2)`, `var(--c-muted)`, `var(--c-border)`, `var(--c-subtle)`.
