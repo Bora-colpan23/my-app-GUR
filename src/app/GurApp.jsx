@@ -10,6 +10,7 @@ import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
 import { usePlatformSettings, useFeature } from '../lib/platform.js';
 import * as reservations from '../lib/reservations.js';
+import * as pricing from '../lib/pricing.js';
 import * as geo from '../lib/geo.js';
 import { seenCampaigns, markShown } from '../lib/ad-frequency.js';
 import { signIn as socialSignIn, isAppleDevice, isConfigured as socialConfigured } from '../lib/social-auth.js';
@@ -1915,6 +1916,101 @@ function TableRequests({ restaurant }) {
   );
 }
 
+// GUR'un işletmeye gönderdiği fiyat teklifleri. Yönetici panelinde
+// "Gelir kalemleri"nden gönderiliyor (src/lib/pricing.js); kabul edilene
+// kadar yürürlükteki fiyat değişmiyor, karar burada veriliyor.
+function PriceOffers({ restaurant }) {
+  const store = pricing.usePricing();
+  const mine = store.offers.filter(o => String(o.restaurantId) === String(restaurant?.id));
+  const open = mine.filter(o => o.status === "pending");
+  const past = mine.filter(o => o.status !== "pending");
+
+  useEffect(() => {
+    if (restaurant?.id) pricing.markOffersSeen(restaurant.id);
+  }, [restaurant?.id, mine.length]);
+
+  const fmt = (n) => `₺${Math.round(n).toLocaleString("tr")}`;
+
+  const card = (o, actionable) => {
+    const cheaper = o.offerMonthly < o.currentMonthly;
+    const diff = o.currentMonthly ? Math.round(((o.offerMonthly - o.currentMonthly) / o.currentMonthly) * 100) : null;
+    return (
+      <div key={o.id} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, padding: "14px 16px", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 13, background: "rgba(255,102,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon n="sparkle" size={17} color="#FF9A4D" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>{o.streamName}</p>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0 }}>
+              GUR'dan fiyat teklifi
+            </p>
+          </div>
+          {!actionable && (
+            <span style={{
+              fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 800, borderRadius: 999, padding: "4px 11px",
+              color: o.status === "accepted" ? "#4CAF50" : "rgba(255,255,255,0.4)",
+              background: o.status === "accepted" ? "rgba(76,175,80,0.14)" : "rgba(255,255,255,0.06)",
+            }}>{o.status === "accepted" ? "Kabul edildi" : "Reddedildi"}</span>
+          )}
+        </div>
+
+        {/* Eski ve yeni fiyat yan yana: teklif tek başına bir sayı değil, bir değişiklik */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(0,0,0,0.22)", borderRadius: 14, padding: "11px 14px", marginBottom: actionable ? 12 : 0 }}>
+          <div>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Şu anki</p>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: 0, textDecoration: "line-through" }}>{fmt(o.currentMonthly)}</p>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.4" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="13 6 19 12 13 18" /></svg>
+          <div>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Teklif</p>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, color: cheaper ? "#4CAF50" : "#FFA500", margin: 0 }}>{fmt(o.offerMonthly)}<span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}> /ay</span></p>
+          </div>
+          {diff !== null && diff !== 0 && (
+            <span style={{ marginLeft: "auto", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 800, color: cheaper ? "#4CAF50" : "#FFA500" }}>
+              {diff > 0 ? "+" : ""}{diff}%
+            </span>
+          )}
+        </div>
+
+        {o.note && (
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.55)", margin: actionable ? "0 0 12px" : "10px 0 0", lineHeight: 1.5 }}>"{o.note}"</p>
+        )}
+
+        {actionable && (
+          <div style={{ display: "flex", gap: 9 }}>
+            <Btn text="Kabul et" onClick={() => pricing.decideOffer(o.id, "accepted")} variant="filled" size="sm" />
+            <Btn text="Reddet" onClick={() => pricing.decideOffer(o.id, "declined")} variant="destructiveSoft" size="sm" />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Size gelen teklifler</p>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 12px", lineHeight: 1.5 }}>
+        Kullandığınız hizmetlerin fiyatına dair GUR'dan gelen teklifler.
+        Kabul etmediğiniz sürece mevcut fiyatınız değişmez.
+      </p>
+      {open.length === 0 && (
+        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.1)", borderRadius: 18, padding: "22px 16px", textAlign: "center", marginBottom: 16 }}>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.38)", margin: 0 }}>Bekleyen teklif yok</p>
+        </div>
+      )}
+      {open.map(o => card(o, true))}
+
+      {past.length > 0 && (
+        <>
+          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 800, color: "#fff", margin: "18px 0 10px" }}>Geçmiş</p>
+          {past.map(o => card(o, false))}
+        </>
+      )}
+    </div>
+  );
+}
+
 function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaurant }) {
   const [activeTab, setActiveTab] = useState("stats");
   // Masa ayırtma yönetici panelinden kapatılabiliyor; kapalıysa sekme de
@@ -1923,6 +2019,9 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
   const allReservations = reservations.useReservations();
   const pendingCount = allReservations.filter(
     x => x.restaurantId === String(ownerRestaurant?.id) && x.status === "pending").length;
+  const priceStore = pricing.usePricing();
+  const openOffers = priceStore.offers.filter(
+    o => String(o.restaurantId) === String(ownerRestaurant?.id) && o.status === "pending").length;
   const [bought, setBought] = useState({});
   const [notice, setNotice] = useState(null);
   const buy = (key, label) => { setBought(p => ({ ...p, [key]: true })); setNotice(label); setTimeout(() => setNotice(null), 2200); };
@@ -2023,6 +2122,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
             {[
               { id: "stats", label: "İstatistikler" },
               ...(canReserve ? [{ id: "tables", label: "Masalar", badge: pendingCount }] : []),
+              { id: "offers", label: "Teklifler", badge: openOffers },
               { id: "info", label: "Bilgiler" },
               { id: "reviews", label: "Yorumlar" },
               { id: "menu", label: "Menü" },
@@ -2051,6 +2151,11 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
               Masayı verecek taraf işletme olduğu için karar da burada. */}
           {activeTab === "tables" && canReserve && (
             <TableRequests restaurant={ownerRestaurant} />
+          )}
+
+          {/* ─── TAB: Fiyat teklifleri ─── */}
+          {activeTab === "offers" && (
+            <PriceOffers restaurant={ownerRestaurant} />
           )}
 
           {/* ─── TAB: İşletme bilgileri ─── */}
