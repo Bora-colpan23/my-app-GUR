@@ -6,12 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>GUR — Restoran Keşif Platformu</title>
     <meta name="description" content="GUR, İstanbul'da restoran keşfetmenin en hızlı yolu: kaydır, beğen, Gastro Onaylı mekanları keşfet." />
-    <meta name="theme-color" content="#0d0d1a" />
+    <!-- Telefonda uygulama ekranı kaplar ve teması açıktır; tarayıcı çubuğu
+         da ona uysun. Masaüstündeki koyu sahne yalnızca önizleme zeminidir. -->
+    <meta name="theme-color" content="#FDFBF7" />
+    <!-- Ana ekrana eklendiğinde tarayıcı çubuğu olmadan açılsın -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="GUR" />
     <!-- Google Search Console doğrulaması: mülkü oluşturduktan sonra "HTML
          etiketi" yöntemiyle verilen içeriği aşağıya yazıp yorumu kaldırın.
          Alternatifi DNS TXT kaydıdır ve alan adı sizdeyse o daha sağlamdır. -->
     <!-- <meta name="google-site-verification" content="BURAYA_DOGRULAMA_KODU" /> -->
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <!-- Uygulama ikonu: turuncu GUR marka pili. Satır içi SVG favicon
          masaüstü tarayıcılarda, PNG ise iOS ana ekran kısayolunda kullanılır. -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23FF6600'/%3E%3Ctext x='32' y='42.5' font-family='Poppins,Helvetica,Arial,sans-serif' font-size='23' font-weight='800' fill='%23ffffff' text-anchor='middle'%3EGUR%3C/text%3E%3C/svg%3E" />
@@ -22,12 +29,25 @@
          yavaş/erişilemez olduğunda modül scriptinin çalışmasını da geciktirip
          uygulamayı bomboş bırakıyor. Bu yolla Poppins gelene kadar sistem
          yazı tipiyle açılır. -->
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" /></noscript>
+    <!-- İKİ aile de buradan gelir. Daha önce Outfit yalnızca GurStyles
+         içindeki bir @import ile isteniyordu; @import başka kurallardan
+         sonra geldiği için CSS kuralınca geçersizdi ve Outfit hiç
+         yüklenmiyordu: arayüz iOS'ta Helvetica, Android'de Roboto ile
+         çiziliyordu. Tek istekte ikisi birden alınır. -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" /></noscript>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: 'Poppins', system-ui, sans-serif; background: #0d0d1a; }
-      #root { min-height: 100vh; }
+      /* iOS yatay çevrildiğinde metni kendiliğinden büyütür; kapatıyoruz.
+         overscroll-behavior: Android Chrome'da aşağı çekince sayfa
+         yenileniyordu — YEREL modda bu, yazılan her şeyi siler. */
+      html {
+        -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+        overscroll-behavior: none;
+      }
+      body { font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0d0d1a; overscroll-behavior: none; }
+      /* dvh: mobil tarayıcıda adres çubuğu gizlenince 100vh ekranı taşırıyor */
+      #root { min-height: 100vh; min-height: 100dvh; }
     </style>
   </head>
   <body>

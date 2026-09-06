@@ -237,7 +237,11 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
         x: isTop ? x : 0, y: isTop ? y : 0, rotate: isTop ? rotate : 0, opacity: isTop ? dragOpacity : 1,
         position: "absolute", inset: 0,
         cursor: isTop ? (dragging ? "grabbing" : "grab") : "default",
-        userSelect: "none", pointerEvents: isTop ? "auto" : "none", zIndex: isTop ? 2 : 1,
+        userSelect: "none", WebkitTouchCallout: "none", pointerEvents: isTop ? "auto" : "none", zIndex: isTop ? 2 : 1,
+        // Hareket iki eksende de bizim: Android Chrome aksi hâlde dikey
+        // sürüklemeyi sayfa kaydırması sanıp "yukarı = hemen gitmek
+        // istiyorum" hareketini yutabiliyor. sheets.jsx da bunu açıkça yazıyor.
+        touchAction: isTop ? "none" : "auto",
         borderRadius: 24, overflow: "hidden",
         boxShadow: isTop ? "0 12px 48px rgba(0,0,0,0.35)" : "0 4px 16px rgba(0,0,0,0.1)",
       }}
@@ -250,16 +254,16 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
       {isTop && (
         <>
           <motion.div style={{ opacity: favOpacity, position: "absolute", top: 90, left: 24, zIndex: 10, border: "4px solid #4CAF50", borderRadius: 14, padding: "8px 22px", transform: "rotate(-15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#4CAF50" }}>FAV!</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "#4CAF50" }}>FAV!</span>
           </motion.div>
           <motion.div style={{ opacity: nopeOpacity, position: "absolute", top: 90, right: 24, zIndex: 10, border: "4px solid #FF3B30", borderRadius: 14, padding: "8px 22px", transform: "rotate(15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#FF3B30" }}>NOPE</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "#FF3B30" }}>NOPE</span>
           </motion.div>
           {/* Yukarı kaydırma etiketi ortada: yön hangi karara gittiğini
               hareketin kendisiyle aynı eksende söylüyor (§8) */}
           <motion.div style={{ opacity: superOpacity, position: "absolute", top: 140, left: "50%", translateX: "-50%", zIndex: 10, border: "4px solid #38BDF8", borderRadius: 14, padding: "8px 22px", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", gap: 7 }}>
             <Icon n="sparkle" size={14} color="#38BDF8" />
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#38BDF8" }}>RESTORANA GİT</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#38BDF8" }}>RESTORANA GİT</span>
           </motion.div>
         </>
       )}
@@ -271,14 +275,14 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
       {r.sponsored && (
         <div style={{ position: "absolute", top: 54, right: 14, zIndex: 6, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.38)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 20, padding: "4px 11px" }}>
           <Icon n="sparkle" size={10} color="rgba(255,255,255,0.75)" />
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.85)", letterSpacing: 0.2 }}>{r.sponsored.label}</span>
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.85)", letterSpacing: 0.2 }}>{r.sponsored.label}</span>
         </div>
       )}
       {/* İşletmenin kendi yüklediği fotoğraflar öne alınır ve işaretlenir */}
       {ii < (r.ownerPhotoCount || 0) && (
         <div style={{ position: "absolute", top: 54, left: 14, zIndex: 6, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 20, padding: "4px 11px" }}>
           <Icon n="camera" size={11} color="#FFA500" />
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#fff" }}>İşletmeden</span>
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, color: "#fff" }}>İşletmeden</span>
         </div>
       )}
       {/* Photo indicators */}
@@ -288,18 +292,18 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 30%, transparent 55%)", borderRadius: 24 }} />
       {/* Content */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
-        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", gap: 7 }}>
+        <h3 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", gap: 7 }}>
           {r.name}
           {(r.claimed || r.ownerClaimed) && <VerifiedStar size={15} title="İşletme hesabı doğrulanmış" />}
         </h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
-          <span style={{ background: "#fff", borderRadius: 10, padding: "4px 12px", fontSize: 13, fontWeight: 700, color: "#1C1917", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="#F59E0B" size={12} />{r.rating}</span>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "'Outfit', sans-serif" }}>{distText(r)}</span>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "'Outfit', sans-serif" }}>•  {r.price}</span>
+          <span style={{ background: "#fff", borderRadius: 10, padding: "4px 12px", fontSize: 13, fontWeight: 700, color: "#1C1917", fontFamily: "var(--f-body)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="#F59E0B" size={12} />{r.rating}</span>
+          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "var(--f-body)" }}>{distText(r)}</span>
+          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "var(--f-body)" }}>•  {r.price}</span>
         </div>
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(255,255,255,0.85)", margin: "0 0 12px", lineHeight: 1.45 }}>{r.desc}</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "rgba(255,255,255,0.85)", margin: "0 0 12px", lineHeight: 1.45 }}>{r.desc}</p>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-          {r.tags.map(t => <span key={t} style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 14px", fontSize: 12, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>{t}</span>)}
+          {r.tags.map(t => <span key={t} style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 14px", fontSize: 12, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 600 }}>{t}</span>)}
         </div>
         {/* Detay davetiyesi. Kartın kendisi yukarı kaydırınca süper beğeni
             olduğu için detay ayrı bir hedefte: dokunmak açar. */}
@@ -308,7 +312,7 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
           onClick={e => { e.stopPropagation(); onTap?.(); }}
           style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", border: "none", background: "rgba(255,255,255,0.14)", backdropFilter: "blur(10px)", borderRadius: 999, padding: "9px 0", cursor: "pointer", outline: "none" }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Menü, saatler ve yol tarifi</span>
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Menü, saatler ve yol tarifi</span>
         </button>
       </div>
       </>}
@@ -337,7 +341,7 @@ function SplashScreen({ onNext }) {
   const letterStyle = (letter, delay) => ({
     fontSize: phase >= 4 ? 110 : 130,
     fontWeight: 900,
-    fontFamily: "'Poppins', sans-serif",
+    fontFamily: "var(--f-display)",
     display: "inline-block",
     opacity: phase >= (letter === "G" ? 1 : letter === "U" ? 2 : 3) ? 1 : 0,
     transform: phase >= 4
@@ -370,7 +374,7 @@ function SplashScreen({ onNext }) {
 
         {/* Alt yazı — harfler birleştikten sonra */}
         <p style={{
-          fontFamily: "'Outfit', sans-serif", fontSize: 14,
+          fontFamily: "var(--f-body)", fontSize: 14,
           color: "#bbb",
           marginTop: 20,
           opacity: phase >= 4 ? 1 : 0,
@@ -409,7 +413,7 @@ function WelcomeScreen({ onStart }) {
           </div>
 
           <p style={{
-            fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#ccc",
+            fontFamily: "var(--f-body)", fontSize: 16, color: "#ccc",
             marginTop: 10, letterSpacing: 2,
             opacity: show ? 1 : 0, transform: show ? "translateY(0)" : "translateY(10px)",
             transition: "all 0.5s ease-out 0.4s",
@@ -436,14 +440,14 @@ function WelcomeScreen({ onStart }) {
           </div>
 
           <h2 style={{
-            fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff",
+            fontFamily: "var(--f-body)", fontSize: 28, color: "#fff",
             textAlign: "center", margin: "14px 0 6px",
             textShadow: "0 2px 8px rgba(0,0,0,0.1)",
           }}>
             Hoş geldin!
           </h2>
           <p style={{
-            fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.75)",
+            fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.75)",
             textAlign: "center", margin: "0 0 28px", lineHeight: 1.5,
           }}>
             İstanbul'un en iyi restoranlarını keşfet, favorilerini kaydet
@@ -458,7 +462,7 @@ function WelcomeScreen({ onStart }) {
               çalışıyor (dev/üretimde yol tabanlı, tek dosyalık artifact
               önizlemesinde hash tabanlı). <Link> hedefi hangisiyse ona göre
               yazar; sabit "/isletme" önizlemede olmayan bir yola giderdi. */}
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.6)", textAlign: "center", margin: "16px 0 0", lineHeight: 1.55 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.6)", textAlign: "center", margin: "16px 0 0", lineHeight: 1.55 }}>
             Restoran sahibi misin?{" "}
             <Link to="/isletme" style={{ color: "#fff", fontWeight: 700, textDecoration: "underline" }}>Doyurucu uygulamasına geç</Link>
           </p>
@@ -503,7 +507,7 @@ function SocialAuthRow({ onDone, tone = "light" }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0 14px" }}>
         <div style={{ flex: 1, height: 1, background: line }} />
-        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: dim, fontWeight: 600 }}>veya</span>
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: dim, fontWeight: 600 }}>veya</span>
         <div style={{ flex: 1, height: 1, background: line }} />
       </div>
 
@@ -513,7 +517,7 @@ function SocialAuthRow({ onDone, tone = "light" }) {
           width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10,
           padding: "14px 0", borderRadius: 999, border: "1px solid rgba(45,36,25,0.14)",
           background: "var(--c-card)", cursor: busy ? "wait" : "pointer", outline: "none",
-          fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 600, color: "var(--c-ink)",
+          fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 600, color: "var(--c-ink)",
           opacity: busy === "google" ? 0.6 : 1, marginBottom: 10,
         }}>
         <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
@@ -532,7 +536,7 @@ function SocialAuthRow({ onDone, tone = "light" }) {
             width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9,
             padding: "14px 0", borderRadius: 999, border: "none", background: "#000",
             cursor: busy ? "wait" : "pointer", outline: "none",
-            fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 600, color: "#fff",
+            fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 600, color: "#fff",
             opacity: busy === "apple" ? 0.6 : 1,
           }}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
@@ -543,10 +547,10 @@ function SocialAuthRow({ onDone, tone = "light" }) {
       )}
 
       {error && (
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#FF3B30", textAlign: "center", margin: "9px 0 0" }}>{error}</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "#FF3B30", textAlign: "center", margin: "9px 0 0" }}>{error}</p>
       )}
       {!socialConfigured.google && (
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: dim, textAlign: "center", margin: "9px 0 0", lineHeight: 1.5 }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: dim, textAlign: "center", margin: "9px 0 0", lineHeight: 1.5 }}>
           Demo sürümü — istemci kimliği tanımlanınca gerçek Google/Apple akışı devreye girer.
         </p>
       )}
@@ -569,12 +573,12 @@ function LoginScreen({ onBack, onLogin, onRegister, live }) {
     catch (err) { setError(err.message || "Giriş yapılamadı"); }
     finally { setBusy(false); }
   };
-  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>Giriş yap</h2><p onClick={onRegister} style={{ textAlign: "center", color: "rgba(255,255,255,0.85)", fontSize: 14, marginBottom: 32, cursor: "pointer", textDecoration: "underline", fontFamily: "'Outfit', sans-serif" }}>Üyeliğiniz yoksa lütfen kayıt için dokununuz</p><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR uldamaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="light" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
+  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "#fff", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>Giriş yap</h2><p onClick={onRegister} style={{ textAlign: "center", color: "rgba(255,255,255,0.85)", fontSize: 14, marginBottom: 32, cursor: "pointer", textDecoration: "underline", fontFamily: "var(--f-body)" }}>Üyeliğiniz yoksa lütfen kayıt için dokununuz</p><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR uldamaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="light" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
 }
 
 function RegisterScreen({ onBack, onDone, onLegal, live }) {
   const [n,setN]=useState(""); const [e,setE]=useState(""); const [p,setP]=useState(""); const [d,setD]=useState(""); const [a,setA]=useState(false);
-  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "'Outfit', sans-serif", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "#FF6600", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" onClick={async () => { if (live) { try { await backend.signIn({ email: e, password: p, name: n }); } catch { /* var olan hesap: giriş ekranı denenmeli */ } } onDone(); }} /><SocialAuthRow tone="dark" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onDone(); }} /></div></Screen>;
+  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "var(--f-body)", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "#FF6600", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" onClick={async () => { if (live) { try { await backend.signIn({ email: e, password: p, name: n }); } catch { /* var olan hesap: giriş ekranı denenmeli */ } } onDone(); }} /><SocialAuthRow tone="dark" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onDone(); }} /></div></Screen>;
 }
 
 // ═══════════════════════════════════════════════
@@ -608,14 +612,14 @@ function HeroCarousel({ slides, intervalMs = 4500 }) {
           <Img src={slide.img} style={{ position: "absolute", inset: 0 }} bg={slide.accent || "#2c1810"} />
           <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.25) 60%)" }} />
           {slide.ad && (
-            <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "2px 7px", fontFamily: "'Outfit', sans-serif", fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.85)", letterSpacing: 0.5 }}>REKLAM</span>
+            <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "2px 7px", fontFamily: "var(--f-body)", fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.85)", letterSpacing: 0.5 }}>REKLAM</span>
           )}
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "18px 18px 22px" }}>
             {slide.eyebrow && (
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 4px" }}>{slide.eyebrow}</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 4px" }}>{slide.eyebrow}</p>
             )}
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, color: "#fff", margin: "0 0 3px", fontWeight: 800, textShadow: "0 2px 10px rgba(0,0,0,0.45)" }}>{slide.title}</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.75)", margin: 0 }}>{slide.sub}</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 17, color: "#fff", margin: "0 0 3px", fontWeight: 800, textShadow: "0 2px 10px rgba(0,0,0,0.45)" }}>{slide.title}</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.75)", margin: 0 }}>{slide.sub}</p>
           </div>
         </motion.div>
       </AnimatePresence>
@@ -715,8 +719,8 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             <div style={{ width: 38 }} />
           </div>
 
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 6px", textAlign: "center" }}>Tüm Kategoriler</h2>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-muted)", textAlign: "center", marginBottom: 24 }}>{CATEGORIES.length} mutfak türü</p>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 6px", textAlign: "center" }}>Tüm Kategoriler</h2>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", textAlign: "center", marginBottom: 24 }}>{CATEGORIES.length} mutfak türü</p>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             {CATEGORIES.map((c, i) => (
@@ -731,7 +735,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                 <Img src={c.img} style={{ position: "absolute", inset: 0 }} bg="#d4c8bc" />
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.05) 55%)" }} />
                 <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "14px 16px" }}>
-                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{c.name}</span>
+                  <span style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{c.name}</span>
                 </div>
               </div>
             ))}
@@ -759,10 +763,10 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
               <Icon n="pin" size={16} color="#FF6600" />
             </div>
             <div style={{ minWidth: 0 }}>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 600, color: "var(--c-muted)", margin: 0, letterSpacing: 0.3 }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 600, color: "var(--c-muted)", margin: 0, letterSpacing: 0.3 }}>
                 {precise ? "Konumun" : "Konum kapalı"}
               </p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "var(--c-ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 800, color: "var(--c-ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {districtLabel}{!precise && " ▾"}
               </p>
             </div>
@@ -770,7 +774,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           <GurLogo size={38} pill />
           <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
             <IconBtn onClick={onProfile} tone="solidLight" size={40} title="Profil">
-              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 800 }}>B</div>
+              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800 }}>B</div>
             </IconBtn>
           </div>
         </div>
@@ -787,7 +791,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
               placeholder="Restoran ara"
               style={{
                 flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent",
-                fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 500, color: "var(--c-ink)", padding: "10px 0",
+                fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 500, color: "var(--c-ink)", padding: "10px 0",
               }} />
             {query ? (
               <IconBtn onClick={() => setQuery("")} tone="subtle" size={36} title="Temizle"
@@ -805,7 +809,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             küçük bir katmanda zor. */}
         {searching && (
           <div style={{ marginBottom: 16, flexShrink: 0 }}>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 10px" }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 10px" }}>
               {results.length > 0
                 ? `"${query.trim()}" için ${results.length} restoran`
                 : `"${query.trim()}" için sonuç yok`}
@@ -816,11 +820,11 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                 style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--c-card)", borderRadius: 20, padding: "10px 12px", marginBottom: 9, cursor: "pointer", boxShadow: ELEV.restLight }}>
                 <Img src={r.imgs?.[0]} box={112} style={{ width: 56, height: 56, borderRadius: 16, flexShrink: 0 }} bg="var(--c-img-bg)" />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 3px", display: "flex", alignItems: "center", gap: 6 }}>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 3px", display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
                     {(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}
                   </p>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "var(--c-muted)", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
                     <Icon n="star" size={11} color="#F59E0B" />{r.rating} · {r.cat} · {distText(r)}
                   </p>
                 </div>
@@ -829,7 +833,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             ))}
             {results.length === 0 && (
               <div style={{ background: "var(--c-card)", borderRadius: 20, padding: "18px 18px", textAlign: "center", boxShadow: ELEV.restLight }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "var(--c-muted)", margin: 0, lineHeight: 1.5 }}>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: 0, lineHeight: 1.5 }}>
                   Başka bir isim ya da mutfak deneyebilirsin.
                 </p>
               </div>
@@ -848,11 +852,11 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         {liveDeals.length > 0 && (
           <div style={{ marginBottom: 16, flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 800, color: "var(--c-ink)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "var(--c-ink)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22C55E", animation: "pulse 1.6s ease-in-out infinite" }} />
                 Şu an yakınında
               </p>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "var(--c-muted)" }}>{liveDeals.length} fırsat</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)" }}>{liveDeals.length} fırsat</span>
             </div>
             <HScroll style={{ gap: 10, paddingBottom: 2 }}>
               {liveDeals.map(d => (
@@ -863,11 +867,11 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                   <Img src={d.r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
                   <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.88), rgba(0,0,0,0.15))" }} />
                   <div style={{ position: "absolute", top: 8, left: 8, background: "#22C55E", borderRadius: 8, padding: "3px 8px" }}>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 800, color: "#fff" }}>%{d.pct}</span>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 800, color: "#fff" }}>%{d.pct}</span>
                   </div>
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "8px 10px" }}>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700, color: "#fff", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.r.name}</p>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "rgba(255,255,255,0.75)", margin: 0 }}>{formatCountdown(d.minutesLeft)} kaldı</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "#fff", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.r.name}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.75)", margin: 0 }}>{formatCountdown(d.minutesLeft)} kaldı</p>
                   </div>
                 </motion.div>
               ))}
@@ -893,8 +897,8 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
               <Icon n="sparkle" size={18} color="#fff" />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Match</p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.8)", margin: 0 }}>Arkadaşınla birlikte kaydır, birlikte karar ver</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Match</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.8)", margin: 0 }}>Arkadaşınla birlikte kaydır, birlikte karar ver</p>
             </div>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
           </motion.div>
@@ -903,9 +907,9 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         {/* Kategoriler — yuvarlak simge şeridi. 2×2 ızgaranın yerine geçti:
             aynı işlev, daha az yer, tek bakışta daha çok seçenek. */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, flexShrink: 0 }}>
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "var(--c-ink)", margin: 0 }}>Ne canın çekti?</h3>
+          <h3 style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "var(--c-ink)", margin: 0 }}>Ne canın çekti?</h3>
           <button type="button" className="gur-btn" onClick={() => setShowAll(true)}
-            style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
+            style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
             Tümü
           </button>
         </div>
@@ -920,7 +924,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
               }}>
                 <Img src={c.img} box={124} style={{ position: "absolute", inset: 0 }} bg="var(--c-img-bg)" />
               </div>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "var(--c-ink)", lineHeight: 1.25, display: "block" }}>{c.name}</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-ink)", lineHeight: 1.25, display: "block" }}>{c.name}</span>
             </motion.div>
           ))}
         </HScroll>
@@ -929,9 +933,9 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         {popular.length > 0 && (
           <div style={{ marginBottom: 16, flexShrink: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-              <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "var(--c-ink)", margin: 0 }}>Yakınında popüler</h3>
+              <h3 style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "var(--c-ink)", margin: 0 }}>Yakınında popüler</h3>
               <button type="button" className="gur-btn" onClick={onSwipe}
-                style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
+                style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
                 Kaydırarak gez
               </button>
             </div>
@@ -950,18 +954,18 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                   </div>
                   <div style={{ padding: "11px 13px 13px" }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 3 }}>
-                      <p style={{ flex: 1, minWidth: 0, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</p>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0, fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 800, color: "var(--c-ink)" }}>
+                      <p style={{ flex: 1, minWidth: 0, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</p>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0, fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: "var(--c-ink)" }}>
                         <Icon n="star" size={12} color="#F59E0B" />{r.rating}
                       </span>
                     </div>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "var(--c-muted)", margin: "0 0 10px" }}>{r.cat}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: "0 0 10px" }}>{r.cat}</p>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0, fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "var(--c-muted)" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0, fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)" }}>
                         <Icon n="pin" size={11} color="var(--c-muted)" />
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{distText(r)}</span>
                       </span>
-                      <span style={{ flexShrink: 0, fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 800, color: "#fff", background: BRAND_GRAD, borderRadius: 999, padding: "6px 13px", boxShadow: ELEV.restBrand }}>
+                      <span style={{ flexShrink: 0, fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "#fff", background: BRAND_GRAD, borderRadius: 999, padding: "6px 13px", boxShadow: ELEV.restBrand }}>
                         Aç
                       </span>
                     </div>
@@ -986,8 +990,8 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
             </div>
             <div>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 700, color: "#333", margin: 0 }}>Tüm Kategoriler</p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#aaa", margin: 0 }}>{CATEGORIES.length} mutfak türü</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "#333", margin: 0 }}>Tüm Kategoriler</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "#aaa", margin: 0 }}>{CATEGORIES.length} mutfak türü</p>
             </div>
           </div>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
@@ -1001,12 +1005,12 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", margin: "12px 0 16px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px var(--c-border), inset 0 1px 0 rgba(255,255,255,0.9)", flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF6600" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
           <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
 
@@ -1045,12 +1049,12 @@ function RewardedAdOverlay({ ad, onComplete, onAbort }) {
 
         {/* Üst şerit: reklam etiketi + geri sayım */}
         <div style={{ position: "absolute", top: 44, left: 16, right: 16, display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 5 }}>
-          <span style={{ background: "rgba(255,255,255,0.16)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 20, padding: "4px 11px", fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 800, color: "#fff", letterSpacing: 0.6 }}>REKLAM</span>
+          <span style={{ background: "rgba(255,255,255,0.16)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 20, padding: "4px 11px", fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, color: "#fff", letterSpacing: 0.6 }}>REKLAM</span>
           {done ? (
             <IconBtn onClick={onComplete} tone="glassLight" size={32} title="Kapat"
               icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
           ) : (
-            <span style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 13px", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.9)", fontVariantNumeric: "tabular-nums" }}>{left} sn</span>
+            <span style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 13px", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.9)", fontVariantNumeric: "tabular-nums" }}>{left} sn</span>
           )}
         </div>
 
@@ -1063,11 +1067,11 @@ function RewardedAdOverlay({ ad, onComplete, onAbort }) {
 
         {/* Marka bilgisi */}
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 20px 22px", zIndex: 5 }}>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 800, color: "rgba(255,255,255,0.75)", margin: "0 0 4px" }}>{ad.brand}</p>
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 6px", lineHeight: 1.25 }}>{ad.headline}</h3>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.6)", margin: "0 0 14px" }}>{ad.tagline}</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 800, color: "rgba(255,255,255,0.75)", margin: "0 0 4px" }}>{ad.brand}</p>
+          <h3 style={{ fontFamily: "var(--f-body)", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 6px", lineHeight: 1.25 }}>{ad.headline}</h3>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.6)", margin: "0 0 14px" }}>{ad.tagline}</p>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#fff", borderRadius: 999, padding: "9px 18px" }}>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: ad.accent }}>{ad.cta}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: ad.accent }}>{ad.cta}</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ad.accent} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
           </div>
         </div>
@@ -1088,7 +1092,7 @@ function RewardedAdOverlay({ ad, onComplete, onAbort }) {
           <Btn text={`+${REWARD_SWIPES} kaydırma hakkı al`} onClick={onComplete} variant="filled" icon={<Icon n="check" size={15} color="#fff" />} />
         ) : (
           <>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.45)", textAlign: "center", margin: "0 0 10px" }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.45)", textAlign: "center", margin: "0 0 10px" }}>
               Reklam bitince {REWARD_SWIPES} kaydırma hakkı kazanacaksın
             </p>
             {/* Çıkış yolu görünür olmalı: soluk bir bağlantı, kapana
@@ -1121,8 +1125,8 @@ function PremiumOffer({ onWatch, onExplore, onPlus }) {
         <div style={{ width: 74, height: 74, borderRadius: "50%", background: "rgba(255,102,0,0.14)", border: "1px solid rgba(255,102,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
           <Icon n="clock" size={28} color="#FFA500" />
         </div>
-        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px" }}>Bugünlük bu kadar keşif</h3>
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: "0 0 22px", lineHeight: 1.55 }}>
+        <h3 style={{ fontFamily: "var(--f-body)", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px" }}>Bugünlük bu kadar keşif</h3>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: "0 0 22px", lineHeight: 1.55 }}>
           Yarın taze bir deste seni bekliyor. Şimdi devam etmek istersen iki yolun var.
         </p>
         <Btn text="GUR Plus ile sınırsız keşfet" onClick={onPlus} variant="filled"
@@ -1157,7 +1161,7 @@ function PremiumSheet({ onClose }) {
               background: period === id ? "#FF6600" : "#fff",
               color: period === id ? "#fff" : "var(--c-ink-2)",
               borderRadius: 999, padding: "10px 0", cursor: "pointer", outline: "none",
-              fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700,
+              fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700,
             }}>{label}</button>
         ))}
       </div>
@@ -1171,13 +1175,13 @@ function PremiumSheet({ onClose }) {
         ].map(([icon, text]) => (
           <div key={text} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Icon n={icon} size={15} color="#FF6600" />
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "var(--c-ink)" }}>{text}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink)" }}>{text}</span>
           </div>
         ))}
       </div>
 
       <Btn text={`${price} ile başla`} onClick={onClose} variant="filled" />
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "var(--c-muted)", textAlign: "center", margin: "10px 0 0", lineHeight: 1.5 }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", textAlign: "center", margin: "10px 0 0", lineHeight: 1.5 }}>
         Demo sürümü — ödeme entegrasyonu (iyzico/Stripe) bağlanmadı.
       </p>
     </Sheet>
@@ -1200,8 +1204,8 @@ function LocationRationale({ onAllow, onDemo, onClose }) {
               <Icon n={icon} size={15} color="#FF6600" />
             </div>
             <div style={{ flex: 1 }}>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 2px" }}>{title}</p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "var(--c-muted)", lineHeight: 1.5, margin: 0 }}>{body}</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 2px" }}>{title}</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", lineHeight: 1.5, margin: 0 }}>{body}</p>
             </div>
           </div>
         ))}
@@ -1237,10 +1241,10 @@ function VisitPrompt({ visit, onWrite, onDismiss }) {
           <Icon n="chat" size={15} color="#FFA500" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "#fff", margin: "0 0 3px" }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "#fff", margin: "0 0 3px" }}>
             {visit.restaurantName} nasıldı?
           </p>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45, margin: "0 0 11px" }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45, margin: "0 0 11px" }}>
             Ziyaretin doğrulandı. Deneyimini yazarsan yorumun rozet alır.
           </p>
           <div style={{ display: "flex", gap: 8 }}>
@@ -1275,10 +1279,10 @@ function ReservationNotice({ record, onOpen, onDismiss }) {
           <Icon n={ok ? "check" : "cross"} size={15} color={ok ? "#4CAF50" : "#FF7A70"} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "#fff", margin: "0 0 3px" }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "#fff", margin: "0 0 3px" }}>
             {ok ? "Rezervasyonun kabul edildi" : "Rezervasyonun kabul edilmedi"}
           </p>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45, margin: "0 0 11px" }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45, margin: "0 0 11px" }}>
             {record.restaurantName} · {record.day} {record.time} · {record.people} kişi
             {ok ? " — masan hazır." : " — başka bir saat deneyebilirsin."}
           </p>
@@ -1334,11 +1338,11 @@ function ChefOverlay({ chefName, compact = false }) {
         border: "1px solid rgba(255,255,255,0.22)", borderRadius: 20, padding: "4px 10px",
       }}>
         <Icon n="sparkle" size={10} color="#FFA500" />
-        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 800, color: "#fff", letterSpacing: 0.2 }}>Şef Tanıtımı</span>
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 10, fontWeight: 800, color: "#fff", letterSpacing: 0.2 }}>Şef Tanıtımı</span>
       </div>
       {chefName && (
         <div style={{ position: "absolute", bottom: 10, left: 12, right: 12, pointerEvents: "none" }}>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.92)", margin: 0, textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>{chefName} · 15 sn</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.92)", margin: 0, textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>{chefName} · 15 sn</p>
         </div>
       )}
     </>
@@ -1365,11 +1369,11 @@ function ReviewGate({ restaurant, onReview, onVerifyLocation, compact = false })
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <Icon n={unlocked ? "check" : "shield"} size={14} color={unlocked ? "#16A34A" : "var(--c-muted)"} />
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: 0 }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: 0 }}>
           {unlocked ? "Yorum yazabilirsin" : "Yorum konumla açılır"}
         </p>
       </div>
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "var(--c-muted)", lineHeight: 1.5, margin: "0 0 10px" }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-muted)", lineHeight: 1.5, margin: "0 0 10px" }}>
         {unlocked
           ? "Bu mekânda geçirdiğin zaman doğrulandı; yorumun “Konumla doğrulandı” rozetiyle yayınlanır."
           : "Mekânda en az 15 dakika kaldığında yorum alanı kendiliğinden açılır ve yorumun doğrulanmış sayılır."}
@@ -1401,18 +1405,18 @@ function ExternalReviews({ reviews = [], restaurant, loading }) {
           <path fill="#4285F4" d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z" opacity=".9" />
           <circle cx="12" cy="9" r="2.6" fill="#fff" />
         </svg>
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: 0 }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: 0 }}>
           Google Haritalar yorumları
         </p>
         {sample && (
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.3, color: "#B45309", background: "#FEF3C7", borderRadius: 6, padding: "2px 7px" }}>ÖRNEK</span>
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.3, color: "#B45309", background: "#FEF3C7", borderRadius: 6, padding: "2px 7px" }}>ÖRNEK</span>
         )}
       </div>
 
       {loading ? (
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "var(--c-muted)", margin: 0 }}>Yükleniyor…</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: 0 }}>Yükleniyor…</p>
       ) : reviews.length === 0 ? (
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "var(--c-muted)", lineHeight: 1.55, margin: 0 }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-muted)", lineHeight: 1.55, margin: 0 }}>
           Bu mekan için Google yorumu çekilmedi. Places anahtarı tanımlanınca besleme
           turu yorumları otomatik getirir.
         </p>
@@ -1423,19 +1427,19 @@ function ExternalReviews({ reviews = [], restaurant, loading }) {
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                 {rv.author_photo
                   ? <img src={rv.author_photo} alt="" loading="lazy" decoding="async" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover" }} />
-                  : <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#EFE9E2", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 800, color: "var(--c-muted)" }}>{(rv.author_name || "?").charAt(0)}</div>}
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700, color: "var(--c-ink)" }}>{rv.author_name || "Google kullanıcısı"}</span>
+                  : <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#EFE9E2", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--f-body)", fontSize: 10, fontWeight: 800, color: "var(--c-muted)" }}>{(rv.author_name || "?").charAt(0)}</div>}
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-ink)" }}>{rv.author_name || "Google kullanıcısı"}</span>
                 <span style={{ display: "flex", gap: 1, marginLeft: "auto" }}>
                   {[1, 2, 3, 4, 5].map(n => <Icon key={n} n="star" size={10} color={n <= (rv.rating || 0) ? "#F59E0B" : "#E5E0D8"} />)}
                 </span>
               </div>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "var(--c-ink-2)", lineHeight: 1.5, margin: "0 0 3px" }}>{rv.body}</p>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "var(--c-muted)" }}>{rv.relative_time || ""}</span>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-ink-2)", lineHeight: 1.5, margin: "0 0 3px" }}>{rv.body}</p>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "var(--c-muted)" }}>{rv.relative_time || ""}</span>
             </div>
           ))}
           {reviews.length > 2 && (
             <button type="button" className="gur-btn" onClick={() => setOpen(o => !o)}
-              style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
+              style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
               {open ? "Daha az göster" : `${reviews.length - 2} yorum daha`}
             </button>
           )}
@@ -1444,7 +1448,7 @@ function ExternalReviews({ reviews = [], restaurant, loading }) {
 
       <button type="button" className="gur-btn"
         onClick={() => window.open(mapsUrl, "_blank", "noopener,noreferrer")}
-        style={{ display: "block", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 600, color: "var(--c-muted)", textDecoration: "underline" }}>
+        style={{ display: "block", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 600, color: "var(--c-muted)", textDecoration: "underline" }}>
         Google Haritalar'da aç
       </button>
     </div>
@@ -1458,11 +1462,11 @@ function ExternalReviews({ reviews = [], restaurant, loading }) {
 function NotYetSheet({ r, onClose }) {
   return (
     <Sheet title="Bu mekan henüz GUR uldamadı" subtitle={r.name} onClose={onClose}>
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "var(--c-ink-2)", lineHeight: 1.6, margin: "0 0 8px" }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink-2)", lineHeight: 1.6, margin: "0 0 8px" }}>
         {r.name} GUR'daki kaydını henüz sahiplenmedi. Sahiplendiği gün menüsü ve
         masa ayırtma tam burada açılacak.
       </p>
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "#FF6600", margin: "0 0 16px" }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "#FF6600", margin: "0 0 16px" }}>
         Çok yakında.
       </p>
       <Btn text="Tamam, beklerim" onClick={onClose} variant="filled" />
@@ -1608,40 +1612,40 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
             {!gallery[ii]?.chef && ii < (r.ownerPhotoCount || 0) && (
               <div style={{ position: "absolute", bottom: 10, left: 12, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "4px 10px" }}>
                 <Icon n="camera" size={10} color="#FFA500" />
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 700, color: "#fff" }}>İşletmeden</span>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 10, fontWeight: 700, color: "#fff" }}>İşletmeden</span>
               </div>
             )}
           </div>
 
           {/* Başlık ve künye */}
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 6px", display: "flex", alignItems: "center", gap: 8 }}>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 6px", display: "flex", alignItems: "center", gap: 8 }}>
             {r.name}
             {claimed && <VerifiedStar size={16} />}
           </h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)" }}>
               <Icon n="star" color="#F59E0B" size={13} />{r.rating}
             </span>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-muted)" }}>{r.cat}</span>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-muted)" }}>· {distText(r)}</span>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-muted)" }}>· {r.price}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)" }}>{r.cat}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)" }}>· {distText(r)}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)" }}>· {r.price}</span>
           </div>
 
           {/* Çalışma saatleri — açık/kapalı sinyali metinden okunur */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--c-subtle)", borderRadius: 14, padding: "10px 14px", marginBottom: 12 }}>
             <Icon n="clock" size={14} color="#FF6600" />
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-ink-2)" }}>Bugün {r.hours}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)" }}>Bugün {r.hours}</span>
           </div>
 
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "var(--c-ink-2)", lineHeight: 1.6, margin: "0 0 16px" }}>{r.desc}</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink-2)", lineHeight: 1.6, margin: "0 0 16px" }}>{r.desc}</p>
 
           {/* Popüler yemekler */}
           {r.popular?.length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Popüler yemekler</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Popüler yemekler</p>
               <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
                 {r.popular.map(p => (
-                  <span key={p} style={{ background: "rgba(255,102,0,0.08)", border: "1px solid rgba(255,102,0,0.16)", borderRadius: 999, padding: "6px 13px", fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 600, color: "var(--c-brand-ink)" }}>{p}</span>
+                  <span key={p} style={{ background: "rgba(255,102,0,0.08)", border: "1px solid rgba(255,102,0,0.16)", borderRadius: 999, padding: "6px 13px", fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 600, color: "var(--c-brand-ink)" }}>{p}</span>
                 ))}
               </div>
             </div>
@@ -1655,7 +1659,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
             <>
               {r.menu?.length > 0 && (
                 <div style={{ marginBottom: 16 }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Menü</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Menü</p>
                   <HScroll style={{ gap: 9, paddingBottom: 4 }}>
                     {r.menu.map((m, i) => (
                       <div key={i} onClick={() => setMenuOpen(m)} style={{ width: 96, height: 132, borderRadius: 14, overflow: "hidden", flexShrink: 0, cursor: "pointer", border: "1px solid var(--c-border)", position: "relative" }}>
@@ -1670,13 +1674,13 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
             <button type="button" className="gur-btn" onClick={() => setSoon(true)}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "1px dashed rgba(45,36,25,0.16)", background: "var(--c-subtle)", borderRadius: 16, padding: "13px 15px", marginBottom: 16, cursor: "pointer", outline: "none" }}>
               <Icon n="doc" size={15} color="var(--c-muted)" />
-              <span style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600, color: "var(--c-ink-2)" }}>Menü ve masa ayırtma</span>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "var(--c-muted)" }}>Henüz GUR uldamadı</span>
+              <span style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 600, color: "var(--c-ink-2)" }}>Menü ve masa ayırtma</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-muted)" }}>Henüz GUR uldamadı</span>
             </button>
           )}
 
           {/* Yol tarifi — cihazın kendi haritasına doğrudan açılır */}
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Yol tarifi</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Yol tarifi</p>
           <Btn
             text={MAP_PROVIDERS.find(p => p.id === provider)?.label + " ile git"}
             onClick={() => openMap(provider)} variant="filled"
@@ -1685,7 +1689,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
           <div style={{ display: "flex", gap: 8, marginTop: 8, marginBottom: 16 }}>
             {MAP_PROVIDERS.filter(p => p.id !== provider).map(p => (
               <button key={p.id} type="button" className="gur-btn" onClick={() => openMap(p.id)}
-                style={{ flex: 1, border: "1px solid rgba(45,36,25,0.14)", background: "var(--c-card)", borderRadius: 999, padding: "9px 0", cursor: "pointer", outline: "none", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 600, color: "var(--c-ink-2)" }}>
+                style={{ flex: 1, border: "1px solid rgba(45,36,25,0.14)", background: "var(--c-card)", borderRadius: 999, padding: "9px 0", cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 600, color: "var(--c-ink-2)" }}>
                 {p.label}
               </button>
             ))}
@@ -1708,7 +1712,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
           <button
             type="button" className="gur-btn"
             onClick={full ? collapse : expand}
-            style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 6, fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FF6600" }}>
+            style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 6, fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "#FF6600" }}>
             {full ? "Küçült" : "Tam ekran"}
           </button>
           <IconBtn onClick={close} tone="subtle" size={30} title="Kapat"
@@ -1916,12 +1920,12 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
           {dataSource === "live" && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(76,175,80,0.12)", border: "1px solid rgba(76,175,80,0.25)", borderRadius: 12, padding: "3px 12px" }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4CAF50", animation: "pulse 1.5s ease-in-out infinite" }} />
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "#4CAF50", fontWeight: 600 }}>Canlı Veri • OpenStreetMap</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "#4CAF50", fontWeight: 600 }}>Canlı Veri • OpenStreetMap</span>
             </div>
           )}
           {filterCat && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#fff", background: "rgba(255,102,0,0.2)", borderRadius: 14, padding: "5px 16px", fontWeight: 600, border: "1px solid rgba(255,102,0,0.25)" }}>{filterCat}</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#fff", background: "rgba(255,102,0,0.2)", borderRadius: 14, padding: "5px 16px", fontWeight: 600, border: "1px solid rgba(255,102,0,0.25)" }}>{filterCat}</span>
               <IconBtn
                 onClick={onExplore} tone="glassLight" shape="rounded" size={26} title="Filtreyi kaldır"
                 icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
@@ -1932,12 +1936,12 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
           {ringNow != null && !done && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "3px 12px" }}>
               <Icon n="pin" size={11} color={precise ? "#FF9A4D" : "rgba(255,255,255,0.45)"} />
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,0.72)" }}>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,0.72)" }}>
                 {precise ? ringLabel(ringNow) : `${ringLabel(ringNow)} · İstanbul merkezine göre`}
               </span>
               {!precise && (
                 <button type="button" className="gur-btn" onClick={() => geo.requestLocation()}
-                  style={{ border: "none", background: "transparent", padding: 0, marginLeft: 2, cursor: "pointer", outline: "none", fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#FF9A4D" }}>
+                  style={{ border: "none", background: "transparent", padding: 0, marginLeft: 2, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, color: "#FF9A4D" }}>
                   Konumumu kullan
                 </button>
               )}
@@ -1959,8 +1963,8 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
 <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Icon n="search" color="rgba(255,255,255,0.4)" size={20} />
               </div>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>Restoran bulunamadı</p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.25)" }}>Bu kategoride henüz restoran yok</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>Restoran bulunamadı</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.25)" }}>Bu kategoride henüz restoran yok</p>
               <div style={{ marginTop: 8 }}>
                 <Btn text="← Keşfete Dön" onClick={onExplore} variant="plain" size="sm" fullWidth={false} />
               </div>
@@ -1970,8 +1974,8 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
 <div style={{ width: 90, height: 90, borderRadius: "50%", background: "rgba(255,102,0,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Icon n="plate" color="#FF6600" size={30} />
               </div>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "#fff", textAlign: "center" }}>Hepsini gördün!</p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(255,255,255,0.35)" }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "#fff", textAlign: "center" }}>Hepsini gördün!</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "rgba(255,255,255,0.35)" }}>
                 {favorites.length > 0 ? `${favorites.length} favori eklendi` : "Henüz favori eklemedin"}
               </p>
               <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -2068,7 +2072,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             position: "absolute", top: 120, left: "50%", transform: "translateX(-50%)",
             background: toast.t === "fav" ? "#4CAF50" : "#FF3B30",
             color: "#fff", padding: "10px 22px", borderRadius: 16,
-            fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700,
+            fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700,
             zIndex: 100, boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
             animation: "fadeInUp 0.3s ease-out",
             display: "flex", alignItems: "center", gap: 8,
@@ -2082,12 +2086,12 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "var(--shadow-bar)", flexShrink: 0 }}>
           <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
           <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
       </div>
@@ -2124,8 +2128,8 @@ function MatchStartScreen({ onBack, onStart }) {
           <div style={{ width: 76, height: 76, borderRadius: "50%", background: "rgba(255,102,0,0.14)", border: "1px solid rgba(255,102,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
             <Icon n="sparkle" size={30} color="#FFA500" />
           </div>
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px" }}>GUR Match</h2>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: 0, lineHeight: 1.55 }}>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px" }}>GUR Match</h2>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: 0, lineHeight: 1.55 }}>
             Arkadaşınla aynı anda kaydır. İkiniz de sağa kaydırdığınız restoranlar eşleşme olur — nereye gideceğinizi tartışmayın, bırakın kartlar karar versin.
           </p>
         </div>
@@ -2139,10 +2143,10 @@ function MatchStartScreen({ onBack, onStart }) {
 
         {mode === "create" && (
           <div style={{ animation: "fadeInUp 0.4s ease-out" }}>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.45)", textAlign: "center", margin: "0 0 12px" }}>Bu kodu arkadaşına gönder</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.45)", textAlign: "center", margin: "0 0 12px" }}>Bu kodu arkadaşına gönder</p>
             <div onClick={copy} style={{ background: "rgba(255,255,255,0.06)", border: "1px dashed rgba(255,165,0,0.45)", borderRadius: 20, padding: "22px 16px", textAlign: "center", cursor: "pointer", marginBottom: 16 }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 32, fontWeight: 800, color: "#FFA500", letterSpacing: 6 }}>{code}</span>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: copied ? "#4CAF50" : "rgba(255,255,255,0.35)", margin: "10px 0 0" }}>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 32, fontWeight: 800, color: "#FFA500", letterSpacing: 6 }}>{code}</span>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: copied ? "#4CAF50" : "rgba(255,255,255,0.35)", margin: "10px 0 0" }}>
                 {copied ? "Kopyalandı!" : "Kopyalamak için dokun"}
               </p>
             </div>
@@ -2166,7 +2170,7 @@ function MatchStartScreen({ onBack, onStart }) {
         )}
 
         <div style={{ marginTop: "auto", paddingTop: 20 }}>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, color: "rgba(255,255,255,0.22)", textAlign: "center", margin: 0, lineHeight: 1.5 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.22)", textAlign: "center", margin: 0, lineHeight: 1.5 }}>
             Demo sürümü — arkadaşın kararları davet kodundan üretilir. Gerçek eş zamanlı oturum için backend gerekir.
           </p>
         </div>
@@ -2216,7 +2220,7 @@ function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,102,0,0.12)", border: "1px solid rgba(255,165,0,0.28)", borderRadius: 14, padding: "5px 14px" }}>
             <Icon n="sparkle" size={12} color="#FFA500" />
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#FFA500", fontWeight: 700 }}>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "#FFA500", fontWeight: 700 }}>
               {friendName} ile eşleşiyorsun • {matches.length} eşleşme
             </span>
           </div>
@@ -2252,16 +2256,16 @@ function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
                 transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                 style={{ width: "100%", textAlign: "center" }}
               >
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#FFA500", fontWeight: 700, letterSpacing: 3, margin: "0 0 10px" }}>EŞLEŞTİNİZ!</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#FFA500", fontWeight: 700, letterSpacing: 3, margin: "0 0 10px" }}>EŞLEŞTİNİZ!</p>
                 <div style={{ width: "100%", height: 220, borderRadius: 24, overflow: "hidden", position: "relative", marginBottom: 18, boxShadow: "0 18px 60px rgba(255,102,0,0.25)" }}>
                   <Img src={popup.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
                   <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.85), transparent 60%)" }} />
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px 18px", textAlign: "left" }}>
-                    <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 4px" }}>{popup.name}</h3>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "rgba(255,255,255,0.65)", margin: 0 }}>{popup.cat} • {popup.dist}</p>
+                    <h3 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 4px" }}>{popup.name}</h3>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.65)", margin: 0 }}>{popup.cat} • {popup.dist}</p>
                   </div>
                 </div>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(255,255,255,0.7)", margin: "0 0 20px" }}>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "rgba(255,255,255,0.7)", margin: "0 0 20px" }}>
                   Sen ve {friendName} ikiniz de beğendiniz
                 </p>
                 <Btn text="Kaydırmaya devam et" onClick={closePopup} variant="filled" size="md" />
@@ -2284,10 +2288,10 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
         </div>
 
         <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#2D2419", margin: "0 0 6px" }}>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#2D2419", margin: "0 0 6px" }}>
             {matches.length > 0 ? `${matches.length} eşleşme!` : "Eşleşme çıkmadı"}
           </h2>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0 }}>
             {matches.length > 0 ? `${friendName} ile ikinizin de beğendiği yerler` : `${friendName} ile ortak beğeniniz olmadı — tekrar deneyin`}
           </p>
         </div>
@@ -2302,9 +2306,9 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
                 <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" box={74} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <h4 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14.5, fontWeight: 800, color: "#2D2419", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</h4>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(45,36,25,0.5)", margin: "0 0 6px" }}>{r.cat} • {r.dist}</p>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,102,0,0.1)", borderRadius: 10, padding: "3px 9px", fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#FF6600" }}>
+                <h4 style={{ fontFamily: "var(--f-body)", fontSize: 14.5, fontWeight: 800, color: "#2D2419", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</h4>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(45,36,25,0.5)", margin: "0 0 6px" }}>{r.cat} • {r.dist}</p>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,102,0,0.1)", borderRadius: 10, padding: "3px 9px", fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "#FF6600" }}>
                   <Icon n="sparkle" size={10} color="#FF6600" /> Eşleşme
                 </span>
               </div>
@@ -2344,32 +2348,32 @@ function ReservationSheet({ r, onClose, onConfirm }) {
 
   return (
     <Sheet title="Masa ayırt" subtitle={r.name} onClose={onClose}>
-      <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Kişi sayısı</label>
+      <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Kişi sayısı</label>
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         {[1, 2, 3, 4, 5, 6].map(n => <Chip key={n} label={n === 6 ? "6+" : String(n)} active={people === n} onClick={() => setPeople(n)} />)}
       </div>
 
-      <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Gün</label>
+      <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Gün</label>
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
         {["Bugün", "Yarın", "Cumartesi"].map(d => <Chip key={d} label={d} active={day === d} onClick={() => setDay(d)} />)}
       </div>
 
-      <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Saat</label>
+      <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Saat</label>
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         {times.map(t => <Chip key={t} label={t} active={time === t} onClick={() => setTime(t)} />)}
       </div>
 
       {deal && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 14, padding: "11px 14px", marginBottom: 18 }}>
-          <span style={{ background: "#22C55E", borderRadius: 8, padding: "3px 8px", fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 800, color: "#fff" }}>%{deal.pct}</span>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#166534", margin: 0, lineHeight: 1.4 }}>
+          <span style={{ background: "#22C55E", borderRadius: 8, padding: "3px 8px", fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "#fff" }}>%{deal.pct}</span>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#166534", margin: 0, lineHeight: 1.4 }}>
             Anlık fırsat bu rezervasyona uygulanır — {formatCountdown(deal.minutesLeft)} kaldı
           </p>
         </div>
       )}
 
       <Btn text={time ? `${day} ${time} • ${people} kişi — Onayla` : "Saat seçin"} onClick={() => time && onConfirm({ day, time, people, deal })} variant="filled" disabled={!time} />
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(45,36,25,0.4)", textAlign: "center", margin: "12px 0 0", lineHeight: 1.5 }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(45,36,25,0.4)", textAlign: "center", margin: "12px 0 0", lineHeight: 1.5 }}>
         Rezervasyon ücretsizdir. Ne senden ne restorandan komisyon alınır.
       </p>
     </Sheet>
@@ -2387,13 +2391,13 @@ function ConfirmSheet({ title, lines, note, onClose }) {
       <div style={{ background: "#FBFAF8", borderRadius: 16, padding: "12px 16px", marginBottom: 18 }}>
         {lines.map(([k, v]) => (
           <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.6)" }}>{k}</span>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#2D2419", fontVariantNumeric: "tabular-nums" }}>{v}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(45,36,25,0.6)" }}>{k}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#2D2419", fontVariantNumeric: "tabular-nums" }}>{v}</span>
           </div>
         ))}
       </div>
       {note && (
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(45,36,25,0.5)", textAlign: "center", margin: "-6px 0 14px", lineHeight: 1.5 }}>{note}</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(45,36,25,0.5)", textAlign: "center", margin: "-6px 0 14px", lineHeight: 1.5 }}>{note}</p>
       )}
       <Btn text="Tamam" onClick={onClose} variant="filled" />
     </Sheet>
@@ -2458,15 +2462,15 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
 
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
           <div style={{ minWidth: 0 }}>
-            <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 3px" }}>Yorumunu yaz</h3>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{restaurantName}</p>
+            <h3 style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 3px" }}>Yorumunu yaz</h3>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{restaurantName}</p>
           </div>
           <IconBtn onClick={cancel} tone="subtle" size={34} title="Vazgeç"
             icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
         </div>
 
         {/* Puan */}
-        <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", marginBottom: 8 }}>Puanın</label>
+        <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", marginBottom: 8 }}>Puanın</label>
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           {[1, 2, 3, 4, 5].map(n => (
             <motion.button
@@ -2480,24 +2484,24 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
         </div>
 
         {/* Metin */}
-        <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", marginBottom: 8 }}>Deneyimin</label>
+        <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", marginBottom: 8 }}>Deneyimin</label>
         <textarea
           value={text} onChange={e => setText(e.target.value)} rows={4}
           placeholder="Ne yedin, servis nasıldı, tekrar gider misin?"
           style={{
             width: "100%", resize: "vertical", borderRadius: 16, padding: "13px 14px",
             border: "1.5px solid rgba(45,36,25,0.14)", background: "var(--c-subtle)",
-            fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "var(--c-ink)", lineHeight: 1.5, outline: "none",
+            fontFamily: "var(--f-body)", fontSize: 16, color: "var(--c-ink)", lineHeight: 1.5, outline: "none",
           }}
           onFocus={e => { e.currentTarget.style.borderColor = "#FF6600"; keepVisible(e); }}
           onBlur={e => e.currentTarget.style.borderColor = "var(--c-border)"}
         />
-        <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: text.trim().length < 10 ? "#C4776B" : "rgba(45,36,25,0.4)", margin: "6px 0 18px" }}>
+        <div style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: text.trim().length < 10 ? "#C4776B" : "rgba(45,36,25,0.4)", margin: "6px 0 18px" }}>
           {text.trim().length < 10 ? `En az 10 karakter (${text.trim().length}/10)` : `${text.trim().length} karakter`}
         </div>
 
         {/* Fotoğraflar */}
-        <label style={{ display: "block", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", marginBottom: 8 }}>
+        <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", marginBottom: 8 }}>
           Fotoğraf ekle <span style={{ fontWeight: 500, color: "var(--c-muted)" }}>— en fazla 4</span>
         </label>
         <input ref={fileRef} type="file" accept="image/*" multiple onChange={addPhotos} style={{ display: "none" }} />
@@ -2519,7 +2523,7 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
               }}>
               <Icon n="camera" size={19} color="#FF6600" />
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#FF6600" }}>Ekle</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, color: "#FF6600" }}>Ekle</span>
             </motion.button>
           )}
         </div>
@@ -2623,16 +2627,16 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
           {/* Info chips */}
           <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 10, flexWrap: "wrap" }}>
-            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: "#FF6600", fontFamily: "'Outfit', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>★ {r.rating}</span>
-            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#333", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", display: "inline-flex", alignItems: "center", gap: 7 }}>
+            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: "#FF6600", fontFamily: "var(--f-body)", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>★ {r.rating}</span>
+            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontFamily: "var(--f-body)", fontSize: 16, color: "#333", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", display: "inline-flex", alignItems: "center", gap: 7 }}>
               {r.name}
               {claimed && <VerifiedStar size={14} />}
             </span>
-            <span style={{ background: "#FF6600", borderRadius: 14, padding: "5px 14px", fontSize: 13, color: "#fff", fontWeight: 700, fontFamily: "'Outfit', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>{distText(r)}</span>
+            <span style={{ background: "#FF6600", borderRadius: 14, padding: "5px 14px", fontSize: 13, color: "#fff", fontWeight: 700, fontFamily: "var(--f-body)", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>{distText(r)}</span>
           </div>
 
           {/* Açıklama */}
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "#fff", margin: "0 4px 14px", lineHeight: 1.35, textShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{r.desc}</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 15, color: "#fff", margin: "0 4px 14px", lineHeight: 1.35, textShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{r.desc}</p>
 
           {/* Fotoğraf Carousel — kaydırılabilir */}
           <div style={{ position: "relative", marginBottom: 12 }}>
@@ -2699,9 +2703,9 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           {/* Yorumlar — tek tek gösterim */}
           <div style={{ marginBottom: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
-<p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 700, color: "#333", margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icon n="chat" color="#333" size={16} />Yorumlar</p>
+<p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "#333", margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icon n="chat" color="#333" size={16} />Yorumlar</p>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#bbb" }}>{revIdx + 1} / {reviews.length}</span>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "#bbb" }}>{revIdx + 1} / {reviews.length}</span>
               </div>
             </div>
 
@@ -2728,17 +2732,17 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                       }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 34, height: 34, borderRadius: 12, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 800 }}>{rev.user.charAt(0)}</div>
+                          <div style={{ width: 34, height: 34, borderRadius: 12, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 800 }}>{rev.user.charAt(0)}</div>
                           <div>
-                            <p style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, fontSize: 14, color: "#FF6600", margin: 0 }}>{rev.user}</p>
+                            <p style={{ fontFamily: "var(--f-body)", fontWeight: 800, fontSize: 14, color: "#FF6600", margin: 0 }}>{rev.user}</p>
                             <div style={{ display: "flex", gap: 2 }}>
                               {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "#FFA500" : "#ddd" }}>★</span>)}
                             </div>
                           </div>
                         </div>
-                        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "#ccc" }}>{rev.date}</span>
+                        <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "#ccc" }}>{rev.date}</span>
                       </div>
-                      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#666", margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{rev.text}</p>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#666", margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{rev.text}</p>
                       {rev.photos && rev.photos.length > 0 && (
                         <div style={{ display: "flex", gap: 6 }}>
                           {rev.photos.slice(0, 3).map((p, pi) => (
@@ -2747,7 +2751,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                             </div>
                           ))}
                           <div style={{ display: "flex", alignItems: "center" }}>
-                            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "#ccc" }}>detay →</span>
+                            <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "#ccc" }}>detay →</span>
                           </div>
                         </div>
                       )}
@@ -2771,21 +2775,21 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
           {/* Tags */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "0 16px", marginBottom: 18 }}>
-            {r.tags.map(t => <span key={t} style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>{t}</span>)}
-            <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>🕐 {r.hours}</span>
+            {r.tags.map(t => <span key={t} style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "var(--f-body)", fontWeight: 600 }}>{t}</span>)}
+            <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "var(--f-body)", fontWeight: 600 }}>🕐 {r.hours}</span>
           </div>
 
           {/* Anlık fırsat */}
           {deal && (
             <div style={{ margin: "0 16px 16px", display: "flex", alignItems: "center", gap: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", borderRadius: 18, padding: "13px 15px" }}>
               <div style={{ background: "#22C55E", borderRadius: 10, padding: "6px 11px", flexShrink: 0 }}>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff" }}>%{deal.pct}</span>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff" }}>%{deal.pct}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#166534", margin: "0 0 2px" }}>Şu an geçerli</p>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(22,101,52,0.75)", margin: 0 }}>{deal.note}</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#166534", margin: "0 0 2px" }}>Şu an geçerli</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(22,101,52,0.75)", margin: 0 }}>{deal.note}</p>
               </div>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, fontWeight: 700, color: "#16A34A", flexShrink: 0 }}>{formatCountdown(deal.minutesLeft)}</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "#16A34A", flexShrink: 0 }}>{formatCountdown(deal.minutesLeft)}</span>
             </div>
           )}
 
@@ -2811,12 +2815,12 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
         <div style={{ position: "sticky", bottom: 0, background: "var(--c-card)", display: "flex", alignItems: "center", justifyContent: "space-around", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px var(--c-border), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
           <div onClick={() => (claimed && canMenu ? setShowMenu(true) : setSheet("soon"))} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: claimed ? 0.5 : 0.35 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Menü</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Menü</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
           <div onClick={openMaps} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.5 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Konum</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Konum</span>
           </div>
         </div>
 
@@ -2886,7 +2890,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
             <div style={{ flex: 1, overflowY: "auto" }}>
               {/* Header */}
               <div style={{ padding: "52px 20px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-<h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: 10 }}><Icon n="chat" color="#fff" size={22} />Yorum Detayı</h2>
+<h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: 10 }}><Icon n="chat" color="#fff" size={22} />Yorum Detayı</h2>
                 <IconBtn
                   onClick={() => setSelectedReview(null)} tone="glassLight" title="Kapat"
                   icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
@@ -2896,27 +2900,27 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
               <div style={{ padding: "0 20px 40px" }}>
                 {/* Kullanıcı bilgisi */}
                 <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-                  <div style={{ width: 52, height: 52, borderRadius: 18, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 800 }}>{selectedReview.user.charAt(0)}</div>
+                  <div style={{ width: 52, height: 52, borderRadius: 18, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 800 }}>{selectedReview.user.charAt(0)}</div>
                   <div>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 3px" }}>{selectedReview.user}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 3px" }}>{selectedReview.user}</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ display: "flex", gap: 2 }}>
                         {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 14, color: s <= selectedReview.stars ? "#FFA500" : "rgba(255,255,255,0.15)" }}>★</span>)}
                       </div>
-                      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{selectedReview.date}</span>
+                      <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{selectedReview.date}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Yorum metni */}
                 <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 20px", marginBottom: 20, border: "1px solid rgba(255,255,255,0.06)" }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "rgba(255,255,255,0.85)", margin: 0, lineHeight: 1.65 }}>{selectedReview.text}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 15, color: "rgba(255,255,255,0.85)", margin: 0, lineHeight: 1.65 }}>{selectedReview.text}</p>
                 </div>
 
                 {/* Fotoğraflar */}
                 {selectedReview.photos && selectedReview.photos.length > 0 && (
                   <div>
-<p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: "0 0 12px" }}>Fotoğraflar</p>
+<p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: "0 0 12px" }}>Fotoğraflar</p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {selectedReview.photos.map((p, pi) => (
                         <div key={pi} style={{ borderRadius: 18, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
@@ -2931,8 +2935,8 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 <div style={{ background: "rgba(255,102,0,0.1)", borderRadius: 18, padding: "14px 16px", marginTop: 20, display: "flex", alignItems: "center", gap: 12, border: "1px solid rgba(255,102,0,0.15)" }}>
 <Icon n="plate" color="#FF6600" size={16} />
                   <div>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#FF6600", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.4)", margin: 0 }}>{r.cat} • {r.addr}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#FF6600", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.4)", margin: 0 }}>{r.cat} • {r.addr}</p>
                   </div>
                 </div>
               </div>
@@ -2951,8 +2955,8 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
             {/* Header */}
             <div style={{ padding: "52px 20px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-<h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 700, color: "#fff", margin: "0 0 3px", display: "flex", alignItems: "center", gap: 8 }}><Icon n="doc" color="#fff" size={16} />Menü</h2>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.4)", margin: 0 }}>{r.name} • {r.menu ? r.menu.length : 0} sayfa</p>
+<h2 style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 700, color: "#fff", margin: "0 0 3px", display: "flex", alignItems: "center", gap: 8 }}><Icon n="doc" color="#fff" size={16} />Menü</h2>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.4)", margin: 0 }}>{r.name} • {r.menu ? r.menu.length : 0} sayfa</p>
               </div>
               <IconBtn
                 onClick={() => setShowMenu(false)} tone="glassLight" title="Kapat"
@@ -2969,7 +2973,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                       <div style={{ position: "relative" }}>
                         <Img src={menuImg} style={{ width: "100%", height: 380, borderRadius: 18 }} bg="#1a1a1a" />
                         <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.5)", borderRadius: 10, padding: "4px 10px", backdropFilter: "blur(6px)" }}>
-                          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.7)" }}>{mi + 1} / {r.menu.length}</span>
+                          <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.7)" }}>{mi + 1} / {r.menu.length}</span>
                         </div>
                       </div>
                     </div>
@@ -2978,8 +2982,8 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
               ) : (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 20px" }}>
 <div style={{ marginBottom: 16 }}><Icon n="bank" color="rgba(255,255,255,0.4)" size={36} /></div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: "0 0 6px" }}>Menü henüz eklenmedi</p>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.3)", margin: 0 }}>Restoran menüsünü yakında yükleyecek</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: "0 0 6px" }}>Menü henüz eklenmedi</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.3)", margin: 0 }}>Restoran menüsünü yakında yükleyecek</p>
                 </div>
               )}
             </div>
@@ -3008,15 +3012,15 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
           <GurLogo size={42} pill />
           <div style={{ position: "absolute", right: 0 }}>
             <IconBtn onClick={onProfile} tone="solidLight" size={40} title="Profil">
-              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 800 }}>B</div>
+              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800 }}>B</div>
             </IconBtn>
           </div>
         </div>
 
         <div style={{ textAlign: "center", marginBottom: 24, animation: "fadeInUp 0.6s ease-out 0.15s both" }}>
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 6px" }}>Favorilerim</h2>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 6px" }}>Favorilerim</h2>
           {favorites.length > 0 && (
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-muted)", margin: 0 }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: 0 }}>
               {favorites.length} restoran kayıtlı
             </p>
           )}
@@ -3028,8 +3032,8 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
             <div style={{ width: 100, height: 100, borderRadius: "50%", background: "#FFF3EA", margin: "0 auto 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon n="brokenHeart" color="#FF6600" size={32} />
             </div>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Henüz favori eklemediniz</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "var(--c-muted)", margin: "0 0 28px", lineHeight: 1.5 }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Henüz favori eklemediniz</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-muted)", margin: "0 0 28px", lineHeight: 1.5 }}>
               Restoranları sağa kaydırarak favorilerinize ekleyin
             </p>
             <Btn text="Keşfetmeye Başla" onClick={onSwipe} variant="filled" fullWidth={false} />
@@ -3045,8 +3049,8 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
               ].map((s, i) => (
                 <div key={i} style={{ flex: 1, background: "var(--c-card)", borderRadius: 18, padding: "14px 10px", textAlign: "center", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
                   <div style={{ display: "flex", justifyContent: "center" }}>{s.icon}</div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: "4px 0 2px" }}>{s.value}</p>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "var(--c-muted)", margin: 0 }}>{s.label}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: "4px 0 2px" }}>{s.value}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-muted)", margin: 0 }}>{s.label}</p>
                 </div>
               ))}
             </div>
@@ -3065,17 +3069,17 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
 
                   {/* Puan ve kategori */}
                   <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6 }}>
-                    <span style={{ background: "var(--c-card)", borderRadius: 10, padding: "4px 10px", fontSize: 12, fontWeight: 700, color: "var(--c-ink)", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="#F59E0B" size={11} />{r.rating}</span>
-                    <span style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(6px)", borderRadius: 10, padding: "4px 10px", fontSize: 11, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>{r.cat}</span>
+                    <span style={{ background: "var(--c-card)", borderRadius: 10, padding: "4px 10px", fontSize: 12, fontWeight: 700, color: "var(--c-ink)", fontFamily: "var(--f-body)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="#F59E0B" size={11} />{r.rating}</span>
+                    <span style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(6px)", borderRadius: 10, padding: "4px 10px", fontSize: 11, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 600 }}>{r.cat}</span>
                   </div>
 
                   {/* Fiyat */}
-                  <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", borderRadius: 10, padding: "4px 10px", fontSize: 12, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>{r.price}</span>
+                  <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", borderRadius: 10, padding: "4px 10px", fontSize: 12, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 600 }}>{r.price}</span>
 
                   {/* İsim ve mesafe */}
                   <div style={{ position: "absolute", bottom: 12, left: 14, right: 14, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{r.name}</span>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.8)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(4px)", borderRadius: 8, padding: "3px 8px" }}>{r.dist}</span>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{r.name}</span>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.8)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(4px)", borderRadius: 8, padding: "3px 8px" }}>{r.dist}</span>
                   </div>
                 </div>
 
@@ -3084,9 +3088,9 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                       <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4CAF50" }} />
-                      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#4CAF50", fontWeight: 700 }}>Açık</span>
+                      <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "#4CAF50", fontWeight: 700 }}>Açık</span>
                     </div>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#bbb" }}>{r.hours}</span>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "#bbb" }}>{r.hours}</span>
                   </div>
 
                   {/* Silme — onaylı */}
@@ -3106,7 +3110,7 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
 
                 {/* Adres */}
                 <div style={{ padding: "0 16px 14px" }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#bbb", margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "#bbb", margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
                     {r.addr}
                   </p>
@@ -3122,12 +3126,12 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px var(--c-border), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
           <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF3B30" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
       </div>
@@ -3199,23 +3203,23 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
             <input ref={fileRef} type="file" accept="image/*" onChange={onPhoto} style={{ display: "none" }} />
             <div onClick={pickPhoto} style={{ position: "relative", cursor: "pointer" }}>
-              <div style={{ width: 84, height: 84, borderRadius: "50%", background: photo ? "transparent" : accentColor, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em" }}>
+              <div style={{ width: 84, height: 84, borderRadius: "50%", background: photo ? "transparent" : accentColor, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "var(--f-body)", fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em" }}>
                 {photo ? <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "B"}
               </div>
               <div style={{ position: "absolute", bottom: 0, right: 0, width: 26, height: 26, borderRadius: "50%", background: "var(--c-card)", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
                 <Icon n="camera" size={13} color={accentColor} />
               </div>
             </div>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "14px 0 3px" }}>Bora Çolpan</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 16px" }}>Nisan 2024'ten beri üye</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "14px 0 3px" }}>Bora Çolpan</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 16px" }}>Nisan 2024'ten beri üye</p>
 
             {/* Tek satır istatistik */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-ink-2)" }}><b style={{ color: "var(--c-ink)" }}>{favorites.length}</b> Favori</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)" }}><b style={{ color: "var(--c-ink)" }}>{favorites.length}</b> Favori</span>
               <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--c-line)" }} />
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-ink-2)" }}><b style={{ color: "var(--c-ink)" }}>{reviews.length}</b> Yorum</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)" }}><b style={{ color: "var(--c-ink)" }}>{reviews.length}</b> Yorum</span>
               <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--c-line)" }} />
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-ink-2)", display: "flex", alignItems: "center", gap: 3 }}><Icon n="star" size={12} color="#F59E0B" /><b style={{ color: "var(--c-ink)" }}>{avgScore}</b> Ortalama</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)", display: "flex", alignItems: "center", gap: 3 }}><Icon n="star" size={12} color="#F59E0B" /><b style={{ color: "var(--c-ink)" }}>{avgScore}</b> Ortalama</span>
             </div>
           </div>
 
@@ -3227,7 +3231,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
                   {[...BADGES, ...BADGES].map((b, i) => (
                     <div key={i} style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, border: "1px solid rgba(0,0,0,0.08)", borderRadius: 999, padding: "6px 12px" }}>
                       <Icon n={b.icon} size={12} color={accentColor} />
-                      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 600, color: "var(--c-ink-2)", whiteSpace: "nowrap" }}>{b.label}</span>
+                      <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 600, color: "var(--c-ink-2)", whiteSpace: "nowrap" }}>{b.label}</span>
                     </div>
                   ))}
                 </div>
@@ -3244,10 +3248,10 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
               borderBottom: tab === t.id ? "2px solid #FF6600" : "2px solid transparent",
               transition: "all 0.2s", display: "flex", alignItems: "center", gap: 5,
             }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, color: tab === t.id ? "var(--c-ink)" : "var(--c-muted)" }}>{t.label}</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, color: tab === t.id ? "var(--c-ink)" : "var(--c-muted)" }}>{t.label}</span>
               {/* Bekleyen talep sayısı: cevap bekleyen bir şey varsa görünsün */}
               {t.badge > 0 && (
-                <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: "#FF6600", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 9.5, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{t.badge}</span>
+                <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: "#FF6600", color: "#fff", fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{t.badge}</span>
               )}
             </div>
           ))}
@@ -3257,7 +3261,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
           {tab === "reviews" && (
             reviews.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 20px" }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "var(--c-muted)", margin: 0 }}>Henüz yorum yapmadın</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-muted)", margin: 0 }}>Henüz yorum yapmadın</p>
               </div>
             ) : reviews.map((rev, i) => (
               <div key={rev.rid} style={{ display: "flex", gap: 12, padding: "16px 0", borderBottom: i < reviews.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", animation: `fadeInUp 0.35s ease-out ${i * 0.06}s both` }}>
@@ -3266,13 +3270,13 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-ink)", margin: 0 }}>{rev.name}</p>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "var(--c-muted)", flexShrink: 0, marginLeft: 6 }}>{rev.date}</span>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)", margin: 0 }}>{rev.name}</p>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-muted)", flexShrink: 0, marginLeft: 6 }}>{rev.date}</span>
                   </div>
                   <div style={{ display: "flex", gap: 2, margin: "4px 0 6px" }}>
                     {[1,2,3,4,5].map(st => <Icon key={st} n="star" size={10} color={st <= rev.stars ? "#F59E0B" : "#E5E0D8"} />)}
                   </div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "var(--c-ink-2)", margin: 0, lineHeight: 1.45 }}>{rev.text}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-ink-2)", margin: 0, lineHeight: 1.45 }}>{rev.text}</p>
                   {rev.photos?.length > 0 && (
                     <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                       {rev.photos.map((src, pi) => (
@@ -3293,7 +3297,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
           {tab === "favorites" && (
             favorites.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 20px" }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "var(--c-muted)", margin: 0 }}>Henüz beğendiğin bir yer yok</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-muted)", margin: 0 }}>Henüz beğendiğin bir yer yok</p>
               </div>
             ) : favorites.map((r, i) => (
               <div key={r.id} onClick={() => onDetail(r)} style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: i < favorites.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", cursor: "pointer" }}>
@@ -3301,12 +3305,12 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
                   <Img src={r.imgs[0]} style={{ width: "100%", height: "100%" }} bg="var(--c-img-bg)" box={46} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 2px", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "var(--c-muted)", margin: 0 }}>{r.cat} · {r.dist}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 2px", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: 0 }}>{r.cat} · {r.dist}</p>
                 </div>
                 <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
                   <Icon n="star" color="#F59E0B" size={12} />
-                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "var(--c-ink)" }}>{r.rating}</span>
+                  <span style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-ink)" }}>{r.rating}</span>
                 </span>
               </div>
             ))
@@ -3314,7 +3318,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
           {tab === "tables" && (
             myTables.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 20px" }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "var(--c-muted)", margin: 0 }}>Henüz masa talebin yok</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-muted)", margin: 0 }}>Henüz masa talebin yok</p>
               </div>
             ) : myTables.map((x, i) => {
               const tone = x.status === "confirmed" ? "#16A34A" : x.status === "declined" ? "#D93A2F" : "var(--c-brand-ink)";
@@ -3328,12 +3332,12 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
                     <Icon n="clock" size={18} color={tone} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.restaurantName}</p>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "var(--c-muted)", margin: 0 }}>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.restaurantName}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: 0 }}>
                       {x.day} · {x.time} · {x.people} kişi{x.dealPct ? ` · %${x.dealPct} fırsat` : ""}
                     </p>
                   </div>
-                  <span style={{ flexShrink: 0, fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 800, color: tone, background: soft, borderRadius: 999, padding: "5px 11px" }}>{label}</span>
+                  <span style={{ flexShrink: 0, fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 800, color: tone, background: soft, borderRadius: 999, padding: "5px 11px" }}>{label}</span>
                 </div>
               );
             })
@@ -3341,8 +3345,8 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
 
           {/* Hesap — geri alınamayan işlem, listelerden ayrı ve en altta */}
           <div style={{ marginTop: 30, paddingTop: 18, borderTop: "1px solid var(--c-border)" }}>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 4px" }}>Hesap</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 4px" }}>Hesap</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
               Hesabını silersen yorumların, favorilerin ve rozetlerin kalıcı olarak kaldırılır.
             </p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -3377,12 +3381,12 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px var(--c-border), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
           <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <Icon n="search" color="#FF6600" size={22} />
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
           <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <Icon n="heart" color="#FF3B30" size={22} />
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
       </div>
@@ -3455,8 +3459,8 @@ function ConsentBanner({ onDecide, onLegal }) {
       border: "1px solid rgba(255,255,255,0.1)", borderRadius: 22, padding: "16px 16px 14px",
       boxShadow: "0 12px 40px rgba(0,0,0,0.4)", animation: "fadeInUp 0.4s ease-out",
     }}>
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", margin: "0 0 5px" }}>Ölçümleme çerezleri</p>
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.5, margin: "0 0 13px" }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#fff", margin: "0 0 5px" }}>Ölçümleme çerezleri</p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.5, margin: "0 0 13px" }}>
         Uygulamayı geliştirmek için anonim kullanım istatistikleri toplayabiliriz. Zorunlu olanlar dışında hiçbir şey izniniz olmadan çalışmaz.{" "}
         <span onClick={onLegal} style={{ color: "#FFA500", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>Ayrıntılar</span>
       </p>
@@ -3480,7 +3484,7 @@ function LegalScreen({ onBack, initialDoc = "kvkk" }) {
         <div style={{ padding: "44px 20px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
             <BackBtn onClick={onBack} variant="light" />
-            <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: 0 }}>Yasal metinler</h2>
+            <h2 style={{ fontFamily: "var(--f-body)", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: 0 }}>Yasal metinler</h2>
           </div>
 
           <div style={{ display: "flex", gap: 8 }}>
@@ -3492,25 +3496,25 @@ function LegalScreen({ onBack, initialDoc = "kvkk" }) {
                   background: d.id === docId ? "#FF6600" : "#fff",
                   color: d.id === docId ? "#fff" : "var(--c-ink-2)",
                   borderRadius: 999, padding: "7px 14px", cursor: "pointer", outline: "none",
-                  fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 700,
+                  fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700,
                 }}>{d.label}</button>
             ))}
           </div>
         </div>
 
         <div style={{ padding: "18px 20px 120px" }}>
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16.5, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 4px", lineHeight: 1.3 }}>{doc.title}</h3>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "var(--c-muted)", margin: "0 0 18px" }}>Son güncelleme: {LEGAL_UPDATED}</p>
+          <h3 style={{ fontFamily: "var(--f-body)", fontSize: 16.5, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 4px", lineHeight: 1.3 }}>{doc.title}</h3>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: "0 0 18px" }}>Son güncelleme: {LEGAL_UPDATED}</p>
 
           {doc.body.map(([heading, text]) => (
             <div key={heading} style={{ marginBottom: 18 }}>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 5px" }}>{heading}</p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-ink-2)", lineHeight: 1.6, margin: 0 }}>{text}</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 5px" }}>{heading}</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)", lineHeight: 1.6, margin: 0 }}>{text}</p>
             </div>
           ))}
 
           <div style={{ background: "#FFF8F4", border: "1px solid rgba(255,102,0,0.18)", borderRadius: 14, padding: "12px 14px", marginTop: 6 }}>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#8A5A2B", lineHeight: 1.55, margin: 0 }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "#8A5A2B", lineHeight: 1.55, margin: 0 }}>
               Bu metinler yayına hazırlık taslağıdır. Ticaret unvanı, adres ve iletişim bilgileri doldurulmadan ve bir hukuk danışmanına onaylatılmadan yayına çıkarılmamalıdır.
             </p>
           </div>
@@ -3788,7 +3792,7 @@ export default function GurApp(props = {}) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", colorScheme: "light" }}>
+    <div className="gur-stage" style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", colorScheme: "light" }}>
       <GurStyles />
       <PhoneFrame>
         {render()}
@@ -3838,7 +3842,7 @@ export default function GurApp(props = {}) {
             ? `Sunucuya bağlı — ${session.info?.restaurants ?? 0} mekan`
             : "Sunucu yok: veriler yalnızca bu tarayıcıda saklanıyor"}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: session.mode === "live" ? "#22C55E" : "#F59E0B" }} />
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
               {session.mode === "live" ? "CANLI" : "YEREL"}
             </span>
           </div>

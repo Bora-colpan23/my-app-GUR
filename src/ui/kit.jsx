@@ -68,7 +68,7 @@ export function usePrefersReducedMotion() {
 
 // Logo: beyaz hap şeklinde arka plan ile her yerde okunur
 export function GurLogo({ size = 48, pill = false }) {
-  const logo = <span style={{ fontSize: size, fontWeight: 900, fontFamily: "'Poppins', sans-serif", letterSpacing: -size/24, lineHeight: 1 }}>
+  const logo = <span style={{ fontSize: size, fontWeight: 900, fontFamily: "var(--f-display)", letterSpacing: -size/24, lineHeight: 1 }}>
     <span style={{ color: "#FFA500" }}>G</span><span style={{ color: "#FF6600" }}>U</span><span style={{ color: "#FF0000" }}>R</span>
   </span>;
   if (pill) return <div style={{ background: "#fff", borderRadius: size * 0.5, padding: `${size*0.12}px ${size*0.35}px`, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 12px rgba(0,0,0,0.12)" }}>{logo}</div>;
@@ -150,15 +150,15 @@ export function InputField({ label, value, onChange, placeholder, type = "text" 
   // ekran okuyucu da alanı adıyla okuyor. Serbest bir <p> bunu yapamaz.
   const id = React.useId();
   return <div style={{ marginBottom: 20 }}>
-    <label htmlFor={id} style={{ display: "block", marginBottom: 7, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
-    <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)} onFocus={keepVisible} placeholder={placeholder} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "var(--c-card)", color: "var(--c-ink)", WebkitTextFillColor: "var(--c-ink)", boxShadow: "0 2px 16px var(--c-border)", boxSizing: "border-box" }} />
+    <label htmlFor={id} style={{ display: "block", marginBottom: 7, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
+    <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)} onFocus={keepVisible} placeholder={placeholder} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 16, fontFamily: "var(--f-body)", background: "var(--c-card)", color: "var(--c-ink)", WebkitTextFillColor: "var(--c-ink)", boxShadow: "0 2px 16px var(--c-border)", boxSizing: "border-box" }} />
   </div>;
 }
 
 export function SelectField({ label, value, onChange, options }) {
   return <div style={{ marginBottom: 20 }}>
-    <label style={{ display: "block", marginBottom: 7, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
-    <select value={value} onChange={e => onChange(e.target.value)} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "#fff", color: value ? "#333" : "#aaa", appearance: "none", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 18px center" }}>
+    <label style={{ display: "block", marginBottom: 7, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
+    <select value={value} onChange={e => onChange(e.target.value)} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 16, fontFamily: "var(--f-body)", background: "var(--c-card)", color: value ? "var(--c-ink)" : "var(--c-muted)", appearance: "none", boxShadow: "0 2px 16px var(--c-border)", boxSizing: "border-box", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 18px center" }}>
       <option value="">Seçiniz</option>{options.map(o => <option key={o} value={o}>{o}</option>)}
     </select>
   </div>;
@@ -237,7 +237,7 @@ export function Btn({ text, onClick, disabled, loading, variant = "onColor", siz
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
         padding: paddings[size], borderRadius: 999,
         border: p.border || "none", color: p.color,
-        fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: fontSizes[size],
+        fontFamily: "var(--f-body)", fontWeight: 600, fontSize: fontSizes[size],
         WebkitTapHighlightColor: "transparent", outline: "none", whiteSpace: "nowrap",
         position: "relative",
       }}>
@@ -420,12 +420,12 @@ export function UploadBox({ label, icon, accept, files, setFiles, multiple = tru
   const remove = (i) => setFiles(prev => { const f = prev[i]; if (f?.url?.startsWith("blob:")) URL.revokeObjectURL(f.url); return prev.filter((_, j) => j !== i); });
   return (
     <div style={{ marginBottom: 20 }}>
-      <label style={{ display: "block", marginBottom: 8, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
+      <label style={{ display: "block", marginBottom: 8, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
       <input ref={ref} type="file" accept={accept} multiple={multiple} onChange={handle} style={{ display: "none" }} />
       <div onClick={() => ref.current?.click()} style={{ border: "2px dashed rgba(255,102,0,0.3)", borderRadius: 18, padding: files.length > 0 ? 14 : "30px 16px", textAlign: "center", cursor: "pointer", background: "#fff", transition: "border-color 0.2s" }}
         onMouseEnter={e => e.currentTarget.style.borderColor = "#FF6600"}
         onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,102,0,0.3)"}>
-        {files.length === 0 ? <><div style={{ display: "flex", justifyContent: "center" }}>{icon}</div><p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#A18F7C", margin: "10px 0 0" }}>Dosya seçmek için tıklayın</p></> : (
+        {files.length === 0 ? <><div style={{ display: "flex", justifyContent: "center" }}>{icon}</div><p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: "10px 0 0" }}>Dosya seçmek için tıklayın</p></> : (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
             {files.map((f, i) => <div key={i} style={{ position: "relative" }}>{f.type?.startsWith("image/") ? <img src={f.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "2px solid rgba(255,102,0,0.2)" }} /> : <div style={{ width: 72, height: 72, borderRadius: 12, background: "#FFF3EA", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="doc" size={20} color="#FF6600" /></div>}<button type="button" className="gur-icon-btn" title="Kaldır" aria-label="Kaldır" onClick={e => { e.stopPropagation(); remove(i); }} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", border: "none", padding: 0, outline: "none", background: "#FF3B30", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", cursor: "pointer", fontWeight: 700, boxShadow: "0 2px 6px rgba(0,0,0,0.2)" }}>✕</button></div>)}
             <div style={{ width: 72, height: 72, borderRadius: 12, border: "2px dashed rgba(255,102,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 18, color: "rgba(255,102,0,0.4)" }}>+</span></div>
@@ -438,7 +438,7 @@ export function UploadBox({ label, icon, accept, files, setFiles, multiple = tru
 
 export function PhoneFrame({ children }) {
   return <div className="gur-frame" style={{ width: 390, maxWidth: "100%", height: 844, borderRadius: 44, overflow: "hidden", boxShadow: "0 25px 80px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05)", position: "relative", background: "var(--c-bg)", margin: "0 auto" }}>
-    <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 126, height: 30, background: "#000", borderBottomLeftRadius: 18, borderBottomRightRadius: 18, zIndex: 999 }} />
+    <div className="gur-notch" style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 126, height: 30, background: "#000", borderBottomLeftRadius: 18, borderBottomRightRadius: 18, zIndex: 999 }} />
     {children}
   </div>;
 }
@@ -491,18 +491,36 @@ export function GurStyles() {
           --c-brand-soft: rgba(255,102,0,0.08);
           --c-brand-ink: #B4530A;       /* turuncu zemin üstünde metin */
           --shadow-bar: 0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9);
+
+          /* ── YAZI TİPİ JETONLARI ──────────────────────────────────
+             Renk gibi yazı tipi de tek yerden. Yedek zincirde önce
+             sistem yazı tipi var: Outfit/Poppins gelene kadar (ya da
+             hiç gelmezse) iOS'ta San Francisco, Android'de Roboto
+             çizilir — genel "sans-serif" iki platformda iki ayrı
+             yazı tipi seçiyordu ve arayüz farklı görünüyordu. */
+          --f-display: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          --f-body: 'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         }
         /* Tarayıcı form denetimlerini ve kaydırma çubuğunu açık temaya uydursun */
         :root { color-scheme: light; }
 
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+        /* Yazı tipleri index.html'den yükleniyor. Burada @import vardı ama
+           @import bir stil sayfasında ilk sırada olmak zorunda: yukarıdaki
+           :root kuralından sonra geldiği için tarayıcı ikisini de atıyordu
+           ve Outfit hiçbir zaman istenmiyordu. */
         @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
         @keyframes badgeMarquee { from { transform:translateX(0); } to { transform:translateX(-50%); } }
         @keyframes spin { to { transform:rotate(360deg); } }
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
         * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
         ::-webkit-scrollbar { display:none; }
+        /* iOS Safari, 16px'ten küçük bir alana odaklanınca sayfayı
+           yakınlaştırır ve düzen bozulur. Taban ölçü 16px; alanlar bunu
+           satır içinde küçültmüyor. */
+        input, textarea, select { font-size: 16px; font-family: var(--f-body); }
+        /* Kaydırırken görselin "sürükle" hayaleti ve iOS'un uzun basma
+           menüsü hareketin önüne geçiyordu. */
+        img { -webkit-user-drag: none; user-select: none; }
         /* ── BUTON DURUMLARI ──────────────────────────────────────────
            Renkler değişkenlerden okunuyor; buton bunları inline veriyor.
            Arka planı inline yazsaydık :hover ve :active hiç devreye
@@ -559,7 +577,39 @@ export function GurStyles() {
           padding-right: env(safe-area-inset-right, 0px);
         }
         /* Klavye açıkken kaydırma alanı klavye yüksekliği kadar uzar */
-        .gur-screen { padding-bottom: var(--gur-kb, 0px); }
+        .gur-screen {
+          padding-bottom: var(--gur-kb, 0px);
+          /* Ekran sonuna gelince kaydırma sayfaya zincirlenmesin */
+          overscroll-behavior-y: contain;
+        }
+
+        /* ── GERÇEK TELEFON: ÇERÇEVE YOK ──────────────────────────────
+           390×844'lük telefon maketi masaüstü önizlemesi içindir. Gerçek
+           bir telefonda ise ekranda ikinci bir telefon çiziliyordu: sahte
+           çentik gerçek çentiğin altına düşüyor, 844px'lik kutu 667px'lik
+           ekranı taşırıp sayfayı kaydırıyor ve alt bar ekran dışında
+           kalıyordu. Dar ya da dokunmatik-kısa ekranlarda maket kalkar,
+           uygulama ekranı kaplar.
+
+           Kurallar !important: uygulama satır içi stille yazılı ve satır
+           içi stil sınıf kuralını yener — tersi değil. */
+        @media (max-width: 439.98px), (pointer: coarse) and (max-height: 883px) {
+          .gur-stage {
+            padding: 0 !important;
+            background: var(--c-bg) !important;
+            min-height: 100dvh !important;
+            align-items: stretch !important;
+          }
+          .gur-frame {
+            width: 100% !important;
+            height: 100dvh !important;
+            max-width: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+          }
+          /* Sahte çentik: cihazın kendi çentiği zaten orada */
+          .gur-notch { display: none !important; }
+        }
 
         /* Erişilebilirlik tercihleri. Uygulama tamamen inline stille yazıldığı
            için cam yüzeyler .gur-glass sınıfıyla işaretlendi; hareket kuralları

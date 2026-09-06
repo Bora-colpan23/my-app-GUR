@@ -39,7 +39,7 @@ npm run dev:all                       # API (8787) + arayüz (5173)
 
 Yalnız arayüz: `npm run dev`. Yalnız API: `npm run dev:api`.
 
-- `/`         → Tüketici uygulaması (telefon çerçevesi içinde önizlenir)
+- `/`         → Tüketici uygulaması (telefon çerçevesi yalnızca masaüstünde)
 - `/isletme`  → Doyurucu: işletme uygulaması (kendi girişi, kendi oturumu)
 - `/admin`    → Yönetici paneli (tam ekran masaüstü)
 
@@ -123,6 +123,33 @@ Bir mekanın kimliği tek yerde: `account` alanı işletmenin hesabı olup
 olmadığını söyler. Hesabı olmayan (yalnız dış beslemeden gelen) mekanlar
 fiyatlandırma panelinde görünmez — teklif gönderilecek muhatap yoktur.
 
+### Telefon çerçevesi yalnızca masaüstünde
+390×844'lük maket bir **önizleme kabuğu**. Gerçek telefonda `.gur-stage` ve
+`.gur-frame` üstündeki medya kuralı devreye girer: çerçeve, gölge, köşe
+yarıçapı ve sahte çentik kalkar, uygulama `100dvh` ile ekranı kaplar. Aksi
+hâlde ekranda ikinci bir telefon çiziliyor, sahte çentik gerçeğinin altına
+düşüyor ve 844px'lik kutu kısa ekranları taşırıyordu.
+
+Kurallar `!important` — uygulama satır içi stille yazılı ve satır içi stil
+sınıf kuralını yener; tersini yapmanın tek yolu bu.
+
+### Yazı tipi: jetondan oku
+`--f-display` (Poppins) ve `--f-body` (Outfit) `GurStyles` içinde tanımlı;
+kodda `fontFamily: "var(--f-body)"` yazılır, aile adı elle yazılmaz. Yedek
+zincirde `system-ui` var: yazı tipi gelene kadar iOS'ta San Francisco,
+Android'de Roboto çizilir — genel `sans-serif` iki platformda iki ayrı
+yazı tipi seçiyordu.
+
+Her iki aile de **index.html'den** yüklenir. `GurStyles` içine `@import`
+yazmayın: `@import` bir stil sayfasında ilk sırada olmak zorundadır, oradaki
+`:root` kuralından sonra geldiği için tarayıcı sessizce atar (Outfit uzun
+süre bu yüzden hiç yüklenmedi).
+
+### Metin alanları 16px
+iOS Safari 16px'ten küçük bir alana odaklanınca sayfayı yakınlaştırır ve
+düzen bozulur. `input`/`textarea`/`select` taban ölçüsü 16px; satır içinde
+daha küçük yazmayın.
+
 ### Renk paleti: tek açık tema
 Uygulamanın tek bir açık teması var; koyu tema **bilinçli olarak yok**.
 Uygulama satır içi stille yazıldığı için renkler yine CSS değişkenlerinden
@@ -174,7 +201,8 @@ sabit aralık kullanıcı tarafından fark ediliyor.
 - Stil: **inline style** (CSS-in-JS yok, Tailwind yok). `GRAD = "#FF6600"`.
 - Hareket: Motion (`motion/react` + imperatif `animate`). Springler Apple HIG'e
   göre: damping 1.0 varsayılan, momentum taşıyan hareketlerde bounce 0.2.
-- Font: **Poppins** + **Outfit**. Başka font kullanma.
+- Font: **Poppins** + **Outfit**, jetondan: `var(--f-display)` / `var(--f-body)`.
+  Başka font kullanma.
 
 ### Konum doğrulamalı ziyaret
 `src/lib/visits.js` ve `server/src/visits/tracker.js` **aynı kuralları** taşır:

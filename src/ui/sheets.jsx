@@ -115,8 +115,8 @@ export function Sheet({ title, subtitle, onClose, children }) {
           <div style={{ width: 40, height: 4, borderRadius: 2, background: dragging ? "#C9C1B8" : "#E5E0DA", margin: "0 auto 16px", transition: "background 0.2s" }} />
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
             <div style={{ minWidth: 0 }}>
-              <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 3px" }}>{title}</h3>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</p>
+              <h3 style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 3px" }}>{title}</h3>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</p>
             </div>
             <IconBtn onClick={close} tone="subtle" size={34} title="Kapat"
               icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
@@ -138,7 +138,7 @@ export function Chip({ label, active, onClick }) {
         background: active ? "var(--c-brand-soft)" : "var(--c-card)",
         color: active ? "#FF6600" : "var(--c-ink)",
         borderRadius: 12, padding: "9px 14px", cursor: "pointer", outline: "none",
-        fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+        fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
       }}>{label}</motion.button>
   );
 }
@@ -148,7 +148,7 @@ export function Chip({ label, active, onClick }) {
 export function DangerConfirm({ title, message, confirmText, onConfirm, onClose }) {
   return (
     <Sheet title={title} subtitle="Bu işlem geri alınamaz" onClose={onClose}>
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "var(--c-ink-2)", lineHeight: 1.55, margin: "0 0 20px" }}>{message}</p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-ink-2)", lineHeight: 1.55, margin: "0 0 20px" }}>{message}</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <Btn text={confirmText} onClick={() => { haptic([18, 40, 18]); onConfirm(); }} variant="destructive" />
         <Btn text="Vazgeç" onClick={onClose} variant="outlineDark" />
