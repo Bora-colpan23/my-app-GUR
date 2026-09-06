@@ -84,6 +84,8 @@ export function Icon({ n, size = 18, color = "currentColor", strokeWidth = 2 }) 
     palette: <><path d="M12 21a9 9 0 010-18 5 5 0 010 10h-1a2 2 0 000 4h1" /><circle cx="8.5" cy="10.5" r="1" fill={color} stroke="none" /><circle cx="12" cy="7.5" r="1" fill={color} stroke="none" /><circle cx="15.5" cy="10.5" r="1" fill={color} stroke="none" /></>,
     doc: <><path d="M6 2h9l5 5v15H6z" /><path d="M15 2v5h5" /></>,
     camera: <><path d="M4 8h3l2-3h6l2 3h3v12H4z" /><circle cx="12" cy="14" r="3.5" /></>,
+    sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>,
+    moon: <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />,
     sparkle: <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18" />,
     check: <polyline points="20 6 9 17 4 12" />,
     clock: <><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 16 14" /></>,
@@ -126,7 +128,7 @@ export function sizedSrc(src, box) {
   });
 }
 
-export function Img({ src, style, bg = "#e8e0d8", box }) {
+export function Img({ src, style, bg = "var(--c-img-bg)", box, alt = "" }) {
   const [state, setState] = useState("loading"); // loading | ok | failed
   useEffect(() => {
     setState("loading");
@@ -140,21 +142,24 @@ export function Img({ src, style, bg = "#e8e0d8", box }) {
       {state === "loading" && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 22, height: 22, border: "3px solid rgba(0,0,0,0.08)", borderTopColor: "#FF6600", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
       {/* Yüklenemeyen görselde <img> gizli kalır; arka plan rengi/gradyanı görünür
           — aksi halde tarayıcının bozuk görsel ikonu kartın üstüne düşüyordu. */}
-      <img src={sizedSrc(src, box)} alt="" loading="lazy" decoding="async" onLoad={() => setState("ok")} onError={() => setState("failed")} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: state === "ok" ? 1 : 0, transition: "opacity 0.4s" }} />
+      <img src={sizedSrc(src, box)} alt={alt} loading="lazy" decoding="async" onLoad={() => setState("ok")} onError={() => setState("failed")} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: state === "ok" ? 1 : 0, transition: "opacity 0.4s" }} />
     </div>
   );
 }
 
 export function InputField({ label, value, onChange, placeholder, type = "text" }) {
+  // Etiket alana htmlFor ile bağlı: etikete dokunmak alanı odaklıyor,
+  // ekran okuyucu da alanı adıyla okuyor. Serbest bir <p> bunu yapamaz.
+  const id = React.useId();
   return <div style={{ marginBottom: 20 }}>
-    <label style={{ display: "block", marginBottom: 7, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#2D2419" }}>{label}</label>
-    <input type={type} value={value} onChange={e => onChange(e.target.value)} onFocus={keepVisible} placeholder={placeholder} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "#fff", color: "#2D2419", WebkitTextFillColor: "#2D2419", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box" }} />
+    <label htmlFor={id} style={{ display: "block", marginBottom: 7, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
+    <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)} onFocus={keepVisible} placeholder={placeholder} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "var(--c-card)", color: "var(--c-ink)", WebkitTextFillColor: "var(--c-ink)", boxShadow: "0 2px 16px var(--c-border)", boxSizing: "border-box" }} />
   </div>;
 }
 
 export function SelectField({ label, value, onChange, options }) {
   return <div style={{ marginBottom: 20 }}>
-    <label style={{ display: "block", marginBottom: 7, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#2D2419" }}>{label}</label>
+    <label style={{ display: "block", marginBottom: 7, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
     <select value={value} onChange={e => onChange(e.target.value)} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "#fff", color: value ? "#333" : "#aaa", appearance: "none", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 18px center" }}>
       <option value="">Seçiniz</option>{options.map(o => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -201,7 +206,7 @@ export function Btn({ text, onClick, disabled, loading, variant = "onColor", siz
     onColor:   { bg: "#fff", hover: "#FFF4EC", press: "#FFE8D8", color: "#FF6600", elev: "restLight", pressElev: "pressLight" },
     filled:    { bg: BRAND_GRAD, hover: BRAND_GRAD_HOVER, press: BRAND_GRAD, color: "#fff", elev: "restBrand", pressElev: "pressBrand" },
     outline:   { bg: "rgba(255,255,255,0.08)", hover: "rgba(255,255,255,0.16)", press: "rgba(255,255,255,0.06)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.55)", elev: "restDark", pressElev: "pressDark" },
-    outlineDark: { bg: "#fff", hover: "#FFF6F0", press: "#FFEFE4", color: "#2D2419", border: "1.5px solid rgba(45,36,25,0.14)", elev: "restLight", pressElev: "pressLight" },
+    outlineDark: { bg: "#fff", hover: "#FFF6F0", press: "#FFEFE4", color: "var(--c-ink)", border: "1.5px solid rgba(45,36,25,0.14)", elev: "restLight", pressElev: "pressLight" },
     destructive: { bg: "linear-gradient(145deg, #FF5449, #FF3B30)", hover: "linear-gradient(145deg, #FF6B61, #FF4A40)", press: "linear-gradient(145deg, #E8352B, #D62F26)", color: "#fff", elev: "0 8px 20px rgba(255,59,48,0.32), inset 0 1px 0 rgba(255,255,255,0.3)", pressElev: "inset 0 3px 10px rgba(140,20,15,0.45)" },
     destructiveSoft: { bg: "rgba(255,59,48,0.08)", hover: "rgba(255,59,48,0.14)", press: "rgba(255,59,48,0.2)", color: "#FF3B30" },
     plain:     { bg: "transparent", hover: "rgba(255,255,255,0.08)", press: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.6)" },   // koyu/turuncu zemin
@@ -417,7 +422,7 @@ export function UploadBox({ label, icon, accept, files, setFiles, multiple = tru
   const remove = (i) => setFiles(prev => { const f = prev[i]; if (f?.url?.startsWith("blob:")) URL.revokeObjectURL(f.url); return prev.filter((_, j) => j !== i); });
   return (
     <div style={{ marginBottom: 20 }}>
-      <label style={{ display: "block", marginBottom: 8, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#2D2419" }}>{label}</label>
+      <label style={{ display: "block", marginBottom: 8, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
       <input ref={ref} type="file" accept={accept} multiple={multiple} onChange={handle} style={{ display: "none" }} />
       <div onClick={() => ref.current?.click()} style={{ border: "2px dashed rgba(255,102,0,0.3)", borderRadius: 18, padding: files.length > 0 ? 14 : "30px 16px", textAlign: "center", cursor: "pointer", background: "#fff", transition: "border-color 0.2s" }}
         onMouseEnter={e => e.currentTarget.style.borderColor = "#FF6600"}
@@ -434,14 +439,15 @@ export function UploadBox({ label, icon, accept, files, setFiles, multiple = tru
 }
 
 export function PhoneFrame({ children }) {
-  return <div className="gur-frame" style={{ width: 390, maxWidth: "100%", height: 844, borderRadius: 44, overflow: "hidden", boxShadow: "0 25px 80px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05)", position: "relative", background: "#fff", margin: "0 auto" }}>
+  return <div className="gur-frame" style={{ width: 390, maxWidth: "100%", height: 844, borderRadius: 44, overflow: "hidden", boxShadow: "0 25px 80px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05)", position: "relative", background: "var(--c-bg)", margin: "0 auto" }}>
     <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 126, height: 30, background: "#000", borderBottomLeftRadius: 18, borderBottomRightRadius: 18, zIndex: 999 }} />
     {children}
   </div>;
 }
 
 export function Screen({ children, grad = true }) {
-  return <div className="gur-screen" style={{ width: "100%", height: "100%", background: grad ? "#fff" : "#fff", overflowY: "auto", overflowX: "hidden", position: "relative" }}>{children}</div>;
+  // main: yardımcı teknolojiler doğrudan içeriğe atlayabilsin
+  return <main className="gur-screen" style={{ width: "100%", height: "100%", background: grad ? "var(--c-bg)" : "var(--c-bg)", overflowY: "auto", overflowX: "hidden", position: "relative" }}>{children}</main>;
 }
 
 
@@ -464,6 +470,50 @@ export function VerifiedStar({ size = 14, title = "İşletme hesabı doğrulanm�
 export function GurStyles() {
   return (
       <style>{`
+        /* ── TEMA JETONLARI ────────────────────────────────────────────
+           Uygulama satır içi stille yazıldığı için renkler CSS
+           değişkenlerinden okunuyor: satır içi stil sınıf kuralını yener
+           ama var() değerini okur. Tema değişimi tek yerden.
+
+           Açık temadaki gri tonları WCAG AA için koyulaştırıldı:
+           eski #A8A29E beyaz üstünde 2.6:1 idi (metin için geçersiz),
+           yenisi 4.6:1. */
+        :root {
+          --c-bg: #FDFBF7;              /* ekran zemini */
+          --c-bg-2: #F4EFE7;            /* zeminin ikinci tonu */
+          --c-card: #ffffff;            /* kart ve sayfa yüzeyi */
+          --c-subtle: #FBFAF8;          /* kart içi ikinci yüzey */
+          --c-ink: #1C1917;             /* ana metin */
+          --c-ink-2: #4A443E;           /* ikincil metin (4.5:1+) */
+          --c-muted: #6F6459;           /* üçüncül metin (4.6:1) */
+          --c-line: #E3DCD2;            /* ayırıcı çizgi */
+          --c-border: rgba(45,36,25,0.10);
+          --c-img-bg: #e8e0d8;          /* görsel yüklenene kadar */
+          --c-shadow: rgba(45,36,25,0.12);
+          --c-brand-soft: rgba(255,102,0,0.08);
+          --c-brand-ink: #B4530A;       /* turuncu zemin üstünde metin */
+          --shadow-bar: 0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9);
+        }
+        :root[data-theme="dark"] {
+          --c-bg: #0E0C10;
+          --c-bg-2: #17141A;
+          --c-card: #1A171E;
+          --c-subtle: #221E27;
+          --c-ink: #F4F1EE;
+          --c-ink-2: #C9C2BA;
+          --c-muted: #9A9189;
+          --c-line: #2E2933;
+          --c-border: rgba(255,255,255,0.10);
+          --c-img-bg: #2A2530;
+          --c-shadow: rgba(0,0,0,0.55);
+          --c-brand-soft: rgba(255,102,0,0.16);
+          --c-brand-ink: #FFB170;
+          --shadow-bar: 0 10px 30px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        /* Tarayıcı de form denetimlerini ve kaydırma çubuğunu temaya uydursun */
+        :root { color-scheme: light; }
+        :root[data-theme="dark"] { color-scheme: dark; }
+
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
         @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }

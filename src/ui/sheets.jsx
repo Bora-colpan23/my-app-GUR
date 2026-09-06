@@ -99,7 +99,8 @@ export function Sheet({ title, subtitle, onClose, children }) {
       <motion.div
         ref={panelRef}
         onClick={e => e.stopPropagation()}
-        style={{ y, position: "relative", width: "100%", maxHeight: "88%", overflowY: dragging ? "hidden" : "auto", background: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: "20px 20px 24px" }}
+        role="dialog" aria-modal="true" aria-label={title}
+        style={{ y, position: "relative", width: "100%", maxHeight: "88%", overflowY: dragging ? "hidden" : "auto", background: "var(--c-card)", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: "20px 20px 24px" }}
       >
         {/* Sürükleme bölgesi: tutamaç ve başlık. İçerik kaydırılabilir kaldığı
             için jest yalnızca burada dinleniyor. */}
@@ -114,11 +115,11 @@ export function Sheet({ title, subtitle, onClose, children }) {
           <div style={{ width: 40, height: 4, borderRadius: 2, background: dragging ? "#C9C1B8" : "#E5E0DA", margin: "0 auto 16px", transition: "background 0.2s" }} />
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
             <div style={{ minWidth: 0 }}>
-              <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "#2D2419", margin: "0 0 3px" }}>{title}</h3>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</p>
+              <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 3px" }}>{title}</h3>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "var(--c-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</p>
             </div>
             <IconBtn onClick={close} tone="subtle" size={34} title="Kapat"
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2D2419" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
           </div>
         </div>
         {children}
@@ -133,9 +134,9 @@ export function Chip({ label, active, onClick }) {
       onClick={onClick} className="gur-btn"
       whileTap={{ scale: 0.95 }} transition={{ type: "spring", bounce: 0, duration: 0.25 }}
       style={{
-        border: `1.5px solid ${active ? "#FF6600" : "rgba(45,36,25,0.14)"}`,
-        background: active ? "rgba(255,102,0,0.08)" : "#fff",
-        color: active ? "#FF6600" : "#2D2419",
+        border: `1.5px solid ${active ? "#FF6600" : "var(--c-border)"}`,
+        background: active ? "var(--c-brand-soft)" : "var(--c-card)",
+        color: active ? "#FF6600" : "var(--c-ink)",
         borderRadius: 12, padding: "9px 14px", cursor: "pointer", outline: "none",
         fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
       }}>{label}</motion.button>
@@ -147,7 +148,7 @@ export function Chip({ label, active, onClick }) {
 export function DangerConfirm({ title, message, confirmText, onConfirm, onClose }) {
   return (
     <Sheet title={title} subtitle="Bu işlem geri alınamaz" onClose={onClose}>
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(45,36,25,0.68)", lineHeight: 1.55, margin: "0 0 20px" }}>{message}</p>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "var(--c-ink-2)", lineHeight: 1.55, margin: "0 0 20px" }}>{message}</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <Btn text={confirmText} onClick={() => { haptic([18, 40, 18]); onConfirm(); }} variant="destructive" />
         <Btn text="Vazgeç" onClick={onClose} variant="outlineDark" />

@@ -31,6 +31,7 @@ import { fileToSquareDataUrl } from '../lib/image.js';
 import { useFeature } from '../lib/platform.js';
 import * as reservations from '../lib/reservations.js';
 import * as pricing from '../lib/pricing.js';
+import { useApplyTheme } from '../lib/theme.js';
 import * as backend from '../lib/backend.js';
 import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
@@ -878,6 +879,102 @@ function LogoUpload({ restaurant, size = 56 }) {
   );
 }
 
+// ─── ETKİLEŞİM ISI HARİTASI ──────────────────────────────────────────
+//
+// Isı haritası (heat map) bir araştırma yöntemidir: ilginin nereye
+// yığıldığını sayı olarak değil renk olarak gösterir, böylece desen tek
+// bakışta okunur. Burada gün × saat: işletme hangi saatlerde keşfedildiğini
+// görüp anlık fırsatını ölü saate koyabilir.
+//
+// Sunucudaki karşılığı analytics_events tablosunun saat kırılımıdır; demo
+// modda restoran kimliğinden deterministik üretiliyor ki panel gezinirken
+// sayılar zıplamasın.
+const HEAT_DAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+const HEAT_SLOTS = [
+  { label: "09-12", peak: 0.25 },
+  { label: "12-15", peak: 0.85 },
+  { label: "15-18", peak: 0.45 },
+  { label: "18-21", peak: 1.00 },
+  { label: "21-24", peak: 0.60 },
+];
+
+function InteractionHeatmap({ restaurant }) {
+  const grid = useMemo(() => {
+    let a = ((Number(String(restaurant?.id).replace(/\D/g, "")) || 7) * 2654435761) >>> 0;
+    const rnd = () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    return HEAT_SLOTS.map(slot => HEAT_DAYS.map((d, di) => {
+      const weekend = di >= 4 ? 1.25 : 1;               // Cuma-Pazar daha yoğun
+      const v = slot.peak * weekend * (0.7 + rnd() * 0.6);
+      return Math.min(1, v);
+    }));
+  }, [restaurant?.id]);
+
+  const best = useMemo(() => {
+    let top = { v: -1 };
+    grid.forEach((row, si) => row.forEach((v, di) => { if (v > top.v) top = { v, si, di }; }));
+    return top;
+  }, [grid]);
+  const worst = useMemo(() => {
+    let low = { v: 2 };
+    grid.forEach((row, si) => row.forEach((v, di) => { if (v < low.v) low = { v, si, di }; }));
+    return low;
+  }, [grid]);
+
+  return (
+    <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 16px", marginBottom: 20 }}>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 4px" }}>Ne zaman keşfediliyorsunuz?</p>
+      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 14px", lineHeight: 1.5 }}>
+        Son 30 günde kartınızın görüldüğü saatler. Koyu turuncu = yoğun.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "46px repeat(7, 1fr)", gap: 4 }}>
+        <span />
+        {HEAT_DAYS.map(d => (
+          <span key={d} style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9.5, color: "rgba(255,255,255,0.35)", textAlign: "center" }}>{d}</span>
+        ))}
+        {HEAT_SLOTS.map((slot, si) => (
+          <React.Fragment key={slot.label}>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9.5, color: "rgba(255,255,255,0.35)", alignSelf: "center" }}>{slot.label}</span>
+            {HEAT_DAYS.map((d, di) => {
+              const v = grid[si][di];
+              return (
+                <div key={d}
+                  title={`${d} ${slot.label} · yoğunluk %${Math.round(v * 100)}`}
+                  aria-label={`${d} ${slot.label} yoğunluk yüzde ${Math.round(v * 100)}`}
+                  style={{
+                    height: 26, borderRadius: 7,
+                    // Renk tek başına bilgi taşımasın diye kutunun içinde
+                    // yüzde de yazıyor: renk körlüğünde de okunur kalsın.
+                    background: `rgba(255,102,0,${(0.10 + v * 0.75).toFixed(2)})`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: "'Outfit', sans-serif", fontSize: 9, fontWeight: 700,
+                    color: v > 0.55 ? "#fff" : "rgba(255,255,255,0.45)",
+                  }}>
+                  {Math.round(v * 100)}
+                </div>
+              );
+            })}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#4CAF50", background: "rgba(76,175,80,0.14)", borderRadius: 999, padding: "5px 11px" }}>
+          En yoğun: {HEAT_DAYS[best.di]} {HEAT_SLOTS[best.si].label}
+        </span>
+        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#FFA500", background: "rgba(255,165,0,0.14)", borderRadius: 999, padding: "5px 11px" }}>
+          En sakin: {HEAT_DAYS[worst.di]} {HEAT_SLOTS[worst.si].label} — anlık fırsat için uygun
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function TableRequests({ restaurant }) {
   const all = reservations.useReservations();
   const mine = all.filter(x => x.restaurantId === String(restaurant?.id));
@@ -1235,6 +1332,8 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                   <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.3)", margin: "2px 0 0" }}>bu hafta</p>
                 </div>
               </div>
+
+              <InteractionHeatmap restaurant={ownerRestaurant} />
 
               {/* Haftalık grafik */}
               <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 16px", marginBottom: 20 }}>
@@ -1599,6 +1698,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 // ═══════════════════════════════════════════════════════════════════════
 export default function GurBusiness() {
   const [screen, setScreen] = useState("auth");   // auth | login | claim | reg1..3 | dashboard
+  useApplyTheme();   // tüketici uygulamasıyla aynı tema
   const [history, setHistory] = useState([]);
   // Yüklenen menü ve fotoğraflar: panelde girilen medya tüketici tarafına
   // da gidiyor (withOwnerMedia), o yüzden kökte duruyor.

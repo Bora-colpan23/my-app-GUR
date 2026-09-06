@@ -770,7 +770,8 @@ export default function GurAdmin() {
 
   const nav = [
     { id: 'dashboard', label: 'Genel Bakış', icon: icons.dash },
-    { id: 'restaurants', label: 'Restoranlar', icon: icons.store, count: restaurants.length },
+    { id: 'restaurants', label: 'Restoranlar', icon: icons.store, count: restaurants.filter(r => r.account).length },
+    { id: 'pool', label: 'Mekan Havuzu', icon: icons.inbox, count: restaurants.filter(r => !r.account).length },
     { id: 'applications', label: 'Başvurular', icon: icons.inbox, count: apps.length, alert: apps.length > 0 },
     { id: 'gastro', label: 'Gastro Onaylı', icon: icons.star },
     { id: 'users', label: 'Kullanıcılar', icon: icons.users },
@@ -920,6 +921,7 @@ export default function GurAdmin() {
           {page === 'campaigns' && <CampaignsPage />}
           {page === 'growth' && <GrowthPage />}
           {page === 'revenue' && <RevenuePage restaurants={restaurants} onOpenStore={openStore} />}
+          {page === 'pool' && <VenuePoolPage restaurants={restaurants} query={query} onOpen={openStore} />}
           {page === 'pricing' && <PricingPage restaurants={restaurants} query={query} />}
           {page === 'settings' && <SettingsPage />}
         </div>
@@ -1814,7 +1816,12 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
 }
 
 function RestaurantsPage({ restaurants, query, onSuspend, onOpen }) {
-  const filtered = restaurants.filter(r => r.name.toLowerCase().includes(query.toLowerCase()) || r.cat.toLowerCase().includes(query.toLowerCase()));
+  // Bu sekme müşterileri gösterir; sahiplenilmemiş mekanlar Mekan Havuzu
+  // sayfasında. İkisini tek listede karıştırmak "kim müşterim" sorusunu
+  // cevapsız bırakıyordu.
+  const filtered = restaurants
+    .filter(r => r.account)
+    .filter(r => r.name.toLowerCase().includes(query.toLowerCase()) || r.cat.toLowerCase().includes(query.toLowerCase()));
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
       <TableShell headers={['Restoran', 'Bölge', 'Puan', 'Plan', 'Ücretli Özellikler', { label: 'Aylık', right: true }, 'Durum', { label: 'İşlemler', right: true }]}>
@@ -1879,7 +1886,7 @@ function RestaurantsWorkspace({ restaurants, query, tab, onTab, onSuspend, onOpe
   const openLow = low.filter(v => !hidden.has(v.key)).length;
 
   const tabs = [
-    { id: 'list', label: 'Restoranlar', count: restaurants.length },
+    { id: 'list', label: 'Restoranlar', count: restaurants.filter(r => r.account).length },
     { id: 'reviews', label: 'Yorumlar', count: all.length },
     { id: 'low', label: 'Düşük Puanlar', count: openLow, alert: openLow > 0 },
   ];
@@ -2157,6 +2164,104 @@ function UsersPage({ query }) {
 // açıldığını ve aktif fazda çalışıp çalışmadığını gösterir; toplam MRR
 // yalnızca açık kalemlerden hesaplanır, böylece faz anahtarı gerçek bir
 // senaryo farkı yaratır.
+// ═══════════════════════════════════════════════════════════════════════
+// MEKAN HAVUZU — dış beslemeden gelen, henüz sahiplenilmemiş kayıtlar
+//
+// Restoranlar sekmesi müşterileri gösteriyor; burası havuzun geri kalanı:
+// Google Places / OSM beslemesinden gelen, kullanıcı adı olmayan mekanlar.
+// Uygulamada görünüyorlar (kullanıcı onları da keşfediyor) ama bize ödeme
+// yapmıyorlar — satışın başlayacağı liste burası.
+// ═══════════════════════════════════════════════════════════════════════
+const SOURCE_LABEL = { api: 'Dış besleme', owner: 'Sahiplenilmiş' };
+
+function VenuePoolPage({ restaurants = [], query = '', onOpen }) {
+  const [invited, setInvited] = useState(() => new Set());
+  const [sort, setSort] = useState('rating');   // 'rating' | 'reviews' | 'name'
+
+  const pool = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('tr');
+    const rows = restaurants
+      .filter(r => !r.account)
+      .filter(r => !q || r.name.toLocaleLowerCase('tr').includes(q) || r.district.toLocaleLowerCase('tr').includes(q));
+    const sorters = {
+      rating: (a, b) => b.rating - a.rating,
+      reviews: (a, b) => b.reviews - a.reviews,
+      name: (a, b) => a.name.localeCompare(b.name, 'tr'),
+    };
+    return rows.sort(sorters[sort]);
+  }, [restaurants, query, sort]);
+
+  const owned = restaurants.filter(r => r.account).length;
+  const total = restaurants.length;
+
+  return (
+    <div style={{ animation: 'fadeIn 0.2s' }}>
+      {/* Havuzun neresindeyiz: sahiplenme oranı satışın tek ölçüsü */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 16, marginBottom: 16 }}>
+        <KpiCard label="Listedeki mekan" value={total} delta={`portföy ${STATS.totalRestaurants}`} deltaNeutral icon={icons.store} accent={{ color: C.blue, soft: C.blueSoft }} />
+        <KpiCard label="Sahiplenilmiş" value={owned} delta={`%${Math.round((owned / total) * 100)}`} deltaNeutral icon={icons.check} accent={{ color: C.green, soft: C.greenSoft }} />
+        <KpiCard label="Sahiplenilmemiş" value={pool.length} icon={icons.inbox} accent={{ color: C.yellow, soft: C.yellowSoft }} />
+        <KpiCard label="Gönderilen davet" value={invited.size} icon={icons.msg} accent={{ color: C.orange, soft: C.orangeSoft }} />
+      </div>
+
+      <section style={{ ...CARD, overflow: 'hidden' }}>
+        <SectionHead title="Sahiplenilmemiş mekanlar"
+          right="dış beslemeden gelir · panel girişi yok" />
+
+        <div style={{ padding: '12px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>Sırala:</span>
+          {[['rating', 'Puan'], ['reviews', 'Yorum'], ['name', 'İsim A-Z']].map(([id, label]) => (
+            <Btn key={id} label={label} onClick={() => setSort(id)} size="sm"
+              variant={sort === id ? 'soft' : 'ghost'} tone={sort === id ? 'orange' : 'neutral'} />
+          ))}
+          <div style={{ flex: 1 }} />
+          <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+            {pool.length} mekan{query ? ` · "${query}" için` : ''}
+          </span>
+        </div>
+
+        {pool.map((r, i) => (
+          <div key={r.id} className="row-hover"
+            style={{ padding: '13px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <StoreAvatar restaurant={r} size={34} radius={10} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 2 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>{r.name}</span>
+                <Badge text={SOURCE_LABEL[r.source] || 'Dış besleme'} color={C.blue} soft={C.blueSoft} />
+              </div>
+              <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+                {r.cat} · {r.district} · ★ {r.rating} ({r.reviews.toLocaleString('tr')} yorum) · havuza {formatDate(r.joined)} girdi
+              </div>
+            </div>
+            <Btn label="Detay" onClick={() => onOpen?.(r.id)} variant="outline" size="sm"
+              icon={<Icon path={icons.eye} size={13} color={C.dim} />} />
+            <Btn
+              label={invited.has(r.id) ? 'Davet gönderildi' : 'Sahiplenmeye davet et'}
+              onClick={() => setInvited(s => new Set(s).add(r.id))}
+              disabled={invited.has(r.id)}
+              variant={invited.has(r.id) ? 'soft' : 'filled'} tone={invited.has(r.id) ? 'green' : 'orange'} size="sm" />
+          </div>
+        ))}
+
+        {pool.length === 0 && (
+          <div style={{ padding: '26px 18px', textAlign: 'center', fontFamily: FB, fontSize: 12.5, color: C.faint }}>
+            {query ? `"${query}" için sahiplenilmemiş mekan yok` : 'Havuzdaki tüm mekanlar sahiplenilmiş'}
+          </div>
+        )}
+
+        <div style={{ padding: '13px 18px', borderTop: `1px solid ${C.border}` }}>
+          <p style={{ margin: 0, fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
+            Bu mekanlar uygulamada görünür ve kullanıcı onları da keşfeder; bilgileri
+            dış kaynaktan gelir. İşletme kaydını sahiplendiği anda Restoranlar
+            sekmesine geçer, bilgilerini kendisi yönetmeye başlar ve fiyatlandırma
+            panelinde muhatap olur.
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // FİYATLANDIRMA — işletme bazlı fiyat teklifleri
 //

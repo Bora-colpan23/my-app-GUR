@@ -25,7 +25,8 @@ Gelir modeli tek ve bütüncül bir sistemdir — **aşamalı faz yapısı kald�
 Ürün dört arayüzden oluşur:
 1. **Tüketici mobil uygulaması** — keşif, kaydırma, detay sayfası, favoriler, profil
 2. **Doyurucu (B2B) paneli** — sahiplenme, bilgi/menü/fotoğraf yönetimi, etkileşim analizi
-3. **Yönetici paneli** — başvuru ve sahiplenme onayı, Gastro yönetimi, kampanyalar, kohort/LTV
+3. **Yönetici paneli** — başvuru ve sahiplenme onayı, mekan havuzu, Gastro
+   yönetimi, kampanyalar, fiyatlandırma, kohort/LTV
 4. **Sunucu** — mekan beslemesi, swipe motoru, bildirim cron'ları, analitik toplama
 
 ## Çalıştırma
@@ -121,6 +122,33 @@ yazıyorlar. Bağ ekranlarda değil depolarda:
 Bir mekanın kimliği tek yerde: `account` alanı işletmenin hesabı olup
 olmadığını söyler. Hesabı olmayan (yalnız dış beslemeden gelen) mekanlar
 fiyatlandırma panelinde görünmez — teklif gönderilecek muhatap yoktur.
+
+### Tema: açık / koyu / sistem
+Uygulama satır içi stille yazıldığı için renkler CSS değişkenlerinden
+okunuyor (`src/ui/kit.jsx` → `GurStyles`): satır içi stil sınıf kuralını
+yener ama `var()` değerini okur. Tema `data-theme` özniteliğiyle kök öğeye
+yazılır (`src/lib/theme.js`), üç seçenek var — sistem varsayılan.
+
+Yeni renk yazarken **jeton kullan**: `var(--c-card)`, `var(--c-ink)`,
+`var(--c-ink-2)`, `var(--c-muted)`, `var(--c-border)`, `var(--c-subtle)`.
+Sabit `#fff` yalnızca turuncu/koyu zemin üstündeki metin ve ikonlar için.
+Yönetici paneli bunun dışında: zaten koyu bir masaüstü aracı.
+
+### Erişilebilirlik kuralları (uyulacak)
+- Alan etiketleri `htmlFor` ile bağlı (`InputField`), `<label>` süs değil.
+- Bildirim ve geri bildirim yüzeyleri `role="status" aria-live="polite"`.
+- Sayfalar (sheet) `role="dialog" aria-modal`, ekranlar `<main>`.
+- Görseller anlamlı `alt` alır; süs görsel `alt=""`.
+- Gri tonlar WCAG AA'ya göre: `--c-muted` beyaz üstünde 4.6:1.
+- Renk tek başına bilgi taşımaz — ısı haritasında kutunun içinde yüzde de yazar.
+
+### Karanlık kalıp yok
+- Rıza kutusunda iki seçenek **aynı** görsel ağırlıkta; reddetmek kabul
+  etmek kadar kolay.
+- Kota teklifinde ücretsiz yol (reklam izle) ve çıkış görünür; satın alma
+  tek belirgin seçenek değil.
+- Ödüllü reklamda "Vazgeç" her zaman görünür.
+- Hesap silme tek onayla ulaşılabilir (roach motel yok).
 
 ### `shared/` — tek doğruluk kaynağı
 `buildDeck` ve `directionsUrl` hem sunucu hem istemci tarafından çağrılır.
