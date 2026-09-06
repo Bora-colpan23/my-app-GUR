@@ -4,13 +4,18 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { MotionConfig } from 'motion/react';
 import GurApp from './app/GurApp.jsx';
 
-// İki ayrı arayüz:
+// Üç ayrı uygulama, tek ürün:
 //   /          → Tüketici mobil uygulaması (telefon çerçevesi içinde)
+//   /isletme   → Doyurucu: işletme uygulaması (kendi girişi, kendi oturumu)
 //   /admin     → Yönetici paneli (tam ekran masaüstü)
 //
-// Yönetici paneli ayrı bir parçaya alındı: tüketiciler asla açmayacağı hâlde
-// paneli de indiriyordu. Artık yalnızca /admin açıldığında yükleniyor.
+// Ortak olan ekranlar değil VERİ: src/lib/* depoları ve src/data/restaurants.js
+// üçünü birbirine bağlıyor; ortak arayüz parçaları src/ui/kit.jsx'te.
+//
+// İşletme ve yönetici uygulamaları ayrı parçaya alındı: tüketiciler asla
+// açmayacağı hâlde ikisini de indiriyorlardı.
 const GurAdmin = lazy(() => import('./admin/GurAdmin.jsx'));
+const GurBusiness = lazy(() => import('./business/GurBusiness.jsx'));
 
 // Panel indirilirken beyaz ekran kalmasın diye paneli anımsatan koyu bir zemin
 const AdminFallback = () => (
@@ -21,6 +26,7 @@ const AdminFallback = () => (
 
 const router = createBrowserRouter([
   { path: '/', element: <GurApp /> },
+  { path: '/isletme', element: <Suspense fallback={<AdminFallback />}><GurBusiness /></Suspense> },
   { path: '/admin', element: <Suspense fallback={<AdminFallback />}><GurAdmin /></Suspense> },
   { path: '*', element: <Navigate to="/" replace /> },
 ]);

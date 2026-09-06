@@ -117,6 +117,24 @@ export function useOwnerProfiles() {
 // Dış kaynaktan gelen ve işletmenin ezebileceği alanlar.
 export const OVERRIDABLE = ["name", "desc", "hours", "price", "phone", "addr"];
 
+// ─── İşletme logosu ───────────────────────────────────────────────────
+// Logo işletmenin kendi kimliği: panelinde, yönetici panelinde ve
+// tüketici tarafındaki kayıtta aynı görsel görünür. Data URL olarak
+// saklanıyor (bkz. src/lib/image.js) ki rotalar arasında taşınabilsin.
+
+export function saveOwnerLogo(restaurantId, dataUrl) {
+  return saveOwnerProfile(restaurantId, { logo: dataUrl });
+}
+
+export function clearOwnerLogo(restaurantId) {
+  clearOwnerField(restaurantId, "logo");
+}
+
+/** Bir restoranın logosu — yüklenmemişse null. */
+export function ownerLogo(restaurantId, profiles = getOwnerProfiles()) {
+  return profiles[String(restaurantId)]?.logo || null;
+}
+
 /**
  * Bir restoran kaydını işletmenin girdikleriyle birleştirir.
  * Dönen nesnede `fieldSource` her alanın nereden geldiğini söyler; panel
@@ -136,6 +154,7 @@ export function applyOwnerProfile(restaurant, profiles = getOwnerProfiles()) {
   return {
     ...restaurant,
     claimed: true,
+    logo: own.logo || null,
     ...Object.fromEntries(OVERRIDABLE.filter(f => own[f]).map(f => [f, own[f]])),
     popular: own.popular?.length ? own.popular : restaurant.popular,
     fieldSource,

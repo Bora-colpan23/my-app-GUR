@@ -38,8 +38,9 @@ npm run dev:all                       # API (8787) + arayüz (5173)
 
 Yalnız arayüz: `npm run dev`. Yalnız API: `npm run dev:api`.
 
-- `/`       → Tüketici + Doyurucu uygulaması (telefon çerçevesi içinde önizlenir)
-- `/admin`  → Yönetici paneli (tam ekran masaüstü)
+- `/`         → Tüketici uygulaması (telefon çerçevesi içinde önizlenir)
+- `/isletme`  → Doyurucu: işletme uygulaması (kendi girişi, kendi oturumu)
+- `/admin`    → Yönetici paneli (tam ekran masaüstü)
 
 Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
 `demo@gur.app` / `gur1234`.
@@ -84,7 +85,11 @@ gur/
 │       ├── auth/{session,password,social}.js
 │       └── {ingestion,swipe,visits,notifications,analytics}/, cron.js
 └── src/
-    ├── main.jsx               # React kökü + router; /admin ayrı parçaya alındı
+    ├── main.jsx               # React kökü + router; /isletme ve /admin ayrı parçada
+    ├── data/restaurants.js    # MEKAN HAVUZU — üç uygulamanın ortak verisi
+    ├── ui/
+    │   ├── kit.jsx            # ortak buton/ikon/alan/yüzey + stil bloğu
+    │   └── sheets.jsx         # aşağı sürüklenip kapanan sayfalar
     ├── lib/
     │   ├── api.js             # API istemcisi + mod ölçümü
     │   ├── backend.js         # canlı/yerel cephesi — tek dallanma noktası
@@ -93,11 +98,29 @@ gur/
     │   ├── b2b.js             # sahiplenme başvuruları + işletmenin girdiği alanlar
     │   ├── campaigns.js       # demo kampanya envanteri
     │   └── social-auth.js     # Google / Apple ile giriş
-    ├── app/GurApp.jsx         # TÜM tüketici + doyurucu uygulaması (tek dosya)
-    └── admin/GurAdmin.jsx     # Yönetici paneli (tek dosya)
+    ├── app/GurApp.jsx         # Tüketici uygulaması
+    ├── business/GurBusiness.jsx  # Doyurucu: işletme uygulaması
+    └── admin/GurAdmin.jsx     # Yönetici paneli
 ```
 
 ## Mimari notlar (ÖNEMLİ)
+
+### Üç uygulama, tek veri katmanı
+Tüketici, işletme ve yönetici ayrı uygulamalar ama aynı kayıtları okuyup
+yazıyorlar. Bağ ekranlarda değil depolarda:
+
+| Depo | Yazan | Okuyan |
+|---|---|---|
+| `lib/b2b.js` | işletme (bilgi, menü, foto, **logo**) | tüketici kaydı, yönetici listesi |
+| `lib/platform.js` | yönetici (özellik kapıları) | tüketici ve işletme |
+| `lib/reservations.js` | tüketici (talep) → işletme (karar) | tüketici (bildirim) |
+| `lib/pricing.js` | yönetici (teklif) → işletme (karar) | yönetici gelir tabloları |
+| `lib/ad-frequency.js` | tüketici (gösterim) | deste kurulumu |
+| `data/restaurants.js` | tohum/besleme | üçü de |
+
+Bir mekanın kimliği tek yerde: `account` alanı işletmenin hesabı olup
+olmadığını söyler. Hesabı olmayan (yalnız dış beslemeden gelen) mekanlar
+fiyatlandırma panelinde görünmez — teklif gönderilecek muhatap yoktur.
 
 ### `shared/` — tek doğruluk kaynağı
 `buildDeck` ve `directionsUrl` hem sunucu hem istemci tarafından çağrılır.

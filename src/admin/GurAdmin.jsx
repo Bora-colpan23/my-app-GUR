@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useClaims, decideClaim } from '../lib/b2b.js';
+import { useClaims, decideClaim, useOwnerProfiles, ownerLogo } from '../lib/b2b.js';
 
 import * as api from '../lib/api.js';
 import { motion, AnimatePresence } from 'motion/react';
@@ -445,6 +445,28 @@ function StatusBadge({ status }) {
   };
   const s = map[status] || map.active;
   return <Badge {...s} />;
+}
+
+// ─── İşletme avatarı ─────────────────────────────────────────────────
+// İşletme kendi panelinden logo yüklediyse burada da o görünür: aynı
+// kayıt, aynı kimlik. Logo ortak depoda data URL olarak duruyor
+// (src/lib/b2b.js), o yüzden iki panel arasında taşınabiliyor.
+function StoreAvatar({ restaurant, size = 36, radius = 11, font = 14 }) {
+  const profiles = useOwnerProfiles();
+  const logo = restaurant ? ownerLogo(restaurant.id, profiles) : null;
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: radius, flexShrink: 0, overflow: 'hidden',
+      background: logo ? C.panel2 : 'linear-gradient(135deg,#FF660033,#FF3B3033)',
+      border: logo ? `1px solid ${C.border}` : 'none',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontWeight: 700, fontSize: font, color: C.orange,
+    }}>
+      {logo
+        ? <img src={logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        : (restaurant?.name?.[0] || '?')}
+    </div>
+  );
 }
 
 // ─── Para biçimi — panelin her yerinde aynı ───────────────────────────
@@ -1598,7 +1620,7 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
         <Btn label="Restoranlar" onClick={onBack} variant="ghost" size="sm"
           icon={<Icon path="M15 18l-6-6 6-6" size={14} color={C.dim} />} />
-        <div style={{ width: 40, height: 40, borderRadius: 11, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, color: C.orange, flexShrink: 0 }}>{r.name[0]}</div>
+        <StoreAvatar restaurant={r} size={40} font={16} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{r.name}</h2>
@@ -1811,7 +1833,7 @@ function RestaurantsPage({ restaurants, query, onSuspend, onOpen }) {
             style={{ borderBottom: `1px solid ${C.border}`, transition: 'background 0.1s', cursor: 'pointer' }}>
             <td style={{ padding: '14px 18px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: C.orange }}>{r.name[0]}</div>
+                <StoreAvatar restaurant={r} size={34} radius={9} />
                 <div>
                   {/* Rozet adın hemen ardında kalsın: flex satırında ad
                       sarılınca yıldız hücrenin ucuna kaçıyordu. */}
@@ -2249,7 +2271,7 @@ function PricingPage({ restaurants = [], query = '' }) {
           <section key={r.id} style={{ ...CARD, overflow: 'hidden', marginBottom: 12 }}>
             <div className="row-hover" onClick={() => setOpenId(open ? null : r.id)}
               style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: C.orange, flexShrink: 0 }}>{r.name[0]}</div>
+              <StoreAvatar restaurant={r} size={36} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 2 }}>
                   <span style={{ fontSize: 14, fontWeight: 700 }}>{r.name}</span>
@@ -2515,7 +2537,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
           <div key={c.id} className="row-hover" onClick={() => onOpenStore?.(c.id)}
             title={`${c.name} detayını aç`}
             style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: C.orange, flexShrink: 0 }}>{c.name[0]}</div>
+            <StoreAvatar restaurant={c} size={34} radius={10} />
             <div style={{ width: 190, flexShrink: 0, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
                 {c.name}
