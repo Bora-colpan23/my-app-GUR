@@ -38,7 +38,7 @@ import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
 // ═══════════════════════════════════════════════
 // DOYURUCU GİRİŞ — Hesap seçimi
 // ═══════════════════════════════════════════════
-function DoyurucuAuthScreen({ onBack, onLogin, onRegister, onClaim }) {
+function DoyurucuAuthScreen({ onLogin, onRegister, onClaim }) {
   return (
     <Screen grad={false}>
       <div style={{ height: "100%", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
@@ -47,16 +47,18 @@ function DoyurucuAuthScreen({ onBack, onLogin, onRegister, onClaim }) {
           <div style={{ position: "absolute", top: -30, right: -30, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,102,0,0.04)" }} />
           <div style={{ position: "absolute", bottom: -15, left: -20, width: 70, height: 70, borderRadius: "50%", background: "rgba(255,0,0,0.03)" }} />
           
-<div style={{ marginBottom: 16, animation: "fadeInUp 0.6s ease-out" }}><Icon n="plate" color="#FF6600" size={34} /></div>
-          <GurLogo size={60} pill />
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#bbb", marginTop: 8, letterSpacing: 1.5 }}>DOYURUCU PANELİ</p>
+{/* Yalnızca logo: üstteki ikon ve "DOYURUCU PANELİ" yazısı, altındaki
+              başlık zaten aynı şeyi söylediği için gereksizdi. */}
+          <div style={{ animation: "fadeInUp 0.6s ease-out" }}>
+            <GurLogo size={72} pill />
+          </div>
         </div>
 
         {/* Alt turuncu alan */}
         <div style={{ background: GRAD, padding: "28px 28px 50px", borderTopLeftRadius: 40, borderTopRightRadius: 40, position: "relative" }}>
-          <div style={{ position: "absolute", left: 14, top: 14 }}>
-            <BackBtn onClick={onBack} />
-          </div>
+          {/* Bu ekran işletme uygulamasının başlangıcı: geri gidilecek bir
+              yer yok, geri düğmesi de yok. Tıklandığında hiçbir şey
+              yapmayan bir düğme, olmayan düğmeden kötü. */}
 
           <div style={{ position: "absolute", top: -22, left: "50%", transform: "translateX(-50%)", background: "#fff", borderRadius: 20, padding: "8px 20px", boxShadow: "0 4px 20px rgba(255,69,0,0.2)" }}>
             <GurLogo size={22} pill />
@@ -1133,11 +1135,13 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                 <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Toplam Yorum</p>
               </div>
             </div>
-            <div style={{ background: "rgba(76,175,80,0.2)", border: "1px solid rgba(76,175,80,0.3)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8 }}>
-<Icon n="flame" color="#4CAF50" size={18} />
+            {/* Turuncu zeminde yeşil-üstüne-yeşil okunmuyordu: beyaz kart,
+                marka turuncusu yazı. */}
+            <div style={{ background: "#fff", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 4px 14px rgba(0,0,0,0.12)" }}>
+<Icon n="flame" color="#FF6600" size={18} />
               <div>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#4CAF50", margin: 0, lineHeight: 1 }}>%{stats.favRate}</p>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(76,175,80,0.7)", margin: 0 }}>Beğeni Oranı</p>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#FF6600", margin: 0, lineHeight: 1 }}>%{stats.favRate}</p>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,102,0,0.75)", margin: 0 }}>Beğeni Oranı</p>
               </div>
             </div>
           </div>
@@ -1641,7 +1645,6 @@ export default function GurBusiness() {
       case "reg3": return <RestRegStep3 onBack={back} onDone={() => nav("dashboard")} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} />;
       case "dashboard": return <RestaurantDashboard onLogout={logout} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} ownerRestaurant={ownerRestaurant} />;
       default: return <DoyurucuAuthScreen
-        onBack={() => { window.location.href = "/"; }}
         onLogin={() => nav("login")} onRegister={() => nav("reg1")} onClaim={() => nav("claim")} />;
     }
   };
