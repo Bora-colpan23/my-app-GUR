@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 're
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { animate } from 'motion';
 import { getConsent, setConsent, initAnalytics, trackEvent } from '../lib/analytics.js';
-import { buildDeck, rankCampaigns, quotaState, orderByProximity, ringLabel, rouletteCandidates } from '../../shared/deck.js';
+import { buildDeck, rankCampaigns, quotaState, orderByProximity, ringLabel } from '../../shared/deck.js';
 import { directionsUrl, placeUrl, defaultMapProvider, MAP_PROVIDERS } from '../../shared/deeplink.js';
 import { hydrateCampaigns } from '../lib/campaigns.js';
 import { submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles, saveOwnerProfile, OVERRIDABLE } from '../lib/b2b.js';
@@ -112,13 +112,13 @@ const I = {
 const GRAD = "#FF6600";
 
 const RESTAURANTS = [
-  { id:1, name:"Nusr-Et Steakhouse", cat:"Türk Mutfağı", rating:4.8, dist:"2.3 km", price:"₺2.500+", addr:"Etiler, Nispetiye Cd. No:87, Beşiktaş", desc:"Dünyaca ünlü et restoranı. Özel kesim etler ve eşsiz sunum.", imgs:[I.steak1,I.interior1,I.kebab1], menu:["https://picsum.photos/seed/menu-nusr1/600/900","https://picsum.photos/seed/menu-nusr2/600/900"], hours:"12:00 - 00:00", tags:["Fine Dining","Et"], lat:41.081, lng:29.033, popular:["Tomahawk","Ottoman Steak","Baklava"], gastro:true, gastroChef:'Şef Mehmet Gürs' },
-  { id:2, name:"Mikla Restaurant", cat:"Fine Dining", rating:4.9, dist:"5.1 km", price:"₺3.000+", addr:"Beyoğlu, Meşrutiyet Cd. No:15", desc:"Skandinav-Türk mutfağı füzyonu. İstanbul manzarası eşliğinde.", imgs:[I.interior2,I.bosphorus,I.wine1], menu:["https://picsum.photos/seed/menu-mikla1/600/900","https://picsum.photos/seed/menu-mikla2/600/900","https://picsum.photos/seed/menu-mikla3/600/900"], hours:"18:00 - 01:00", tags:["Manzara","Romantik"], lat:41.0315, lng:28.976, popular:["Kuzu Sırtı","Deniz Börülcesi","Sakız Dondurması"] },
+  { id:1, name:"Nusr-Et Steakhouse", cat:"Türk Mutfağı", rating:4.8, dist:"2.3 km", price:"₺2.500+", addr:"Etiler, Nispetiye Cd. No:87, Beşiktaş", desc:"Dünyaca ünlü et restoranı. Özel kesim etler ve eşsiz sunum.", imgs:[I.steak1,I.interior1,I.kebab1], menu:["https://picsum.photos/seed/menu-nusr1/600/900","https://picsum.photos/seed/menu-nusr2/600/900"], hours:"12:00 - 00:00", tags:["Fine Dining","Et"], lat:41.081, lng:29.033, popular:["Tomahawk","Ottoman Steak","Baklava"], gastro:true, gastroChef:'Şef Mehmet Gürs', claimed:true },
+  { id:2, name:"Mikla Restaurant", cat:"Fine Dining", rating:4.9, dist:"5.1 km", price:"₺3.000+", addr:"Beyoğlu, Meşrutiyet Cd. No:15", desc:"Skandinav-Türk mutfağı füzyonu. İstanbul manzarası eşliğinde.", imgs:[I.interior2,I.bosphorus,I.wine1], menu:["https://picsum.photos/seed/menu-mikla1/600/900","https://picsum.photos/seed/menu-mikla2/600/900","https://picsum.photos/seed/menu-mikla3/600/900"], hours:"18:00 - 01:00", tags:["Manzara","Romantik"], lat:41.0315, lng:28.976, popular:["Kuzu Sırtı","Deniz Börülcesi","Sakız Dondurması"], claimed:true },
   { id:3, name:"La Sagrata Famila", cat:"Uzak Doğu", rating:4.5, dist:"10 km", price:"₺800+", addr:"Kadıköy, Moda Cd. No:42", desc:"Geleneksel Japon lezzetini taze malzemelerle modern bir dokunuşla sunuyoruz.", imgs:[I.interior3,I.sushi1,I.sushi2], menu:["https://picsum.photos/seed/menu-sagr1/600/900","https://picsum.photos/seed/menu-sagr2/600/900"], hours:"11:00 - 23:00", tags:["Sushi","Japon"], lat:40.987, lng:29.027, popular:["Omakase","Uramaki","Miso Çorbası"], claimed:true },
   { id:4, name:"Green Bowl", cat:"Sağlıklı", rating:4.5, dist:"1.2 km", price:"₺350+", addr:"Şişli, Halaskargazi Cd. No:12", desc:"Organik ve sağlıklı tarifler. Vegan seçenekler.", imgs:[I.healthy1,I.healthy2,I.salad1], menu:["https://picsum.photos/seed/menu-green1/600/900"], hours:"08:00 - 22:00", tags:["Vegan","Organik"], lat:41.0555, lng:28.988, popular:["Acai Bowl","Falafel Tabağı","Yeşil Detoks"] },
   { id:5, name:"Ateş Mangal", cat:"Mangal", rating:4.7, dist:"4.5 km", price:"₺600+", addr:"Üsküdar, Bağlarbaşı Cd. No:88", desc:"Geleneksel odun ateşinde pişen lezzetler.", imgs:[I.bbq1,I.bbq2,I.kebab1], menu:["https://picsum.photos/seed/menu-ates1/600/900","https://picsum.photos/seed/menu-ates2/600/900"], hours:"11:00 - 00:00", tags:["Mangal","Aile"], lat:41.027, lng:29.018, popular:["Adana Kebap","Kuzu Şiş","Künefe"] },
-  { id:6, name:"Klein Bistro", cat:"Kafe", rating:4.4, dist:"0.8 km", price:"₺200+", addr:"Beyoğlu, İstiklal Cd. No:156", desc:"Butik kahve ve ev yapımı pastalar.", imgs:[I.cafe1,I.cafe2,I.barista1], menu:["https://picsum.photos/seed/menu-klein1/600/900"], hours:"07:30 - 23:00", tags:["Kahve","Brunch"], lat:41.0345, lng:28.978, popular:["Flat White","Cheesecake","Avokadolu Tost"], claimed:true },
-  { id:7, name:"Lucca Lounge", cat:"Gece Hayatı", rating:4.3, dist:"6.2 km", price:"₺1.200+", addr:"Bebek, Cevdetpaşa Cd. No:51", desc:"Boğaz manzaralı lounge. Canlı DJ.", imgs:[I.night1,I.cocktail1,I.rooftop1], menu:["https://picsum.photos/seed/menu-lucca1/600/900","https://picsum.photos/seed/menu-lucca2/600/900"], hours:"17:00 - 04:00", tags:["Lounge","Kokteyl"], lat:41.077, lng:29.043, popular:["Espresso Martini","Tuna Tartar","Trüf Patates"] },
+  { id:6, name:"Klein Bistro", cat:"Kafe", rating:4.4, dist:"0.8 km", price:"₺200+", addr:"Beyoğlu, İstiklal Cd. No:156", desc:"Butik kahve ve ev yapımı pastalar.", imgs:[I.cafe1,I.cafe2,I.barista1], menu:["https://picsum.photos/seed/menu-klein1/600/900"], hours:"07:30 - 23:00", tags:["Kahve","Brunch"], lat:41.0345, lng:28.978, popular:["Flat White","Cheesecake","Avokadolu Tost"] },
+  { id:7, name:"Lucca Lounge", cat:"Gece Hayatı", rating:4.3, dist:"6.2 km", price:"₺1.200+", addr:"Bebek, Cevdetpaşa Cd. No:51", desc:"Boğaz manzaralı lounge. Canlı DJ.", imgs:[I.night1,I.cocktail1,I.rooftop1], menu:["https://picsum.photos/seed/menu-lucca1/600/900","https://picsum.photos/seed/menu-lucca2/600/900"], hours:"17:00 - 04:00", tags:["Lounge","Kokteyl"], lat:41.077, lng:29.043, popular:["Espresso Martini","Tuna Tartar","Trüf Patates"], claimed:true },
   { id:8, name:"Nonna's Trattoria", cat:"İtalyan", rating:4.6, dist:"3.1 km", price:"₺500+", addr:"Karaköy, Kemankeş Cd. No:29", desc:"Napoli usulü pizza ve makarna.", imgs:[I.pasta1,I.pizza1,I.bread1], menu:["https://picsum.photos/seed/menu-nonna1/600/900","https://picsum.photos/seed/menu-nonna2/600/900","https://picsum.photos/seed/menu-nonna3/600/900"], hours:"12:00 - 23:30", tags:["Pizza","Makarna"], lat:41.0245, lng:28.976, popular:["Margherita","Cacio e Pepe","Tiramisu"] },
   { id:9, name:"Çiya Sofrası", cat:"Türk Mutfağı", rating:4.7, dist:"4.0 km", price:"₺400+", addr:"Kadıköy, Güneşlibahçe Sk. No:43", desc:"Anadolu'nun dört köşesinden geleneksel tarifler.", imgs:[I.turkish1,I.turkish2,I.soup1], menu:["https://picsum.photos/seed/menu-ciya1/600/900","https://picsum.photos/seed/menu-ciya2/600/900"], hours:"11:00 - 22:00", tags:["Geleneksel","Anadolu"], lat:40.9903, lng:29.0264, popular:["Kuzu Kapama","Zeytinyağlılar","İrmik Helvası"], gastro:true, gastroChef:'Şef Didem Şenol', gastroVideo:'https://picsum.photos/seed/ciya-video/900/600', claimed:true },
   { id:10, name:"Mandarin Oriental", cat:"Uzak Doğu", rating:4.8, dist:"5.5 km", price:"₺1.500+", addr:"Kuruçeşme, Muallim Naci Cd.", desc:"Uzak Doğu'nun en rafine lezzetleri.", imgs:[I.dimsum1,I.ramen1,I.interior2], menu:["https://picsum.photos/seed/menu-mand1/600/900","https://picsum.photos/seed/menu-mand2/600/900"], hours:"12:00 - 23:00", tags:["Dim Sum","Ramen"], lat:41.057, lng:29.033, popular:["Peking Ördeği","Dim Sum Tabağı","Tonkotsu Ramen"] },
@@ -2624,7 +2624,7 @@ function HeroCarousel({ slides, intervalMs = 4500 }) {
   );
 }
 
-function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, onRoulette, matchEnabled = true, rouletteEnabled = true, restaurants = [], onDetail }) {
+function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, matchEnabled = true, restaurants = [], onDetail }) {
   // Marka slaytı her zaman ilk sırada, sponsor slaytları onu izler
   const slides = useMemo(() => [
     { id: "brand", img: I.hero, title: "İstanbul'un Lezzetleri", sub: "En popüler restoranları keşfet" },
@@ -2860,49 +2860,29 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           </div>
         )}
 
-        {/* Karar araçları yan yana: Match arkadaşla, Çark tek başına.
-            Match yönetici panelinden kapatılabiliyor; kapalıyken Çark tüm
-            genişliği alır, boş bir yer kalmaz. */}
-        {(matchEnabled || rouletteEnabled) && (
-        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexShrink: 0 }}>
-          {matchEnabled && (
-            <motion.div
-              onClick={onMatch}
-              whileTap={{ scale: 0.97 }}
-              transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-              style={{
-                flex: 1, minWidth: 0, cursor: "pointer",
-                background: "linear-gradient(140deg, #FF6600, #FF3B30)", borderRadius: 18, padding: "13px 14px",
-                boxShadow: "0 6px 20px rgba(255,69,0,0.28)",
-              }}
-            >
-              <div style={{ width: 34, height: 34, borderRadius: 12, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 9 }}>
-                <Icon n="sparkle" size={17} color="#fff" />
-              </div>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Match</p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.82)", margin: 0, lineHeight: 1.35 }}>Arkadaşınla birlikte kaydır</p>
-            </motion.div>
-          )}
-
-          {rouletteEnabled && (
+        {/* GUR Match girişi — yönetici panelinden kapatılabilir bir özellik.
+            Kapalıyken kart hiç çizilmiyor: tıklanınca "kapalı" diyen bir
+            giriş, olmayan girişten daha kötü. */}
+        {matchEnabled && (
           <motion.div
-            onClick={onRoulette}
+            onClick={onMatch}
             whileTap={{ scale: 0.97 }}
             transition={{ type: "spring", bounce: 0, duration: 0.3 }}
             style={{
-              flex: 1, minWidth: 0, cursor: "pointer",
-              background: "linear-gradient(140deg, #2D2419, #4A3418)", borderRadius: 18, padding: "13px 14px",
-              border: "1px solid rgba(255,165,0,0.28)", boxShadow: "0 6px 20px rgba(45,36,25,0.22)",
+              display: "flex", alignItems: "center", gap: 12, marginBottom: 16, cursor: "pointer", flexShrink: 0,
+              background: "linear-gradient(100deg, #FF6600, #FF3B30)", borderRadius: 18, padding: "13px 14px",
+              boxShadow: "0 6px 20px rgba(255,69,0,0.28)",
             }}
           >
-            <div style={{ width: 34, height: 34, borderRadius: 12, background: "rgba(255,165,0,0.18)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 9 }}>
-              <span style={{ fontSize: 17, lineHeight: 1 }}>🎲</span>
+            <div style={{ width: 38, height: 38, borderRadius: 13, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon n="sparkle" size={18} color="#fff" />
             </div>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Çark</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.35 }}>Yakınından rastgele seçsin</p>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Match</p>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.8)", margin: 0 }}>Arkadaşınla birlikte kaydır, birlikte karar ver</p>
+            </div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
           </motion.div>
-          )}
-        </div>
         )}
 
         {/* Kategoriler — yuvarlak simge şeridi. 2×2 ızgaranın yerine geçti:
@@ -4110,195 +4090,6 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
 // ═══════════════════════════════════════════════
 // GUR MATCH — Arkadaşınla birlikte kaydır
 // ═══════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════════
-// ÇARK — "nereye gideceğime karar veremiyorum" ekranı
-//
-// Kategori seçilir, çark çevrilir, konuma yakın adaylardan biri çıkar.
-// Aday havuzu en yakın halkadan başlar ve yeterli seçenek bulana kadar
-// genişler (shared/deck.js → rouletteCandidates): çark rastgele
-// hissettirmeli ama kullanıcıyı şehrin öbür ucuna atmamalı.
-//
-// Aynı sonucu üst üste vermemek için son çıkanlar kısa süre hatırlanıyor.
-// ═══════════════════════════════════════════════════════════════════════
-function RouletteScreen({ onBack, onDetail, restaurants = [], onDirections }) {
-  const [cat, setCat] = useState(null);
-  const [spinning, setSpinning] = useState(false);
-  const [pick, setPick] = useState(null);
-  const [recent, setRecent] = useState([]);      // son çıkanlar, tekrarı azaltmak için
-  const reelRef = useRef(null);
-
-  const loc = geo.useUserLocation();
-  useEffect(() => { geo.requestLocation({ silent: true }); }, []);
-  const precise = loc.source === "device";
-  const origin = precise ? { lat: loc.lat, lng: loc.lng } : geo.DEFAULT_ORIGIN;
-
-  // Uygulamada gerçekten karşılığı olan kategoriler — boş kategori
-  // göstermek, çeviremeyeceğin bir çark sunmak olur.
-  const cats = useMemo(() => {
-    const counts = new Map();
-    for (const r of restaurants) {
-      for (const key of [r.cat, ...(r.tags || [])]) {
-        if (key) counts.set(key, (counts.get(key) || 0) + 1);
-      }
-    }
-    return CATEGORIES.map(c => c.name).filter(n => (counts.get(n) || 0) > 0);
-  }, [restaurants]);
-
-  const pool = useMemo(
-    () => rouletteCandidates(restaurants, origin, { category: cat, minPool: 6 }),
-    // origin nesnesi her çizimde yeni; kimliğine değil koordinatına bakıyoruz.
-    [restaurants, cat, origin.lat, origin.lng]
-  );
-
-  const spin = () => {
-    if (!pool.length || spinning) return;
-    haptic(14);
-    setSpinning(true);
-    setPick(null);
-
-    // Son üç sonucu ele: küçük havuzda aynı yeri üst üste vermek çarkı
-    // "bozuk" gösterir. Havuz zaten küçükse eleme uygulanmaz.
-    const fresh = pool.filter(r => !recent.includes(r.id));
-    const from = fresh.length >= 2 ? fresh : pool;
-    const chosen = from[Math.floor(Math.random() * from.length)];
-
-    // Makara: isimler hızla akar, sonra yavaşlayıp durur. Sonucu hemen
-    // basmak "çark" hissini tamamen kaldırırdı.
-    const frames = 18;
-    let i = 0;
-    const tick = () => {
-      i++;
-      if (reelRef.current) {
-        const r = pool[Math.floor(Math.random() * pool.length)];
-        reelRef.current.textContent = r?.name || "";
-      }
-      if (i < frames) {
-        setTimeout(tick, 45 + i * 9);   // yavaşlayarak duruyor
-      } else {
-        setSpinning(false);
-        setPick(chosen);
-        setRecent(p => [chosen.id, ...p].slice(0, 3));
-        haptic(22);
-        trackEvent("roulette_spin", { restaurantId: chosen.id, category: cat || "all" });
-      }
-    };
-    setTimeout(tick, 60);
-  };
-
-  return (
-    <Screen grad={false}>
-      <div style={{ height: "100%", background: "linear-gradient(160deg, #1a0f00, #2b1400 55%, #1a0f00)", display: "flex", flexDirection: "column", padding: "44px 20px 20px", overflowY: "auto" }} className="gur-screen">
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-          <IconBtn onClick={onBack} tone="glassLight" title="Geri"
-            icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>} />
-          <GurLogo size={42} pill />
-          <div style={{ width: 40 }} />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 5px" }}>GUR Çark</h2>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.5 }}>
-            Kategoriyi seç, çarkı çevir. Yakınındaki mekânlardan biri çıksın.
-          </p>
-        </div>
-
-        {/* Konum durumu — "yakınında" derken neresi olduğunu saklamıyoruz */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "9px 13px", marginBottom: 16 }}>
-          <Icon n="pin" size={14} color={precise ? "#FFA500" : "rgba(255,255,255,0.4)"} />
-          <span style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.4 }}>
-            {precise ? "Bulunduğun konuma göre sıralanıyor" : "Konum kapalı — İstanbul merkezine göre sıralanıyor"}
-          </span>
-          {!precise && (
-            <Btn text="Konumu aç" onClick={() => geo.requestLocation()} variant="outline" size="sm" fullWidth={false} />
-          )}
-        </div>
-
-        {/* Kategori seçimi */}
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 9px" }}>Kategori</p>
-        <HScroll style={{ gap: 8, paddingBottom: 6, marginBottom: 18, flexShrink: 0 }}>
-          {[null, ...cats].map(c => {
-            const active = cat === c;
-            return (
-              <button key={c || "all"} type="button" className="gur-btn"
-                onClick={() => { setCat(c); setPick(null); }}
-                style={{
-                  "--btn-bg": active ? BRAND_GRAD : "rgba(255,255,255,0.06)",
-                  "--btn-bg-hover": active ? BRAND_GRAD_HOVER : "rgba(255,255,255,0.12)",
-                  "--btn-bg-press": active ? BRAND_GRAD : "rgba(255,255,255,0.04)",
-                  "--btn-shadow": active ? ELEV.restBrand : "none",
-                  "--btn-shadow-press": active ? ELEV.pressBrand : "none",
-                  flexShrink: 0, border: active ? "none" : "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: 999, padding: "9px 16px", outline: "none",
-                  fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700,
-                  color: active ? "#fff" : "rgba(255,255,255,0.7)", whiteSpace: "nowrap",
-                }}>
-                {c || "Farketmez"}
-              </button>
-            );
-          })}
-        </HScroll>
-
-        {/* Çark kartı */}
-        <div style={{ background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 26, padding: "24px 20px", textAlign: "center", marginBottom: 14 }}>
-          {pick ? (
-            <motion.div
-              key={pick.id}
-              initial={{ opacity: 0, scale: 0.94, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ type: "spring", bounce: 0.2, duration: 0.45 }}>
-              <div onClick={() => onDetail(pick)} style={{ borderRadius: 20, overflow: "hidden", height: 150, position: "relative", marginBottom: 14, cursor: "pointer" }}>
-                <Img src={pick.imgs?.[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" box={360} />
-                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75), transparent 55%)" }} />
-                <div style={{ position: "absolute", left: 14, right: 14, bottom: 12, textAlign: "left" }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>{pick.name}</p>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.75)", margin: 0 }}>
-                    ★ {pick.rating} · {pick.cat} · {distText(pick)}
-                  </p>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 9 }}>
-                <Btn text="Detayı aç" onClick={() => onDetail(pick)} variant="filled" size="md" />
-                <Btn text="Yol tarifi" onClick={() => onDirections?.(pick)} variant="outline" size="md" />
-              </div>
-              <div style={{ marginTop: 10 }}>
-                <Btn text="Tekrar çevir" onClick={spin} variant="plain" size="sm" />
-              </div>
-            </motion.div>
-          ) : (
-            <>
-              <div style={{ width: 74, height: 74, borderRadius: "50%", background: "rgba(255,102,0,0.14)", border: "1px solid rgba(255,102,0,0.28)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                <motion.div
-                  animate={spinning ? { rotate: 360 } : { rotate: 0 }}
-                  transition={spinning ? { repeat: Infinity, ease: "linear", duration: 0.9 } : { type: "spring", bounce: 0.2, duration: 0.4 }}>
-                  <Icon n="sparkle" size={28} color="#FFA500" />
-                </motion.div>
-              </div>
-              <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px", lineHeight: 1.25 }}>
-                Nereye gideceğine<br />karar veremedin mi?
-              </h3>
-              {/* Makara: çevirirken isimler akar */}
-              <p ref={reelRef} style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600, color: spinning ? "#FFA500" : "rgba(255,255,255,0.45)", margin: "0 0 18px", minHeight: 20, lineHeight: 1.5 }}>
-                {spinning ? "" : (pool.length
-                  ? `${pool.length} yakın mekan arasından seçilecek`
-                  : "Bu kategoride yakında mekan bulunamadı")}
-              </p>
-              <Btn text={spinning ? "Çevriliyor…" : "Çarkı Çevir 🎲"} onClick={spin}
-                variant="filled" size="lg" disabled={!pool.length} loading={spinning} />
-            </>
-          )}
-        </div>
-
-        {pool.length > 0 && (
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.3)", textAlign: "center", margin: 0, lineHeight: 1.5 }}>
-            Havuz en yakın çevreden başlar; yeterli seçenek çıkana kadar
-            yarıçap büyür.
-          </p>
-        )}
-      </div>
-    </Screen>
-  );
-}
-
 function MatchStartScreen({ onBack, onStart }) {
   const [mode, setMode] = useState(null); // null | "create" | "join"
   const [code] = useState(() => makeInviteCode());
@@ -6139,7 +5930,6 @@ export default function GurApp(props = {}) {
   const goProfile = () => { nav("profile"); };
   const catTap = (cat) => { setFilterCat(cat); nav("swipe"); };
   const goMatch = () => { if (!platform.matchEnabled) return; setMatchResults([]); nav("match-start"); };
-  const goRoulette = () => { if (!platform.rouletteEnabled) return; nav("roulette"); };
   const startMatch = (code) => { setMatchCode(code); setMatchResults([]); nav("match-swipe"); };
   const finishMatch = (found) => { setMatchResults(found); nav("match-result"); };
   // Hesap silme: yerel durumun tamamı temizlenir (kalıcılık yok, backend yok)
@@ -6195,9 +5985,7 @@ export default function GurApp(props = {}) {
       case "rest2": return <RestRegStep2 onBack={back} onNext={() => nav("rest3")} />;
       case "rest3": return <RestRegStep3 onBack={back} onDone={() => nav("rest-dashboard")} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} />;
       case "rest-dashboard": return <RestaurantDashboard onLogout={() => { setHistory([]); setScreen("welcome"); }} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} ownerRestaurant={ownerRestaurant} />;
-      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} onRoulette={goRoulette} matchEnabled={platform.matchEnabled} rouletteEnabled={platform.rouletteEnabled} restaurants={feed} onDetail={openDetail} />;
-      case "roulette": return <RouletteScreen onBack={back} restaurants={feed} onDetail={openDetail}
-        onDirections={(r) => { backend.trackDirections(r.id); window.open(directionsUrl({ lat: r.lat, lng: r.lng, name: r.name, address: r.addr }, defaultMapProvider()), "_blank", "noopener,noreferrer"); }} />;
+      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} matchEnabled={platform.matchEnabled} restaurants={feed} onDetail={openDetail} />;
       case "match-start": return <MatchStartScreen onBack={back} onStart={startMatch} />;
       case "match-swipe": return <MatchSwipeScreen code={matchCode} restaurants={feed} onExit={goExplore} onFinish={finishMatch} />;
       case "match-result": return <MatchResultScreen code={matchCode} matches={matchResults} onDetail={openDetail} onRestart={goMatch} onExplore={goExplore} />;

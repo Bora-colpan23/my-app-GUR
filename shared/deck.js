@@ -227,26 +227,3 @@ export function orderByProximity(list, origin, { seed = 1, rules = RADIUS_RULES 
   }
   return out;
 }
-
-/**
- * Çark için aday havuzu: en yakın dolu halkadan başlayıp yeterli aday
- * bulana kadar genişler. Çark "rastgele" hissettirmeli ama kullanıcıyı
- * şehrin öbür ucuna atmamalı.
- */
-export function rouletteCandidates(list, origin, { category = null, minPool = 6, rules = RADIUS_RULES } = {}) {
-  const pool = category
-    ? list.filter(r => r.cat === category || (r.tags || []).includes(category))
-    : list.slice();
-  if (!pool.length) return [];
-  const ranked = orderByProximity(pool, origin, { seed: "roulette", rules });
-  if (!origin) return ranked;
-  // Havuz yeterince dolana kadar halka ekle: tek bir yakın mekan varsa
-  // çarkın her dönüşünde aynı yeri vermesin.
-  const out = [];
-  let ring = 0;
-  while (out.length < minPool && ring <= rules.maxRings) {
-    out.push(...ranked.filter(r => r.ring === ring));
-    ring++;
-  }
-  return out.length ? out : ranked;
-}

@@ -26,8 +26,6 @@ const KEY = "gur.platform";
 export const FEATURES = [
   { key: 'matchEnabled', label: 'GUR Match', perStore: false,
     desc: 'İki kişinin aynı desteyi kaydırıp ortak kararda buluştuğu arkadaş sistemi. Kapatıldığında Keşfet ekranındaki Match kartı gizlenir, süren oturumlar Keşfet’e döner; kayıtlı eşleşmeler silinmez.' },
-  { key: 'rouletteEnabled', label: 'GUR Çark', perStore: false,
-    desc: 'Kategori seçip çevirince yakındaki mekânlardan birini öneren karar çarkı. Kapatıldığında Keşfet’teki Çark kartı gizlenir.' },
   { key: 'reservationsEnabled', label: 'Masa ayırtma', perStore: true,
     desc: 'Kullanıcı uygulamadan masa ayırtır, talep işletmenin paneline bildirim olarak düşer. Kapatıldığında restoran sayfasındaki "Masa Ayırt" düğmesi çıkmaz.' },
   { key: 'menuEnabled', label: 'Menü görüntüleme', perStore: true,
@@ -44,7 +42,6 @@ export const PER_STORE_FEATURES = FEATURES.filter(f => f.perStore);
 
 export const DEFAULTS = {
   matchEnabled: true,          // GUR Match: arkadaşla yan yana kaydırma
-  rouletteEnabled: true,       // GUR Çark: rastgele mekan önerisi
   reservationsEnabled: true,   // masa ayırtma ve işletmeye giden bildirim
   menuEnabled: true,           // menü galerisi
   gastroVideoEnabled: true,    // şef tanıtım videosu

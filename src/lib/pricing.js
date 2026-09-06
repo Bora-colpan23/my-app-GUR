@@ -1,10 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════════
 // FİYATLANDIRMA VE TEKLİFLER
 //
-// Yönetici bir gelir kaleminin liste fiyatını belirler ve o kalemi kullanan
-// işletmelere tek tek fiyat teklifi gönderir. Teklif işletmenin panelinde
-// görünür; işletme kabul ederse o kalemin aylık bedeli teklif edilen tutara
-// döner ve gelir tabloları bunu okur.
+// Yönetici, hesabı olan bir müşteriye aldığı hizmetler için tek tek fiyat
+// teklifi gönderir. Liste fiyatı yoktur: her işletmenin fiyatı kendi
+// pazarlığının sonucudur. Teklif işletmenin panelinde görünür; kabul
+// ederse o kalemin aylık bedeli teklif edilen tutara döner ve gelir
+// tabloları bunu okur.
 //
 // Teklif "uygulanmış fiyat" değildir: karşı taraf kabul edene kadar hiçbir
 // tutar değişmez. Kabul etmeden fiyatı düşürmek/yükseltmek, işletmeye
@@ -18,7 +19,7 @@ import { useSyncExternalStore } from "react";
 
 const KEY = "gur.pricing";
 
-const EMPTY = { listPrices: {}, offers: [] };
+const EMPTY = { offers: [] };
 
 const listeners = new Set();
 function emit() {
@@ -45,32 +46,13 @@ export function getPricing() {
   if (snap.raw === raw) return snap.value;
   let stored = null;
   try { stored = JSON.parse(raw || "null"); } catch { stored = null; }
-  snap = {
-    raw,
-    value: {
-      listPrices: stored?.listPrices || {},
-      offers: Array.isArray(stored?.offers) ? stored.offers : [],
-    },
-  };
+  snap = { raw, value: { offers: Array.isArray(stored?.offers) ? stored.offers : [] } };
   return snap.value;
 }
 
 function write(next) {
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* depolama kapalı */ }
   emit();
-}
-
-// ─── Liste fiyatı ────────────────────────────────────────────────────
-
-/** Kalemin güncel liste fiyatı; belirlenmemişse katalog varsayılanı. */
-export function listPrice(streamKey, fallback = 0) {
-  const v = getPricing().listPrices[streamKey];
-  return Number.isFinite(v) ? v : fallback;
-}
-
-export function setListPrice(streamKey, price) {
-  const cur = getPricing();
-  write({ ...cur, listPrices: { ...cur.listPrices, [streamKey]: Math.max(0, Math.round(price)) } });
 }
 
 // ─── Teklifler ───────────────────────────────────────────────────────

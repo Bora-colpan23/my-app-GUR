@@ -80,39 +80,47 @@ const CAT_DIST = [
   { name: 'Diğer', count: 73, color: '#8B98A9' },
 ];
 
+// account: işletme kaydını sahiplenmiş, panel girişi olan müşterimiz mi.
+// false olanlar yalnızca dış besleme (Google Places / OSM) üzerinden gelen
+// mekanlar: kullanıcı adları yok, bize ödeme yapmıyorlar — fiyatlandırma
+// panelinde görünmezler, çünkü teklif gönderilecek bir muhatap yok.
 const RESTAURANTS = [
-  { id: 1, name: 'Nusr-Et Steakhouse', cat: 'Türk Mutfağı', district: 'Beşiktaş', rating: 4.8, reviews: 1240, status: 'active', gastro: true, plan: 'Premium', joined: '2024-03-12' },
-  { id: 2, name: 'Mikla Restaurant', cat: 'Fine Dining', district: 'Beyoğlu', rating: 4.9, reviews: 890, status: 'active', gastro: true, plan: 'Premium', joined: '2024-01-08' },
-  { id: 9, name: 'Çiya Sofrası', cat: 'Türk Mutfağı', district: 'Kadıköy', rating: 4.7, reviews: 2100, status: 'active', gastro: true, plan: 'Pro', joined: '2024-02-20' },
-  { id: 3, name: 'La Sagrata Famila', cat: 'Uzak Doğu', district: 'Kadıköy', rating: 4.6, reviews: 620, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-05' },
-  { id: 4, name: 'Green Bowl', cat: 'Sağlıklı', district: 'Şişli', rating: 4.5, reviews: 340, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2024-06-15' },
-  { id: 6, name: 'Klein Bistro', cat: 'Kafe', district: 'Beyoğlu', rating: 4.4, reviews: 560, status: 'suspended', gastro: false, plan: 'Ücretsiz', joined: '2024-05-02' },
-  { id: 11, name: 'The Burger Joint', cat: 'Fast Food', district: 'Nişantaşı', rating: 4.2, reviews: 780, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-18' },
-  { id: 12, name: 'Karaköy Güllüoğlu', cat: 'Tatlıcı', district: 'Karaköy', rating: 4.9, reviews: 3200, status: 'active', gastro: true, plan: 'Premium', joined: '2023-12-01' },
-  { id: 7, name: 'Lucca Lounge', cat: 'Gece Hayatı', district: 'Bebek', rating: 4.3, reviews: 450, status: 'active', gastro: false, plan: 'Pro', joined: '2024-07-22' },
+  { id: 1, name: 'Nusr-Et Steakhouse', cat: 'Türk Mutfağı', district: 'Beşiktaş', rating: 4.8, reviews: 1240, status: 'active', gastro: true, plan: 'Premium', joined: '2024-03-12', account: true, source: 'owner' },
+  { id: 2, name: 'Mikla Restaurant', cat: 'Fine Dining', district: 'Beyoğlu', rating: 4.9, reviews: 890, status: 'active', gastro: true, plan: 'Premium', joined: '2024-01-08', account: true, source: 'owner' },
+  { id: 9, name: 'Çiya Sofrası', cat: 'Türk Mutfağı', district: 'Kadıköy', rating: 4.7, reviews: 2100, status: 'active', gastro: true, plan: 'Pro', joined: '2024-02-20', account: true, source: 'owner' },
+  { id: 3, name: 'La Sagrata Famila', cat: 'Uzak Doğu', district: 'Kadıköy', rating: 4.6, reviews: 620, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-05', account: true, source: 'owner' },
+  { id: 4, name: 'Green Bowl', cat: 'Sağlıklı', district: 'Şişli', rating: 4.5, reviews: 340, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2024-06-15', account: false, source: 'api' },
+  { id: 6, name: 'Klein Bistro', cat: 'Kafe', district: 'Beyoğlu', rating: 4.4, reviews: 560, status: 'suspended', gastro: false, plan: 'Ücretsiz', joined: '2024-05-02', account: false, source: 'api' },
+  { id: 11, name: 'The Burger Joint', cat: 'Fast Food', district: 'Nişantaşı', rating: 4.2, reviews: 780, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-18', account: true, source: 'owner' },
+  { id: 12, name: 'Karaköy Güllüoğlu', cat: 'Tatlıcı', district: 'Karaköy', rating: 4.9, reviews: 3200, status: 'active', gastro: true, plan: 'Premium', joined: '2023-12-01', account: true, source: 'owner' },
+  // Dış beslemeden gelen, henüz sahiplenilmemiş mekanlar
+  { id: 5, name: 'Ateş Mangal', cat: 'Mangal', district: 'Beykoz', rating: 4.7, reviews: 210, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-02-14', account: false, source: 'api' },
+  { id: 13, name: 'Balıkçı Sabahattin', cat: 'Deniz Ürünleri', district: 'Fatih', rating: 4.6, reviews: 980, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-01-22', account: false, source: 'api' },
+  { id: 14, name: 'Spice Market', cat: 'Uzak Doğu', district: 'Şişli', rating: 4.4, reviews: 150, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-03-30', account: false, source: 'api' },
+  { id: 7, name: 'Lucca Lounge', cat: 'Gece Hayatı', district: 'Bebek', rating: 4.3, reviews: 450, status: 'active', gastro: false, plan: 'Pro', joined: '2024-07-22', account: true, source: 'owner' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
 // GELİR KALEMLERİ VE MÜŞTERİ BAZLI SATIN ALIMLAR
 //
 // Katalog (REVENUE_STREAMS) platformun sattığı ücretli özelliklerin
-// tamamıdır. `monthly` platform genelindeki aylık toplam, `list` ise TEK
-// bir işletmenin aylık liste bedeli — teklifler bu ikincisiyle konuşuyor,
-// ikisini karıştırmak işletmeye platform cirosunu fatura etmek olurdu. STORE_SERVICES ise bunların hangi müşteride açık olduğunu
+// tamamıdır; `monthly` platform genelindeki aylık toplamdır. Tek bir
+// işletmenin ödediği tutar liste fiyatından değil, o işletmeyle yapılan
+// pazarlıktan gelir (STORE_SERVICES + kabul edilen teklifler). STORE_SERVICES ise bunların hangi müşteride açık olduğunu
 // tutar — panelin her yerinde "bu mağaza neyi satın almış" sorusunun tek
 // cevabı burasıdır. Sunucudaki karşılığı subscriptions + campaign_orders
 // tablolarının işletme kırılımıdır.
 // ═══════════════════════════════════════════════════════════════════════
 const REVENUE_STREAMS = [
-  { key: 'bannerAds', list: 12000, short: 'Banner', name: 'Dönen keşfet banner\'ı', kind: 'Reklam', monthly: 128000, unit: '42 aktif kampanya', note: 'Keşfet ekranının üstündeki marka + sponsor karuseli.' },
-  { key: 'pushAds', list: 5500, short: 'Push', name: 'Push bildirim reklamları', kind: 'Reklam', monthly: 74000, unit: '41 gönderim / ay', note: 'Semt bazlı tek seferlik bildirim satışı.' },
-  { key: 'rewardedAds', list: 4800, short: 'Ödüllü video', name: 'Ödüllü video reklam (kaydırma hakkı)', kind: 'Sponsorluk', monthly: 96000, unit: '~%78 tamamlanma', note: '10 kaydırma sonrası izlenen video, +5 hak kazandırır.' },
-  { key: 'secondChance', list: 1450, short: 'İkinci Şans', name: 'İkinci Şans yerleşimi', kind: 'Performans', monthly: 41000, unit: '86 restoran', note: 'Geçilen restoranın desteye geri girmesi.' },
-  { key: 'instantDeals', list: 2900, short: 'Anlık fırsat', name: 'Anlık fırsat bildirimleri', kind: 'Performans', monthly: 63000, unit: '140 yayın / ay', note: 'Ölü saat doldurma; yayın başına ücret.' },
-  { key: 'reservations', list: 6500, short: 'Rezervasyon', name: 'Rezervasyon ve menü komisyonu', kind: 'İşlem', monthly: 88000, unit: '%8 komisyon', note: 'Gerçekleşen işlem başına alınır.' },
-  { key: 'chefVideo', list: 9000, short: 'Şef videosu', name: 'Gastro şefli video paketi', kind: 'İçerik', monthly: 52000, unit: '8 çekim / ay', note: 'Üç büyük semtte VIP marka algısı.' },
-  { key: 'contentLicense', list: 4200, short: 'İçerik lisansı', name: 'Gastro içerik lisanslama', kind: 'İçerik', monthly: 39000, unit: '6 lisans / ay', note: '15 sn dikey videonun restorana devri.' },
-  { key: 'analyticsSaas', list: 2900, short: 'Analiz paneli', name: 'Restoran Analiz Paneli (SaaS)', kind: 'Abonelik', monthly: 145000, unit: '50 abone', note: 'Tıklama, kaydetme ve konum ilgisi verisi.' },
+  { key: 'bannerAds', short: 'Banner', name: 'Dönen keşfet banner\'ı', kind: 'Reklam', monthly: 128000, unit: '42 aktif kampanya', note: 'Keşfet ekranının üstündeki marka + sponsor karuseli.' },
+  { key: 'pushAds', short: 'Push', name: 'Push bildirim reklamları', kind: 'Reklam', monthly: 74000, unit: '41 gönderim / ay', note: 'Semt bazlı tek seferlik bildirim satışı.' },
+  { key: 'rewardedAds', short: 'Ödüllü video', name: 'Ödüllü video reklam (kaydırma hakkı)', kind: 'Sponsorluk', monthly: 96000, unit: '~%78 tamamlanma', note: '10 kaydırma sonrası izlenen video, +5 hak kazandırır.' },
+  { key: 'secondChance', short: 'İkinci Şans', name: 'İkinci Şans yerleşimi', kind: 'Performans', monthly: 41000, unit: '86 restoran', note: 'Geçilen restoranın desteye geri girmesi.' },
+  { key: 'instantDeals', short: 'Anlık fırsat', name: 'Anlık fırsat bildirimleri', kind: 'Performans', monthly: 63000, unit: '140 yayın / ay', note: 'Ölü saat doldurma; yayın başına ücret.' },
+  { key: 'reservations', short: 'Rezervasyon', name: 'Rezervasyon ve menü komisyonu', kind: 'İşlem', monthly: 88000, unit: '%8 komisyon', note: 'Gerçekleşen işlem başına alınır.' },
+  { key: 'chefVideo', short: 'Şef videosu', name: 'Gastro şefli video paketi', kind: 'İçerik', monthly: 52000, unit: '8 çekim / ay', note: 'Üç büyük semtte VIP marka algısı.' },
+  { key: 'contentLicense', short: 'İçerik lisansı', name: 'Gastro içerik lisanslama', kind: 'İçerik', monthly: 39000, unit: '6 lisans / ay', note: '15 sn dikey videonun restorana devri.' },
+  { key: 'analyticsSaas', short: 'Analiz paneli', name: 'Restoran Analiz Paneli (SaaS)', kind: 'Abonelik', monthly: 145000, unit: '50 abone', note: 'Tıklama, kaydetme ve konum ilgisi verisi.' },
 ];
 
 const KIND_TONE = {
@@ -158,9 +166,7 @@ const STORE_SERVICES = {
     { key: 'instantDeals', monthly: 2400, since: '2026-03-08' },
     { key: 'analyticsSaas', monthly: 2900, since: '2026-01-16' },
   ],
-  4: [ // Green Bowl — ücretsiz planda tek kalem
-    { key: 'secondChance', monthly: 1450, since: '2026-06-01' },
-  ],
+  4: [],  // Green Bowl — sahiplenilmemiş kayıt, satın alım yok
   6: [], // Klein Bistro — askıda, satın alım yok
   11: [ // The Burger Joint
     { key: 'rewardedAds', monthly: 4300, since: '2026-02-27' },
@@ -759,6 +765,7 @@ export default function GurAdmin() {
     { id: 'campaigns', label: 'Kampanyalar', icon: icons.trend, count: 4 },
     { id: 'growth', label: 'Büyüme & Kohort', icon: icons.chart },
     { id: 'revenue', label: 'Gelir & Reklam', icon: icons.money },
+    { id: 'pricing', label: 'Fiyatlandırma', icon: icons.trend },
     { id: 'settings', label: 'Ayarlar', icon: icons.settings },
   ];
 
@@ -901,6 +908,7 @@ export default function GurAdmin() {
           {page === 'campaigns' && <CampaignsPage />}
           {page === 'growth' && <GrowthPage />}
           {page === 'revenue' && <RevenuePage restaurants={restaurants} onOpenStore={openStore} />}
+          {page === 'pricing' && <PricingPage restaurants={restaurants} query={query} />}
           {page === 'settings' && <SettingsPage />}
         </div>
       </main>
@@ -2138,17 +2146,17 @@ function UsersPage({ query }) {
 // yalnızca açık kalemlerden hesaplanır, böylece faz anahtarı gerçek bir
 // senaryo farkı yaratır.
 // ═══════════════════════════════════════════════════════════════════════
-// FİYATLANDIRMA — bir gelir kaleminin liste fiyatı ve işletme teklifleri
+// FİYATLANDIRMA — işletme bazlı fiyat teklifleri
 //
-// Abonelik paketleri bölümünün yerini aldı: paketler neye bağlı olduğu
-// belirsiz bir vitrindi, burası ise gerçekten iş yapılan yer — kalemin
-// fiyatı burada belirleniyor, o kalemi kullanan işletmelere teklif buradan
-// gidiyor ve teklifin akıbeti burada görünüyor.
+// Teklif kaleme değil İŞLETMEYE gidiyor: bir mekanın aldığı hizmetlerin
+// fiyatı tek ekranda görülüp tek tek teklif ediliyor. Liste fiyatı yok —
+// her işletmenin fiyatı kendi pazarlığının sonucu.
 //
-// Teklif tek başına fiyatı değiştirmez: işletme kabul edene kadar yürürlükteki
-// tutar aynı kalır (src/lib/pricing.js).
+// Panelde yalnızca kaydını sahiplenmiş, girişi olan müşteriler görünür.
+// Dış beslemeden (Google Places / OSM) gelen mekanların kullanıcı adı da
+// muhatabı da yok; onlara teklif göndermek boşa yazmak olurdu.
 // ═══════════════════════════════════════════════════════════════════════
-function PriceOfferRow({ restaurant, current, offer, onSend }) {
+function OfferField({ current, offer, onSend }) {
   const [value, setValue] = useState(String(current || ''));
   const [note, setNote] = useState('');
   const [sent, setSent] = useState(false);
@@ -2164,147 +2172,185 @@ function PriceOfferRow({ restaurant, current, offer, onSend }) {
     setTimeout(() => setSent(false), 1800);
   };
 
-  const statusTone = offer?.status === 'accepted' ? C.green
+  const tone = offer?.status === 'accepted' ? C.green
     : offer?.status === 'declined' ? C.red : C.yellow;
-  const statusText = offer?.status === 'accepted' ? 'Kabul edildi'
+  const label = offer?.status === 'accepted' ? 'Kabul edildi'
     : offer?.status === 'declined' ? 'Reddedildi' : 'İşletmede bekliyor';
 
   return (
-    <div style={{ padding: '13px 18px', borderTop: `1px solid ${C.border}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
-        <div style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12.5, color: C.orange, flexShrink: 0 }}>{restaurant.name[0]}</div>
-        <div style={{ flex: 1, minWidth: 140 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700 }}>{restaurant.name}</div>
-          <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
-            Yürürlükteki fiyat {money(current)} / ay · {restaurant.plan}
-          </div>
-        </div>
-        {offer && (
-          <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: statusTone, background: `${statusTone}1F`, border: `1px solid ${statusTone}33`, borderRadius: R.pill, padding: '4px 11px' }}>
-            {statusText} · {money(offer.offerMonthly)}
-          </span>
-        )}
-      </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.bg, border: `1px solid ${C.border}`, borderRadius: R.control, padding: '0 12px', height: 38 }}>
-          <span style={{ fontFamily: FB, fontSize: 13, color: C.faint }}>₺</span>
-          <input
-            value={value} onChange={e => setValue(e.target.value)}
-            inputMode="numeric" placeholder="Teklif"
-            style={{ width: 84, background: 'transparent', border: 'none', outline: 'none', color: C.text, fontFamily: FB, fontSize: 13.5, fontWeight: 700 }} />
-          <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>/ay</span>
-        </div>
-        {delta !== null && delta !== 0 && (
-          <span style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: delta < 0 ? C.green : C.yellow }}>
-            {delta > 0 ? '+' : ''}{delta}%
-          </span>
-        )}
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.bg, border: `1px solid ${C.border}`, borderRadius: R.control, padding: '0 12px', height: 38 }}>
+        <span style={{ fontFamily: FB, fontSize: 13, color: C.faint }}>₺</span>
         <input
-          value={note} onChange={e => setNote(e.target.value)}
-          placeholder="Not (işletme görür)"
-          style={{ flex: 1, minWidth: 150, height: 38, background: C.bg, border: `1px solid ${C.border}`, borderRadius: R.control, padding: '0 12px', color: C.text, fontFamily: FB, fontSize: 12.5, outline: 'none' }} />
-        <Btn label={sent ? 'Gönderildi' : 'Teklif gönder'} onClick={send} disabled={!valid}
-          variant="filled" tone={sent ? 'green' : 'orange'} size="md" />
+          value={value} onChange={e => setValue(e.target.value)}
+          inputMode="numeric" placeholder="Teklif"
+          style={{ width: 84, background: 'transparent', border: 'none', outline: 'none', color: C.text, fontFamily: FB, fontSize: 13.5, fontWeight: 700 }} />
+        <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>/ay</span>
       </div>
+      {delta !== null && delta !== 0 && (
+        <span style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: delta < 0 ? C.green : C.yellow }}>
+          {delta > 0 ? '+' : ''}{delta}%
+        </span>
+      )}
+      <input
+        value={note} onChange={e => setNote(e.target.value)}
+        placeholder="Not (işletme görür)"
+        style={{ flex: 1, minWidth: 150, height: 38, background: C.bg, border: `1px solid ${C.border}`, borderRadius: R.control, padding: '0 12px', color: C.text, fontFamily: FB, fontSize: 12.5, outline: 'none' }} />
+      <Btn label={sent ? 'Gönderildi' : 'Teklif gönder'} onClick={send} disabled={!valid}
+        variant="filled" tone={sent ? 'green' : 'orange'} size="md" />
+      {offer && (
+        <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: tone, background: `${tone}1F`, border: `1px solid ${tone}33`, borderRadius: R.pill, padding: '4px 11px' }}>
+          {label} · {money(offer.offerMonthly)}
+        </span>
+      )}
     </div>
   );
 }
 
-function PricingSheet({ stream, restaurants, onClose }) {
+function PricingPage({ restaurants = [], query = '' }) {
   const store = pricing.usePricing();
-  const catalogPrice = stream.list;
-  const current = pricing.listPrice(stream.key, catalogPrice);
-  const [listValue, setListValue] = useState(String(current));
-  const [savedList, setSavedList] = useState(false);
+  const [openId, setOpenId] = useState(null);
 
-  const users = restaurants.filter(r => storeServices(r).some(sv => sv.key === stream.key));
-  const offersHere = store.offers.filter(o => o.streamKey === stream.key);
-  const latestFor = (id) => offersHere
-    .filter(o => String(o.restaurantId) === String(id))
+  // Yalnız hesabı olan müşteriler. Dış beslemeden gelen mekanlar burada yok.
+  const customers = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('tr');
+    return restaurants
+      .filter(r => r.account)
+      .filter(r => !q || r.name.toLocaleLowerCase('tr').includes(q))
+      .sort((a, b) => storeMonthly(b) - storeMonthly(a));
+  }, [restaurants, query]);
+
+  const apiOnly = restaurants.filter(r => !r.account).length;
+  const pendingFor = (id) => store.offers.filter(
+    o => String(o.restaurantId) === String(id) && o.status === 'pending').length;
+  const latestOffer = (id, key) => store.offers
+    .filter(o => String(o.restaurantId) === String(id) && o.streamKey === key)
     .sort((a, b) => b.createdAt - a.createdAt)[0];
 
-  const saveList = () => {
-    const n = Number(listValue.replace(/[^\d]/g, ''));
-    if (!Number.isFinite(n) || n <= 0) return;
-    pricing.setListPrice(stream.key, n);
-    setSavedList(true);
-    setTimeout(() => setSavedList(false), 1800);
-  };
-
   return (
-    <motion.div
-      onClick={onClose}
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24 }}>
-      <motion.div
-        onClick={e => e.stopPropagation()}
-        initial={{ opacity: 0, scale: 0.96, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        transition={{ type: 'spring', bounce: 0.1, duration: 0.3 }}
-        style={{ width: 720, maxWidth: '100%', maxHeight: '88vh', overflowY: 'auto', ...CARD, boxShadow: ELEV.raised }}>
+    <div style={{ animation: 'fadeIn 0.2s' }}>
+      <section style={{ ...CARD, padding: '15px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <Icon path={icons.store} size={17} color={C.orange} />
+        <span style={{ fontFamily: FB, fontSize: 12.5, color: C.dim, lineHeight: 1.5, flex: 1, minWidth: 220 }}>
+          Teklifler işletme bazlı gönderilir. Burada yalnızca kaydını
+          sahiplenmiş, panel girişi olan müşteriler görünür
+          {apiOnly > 0 && ` — dış beslemeden gelen ${apiOnly} mekan listede değil`}.
+        </span>
+        <span style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: C.faint }}>
+          {customers.length} müşteri · {store.offers.filter(o => o.status === 'pending').length} bekleyen teklif
+        </span>
+      </section>
 
-        <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4, flexWrap: 'wrap' }}>
-              <h3 style={{ margin: 0, fontSize: 16.5, fontWeight: 800 }}>{stream.name}</h3>
-              <Badge text={stream.kind} color={KIND_TONE[stream.kind]} soft={C.panel2} />
+      {customers.map(r => {
+        const services = storeServices(r);
+        const open = openId === r.id;
+        const pending = pendingFor(r.id);
+        return (
+          <section key={r.id} style={{ ...CARD, overflow: 'hidden', marginBottom: 12 }}>
+            <div className="row-hover" onClick={() => setOpenId(open ? null : r.id)}
+              style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: C.orange, flexShrink: 0 }}>{r.name[0]}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 2 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>{r.name}</span>
+                  {r.gastro && <Icon path={icons.star} size={12} color={C.orange} fill={C.orange} />}
+                  {pending > 0 && <Badge text={`${pending} teklif bekliyor`} color={C.yellow} soft={C.yellowSoft} />}
+                </div>
+                <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+                  {r.district} · <span style={{ color: PLAN_COLOR[r.plan], fontWeight: 700 }}>{r.plan}</span> · {services.length} ücretli özellik
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{money(storeMonthly(r))}</div>
+                <div style={{ fontFamily: FB, fontSize: 10.5, color: C.faint }}>aylık</div>
+              </div>
+              <Icon path={open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} size={16} color={C.faint} />
             </div>
-            <p style={{ margin: 0, fontFamily: FB, fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>{stream.note}</p>
-          </div>
-          <IconBtn onClick={onClose} size={32} title="Kapat" icon={<Icon path={icons.x} size={16} color={C.dim} />} />
-        </div>
 
-        {/* Liste fiyatı */}
-        <div style={{ padding: '16px 22px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 9 }}>Liste fiyatı</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.bg, border: `1px solid ${C.border}`, borderRadius: R.control, padding: '0 12px', height: 40 }}>
-              <span style={{ fontFamily: FB, fontSize: 14, color: C.faint }}>₺</span>
-              <input
-                value={listValue} onChange={e => setListValue(e.target.value)}
-                inputMode="numeric"
-                style={{ width: 110, background: 'transparent', border: 'none', outline: 'none', color: C.text, fontFamily: FB, fontSize: 15, fontWeight: 800 }} />
-              <span style={{ fontFamily: FB, fontSize: 12, color: C.faint }}>/ay</span>
-            </div>
-            <Btn label={savedList ? 'Kaydedildi' : 'Liste fiyatını güncelle'} onClick={saveList}
-              variant="outline" tone={savedList ? 'green' : 'neutral'} size="md" />
-            <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.5 }}>
-              Katalog varsayılanı {money(catalogPrice)} · yeni işletmelere bu fiyattan teklif edilir
-            </span>
-          </div>
-        </div>
+            {open && (
+              <div>
+                <SectionHead title="Aldığı hizmetler" right="fiyatı değiştirmek için teklif gönderin" />
+                <div style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: PLAN_COLOR[r.plan], flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{r.plan} abonelik</div>
+                    <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>Paket fiyatı — kalem bazlı teklif dışında</div>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: PLAN_PRICE[r.plan] ? C.text : C.faint }}>
+                    {PLAN_PRICE[r.plan] ? `${money(PLAN_PRICE[r.plan])}/ay` : '—'}
+                  </div>
+                </div>
+                {services.map(sv => (
+                  <div key={sv.key} style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: KIND_TONE[sv.kind], flexShrink: 0 }} />
+                      <span style={{ fontSize: 13.5, fontWeight: 600 }}>{sv.name}</span>
+                      <Badge text={sv.kind} color={KIND_TONE[sv.kind]} soft={C.panel2} />
+                      <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+                        Yürürlükteki fiyat {money(sv.monthly)} / ay
+                        {sv.repriced && ' · kabul edilen teklif'}
+                      </span>
+                    </div>
+                    <OfferField
+                      current={sv.monthly}
+                      offer={latestOffer(r.id, sv.key)}
+                      onSend={({ offerMonthly, note }) => pricing.sendOffer({
+                        streamKey: sv.key, streamName: sv.name,
+                        restaurantId: r.id, restaurantName: r.name,
+                        currentMonthly: sv.monthly, offerMonthly, note,
+                      })}
+                    />
+                  </div>
+                ))}
+                {services.length === 0 && (
+                  <div style={{ padding: '20px 18px', fontFamily: FB, fontSize: 12.5, color: C.faint, textAlign: 'center' }}>
+                    Bu müşteri henüz ücretli bir özellik almadı — teklif için önce satış gerekiyor.
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        );
+      })}
 
-        {/* Bu kalemi kullanan işletmeler */}
-        <SectionHead title="Bu kalemi kullanan işletmeler"
-          right={`${users.length} işletme · ${offersHere.filter(o => o.status === 'pending').length} bekleyen teklif`} />
-        {users.map(r => {
-          const sv = storeServices(r).find(x => x.key === stream.key);
-          return (
-            <PriceOfferRow
-              key={r.id} restaurant={r} current={sv?.monthly || 0}
-              offer={latestFor(r.id)}
-              onSend={({ offerMonthly, note }) => pricing.sendOffer({
-                streamKey: stream.key, streamName: stream.name,
-                restaurantId: r.id, restaurantName: r.name,
-                currentMonthly: sv?.monthly || 0, offerMonthly, note,
-              })}
-            />
-          );
-        })}
-        {users.length === 0 && (
+      {customers.length === 0 && (
+        <section style={{ ...CARD, padding: '26px 18px', textAlign: 'center' }}>
+          <p style={{ margin: 0, fontFamily: FB, fontSize: 12.5, color: C.faint }}>
+            {query ? `"${query}" için hesabı olan müşteri bulunamadı` : 'Hesabı olan müşteri yok'}
+          </p>
+        </section>
+      )}
+
+      {/* Gönderilen tekliflerin akıbeti */}
+      <section style={{ ...CARD, overflow: 'hidden', marginTop: 16 }}>
+        <SectionHead title="Gönderilen teklifler"
+          right={`${store.offers.length} teklif · ${store.offers.filter(o => o.status === 'pending').length} bekliyor`} />
+        {store.offers.length === 0 && (
           <div style={{ padding: '22px', fontFamily: FB, fontSize: 12.5, color: C.faint, textAlign: 'center' }}>
-            Bu kalemi kullanan işletme yok — teklif için önce satış gerekiyor.
+            Henüz teklif gönderilmedi. Bir müşteriye dokunup hizmetlerini açın.
           </div>
         )}
-
-        <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}` }}>
-          <p style={{ margin: 0, fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
-            Teklif gönderildiğinde işletmenin panelinde "Teklifler" sekmesine
-            düşer. Yürürlükteki fiyat, işletme kabul edene kadar değişmez.
-          </p>
-        </div>
-      </motion.div>
-    </motion.div>
+        {store.offers.map((o, i) => {
+          const tone = o.status === 'accepted' ? C.green : o.status === 'declined' ? C.red : C.yellow;
+          const label = o.status === 'accepted' ? 'Kabul edildi' : o.status === 'declined' ? 'Reddedildi' : 'İşletmede bekliyor';
+          const diff = o.currentMonthly ? Math.round(((o.offerMonthly - o.currentMonthly) / o.currentMonthly) * 100) : null;
+          return (
+            <div key={o.id} style={{ padding: '13px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: tone, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>{o.restaurantName} · {o.streamName}</div>
+                <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+                  {money(o.currentMonthly)} → {money(o.offerMonthly)}
+                  {diff !== null && diff !== 0 && ` (${diff > 0 ? '+' : ''}${diff}%)`}
+                  {o.note ? ` · "${o.note}"` : ''}
+                </div>
+              </div>
+              <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: tone, background: `${tone}1F`, border: `1px solid ${tone}33`, borderRadius: R.pill, padding: '4px 11px', flexShrink: 0 }}>{label}</span>
+            </div>
+          );
+        })}
+      </section>
+    </div>
   );
 }
 
@@ -2320,8 +2366,7 @@ function PricingSheet({ stream, restaurants, onClose }) {
 function RevenuePage({ restaurants = [], onOpenStore }) {
   const [sort, setSort] = useState('revenue');   // 'revenue' | 'services' | 'name'
   const [kind, setKind] = useState(null);        // kalem türü filtresi
-  const [pricingFor, setPricingFor] = useState(null);   // fiyatlandırma açılan kalem
-  const priceStore = pricing.usePricing();
+  const [find, setFind] = useState('');          // isim araması
 
   const streams = REVENUE_STREAMS;
   const total = PLATFORM_TOTAL;
@@ -2347,14 +2392,17 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
         monthly: storeMonthly(r),
       };
     });
-    const shown = kind ? rows.filter(r => r.services.some(x => x.kind === kind)) : rows;
+    const q = find.trim().toLocaleLowerCase('tr');
+    const shown = rows
+      .filter(r => !kind || r.services.some(x => x.kind === kind))
+      .filter(r => !q || r.name.toLocaleLowerCase('tr').includes(q));
     const sorters = {
-      revenue: (a, b) => b.monthly - a.monthly,
+      revenue: (a, b) => b.monthly - a.monthly,          // büyükten küçüğe
       services: (a, b) => b.services.length - a.services.length || b.monthly - a.monthly,
       name: (a, b) => a.name.localeCompare(b.name, 'tr'),
     };
     return shown.sort(sorters[sort]);
-  }, [restaurants, sort, kind]);
+  }, [restaurants, sort, kind, find]);
 
   const namedTotal = restaurants.reduce((a, r) => a + storeMonthly(r), 0);
   const otherCount = STATS.totalRestaurants - restaurants.length;
@@ -2432,6 +2480,21 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
         <SectionHead title="Müşteri bazlı gelir"
           right={`${payingCount} ödeyen müşteri · ${money(namedTotal)} / ay`} />
 
+        {/* İsim araması */}
+        <div style={{ padding: '12px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+            <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}>
+              <Icon path={icons.search} size={15} color={C.faint} />
+            </div>
+            <input value={find} onChange={e => setFind(e.target.value)} placeholder="Restoran adı ara"
+              style={{ width: '100%', height: 38, background: C.bg, border: `1px solid ${C.border}`, borderRadius: R.control, padding: '0 12px 0 34px', color: C.text, fontFamily: FB, fontSize: 13, outline: 'none' }} />
+          </div>
+          {find && <Btn label="Temizle" onClick={() => setFind('')} variant="ghost" size="sm" />}
+          <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+            {customers.length} sonuç
+          </span>
+        </div>
+
         {/* Filtre ve sıralama */}
         <div style={{ padding: '12px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, marginRight: 2 }}>Kalem:</span>
@@ -2442,7 +2505,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
           ))}
           <div style={{ flex: 1 }} />
           <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, marginRight: 2 }}>Sırala:</span>
-          {[['revenue', 'Ciro'], ['services', 'Özellik'], ['name', 'İsim']].map(([id, label]) => (
+          {[['revenue', 'Ciro ↓'], ['services', 'Özellik'], ['name', 'İsim A-Z']].map(([id, label]) => (
             <Btn key={id} label={label} onClick={() => setSort(id)} size="sm"
               variant={sort === id ? 'soft' : 'ghost'} tone={sort === id ? 'orange' : 'neutral'} />
           ))}
@@ -2502,27 +2565,22 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
 
       {/* ─── 3. KALEM BAZLI KATALOG ─── */}
       <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
-        <SectionHead title="Gelir kalemleri · fiyatlandırma"
-          right={`${streams.length} kalem · kaleme dokunup fiyat belirleyin`} />
+        <SectionHead title="Gelir kalemleri" right={`${streams.length} kalem · ${money(STREAM_TOTAL)} / ay`} />
         {streams.map((x, i) => {
           // Bu kalemi kaç adlandırılmış müşteri almış — satış konuşmasının başlangıcı
           const buyers = restaurants.filter(r => storeServices(r).some(sv => sv.key === x.key));
-          const openOffers = priceStore.offers.filter(o => o.streamKey === x.key && o.status === 'pending').length;
-          const listed = pricing.listPrice(x.key, x.list);
           return (
-            <div key={x.key} className="row-hover" onClick={() => setPricingFor(x)}
-              title={`${x.name} · fiyat ayarla ve teklif gönder`}
-              style={{ padding: '13px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
+            <div key={x.key}
+              style={{ padding: '13px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: KIND_TONE[x.kind], flexShrink: 0 }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
                   <span style={{ fontSize: 13.5, fontWeight: 600 }}>{x.name}</span>
                   <Badge text={x.kind} color={KIND_TONE[x.kind]} soft={C.panel2} />
-                  {openOffers > 0 && <Badge text={`${openOffers} teklif bekliyor`} color={C.yellow} soft={C.yellowSoft} />}
                 </div>
                 <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
-                  İşletme başına liste fiyatı {money(listed)} / ay · {buyers.length} işletme kullanıyor
-                  {buyers.length > 0 && <>: {buyers.map(bR => bR.name).join(', ')}</>}
+                  {x.note}
+                  {buyers.length > 0 && <> · {buyers.length} işletme kullanıyor: {buyers.map(bR => bR.name).join(', ')}</>}
                 </div>
               </div>
               <div style={{ width: 120, flexShrink: 0 }}>
@@ -2534,50 +2592,11 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
                 <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(x.monthly)}</div>
                 <div style={{ fontFamily: FB, fontSize: 10.5, color: C.faint }}>{x.unit}</div>
               </div>
-              <Icon path="M9 18l6-6-6-6" size={15} color={C.faint} />
             </div>
           );
         })}
       </section>
 
-      {/* ─── 4. GÖNDERİLEN FİYAT TEKLİFLERİ ───
-          Abonelik paketleri vitrininin yerini aldı: burası tekliflerin
-          akıbetinin görüldüğü yer. Teklif tek başına fiyatı değiştirmiyor,
-          işletme kabul edene kadar yürürlükteki tutar aynı kalıyor. */}
-      <section style={{ ...CARD, overflow: 'hidden' }}>
-        <SectionHead title="Gönderilen fiyat teklifleri"
-          right={`${priceStore.offers.length} teklif · ${priceStore.offers.filter(o => o.status === 'pending').length} bekliyor`} />
-        {priceStore.offers.length === 0 && (
-          <div style={{ padding: '22px', fontFamily: FB, fontSize: 12.5, color: C.faint, textAlign: 'center' }}>
-            Henüz teklif gönderilmedi. Yukarıdaki bir gelir kalemine dokunun.
-          </div>
-        )}
-        {priceStore.offers.map((o, i) => {
-          const tone = o.status === 'accepted' ? C.green : o.status === 'declined' ? C.red : C.yellow;
-          const label = o.status === 'accepted' ? 'Kabul edildi' : o.status === 'declined' ? 'Reddedildi' : 'İşletmede bekliyor';
-          const diff = o.currentMonthly ? Math.round(((o.offerMonthly - o.currentMonthly) / o.currentMonthly) * 100) : null;
-          return (
-            <div key={o.id} style={{ padding: '13px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: tone, flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>{o.restaurantName} · {o.streamName}</div>
-                <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
-                  {money(o.currentMonthly)} → {money(o.offerMonthly)}
-                  {diff !== null && diff !== 0 && ` (${diff > 0 ? '+' : ''}${diff}%)`}
-                  {o.note ? ` · "${o.note}"` : ''}
-                </div>
-              </div>
-              <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: tone, background: `${tone}1F`, border: `1px solid ${tone}33`, borderRadius: R.pill, padding: '4px 11px', flexShrink: 0 }}>{label}</span>
-            </div>
-          );
-        })}
-      </section>
-
-      <AnimatePresence>
-        {pricingFor && (
-          <PricingSheet stream={pricingFor} restaurants={restaurants} onClose={() => setPricingFor(null)} />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
