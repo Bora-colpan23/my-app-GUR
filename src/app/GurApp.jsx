@@ -510,6 +510,125 @@ function IconBtn({ onClick, icon, children, tone = "glassDark", shape = "circle"
   );
 }
 
+// ─── Yatay şerit — parmakla ve imleçle sürüklenebilir ────────────────
+//
+// Dokunmatikte tarayıcının kendi kaydırması zaten en iyisi: ona
+// dokunmuyoruz. İmleçte ise `overflow-x` tek başına işe yaramıyor —
+// masaüstünde ve önizleme çerçevesinde kullanıcı listeyi tutup
+// sürükleyemiyordu. Fare/kalem için 1:1 takip + bırakınca momentum
+// ekliyoruz (Apple HIG: hareket parmağın hızını devralır, dikiş olmaz).
+//
+// Sürükleme sonrası tıklama bastırılıyor: listeyi kaydırmak isteyen
+// kullanıcı yanlışlıkla bir kartı açmamalı.
+const HSCROLL_THRESHOLD = 8;   // bu kadar piksel sonrası "sürükleme" sayılır
+
+function HScroll({ children, style, className }) {
+  const ref = useRef(null);
+  const drag = useRef(null);
+  const raf = useRef(0);
+  const suppressClick = useRef(false);
+  const [grabbing, setGrabbing] = useState(false);
+
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+
+  const clamp = (v, el) => Math.max(0, Math.min(v, el.scrollWidth - el.clientWidth));
+
+  const onPointerDown = (e) => {
+    if (e.pointerType === "touch") return;          // dokunmatik: tarayıcıya bırak
+    const el = ref.current;
+    if (!el || el.scrollWidth <= el.clientWidth) return;
+    cancelAnimationFrame(raf.current);
+    // Önceki sürüklemeden kalan bastırma bayrağı temizlenir: sürükleme
+    // sonrası tarayıcı click üretmeyebiliyor, bayrak asılı kalırsa bir
+    // sonraki gerçek tıklamayı yiyor.
+    suppressClick.current = false;
+    // Burada İMLEÇ YAKALANMIYOR. Yakalarsak tarayıcı uyumluluk fare
+    // olaylarını (click dahil) da bu kaba yönlendiriyor ve şeritteki
+    // kartlara tıklanamaz oluyor. Yakalama, eşik aşılınca yapılıyor.
+    drag.current = {
+      pointerId: e.pointerId, captured: false,
+      startX: e.clientX, startLeft: el.scrollLeft,
+      lastX: e.clientX, lastT: performance.now(), v: 0, moved: 0,
+    };
+  };
+
+  const onPointerMove = (e) => {
+    const d = drag.current, el = ref.current;
+    if (!d || !el) return;
+    const dx = e.clientX - d.startX;
+    d.moved = Math.max(d.moved, Math.abs(dx));
+    if (!d.captured) {
+      // Histerezis: küçük titremeler tıklamayı bozmasın (Apple HIG ~10px)
+      if (d.moved <= HSCROLL_THRESHOLD) return;
+      d.captured = true;
+      setGrabbing(true);
+      try { el.setPointerCapture(d.pointerId); } catch { /* yakalanamazsa da çalışır */ }
+    }
+    // Eşik kadar kaydırma sayılmıyor ki sürükleme sıçrayarak başlamasın
+    const eff = dx - Math.sign(dx) * HSCROLL_THRESHOLD;
+    el.scrollLeft = clamp(d.startLeft - eff, el);
+    const now = performance.now();
+    const dt = now - d.lastT;
+    if (dt > 0) {
+      // Son iki örnekten hız (px/sn) — bırakma anında bu devralınıyor
+      d.v = ((e.clientX - d.lastX) / dt) * 1000;
+      d.lastX = e.clientX; d.lastT = now;
+    }
+  };
+
+  const onPointerUp = (e) => {
+    const d = drag.current, el = ref.current;
+    drag.current = null;
+    setGrabbing(false);
+    if (!d || !el) return;
+    if (d.captured) { try { el.releasePointerCapture(e.pointerId); } catch { /* zaten bırakılmış */ } }
+    if (!d.captured) return;                        // sürükleme değil, tıklama
+    suppressClick.current = true;
+
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    // Bırakma noktasından değil, momentumun taşıyacağı noktadan duruyoruz.
+    const target = clamp(el.scrollLeft - projectMomentum(d.v), el);
+    const start = el.scrollLeft;
+    const dist = target - start;
+    if (reduced || Math.abs(dist) < 1) { el.scrollLeft = target; return; }
+    const dur = Math.min(700, 220 + Math.abs(dist) * 0.55);
+    const t0 = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - t0) / dur);
+      el.scrollLeft = start + dist * (1 - Math.pow(1 - t, 3));   // sönümlenerek durur
+      if (t < 1) raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+  };
+
+  return (
+    <div
+      ref={ref}
+      className={className}
+      data-hscroll=""
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onClickCapture={(e) => {
+        if (!suppressClick.current) return;
+        suppressClick.current = false;
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+      onDragStart={(e) => e.preventDefault()}
+      style={{
+        display: "flex", overflowX: "auto", overscrollBehaviorX: "contain",
+        cursor: grabbing ? "grabbing" : "grab",
+        userSelect: grabbing ? "none" : undefined,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 function UploadBox({ label, icon, accept, files, setFiles, multiple = true }) {
   const ref = useRef(null);
   const handle = (e) => { const nf = Array.from(e.target.files).map(f => ({ name: f.name, url: URL.createObjectURL(f), type: f.type })); setFiles(prev => multiple ? [...prev, ...nf] : nf); };
@@ -2615,7 +2734,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
               </p>
               <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(45,36,25,0.45)" }}>{liveDeals.length} fırsat</span>
             </div>
-            <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 2 }}>
+            <HScroll style={{ gap: 10, paddingBottom: 2 }}>
               {liveDeals.map(d => (
                 <motion.div
                   key={d.restaurantId} onClick={() => onDetail?.(d.r)}
@@ -2632,7 +2751,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                   </div>
                 </motion.div>
               ))}
-            </div>
+            </HScroll>
           </div>
         )}
 
@@ -2690,7 +2809,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             Tümü
           </button>
         </div>
-        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6, marginBottom: 16, flexShrink: 0 }}>
+        <HScroll style={{ gap: 12, paddingBottom: 6, marginBottom: 16, flexShrink: 0 }}>
           {CATEGORIES.slice(0, 8).map((c, i) => (
             <motion.div key={c.name} onClick={() => onCategoryTap(c.name)}
               whileTap={{ scale: 0.94 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
@@ -2704,7 +2823,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
               <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#2D2419", lineHeight: 1.25, display: "block" }}>{c.name}</span>
             </motion.div>
           ))}
-        </div>
+        </HScroll>
 
         {/* Yakınında popüler — önce yakınlık, sonra puan */}
         {popular.length > 0 && (
@@ -2716,7 +2835,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                 Kaydırarak gez
               </button>
             </div>
-            <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6 }}>
+            <HScroll style={{ gap: 12, paddingBottom: 6 }}>
               {popular.map(r => (
                 <motion.div key={r.id} onClick={() => onDetail?.(r)}
                   whileTap={{ scale: 0.97 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
@@ -2749,7 +2868,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                   </div>
                 </motion.div>
               ))}
-            </div>
+            </HScroll>
           </div>
         )}
 
@@ -3444,13 +3563,13 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
               {r.menu?.length > 0 && (
                 <div style={{ marginBottom: 16 }}>
                   <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#1C1917", margin: "0 0 8px" }}>Menü</p>
-                  <div style={{ display: "flex", gap: 9, overflowX: "auto", paddingBottom: 4 }}>
+                  <HScroll style={{ gap: 9, paddingBottom: 4 }}>
                     {r.menu.map((m, i) => (
                       <div key={i} onClick={() => setMenuOpen(m)} style={{ width: 96, height: 132, borderRadius: 14, overflow: "hidden", flexShrink: 0, cursor: "pointer", border: "1px solid rgba(0,0,0,0.07)", position: "relative" }}>
                         <Img src={m} style={{ position: "absolute", inset: 0 }} bg="#f2ede7" box={192} />
                       </div>
                     ))}
-                  </div>
+                  </HScroll>
                 </div>
               )}
             </>
@@ -3992,7 +4111,7 @@ function RouletteScreen({ onBack, onDetail, restaurants = [], onDirections }) {
 
         {/* Kategori seçimi */}
         <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 9px" }}>Kategori</p>
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 18, flexShrink: 0 }}>
+        <HScroll style={{ gap: 8, paddingBottom: 6, marginBottom: 18, flexShrink: 0 }}>
           {[null, ...cats].map(c => {
             const active = cat === c;
             return (
@@ -4013,7 +4132,7 @@ function RouletteScreen({ onBack, onDetail, restaurants = [], onDirections }) {
               </button>
             );
           })}
-        </div>
+        </HScroll>
 
         {/* Çark kartı */}
         <div style={{ background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 26, padding: "24px 20px", textAlign: "center", marginBottom: 14 }}>
@@ -4788,7 +4907,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           </div>
 
           {/* Küçük thumbnail'lar */}
-          <div style={{ display: "flex", gap: 10, paddingBottom: 16, overflowX: "auto", scrollbarWidth: "none" }}>
+          <HScroll style={{ gap: 10, paddingBottom: 16, scrollbarWidth: "none" }}>
             {gallery.map((g, i) => (
               <div key={i} onClick={() => setPhotoIdx(i)} style={{
                 flexShrink: 0, width: 80, height: 60, borderRadius: 12, overflow: "hidden",
@@ -4804,7 +4923,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 )}
               </div>
             ))}
-          </div>
+          </HScroll>
         </div>
 
         {/* Beyaz alan */}
