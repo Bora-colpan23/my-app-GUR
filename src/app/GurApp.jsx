@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
+import { Link } from 'react-router-dom';
 import { animate } from 'motion';
 import { getConsent, setConsent, initAnalytics, trackEvent } from '../lib/analytics.js';
 import { buildDeck, rankCampaigns, quotaState, orderByProximity, ringLabel } from '../../shared/deck.js';
@@ -451,10 +452,15 @@ function WelcomeScreen({ onStart }) {
           <Btn text="GUR uldamaya başla sende" onClick={onStart} />
           {/* İşletme girişi bu uygulamada yok: işletmeler kendi
               uygulamalarından (/isletme) giriyor. Aynı ürünün iki ayrı
-              tarafı — müşteriye işletme paneli göstermenin anlamı yok. */}
+              tarafı — müşteriye işletme paneli göstermenin anlamı yok.
+
+              Bağlantı düz <a> değil <Link>: uygulama iki ayrı yönlendiriciyle
+              çalışıyor (dev/üretimde yol tabanlı, tek dosyalık artifact
+              önizlemesinde hash tabanlı). <Link> hedefi hangisiyse ona göre
+              yazar; sabit "/isletme" önizlemede olmayan bir yola giderdi. */}
           <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.6)", textAlign: "center", margin: "16px 0 0", lineHeight: 1.55 }}>
             Restoran sahibi misin?{" "}
-            <a href="/isletme" style={{ color: "#fff", fontWeight: 700, textDecoration: "underline" }}>Doyurucu uygulamasına geç</a>
+            <Link to="/isletme" style={{ color: "#fff", fontWeight: 700, textDecoration: "underline" }}>Doyurucu uygulamasına geç</Link>
           </p>
         </div>
       </div>

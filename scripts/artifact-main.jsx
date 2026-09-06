@@ -28,15 +28,14 @@ const router = createHashRouter([
 ]);
 
 function ArtifactSwitcher() {
-  const [hash, setHash] = useState(() => window.location.hash);
-  useEffect(() => {
-    const on = () => setHash(window.location.hash);
-    window.addEventListener('hashchange', on);
-    return () => window.removeEventListener('hashchange', on);
-  }, []);
-  const admin = hash.startsWith('#/admin');
-  const business = hash.startsWith('#/isletme');
-  const go = (to) => { window.location.hash = to; };
+  // Yönlendiriciye abone oluruz, hash'e değil: React Router hash'i
+  // pushState ile değiştirdiği için 'hashchange' olayı çıkmaz ve
+  // uygulama içinden gelen geçişlerde sekme yanlış yerde kalırdı.
+  const [path, setPath] = useState(() => router.state.location.pathname);
+  useEffect(() => router.subscribe((state) => setPath(state.location.pathname)), []);
+  const admin = path.startsWith('/admin');
+  const business = path.startsWith('/isletme');
+  const go = (to) => { router.navigate(to); };
   const style = (active) => ({
     border: 'none', cursor: 'pointer', borderRadius: 999, padding: '6px 14px',
     fontFamily: "'Outfit', system-ui, sans-serif", fontSize: 12.5, fontWeight: 700,
