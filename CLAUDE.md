@@ -159,7 +159,47 @@ yener ama `var()` değerini okur. Böylece palet tek yerden değişir.
 Yeni renk yazarken **jeton kullan**: `var(--c-card)`, `var(--c-ink)`,
 `var(--c-ink-2)`, `var(--c-muted)`, `var(--c-border)`, `var(--c-subtle)`.
 Sabit `#fff` yalnızca turuncu/koyu zemin üstündeki metin ve ikonlar için.
-Yönetici paneli bunun dışında: zaten koyu bir masaüstü aracı.
+Yönetici paneli kendi jeton kümesini taşır (`GurAdmin.jsx` → `C`), ama o da
+açık: koyu masaüstü sürümü kaldırıldı.
+
+### "One" buton dili
+Bütün haplar tek tarifte: tam yuvarlak (`999`), kalın yazı (700), rengine
+göre tonlanmış **dar** bir düşüş gölgesi, basılınca hem küçülme hem gölgenin
+kısalması. İçeriden parlayan `inset` gölgeler kaldırıldı.
+
+`src/ui/kit.jsx` → `Btn` varyantları:
+
+| Varyant | Nerede |
+|---|---|
+| `filled` | turuncu birincil eylem |
+| `ink` | siyah hap — turuncuyla yarışmadan birincil olabilen tek renk |
+| `onColor` | turuncu zemin üstünde beyaz hap |
+| `outlineDark` | beyaz zemin üstünde beyaz hap + ince kenarlık |
+| `brandSoft` / `successSoft` / `destructiveSoft` | %10 tonlu zemin, renkli kalın yazı |
+| `outline` / `plain` / `plainDark` | kenarlıklı ve düz metin hapları |
+
+İki ek yuva: `trailing` bir simgeyi yuvarlak cebe alır (referanstaki
+"Download ⬇"), `count` hapın içine küçük bir sayaç rozeti koyar ("Done ①").
+
+Devre dışı hap **soluklaştırılmaz**: uygulamada kendi rengini koruyup geri
+çekilir, yönetici panelinde gri hapa döner. `opacity: 0.42 + grayscale`
+beyaz yazıyı okunmaz bırakıyordu.
+
+### Yönetici panosu: One düzeni
+Panel açık gri kâğıt (`C.bg`) üzerinde beyaz kartlar. Üç imza parçası
+`GurAdmin.jsx` içinde:
+
+- `Segmented` — gri kanal, seçili seçenek beyaz hap. Dönem ve zaman aralığı
+  seçimlerinin tamamı bundan geçer ve **gerçekten veri değiştirir**
+  (`TREND_RANGES`), yalnızca etiket değiştirmez.
+- `TrendChart` — tek serili çizgi + solan alan, imleçle nişangâh ve koyu
+  ipucu kutusu. Tek seri olduğu için gösterge kutusu yok; her noktaya sayı
+  yazılmaz, yalnızca tepe noktası etiketlidir.
+- `Sparkline` — tablo satırının 24 saatlik eğilimi. Renk tek başına bilgi
+  taşımaz: yanındaki sütun yüzdeyi ↗/↘ ile de yazar.
+
+Sayı sütunları `NUM` yayılımını kullanır (sistem mono + `tabular-nums`):
+rakamlar hizalanır, ek font isteği gitmez.
 
 ### Erişilebilirlik kuralları (uyulacak)
 - Alan etiketleri `htmlFor` ile bağlı (`InputField`), `<label>` süs değil.
@@ -202,7 +242,7 @@ sabit aralık kullanıcı tarafından fark ediliyor.
 - Hareket: Motion (`motion/react` + imperatif `animate`). Springler Apple HIG'e
   göre: damping 1.0 varsayılan, momentum taşıyan hareketlerde bounce 0.2.
 - Font: **Poppins** + **Outfit**, jetondan: `var(--f-display)` / `var(--f-body)`.
-  Başka font kullanma.
+  Başka font kullanma. Sayı sütunlarında sistem mono (yönetici: `FM`).
 
 ### Konum doğrulamalı ziyaret
 `src/lib/visits.js` ve `server/src/visits/tracker.js` **aynı kuralları** taşır:

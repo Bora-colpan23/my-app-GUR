@@ -177,6 +177,19 @@ export const ELEV = {
   pressLight: "inset 0 3px 8px rgba(45,36,25,0.18), inset 0 -1px 0 rgba(255,255,255,0.7)",
   pressDark:  "inset 0 3px 10px rgba(0,0,0,0.55)",
   pressBrand: "inset 0 3px 10px rgba(120,40,0,0.45)",
+
+  // ── "One" gölgeleri ───────────────────────────────────────────────────
+  // One'ın hapları içeriden parlamıyor: pilin hemen altında, rengine göre
+  // tonlanmış dar bir düşüş var. Basılınca gölge kısalıyor — pil masaya
+  // yaklaşıyor, kaybolmuyor.
+  oneRest:       "0 4px 12px rgba(28,22,15,0.10), 0 1px 2px rgba(28,22,15,0.05)",
+  onePress:      "0 1px 3px rgba(28,22,15,0.14)",
+  oneBrand:      "0 6px 16px rgba(255,102,0,0.32)",
+  oneBrandPress: "0 2px 5px rgba(255,102,0,0.30)",
+  oneInk:        "0 6px 16px rgba(12,10,8,0.30)",
+  oneInkPress:   "0 2px 5px rgba(12,10,8,0.28)",
+  oneDanger:     "0 6px 16px rgba(229,72,77,0.30)",
+  oneDangerPress:"0 2px 5px rgba(229,72,77,0.28)",
 };
 
 // Marka gradyanı — referanstaki gradyan dolgunun GUR karşılığı.
@@ -194,27 +207,64 @@ export function Spinner({ size = 15, color = "currentColor" }) {
   );
 }
 
-export function Btn({ text, onClick, disabled, loading, variant = "onColor", size = "lg", fullWidth = true, icon }) {
+// ── "One" haplarının ortak parçaları ─────────────────────────────────────
+// Sayaç rozeti: referanstaki "Done ①" hapının içindeki küçük yuvarlak.
+function OneCount({ value, bg, ink, d }) {
+  return (
+    <span style={{
+      minWidth: d, height: d, borderRadius: 999, padding: "0 6px", flexShrink: 0,
+      background: bg, color: ink,
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      fontFamily: "var(--f-body)", fontWeight: 700, fontSize: Math.round(d * 0.6),
+      fontVariantNumeric: "tabular-nums",
+    }}>{value}</span>
+  );
+}
+
+export function Btn({
+  text, onClick, disabled, loading, variant = "onColor", size = "lg",
+  fullWidth = true, icon, trailing, count,
+}) {
   const paddings = { lg: "16px 0", md: "13px 22px", sm: "9px 16px" };
   const fontSizes = { lg: 16, md: 14, sm: 12.5 };
+  const chipSizes = { lg: 26, md: 22, sm: 19 };
 
   // Her varyant üç renk verir: duruş, üzerine gelme, basılı. CSS bu üçünü
   // değişkenlerden okuyor; inline background yazsaydık :hover'ı ezerdi.
+  // chip/badge alanları simge cebinin ve sayaç rozetinin rengini söyler.
   const palettes = {
-    onColor:   { bg: "#fff", hover: "#FFF4EC", press: "#FFE8D8", color: "#FF6600", elev: "restLight", pressElev: "pressLight" },
-    filled:    { bg: BRAND_GRAD, hover: BRAND_GRAD_HOVER, press: BRAND_GRAD, color: "#fff", elev: "restBrand", pressElev: "pressBrand" },
-    outline:   { bg: "rgba(255,255,255,0.08)", hover: "rgba(255,255,255,0.16)", press: "rgba(255,255,255,0.06)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.55)", elev: "restDark", pressElev: "pressDark" },
-    outlineDark: { bg: "#fff", hover: "#FFF6F0", press: "#FFEFE4", color: "var(--c-ink)", border: "1.5px solid rgba(45,36,25,0.14)", elev: "restLight", pressElev: "pressLight" },
-    destructive: { bg: "linear-gradient(145deg, #FF5449, #FF3B30)", hover: "linear-gradient(145deg, #FF6B61, #FF4A40)", press: "linear-gradient(145deg, #E8352B, #D62F26)", color: "#fff", elev: "0 8px 20px rgba(255,59,48,0.32), inset 0 1px 0 rgba(255,255,255,0.3)", pressElev: "inset 0 3px 10px rgba(140,20,15,0.45)" },
-    destructiveSoft: { bg: "rgba(255,59,48,0.08)", hover: "rgba(255,59,48,0.14)", press: "rgba(255,59,48,0.2)", color: "#FF3B30" },
-    plain:     { bg: "transparent", hover: "rgba(255,255,255,0.08)", press: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.6)" },   // koyu/turuncu zemin
-    plainDark: { bg: "transparent", hover: "rgba(255,102,0,0.08)", press: "rgba(255,102,0,0.14)", color: "#FF6600" },                      // beyaz zemin
+    onColor:   { bg: "#fff", hover: "#FFF4EC", press: "#FFE8D8", color: "#B4530A", elev: "oneRest", pressElev: "onePress",
+                 chip: { bg: "#FF6600", ink: "#fff" }, badge: { bg: "rgba(255,102,0,0.14)", ink: "#B4530A" } },
+    filled:    { bg: BRAND_GRAD, hover: BRAND_GRAD_HOVER, press: BRAND_GRAD, color: "#fff", elev: "oneBrand", pressElev: "oneBrandPress",
+                 chip: { bg: "#fff", ink: "#FF6600" }, badge: { bg: "rgba(255,255,255,0.28)", ink: "#fff" } },
+    // Siyah hap: referansın "Download" düğmesi. Turuncuyla yarışmadan
+    // birincil olabilen tek renk.
+    ink:       { bg: "#17130F", hover: "#241E18", press: "#0D0A08", color: "#fff", elev: "oneInk", pressElev: "oneInkPress",
+                 chip: { bg: "#fff", ink: "#17130F" }, badge: { bg: "rgba(255,255,255,0.22)", ink: "#fff" } },
+    outline:   { bg: "rgba(255,255,255,0.10)", hover: "rgba(255,255,255,0.18)", press: "rgba(255,255,255,0.06)", color: "#fff", border: "1px solid rgba(255,255,255,0.45)",
+                 chip: { bg: "#fff", ink: "#17130F" }, badge: { bg: "rgba(255,255,255,0.22)", ink: "#fff" } },
+    outlineDark: { bg: "#fff", hover: "#FAF8F6", press: "#F1ECE7", color: "var(--c-ink)", border: "1px solid var(--c-line)", elev: "oneRest", pressElev: "onePress",
+                 chip: { bg: "#17130F", ink: "#fff" }, badge: { bg: "rgba(45,36,25,0.09)", ink: "var(--c-ink-2)" } },
+    destructive: { bg: "#E5484D", hover: "#EE5A5F", press: "#CE3A3F", color: "#fff", elev: "oneDanger", pressElev: "oneDangerPress",
+                 chip: { bg: "#fff", ink: "#E5484D" }, badge: { bg: "rgba(255,255,255,0.26)", ink: "#fff" } },
+    // Yumuşak haplar: %10-12 tonlu zemin, renkli kalın yazı, gölge yok.
+    destructiveSoft: { bg: "rgba(229,72,77,0.10)", hover: "rgba(229,72,77,0.16)", press: "rgba(229,72,77,0.22)", color: "#C2282D", border: "1px solid rgba(229,72,77,0.16)",
+                 chip: { bg: "#E5484D", ink: "#fff" }, badge: { bg: "rgba(229,72,77,0.18)", ink: "#C2282D" } },
+    brandSoft: { bg: "rgba(255,102,0,0.10)", hover: "rgba(255,102,0,0.16)", press: "rgba(255,102,0,0.22)", color: "#B4530A", border: "1px solid rgba(255,102,0,0.16)",
+                 chip: { bg: "#FF6600", ink: "#fff" }, badge: { bg: "rgba(255,102,0,0.18)", ink: "#B4530A" } },
+    successSoft: { bg: "rgba(19,179,100,0.10)", hover: "rgba(19,179,100,0.16)", press: "rgba(19,179,100,0.22)", color: "#0B7D46", border: "1px solid rgba(19,179,100,0.16)",
+                 chip: { bg: "#13B364", ink: "#fff" }, badge: { bg: "rgba(19,179,100,0.18)", ink: "#0B7D46" } },
+    plain:     { bg: "transparent", hover: "rgba(255,255,255,0.10)", press: "rgba(255,255,255,0.16)", color: "rgba(255,255,255,0.72)",
+                 chip: { bg: "rgba(255,255,255,0.2)", ink: "#fff" }, badge: { bg: "rgba(255,255,255,0.18)", ink: "#fff" } },   // koyu/turuncu zemin
+    plainDark: { bg: "transparent", hover: "rgba(255,102,0,0.08)", press: "rgba(255,102,0,0.14)", color: "#B4530A",
+                 chip: { bg: "#FF6600", ink: "#fff" }, badge: { bg: "rgba(255,102,0,0.14)", ink: "#B4530A" } },                 // beyaz zemin
   };
   const p = palettes[variant] || palettes.onColor;
   const busy = !!loading;
   const off = !!disabled || busy;
   const shadow = ELEV[p.elev] || p.elev || "none";
   const pressShadow = ELEV[p.pressElev] || p.pressElev || shadow;
+  const d = chipSizes[size];
 
   return (
     <motion.button
@@ -234,22 +284,28 @@ export function Btn({ text, onClick, disabled, loading, variant = "onColor", siz
         "--btn-shadow": shadow,
         "--btn-shadow-press": pressShadow,
         width: fullWidth ? "100%" : "auto",
-        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9,
         padding: paddings[size], borderRadius: 999,
-        border: p.border || "none", color: p.color,
-        fontFamily: "var(--f-body)", fontWeight: 600, fontSize: fontSizes[size],
+        border: p.border || "1px solid transparent", color: p.color,
+        // One'ın hapları kalın yazar: 600 bu ölçekte cılız kalıyordu.
+        fontFamily: "var(--f-body)", fontWeight: 700, fontSize: fontSizes[size],
+        letterSpacing: -0.1,
         WebkitTapHighlightColor: "transparent", outline: "none", whiteSpace: "nowrap",
         position: "relative",
       }}>
       {busy ? <Spinner size={fontSizes[size]} color={p.color} /> : icon}
       {busy ? "Yükleniyor…" : text}
+      {!busy && count != null && <OneCount value={count} bg={p.badge.bg} ink={p.badge.ink} d={d - 4} />}
+      {!busy && trailing && (
+        <span aria-hidden style={{
+          width: d, height: d, borderRadius: "50%", flexShrink: 0,
+          background: p.chip.bg, color: p.chip.ink,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+        }}>{trailing}</span>
+      )}
     </motion.button>
   );
 }
-
-// ─── İkon buton ──────────────────────────────────────────────────────
-// Aynı durum sistemi; ek olarak `elevated` yüzeyi kabartıyor. Kaydırma
-// aksiyonları bu yüzeyi kullanıyor: siyah zeminde havada duran üç disk.
 export function IconBtn({ onClick, icon, children, tone = "glassDark", shape = "circle", size = 40, title, disabled, loading, elevated }) {
   const tones = {
     glassDark:  { bg: "rgba(0,0,0,0.35)", hover: "rgba(0,0,0,0.5)", press: "rgba(0,0,0,0.62)", blur: true, glass: "dark", elev: "restDark", pressElev: "pressDark" },
@@ -550,8 +606,11 @@ export function GurStyles() {
           box-shadow: 0 0 0 3px rgba(255,102,0,0.65), var(--btn-shadow, 0 0 0 0 transparent);
         }
         /* Devre dışı: soluk ve tepkisiz. İmleç de bunu söylüyor. */
+        /* Devre dışı: gri filtre yazıyı okunmaz bırakıyordu. Hap kendi
+           rengini koruyor, yalnızca geri çekiliyor — turuncu ve koyu
+           zeminlerin ikisinde de okunur kalması için. */
         .gur-btn:disabled, .gur-icon-btn:disabled {
-          opacity: 0.42; cursor: not-allowed; box-shadow: none; filter: grayscale(0.35);
+          opacity: 0.55; cursor: not-allowed; box-shadow: none; filter: none;
         }
         /* Yükleniyor: tıklanamaz ama soluk değil — iş sürüyor, kapalı değil. */
         .gur-btn[data-state="loading"], .gur-icon-btn[data-state="loading"] {

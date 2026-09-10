@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useClaims, decideClaim, useOwnerProfiles, ownerLogo } from '../lib/b2b.js';
 
 import * as api from '../lib/api.js';
@@ -11,30 +11,40 @@ import * as pricing from '../lib/pricing.js';
 // Restoranlar, başvurular, kullanıcılar, Gastro Onaylı, gelir yönetimi
 // ═══════════════════════════════════════════════════════════════
 
+// "One" panosu: açık gri kâğıt üzerinde beyaz kartlar. Panel eskiden koyu
+// bir masaüstü aracıydı; referans tasarım açık, o yüzden jetonlar çevrildi.
+// Anlam aynı kaldığı için 498 kullanım yerine dokunmaya gerek olmadı:
+// bg = sayfa zemini, panel = kart, panel2 = kart içi ikinci yüzey.
+//
+// Yumuşak tonlarda alfa değeri bilerek 0.12: Btn'in soft varyantı hover ve
+// press için bu dizgiyi 0.2 / 0.26 ile değiştiriyor.
 const C = {
-  bg: '#0E1117',
-  panel: '#161B22',
-  panel2: '#1C2230',
-  border: '#242C3A',
-  text: '#E6EDF3',
-  dim: '#8B98A9',
-  faint: '#5A6675',
+  bg: '#EEF0F3',
+  panel: '#FFFFFF',
+  panel2: '#F3F4F7',
+  border: '#E4E7EC',
+  text: '#12141A',          /* saf siyah değil */
+  dim: '#5A6474',
+  faint: '#8B95A5',
   orange: '#FF6600',
   orangeSoft: 'rgba(255,102,0,0.12)',
-  green: '#3FB950',
-  greenSoft: 'rgba(63,185,80,0.12)',
-  red: '#F85149',
-  redSoft: 'rgba(248,81,73,0.12)',
-  yellow: '#D29922',
-  yellowSoft: 'rgba(210,153,34,0.12)',
-  blue: '#58A6FF',
-  blueSoft: 'rgba(88,166,255,0.12)',
+  green: '#13B364',
+  greenSoft: 'rgba(19,179,100,0.12)',
+  red: '#E5484D',
+  redSoft: 'rgba(229,72,77,0.12)',
+  yellow: '#E08700',
+  yellowSoft: 'rgba(224,135,0,0.12)',
+  blue: '#2563EB',
+  blueSoft: 'rgba(37,99,235,0.12)',
 };
 
-const F = "'Poppins', system-ui, sans-serif";
+const F = "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 // Gövde ve sayılar uygulamanın gövde yazı tipiyle aynı: iki panel yan yana
 // açıldığında aynı ürüne ait olduğu okunmalı.
-const FB = "'Outfit', system-ui, sans-serif";
+const FB = "'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+// Sayı sütunları: referans panoda fiyatlar sabit genişlikli. Sistem mono'su
+// kullanılıyor — ek bir font isteği getirmeden rakamlar hizalanıyor.
+const FM = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace";
 
 // ─── Uygulamayla ortak tasarım dili ──────────────────────────────────────
 // GurApp.jsx'teki ELEV/BRAND_GRAD kalıbının koyu zemin karşılığı. Değerler
@@ -42,18 +52,24 @@ const FB = "'Outfit', system-ui, sans-serif";
 // aynı: her yüzeyin bir duruş gölgesi, her butonun bir basılma gölgesi var.
 const BRAND_GRAD = 'linear-gradient(145deg, #FF7A1A 0%, #FF6600 55%, #F04E00 100%)';
 const BRAND_GRAD_HOVER = 'linear-gradient(145deg, #FF8A33 0%, #FF7311 55%, #FF5A05 100%)';
+// One'ın kartları içeriden parlamıyor: geniş yayılan, çok açık tek bir
+// düşüş var. Basılınca gölge kısalıyor — yüzey kâğıda yaklaşıyor.
 const ELEV = {
-  card:      '0 10px 26px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.045)',
-  raised:    '0 14px 34px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07)',
-  brand:     '0 8px 22px rgba(255,102,0,0.30), inset 0 1px 0 rgba(255,255,255,0.28)',
-  pressDark: 'inset 0 3px 10px rgba(0,0,0,0.55)',
-  pressBrand:'inset 0 3px 10px rgba(120,40,0,0.45)',
+  card:      '0 20px 40px -18px rgba(15,18,25,0.10), 0 1px 2px rgba(15,18,25,0.04)',
+  raised:    '0 28px 56px -20px rgba(15,18,25,0.16), 0 2px 6px rgba(15,18,25,0.05)',
+  brand:     '0 6px 16px rgba(255,102,0,0.32)',
+  pressDark: '0 1px 3px rgba(15,18,25,0.14)',
+  pressBrand:'0 2px 5px rgba(255,102,0,0.30)',
 };
 // Köşe yarıçapları uygulamayla aynı ölçekte: kart 18, kontrol 12, pill 999.
-const R = { card: 18, control: 12, pill: 999 };
+const R = { card: 24, control: 14, pill: 999 };
 // Panellerin tamamı tek bir kart tarifinden geçiyor — 20 ayrı yerde
 // tekrarlanan literal, tek yerden değişebilen bir jetona indi.
 const CARD = { background: C.panel, border: `1px solid ${C.border}`, borderRadius: R.card, boxShadow: ELEV.card };
+
+// Referans panoda kart başlıkları kartın İÇİNDE, ayırıcı çizgiyle değil
+// boşlukla ayrılıyor; sayılar mono. İki yardımcı bunu tek yerden verir.
+const NUM = { fontFamily: FM, fontVariantNumeric: 'tabular-nums', letterSpacing: -0.2 };
 
 // ─── Mock veri ───
 const STATS = {
@@ -421,7 +437,7 @@ const icons = {
 // ─── Küçük bileşenler ───
 function Badge({ text, color, soft }) {
   return (
-    <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color, background: soft, padding: '3px 10px', borderRadius: R.pill, display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+    <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color, background: soft, border: `1px solid ${color}22`, padding: '3px 10px', borderRadius: R.pill, display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
       {text}
     </span>
   );
@@ -498,9 +514,9 @@ function ServiceChips({ services, max = 0, size = 'sm' }) {
 // ─── Bölüm başlığı — panel genelinde tek tip ─────────────────────────
 function SectionHead({ title, right }) {
   return (
-    <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-      <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</span>
-      {right && <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{right}</span>}
+    <header style={{ padding: '16px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <span style={{ fontFamily: FB, fontSize: 14.5, fontWeight: 700, color: C.text, letterSpacing: -0.2 }}>{title}</span>
+      {right && <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, ...NUM }}>{right}</span>}
     </header>
   );
 }
@@ -536,10 +552,13 @@ function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size
       color: tone === 'yellow' ? '#241c00' : '#fff', border: '1px solid transparent',
       elev: brand ? ELEV.brand : `0 6px 16px ${toneColor}33`, pressElev: brand ? ELEV.pressBrand : ELEV.pressDark,
     },
-    soft:    { bg: toneSoft, hover: toneSoft.replace('0.12', '0.2'), press: toneSoft.replace('0.12', '0.26'), color: toneColor, border: `1px solid ${toneColor}44` },
-    outline: { bg: C.bg, hover: C.panel2, press: C.panel, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}`, elev: ELEV.card, pressElev: ELEV.pressDark },
-    ghost:   { bg: 'transparent', hover: C.panel2, press: C.bg, color: toneColor, border: `1px solid ${C.border}` },
-    plain:   { bg: 'transparent', hover: C.panel2, press: C.bg, color: toneColor, border: '1px solid transparent' },
+    // Yumuşak hap: %12 tonlu zemin, renkli kalın yazı, gölge yok.
+    soft:    { bg: toneSoft, hover: toneSoft.replace('0.12', '0.2'), press: toneSoft.replace('0.12', '0.26'), color: toneColor, border: `1px solid ${toneColor}29` },
+    // Beyaz hap: One'ın nötr birincil-olmayan düğmesi — kâğıttan bir tık
+    // yukarıda durur, o yüzden zemini panel değil kart rengi.
+    outline: { bg: C.panel, hover: '#FAFBFC', press: C.panel2, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}`, elev: '0 2px 6px rgba(15,18,25,0.07)', pressElev: ELEV.pressDark },
+    ghost:   { bg: 'transparent', hover: C.panel2, press: C.border, color: toneColor, border: `1px solid ${C.border}` },
+    plain:   { bg: 'transparent', hover: C.panel2, press: C.border, color: toneColor, border: '1px solid transparent' },
   };
   const p = variants[variant] || variants.outline;
   const busy = !!loading;
@@ -563,7 +582,7 @@ function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size
         width: fullWidth ? '100%' : 'auto',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
         padding: paddings[size], borderRadius: R.pill,
-        fontFamily: FB, fontSize: fontSizes[size], fontWeight: variant === 'filled' ? 700 : 600,
+        fontFamily: FB, fontSize: fontSizes[size], fontWeight: 700, letterSpacing: -0.1,
         border: p.border, color: p.color,
         whiteSpace: 'nowrap', outline: 'none', position: 'relative',
       }}>
@@ -584,12 +603,13 @@ function NavItem({ item, active, onClick }) {
       className="gur-admin-btn"
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-        padding: '10px 12px', marginBottom: 2, borderRadius: 10, border: 'none',
-        backgroundColor: active ? C.orangeSoft : 'transparent', cursor: 'pointer',
-        color: active ? C.orange : C.dim, fontFamily: FB, fontSize: 13.5, fontWeight: active ? 600 : 500,
+        padding: '10px 12px', marginBottom: 2, borderRadius: 12, border: 'none',
+        backgroundColor: active ? C.panel : 'transparent', cursor: 'pointer',
+        boxShadow: active ? '0 2px 8px rgba(15,18,25,0.08)' : 'none',
+        color: active ? C.text : C.dim, fontFamily: FB, fontSize: 13.5, fontWeight: active ? 700 : 500,
         textAlign: 'left', outline: 'none',
       }}>
-      <Icon path={item.icon} size={18} color={active ? C.orange : C.dim} />
+      <Icon path={item.icon} size={18} color={active ? C.orange : C.faint} />
       <span style={{ flex: 1 }}>{item.label}</span>
       {item.count !== undefined && (
         <span style={{
@@ -611,13 +631,13 @@ function IconBtn({ onClick, icon, size = 38, title, danger, disabled }) {
       transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
       className="gur-admin-btn gur-admin-icon"
       style={{
-        '--btn-bg': C.bg,
+        '--btn-bg': C.panel,
         '--btn-bg-hover': danger ? C.redSoft : C.panel2,
-        '--btn-bg-press': danger ? 'rgba(248,81,73,0.22)' : C.panel,
-        '--btn-shadow': ELEV.card,
+        '--btn-bg-press': danger ? 'rgba(229,72,77,0.22)' : C.border,
+        '--btn-shadow': '0 2px 6px rgba(15,18,25,0.07)',
         '--btn-shadow-press': ELEV.pressDark,
         width: size, height: size, minWidth: size, borderRadius: R.control,
-        borderWidth: 1, borderStyle: 'solid', borderColor: danger ? `${C.red}55` : C.border,
+        borderWidth: 1, borderStyle: 'solid', borderColor: danger ? `${C.red}44` : C.border,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0, position: 'relative', padding: 0, outline: 'none',
       }}>
@@ -678,9 +698,9 @@ function AdminLogin({ onLogin }) {
   };
 
   return (
-    <div lang="tr" style={{ height: '100vh', background: C.bg, fontFamily: FB, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, colorScheme: 'dark' }}>
+    <div lang="tr" style={{ minHeight: '100dvh', background: C.bg, fontFamily: FB, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, colorScheme: 'light' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
+        /* Yazı tipleri index.html'den yükleniyor — buraya @import yazmayın. */
         * { box-sizing: border-box; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .gur-admin-btn:focus-visible { box-shadow: 0 0 0 3px ${C.orange}55 !important; }
@@ -689,7 +709,7 @@ function AdminLogin({ onLogin }) {
 
       <div style={{ width: '100%', maxWidth: 380, animation: 'fadeIn 0.3s ease-out' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 26 }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: '8px 16px', display: 'inline-flex', marginBottom: 14 }}>
+          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 16, padding: '8px 16px', display: 'inline-flex', marginBottom: 14, boxShadow: ELEV.card }}>
             <GurLogo size={26} />
           </div>
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: 0.5 }}>YÖNETİM PANELİ</div>
@@ -799,15 +819,16 @@ export default function GurAdmin() {
   return (
     // lang: Türkçe büyük harf kuralı (i→İ). Artifact kabuğunda <html lang>
     // bize ait değil, o yüzden kökte bildiriyoruz.
-    <div lang="tr" style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: FB, color: C.text, overflow: 'hidden', colorScheme: 'dark' }}>
+    <div lang="tr" style={{ display: 'flex', height: '100dvh', background: C.bg, fontFamily: FB, color: C.text, overflow: 'hidden', colorScheme: 'light' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+        /* Yazı tipleri index.html'den yükleniyor — buraya @import yazmayın:
+           @import stil sayfasında ilk sırada olmak zorunda, aşağıdaki
+           kurallardan sonra gelseydi tarayıcı sessizce atardı. */
         * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #2A3341; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #3A4453; }
+        ::-webkit-scrollbar-thumb { background: #D3D8E0; border-radius: 5px; border: 3px solid transparent; background-clip: content-box; }
+        ::-webkit-scrollbar-thumb:hover { background: #B9C0CC; background-clip: content-box; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes spin { to { transform: rotate(360deg); } }
         .row-hover:hover { background: ${C.panel2} !important; }
@@ -835,9 +856,16 @@ export default function GurAdmin() {
         }
         .gur-admin-btn:focus-visible {
           outline: none;
-          box-shadow: 0 0 0 3px ${C.orange}88, var(--btn-shadow, 0 0 0 0 transparent);
+          box-shadow: 0 0 0 3px ${C.orange}66, var(--btn-shadow, 0 0 0 0 transparent);
         }
-        .gur-admin-btn:disabled { opacity: 0.42; cursor: not-allowed; box-shadow: none; filter: grayscale(0.35); }
+        /* Devre dışı: soluklaştırmak yerine kendi rengi olan gri hap.
+           Turuncu bir hapı %42 saydamlığa düşürmek beyaz yazıyı okunmaz
+           bırakıyordu — referanstaki gri 'Comment' hapı gibi davranıyor. */
+        .gur-admin-btn:disabled {
+          cursor: not-allowed; box-shadow: none; filter: none; opacity: 1;
+          background: #E7E9EE !important; color: #98A0AE !important;
+          border-color: #E0E3E9 !important;
+        }
         .gur-admin-btn[data-state="loading"] { opacity: 0.9; cursor: progress; filter: none; }
 
         /* Apple HIG: dokunma hedefi en az 44×44. İkon butonun görsel boyutu
@@ -851,9 +879,9 @@ export default function GurAdmin() {
       `}</style>
 
       {/* ─── SIDEBAR ─── */}
-      <aside style={{ width: 248, background: C.panel, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <aside style={{ width: 248, background: C.panel2, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <div style={{ padding: '20px 22px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: '6px 12px', display: 'inline-flex' }}>
+          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: '6px 12px', display: 'inline-flex' }}>
             <GurLogo size={22} />
           </div>
           <div>
@@ -907,7 +935,7 @@ export default function GurAdmin() {
 
         {/* Sayfa içeriği */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 28 }}>
-          {page === 'dashboard' && <DashboardPage />}
+          {page === 'dashboard' && <DashboardPage restaurants={restaurants} />}
           {page === 'restaurants' && (openRestaurant
             ? <RestaurantDetailPage r={openRestaurant} onBack={() => setOpenRestaurantId(null)} onGastro={toggleGastro} onSuspend={toggleSuspend} />
             : <RestaurantsWorkspace
@@ -1000,6 +1028,163 @@ export default function GurAdmin() {
 
 // ═══ SAYFALAR ═══
 
+// ─── One'ın bölmeli denetimi ─────────────────────────────────────────────
+// Referans panonun imzası: gri kanal, seçili seçenek beyaz hap olarak
+// yükseliyor. Zaman aralığı ve dönem seçimlerinin tamamı bundan geçiyor.
+function Segmented({ options, value, onChange, label }) {
+  return (
+    <div role="group" aria-label={label} style={{
+      display: 'inline-flex', gap: 3, background: C.panel2,
+      border: `1px solid ${C.border}`, borderRadius: R.pill, padding: 3,
+    }}>
+      {options.map(o => {
+        const on = o.id === value;
+        return (
+          <button
+            key={o.id} type="button" onClick={() => onChange(o.id)}
+            aria-pressed={on} className="gur-admin-btn"
+            style={{
+              border: on ? `1px solid ${C.border}` : '1px solid transparent',
+              borderRadius: R.pill, padding: '5px 12px',
+              background: on ? C.panel : 'transparent',
+              boxShadow: on ? '0 1px 3px rgba(15,18,25,0.10)' : 'none',
+              color: on ? C.text : C.dim,
+              fontFamily: FB, fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap',
+              outline: 'none',
+            }}>{o.label}</button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Sparkline ───────────────────────────────────────────────────────────
+// Tablo satırındaki 24 saatlik eğilim. Tek seri olduğu için gösterge yok;
+// renk tek başına bilgi taşımasın diye yanındaki sütun yüzdeyi ▲/▼ ile
+// yazıyor — sparkline onu tekrar ediyor, tek kaynağı değil.
+function Sparkline({ points, up, w = 78, h = 26 }) {
+  const min = Math.min(...points), max = Math.max(...points);
+  const span = max - min || 1;
+  const d = points.map((v, i) => {
+    const x = (i / (points.length - 1)) * (w - 2) + 1;
+    const y = h - 3 - ((v - min) / span) * (h - 6);
+    return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(' ');
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden focusable="false" style={{ display: 'block' }}>
+      <path d={d} fill="none" stroke={up ? C.green : C.red} strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ─── Tek serili çizgi grafik ─────────────────────────────────────────────
+// Tek seri: gösterge kutusu yok, başlık seriyi zaten adlandırıyor. Her
+// noktaya sayı yazılmıyor — yalnızca tepe noktası etiketli, gerisi
+// imleçle geliyor. Izgara ve eksen geri planda: veri önde.
+function TrendChart({ data, height = 200, format }) {
+  const wrap = useRef(null);
+  const [w, setW] = useState(560);
+  const [hover, setHover] = useState(null);
+
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(240, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // padX uç etiketin yarısını içeride tutar: text-anchor=middle olduğu için
+  // 6px payla "Pzt" ve "Paz" kartın dışına taşıyordu.
+  const padT = 18, padB = 26, padX = 26;
+  const values = data.map(d => d.v);
+  const min = Math.min(...values), max = Math.max(...values);
+  const span = max - min || 1;
+  const plotH = height - padT - padB;
+  const xAt = i => padX + (i / (data.length - 1)) * (w - padX * 2);
+  const yAt = v => padT + plotH - ((v - min) / span) * plotH;
+
+  const line = data.map((d, i) => `${i ? 'L' : 'M'}${xAt(i).toFixed(1)} ${yAt(d.v).toFixed(1)}`).join(' ');
+  const area = `${line} L${xAt(data.length - 1).toFixed(1)} ${padT + plotH} L${xAt(0).toFixed(1)} ${padT + plotH} Z`;
+  const peak = values.indexOf(max);
+  const active = hover == null ? null : data[hover];
+
+  const pick = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const rel = (e.clientX - r.left - padX) / (r.width - padX * 2);
+    setHover(Math.max(0, Math.min(data.length - 1, Math.round(rel * (data.length - 1)))));
+  };
+
+  return (
+    <div ref={wrap} style={{ position: 'relative', width: '100%' }}>
+      <svg
+        width={w} height={height} viewBox={`0 0 ${w} ${height}`}
+        role="img" aria-label={`Günlere göre eğilim. En yüksek ${data[peak].d}: ${format(max)}.`}
+        onMouseMove={pick} onMouseLeave={() => setHover(null)}
+        style={{ display: 'block', touchAction: 'none' }}>
+        <defs>
+          <linearGradient id="gur-trend-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.orange} stopOpacity="0.16" />
+            <stop offset="100%" stopColor={C.orange} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Izgara: geri planda, dört yatay çizgi */}
+        {[0, 0.25, 0.5, 0.75, 1].map(t => (
+          <line key={t} x1={padX} x2={w - padX} y1={padT + plotH * t} y2={padT + plotH * t}
+            stroke={C.border} strokeWidth="1" />
+        ))}
+
+        {/* İmlecin durduğu gün: yumuşak bir sütun, kesikli tarama değil */}
+        {active && (
+          <rect x={xAt(hover) - (w / data.length) / 2} y={padT - 6}
+            width={w / data.length} height={plotH + 12}
+            fill={C.orange} opacity="0.07" rx="8" />
+        )}
+
+        <path d={area} fill="url(#gur-trend-fill)" />
+        <path d={line} fill="none" stroke={C.orange} strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Tepe noktası her zaman etiketli; gerisi imleçle */}
+        <circle cx={xAt(peak)} cy={yAt(max)} r="4" fill={C.panel} stroke={C.orange} strokeWidth="2" />
+        {active && (
+          <>
+            <line x1={xAt(hover)} x2={xAt(hover)} y1={padT - 6} y2={padT + plotH}
+              stroke={C.orange} strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+            <circle cx={xAt(hover)} cy={yAt(active.v)} r="5.5" fill={C.orange} stroke={C.panel} strokeWidth="2" />
+          </>
+        )}
+
+        {data.map((d, i) => (
+          <text key={d.d} x={xAt(i)} y={height - 8}
+            textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}
+            style={{ fontFamily: FB, fontSize: 11, fontWeight: hover === i ? 700 : 500 }}
+            dx={i === 0 ? -padX + 2 : i === data.length - 1 ? padX - 2 : 0}
+            fill={hover === i ? C.text : C.faint}>{d.d}</text>
+        ))}
+      </svg>
+
+      {/* İpucu: referanstaki koyu kutu. Sayı mono, etiket metin jetonunda. */}
+      {active && (
+        <div role="status" style={{
+          position: 'absolute', left: Math.min(Math.max(xAt(hover) - 62, 0), Math.max(w - 124, 0)),
+          top: 0, width: 124, pointerEvents: 'none',
+          background: '#17130F', color: '#fff', borderRadius: 12, padding: '9px 11px',
+          boxShadow: '0 10px 24px rgba(15,18,25,0.28)',
+        }}>
+          <div style={{ fontFamily: FB, fontSize: 10.5, color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>{active.d}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.orange, flexShrink: 0 }} />
+            <span style={{ fontSize: 13.5, fontWeight: 700, ...NUM }}>{format(active.v)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KpiCard({ label, value, delta, deltaUp, deltaNeutral, icon, accent }) {
   return (
     <div style={{ ...CARD, padding: 20 }}>
@@ -1010,24 +1195,107 @@ function KpiCard({ label, value, delta, deltaUp, deltaNeutral, icon, accent }) {
         {delta && (
           // Nötr delta: artış/azalış değil, bilgi (örn. "açılmamış potansiyel").
           // Ok ve renk kodu kullanılmaz ki yanlış okunmasın.
-          <span style={{ fontSize: 12, fontWeight: 600, color: deltaNeutral ? C.faint : (deltaUp ? C.green : C.red), display: 'flex', alignItems: 'center', gap: 3 }}>
-            {deltaNeutral ? '' : (deltaUp ? '↑' : '↓')} {delta}
+          <span style={{
+            fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3,
+            padding: '4px 9px', borderRadius: R.pill,
+            color: deltaNeutral ? C.dim : (deltaUp ? C.green : C.red),
+            background: deltaNeutral ? C.panel2 : (deltaUp ? C.greenSoft : C.redSoft),
+          }}>
+            {deltaNeutral ? '' : (deltaUp ? '▲' : '▼')} {delta}
           </span>
         )}
       </div>
-      <div style={{ fontSize: 26, fontWeight: 800, marginBottom: 2 }}>{value}</div>
+      <div style={{ fontSize: 27, fontWeight: 700, marginBottom: 3, ...NUM }}>{value}</div>
       <div style={{ fontSize: 12.5, color: C.dim }}>{label}</div>
     </div>
   );
 }
 
-function DashboardPage() {
-  const maxSwipe = Math.max(...SWIPE_TREND.map(d => d.v));
+// ─── Eğilim aralıkları ───────────────────────────────────────────────────
+// Aralık düğmeleri gerçekten veri değiştiriyor: seçili aralığın kendi
+// serisi ve kendi toplamı var, yalnızca etiket değişmiyor.
+const TREND_RANGES = {
+  '1g': { label: '1G', unit: 'saat', data: [
+    { d: '00', v: 4200 }, { d: '04', v: 1830 }, { d: '08', v: 6740 }, { d: '12', v: 11260 },
+    { d: '16', v: 9480 }, { d: '20', v: 14930 }, { d: '23', v: 8710 }] },
+  '7g': { label: '7G', unit: 'gün', data: SWIPE_TREND },
+  '1a': { label: '1A', unit: 'hafta', data: [
+    { d: '1. hf', v: 842000 }, { d: '2. hf', v: 791000 }, { d: '3. hf', v: 918000 },
+    { d: '4. hf', v: 1052000 }] },
+  '1y': { label: '1Y', unit: 'ay', data: [
+    { d: 'Oca', v: 412000 }, { d: 'Şub', v: 468000 }, { d: 'Mar', v: 523000 },
+    { d: 'Nis', v: 611000 }, { d: 'May', v: 702000 }, { d: 'Haz', v: 684000 },
+    { d: 'Tem', v: 759000 }, { d: 'Ağu', v: 838000 }, { d: 'Eyl', v: 892000 }] },
+};
+const RANGE_OPTS = Object.entries(TREND_RANGES).map(([id, r]) => ({ id, label: r.label }));
+
+// Kaydırma sayısı kısaltması — grafikte ve ipucunda aynı biçim.
+function swipes(n) {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return String(Math.round(n));
+}
+
+// Bir mekânın panodaki hareket satırı: id'den deterministik üretilir, o
+// yüzden sayfalar arasında gezerken sayılar zıplamıyor.
+function movement(r) {
+  const rnd = seeded(r.id * 7 + 3);
+  const base = 2400 + Math.round(rnd() * 21000);
+  const trend = Array.from({ length: 14 }, () => rnd());
+  const ch24 = (rnd() * 74 - 29);
+  const ch7 = (rnd() * 68 - 24);
+  return {
+    swipes: base,
+    favs: Math.round(base * (0.06 + rnd() * 0.11)),
+    ch24, ch7,
+    points: trend.map((t, i) => base * (0.72 + t * 0.5 + (ch24 > 0 ? i * 0.012 : -i * 0.008))),
+    revenue: storeMonthly(r),
+  };
+}
+
+function ChangeCell({ value }) {
+  const up = value >= 0;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      color: up ? C.green : C.red, fontSize: 12.5, fontWeight: 700, ...NUM,
+    }}>
+      <span aria-hidden>{up ? '↗' : '↘'}</span>
+      {up ? '+' : ''}{value.toFixed(1)}%
+    </span>
+  );
+}
+
+function DashboardPage({ restaurants = [] }) {
+  const [range, setRange] = useState('7g');
+  const [period, setPeriod] = useState('month');
+  const [tableRange, setTableRange] = useState('7g');
+  const [q, setQ] = useState('');
+
+  const series = TREND_RANGES[range];
+  const total = series.data.reduce((a, d) => a + d.v, 0);
+  const first = series.data[0].v, last = series.data[series.data.length - 1].v;
+  const delta = ((last - first) / (first || 1)) * 100;
+
   const totalCat = CAT_DIST.reduce((a, c) => a + c.count, 0);
+  const leaders = CAT_DIST.slice(0, 3);
+  const leaderMax = Math.max(...leaders.map(c => c.count));
+
+  const rows = useMemo(() => {
+    const needle = q.trim().toLocaleLowerCase('tr');
+    return restaurants
+      // Satırda ad, kategori ve ilçe yazıyor — üçü de aranabilmeli.
+      .filter(r => !needle || [r.name, r.cat, r.district]
+        .some(v => v && v.toLocaleLowerCase('tr').includes(needle)))
+      .map(r => ({ r, m: movement(r) }))
+      .sort((a, b) => b.m.swipes - a.m.swipes)
+      .slice(0, 7);
+  }, [restaurants, q]);
+
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
-      {/* KPI kartları */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+      {/* Dört ölçü — panonun tepesindeki özet */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, marginBottom: 16 }}>
         <KpiCard label="Toplam Restoran" value={STATS.totalRestaurants} delta="8%" deltaUp icon={icons.store} accent={{ color: C.orange, soft: C.orangeSoft }} />
         <KpiCard label="Günlük Aktif Kullanıcı" value={STATS.dailyActive.toLocaleString('tr')} delta="12%" deltaUp icon={icons.users} accent={{ color: C.blue, soft: C.blueSoft }} />
         <KpiCard label="Bekleyen Başvuru" value={STATS.pendingApps} icon={icons.inbox} accent={{ color: C.yellow, soft: C.yellowSoft }} />
@@ -1035,61 +1303,142 @@ function DashboardPage() {
         <KpiCard label="Aylık Ciro" value={money(PLATFORM_TOTAL)} delta="18%" deltaUp icon={icons.money} accent={{ color: C.green, soft: C.greenSoft }} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16, marginBottom: 20 }}>
-        {/* Kaydırma trendi */}
-        <div style={{ ...CARD, padding: 22 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Haftalık Kaydırma Aktivitesi</h3>
-              <p style={{ margin: '2px 0 0', fontSize: 12, color: C.dim }}>Toplam {(STATS.totalSwipes / 1000).toFixed(0)}K kaydırma</p>
-            </div>
-            <Badge text="↑ 15% bu hafta" color={C.green} soft={C.greenSoft} />
+      {/* Referans düzen: solda dar liderler kartı, sağda geniş grafik */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) minmax(360px, 1.9fr)', gap: 16, marginBottom: 16 }}>
+
+        {/* Kategori liderleri */}
+        <section style={{ ...CARD, padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 18 }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, letterSpacing: -0.2 }}>Kategori liderleri</h3>
+            <Segmented label="Dönem" value={period} onChange={setPeriod}
+              options={[{ id: 'week', label: 'Hafta' }, { id: 'month', label: 'Ay' }]} />
           </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, height: 180 }}>
-            {SWIPE_TREND.map((d, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                <div style={{ fontSize: 10.5, color: C.faint, fontWeight: 600 }}>{(d.v / 1000).toFixed(0)}K</div>
-                <div style={{ width: '100%', height: `${(d.v / maxSwipe) * 130}px`, background: `linear-gradient(180deg, ${C.orange}, ${C.orange}66)`, borderRadius: '6px 6px 0 0', transition: 'height 0.4s' }} />
-                <div style={{ fontSize: 11, color: C.dim }}>{d.d}</div>
+
+          {/* İlk üç: azalan doygunlukta şeritler. Yüzde şeridin üstünde
+              yazıyor — renk tek başına sıralamayı taşımıyor. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 8 }}>
+            {leaders.map((c, i) => (
+              <div key={c.name} style={{ borderLeft: i ? `1px solid ${C.border}` : 'none', paddingLeft: i ? 10 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 7, color: C.green, fontSize: 11.5, fontWeight: 700, ...NUM }}>
+                  <span aria-hidden>▲</span>{(period === 'week' ? 1.3 + i * 0.9 : 3.1 - i * 0.9).toFixed(1)}%
+                </div>
+                <div style={{ height: 14, borderRadius: 4, background: C.orange, opacity: 1 - i * 0.32, width: `${(c.count / leaderMax) * 100}%`, minWidth: 12 }} />
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Kategori dağılımı */}
-        <div style={{ ...CARD, padding: 22 }}>
-          <h3 style={{ margin: '0 0 20px', fontSize: 15, fontWeight: 700 }}>Kategori Dağılımı</h3>
-          {CAT_DIST.map((c, i) => (
-            <div key={i} style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 12.5, color: C.text }}>{c.name}</span>
-                <span style={{ fontSize: 12.5, color: C.dim, fontWeight: 600 }}>{c.count}</span>
-              </div>
-              <div style={{ height: 6, background: C.bg, borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: `${(c.count / totalCat) * 100}%`, height: '100%', background: c.color, borderRadius: 3 }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Alt satır: hızlı özet */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        {[
-          { label: 'Aktif Restoran', value: STATS.activeRestaurants, icon: icons.store, color: C.green },
-          { label: 'Gastro Onaylı', value: STATS.gastroApproved, icon: icons.star, color: C.orange },
-          { label: 'Toplam Kullanıcı', value: STATS.totalUsers.toLocaleString('tr'), icon: icons.users, color: C.blue },
-          { label: 'Toplam Kaydırma', value: `${(STATS.totalSwipes / 1000).toFixed(0)}K`, icon: icons.trend, color: C.yellow },
-        ].map((s, i) => (
-          <div key={i} style={{ ...CARD, padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <Icon path={s.icon} size={22} color={s.color} />
-            <div>
-              <div style={{ fontSize: 19, fontWeight: 800 }}>{s.value}</div>
-              <div style={{ fontSize: 11.5, color: C.dim }}>{s.label}</div>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: C.faint, marginBottom: 16 }}>
+            <span>{period === 'week' ? '1 Eyl' : '1 Haz'}</span><span>{period === 'week' ? '7 Eyl' : '30 Eyl'}</span>
           </div>
-        ))}
+
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {CAT_DIST.map((c, i) => (
+              <li key={c.name} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 0', borderTop: i ? `1px solid ${C.border}` : 'none',
+              }}>
+                <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: 12.5, color: C.text, fontWeight: 600 }}>{c.name}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, ...NUM }}>{c.count}</span>
+                <span style={{ fontSize: 11, color: C.faint, ...NUM, minWidth: 40, textAlign: 'right' }}>
+                  %{((c.count / totalCat) * 100).toFixed(1)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* Kaydırma hacmi */}
+        <section style={{ ...CARD, padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 12.5, color: C.dim }}>Kaydırma hacmi</p>
+              <div style={{ fontSize: 32, fontWeight: 700, margin: '4px 0 6px', ...NUM }}>{swipes(total)}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <ChangeCell value={delta} />
+                <span style={{ fontSize: 11.5, color: C.faint }}>ilk {series.unit}e göre</span>
+              </div>
+            </div>
+            <Segmented label="Zaman aralığı" value={range} onChange={setRange} options={RANGE_OPTS} />
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <TrendChart key={range} data={series.data} format={swipes} />
+          </div>
+        </section>
       </div>
+
+      {/* Mekân hareketi — referanstaki işlem tablosunun karşılığı */}
+      <section style={{ ...CARD, overflow: 'hidden' }}>
+        <header style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px', flexWrap: 'wrap' }}>
+          <div style={{ width: 38, height: 38, borderRadius: 12, background: C.orangeSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon path={icons.trend} size={19} color={C.orange} />
+          </div>
+          <div style={{ flex: 1, minWidth: 170 }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, letterSpacing: -0.2 }}>Mekân hareketi</h3>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: C.dim }}>En çok kaydırılan mekanlar ve eğilimleri</p>
+          </div>
+          <div style={{ position: 'relative' }}>
+            <input
+              value={q} onChange={e => setQ(e.target.value)}
+              placeholder="Mekân ara" aria-label="Mekân ara"
+              style={{
+                width: 190, background: C.panel2, border: `1px solid ${C.border}`,
+                borderRadius: R.pill, padding: '8px 14px 8px 34px',
+                fontSize: 12.5, fontFamily: FB, color: C.text, outline: 'none',
+              }}
+              onFocus={e => e.currentTarget.style.borderColor = C.orange}
+              onBlur={e => e.currentTarget.style.borderColor = C.border} />
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', display: 'flex' }}>
+              <Icon path={icons.search} size={14} color={C.faint} />
+            </span>
+          </div>
+          <Segmented label="Tablo aralığı" value={tableRange} onChange={setTableRange} options={RANGE_OPTS} />
+        </header>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+            <thead>
+              <tr style={{ background: C.panel2, borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }}>
+                {['Mekân', 'Kaydırma', '24s değişim', '7g değişim', 'Favori', '24s eğilim', 'Aylık ciro'].map((h, i) => (
+                  <th key={h} style={{
+                    textAlign: i === 0 ? 'left' : 'right', padding: '12px 18px',
+                    fontSize: 11.5, fontWeight: 700, color: C.dim, whiteSpace: 'nowrap',
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ r, m }) => (
+                <tr key={r.id} className="row-hover" style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: '12px 18px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                      <StoreAvatar restaurant={r} size={34} radius={11} font={13} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>{r.name}</div>
+                        <div style={{ fontSize: 11, color: C.faint, whiteSpace: 'nowrap' }}>{r.cat} · {r.district}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 18px', textAlign: 'right', fontSize: 13, fontWeight: 700, ...NUM }}>{swipes(m.swipes)}</td>
+                  <td style={{ padding: '12px 18px', textAlign: 'right' }}><ChangeCell value={m.ch24} /></td>
+                  <td style={{ padding: '12px 18px', textAlign: 'right' }}><ChangeCell value={m.ch7} /></td>
+                  <td style={{ padding: '12px 18px', textAlign: 'right', fontSize: 12.5, color: C.dim, ...NUM }}>{m.favs.toLocaleString('tr')}</td>
+                  <td style={{ padding: '12px 18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <Sparkline points={m.points} up={m.ch24 >= 0} />
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 18px', textAlign: 'right', fontSize: 13, fontWeight: 700, ...NUM }}>{m.revenue ? money(m.revenue) : <span style={{ color: C.faint, fontWeight: 500 }}>—</span>}</td>
+                </tr>
+              ))}
+              {!rows.length && (
+                <tr><td colSpan={7} style={{ padding: '36px 18px', textAlign: 'center', color: C.faint, fontSize: 13 }}>
+                  “{q}” için mekân bulunamadı.
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
@@ -1099,9 +1448,9 @@ function TableShell({ headers, children }) {
     <div style={{ ...CARD, overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+          <tr style={{ background: C.panel2, borderBottom: `1px solid ${C.border}` }}>
             {headers.map((h, i) => (
-              <th key={i} style={{ textAlign: h.right ? 'right' : 'left', padding: '13px 18px', fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{h.label || h}</th>
+              <th key={i} style={{ textAlign: h.right ? 'right' : 'left', padding: '12px 18px', fontSize: 11.5, fontWeight: 700, color: C.dim, whiteSpace: 'nowrap' }}>{h.label || h}</th>
             ))}
           </tr>
         </thead>
@@ -1281,14 +1630,14 @@ const COHORTS = [
 // Retention hücresi: renk yoğunluğu oranla artar, sayı okunaklı kalır.
 function HeatCell({ value }) {
   if (value == null) {
-    return <span style={{ fontSize: 12, color: C.border }}>—</span>;
+    return <span style={{ fontSize: 12, color: C.faint }} title="Bu kohort için veri yok">—</span>;
   }
   const alpha = Math.min(0.42, Math.max(0.05, value / 140));
   return (
     <span style={{
       display: 'inline-block', minWidth: 52, textAlign: 'center',
       padding: '4px 8px', borderRadius: 6,
-      background: `rgba(34,197,94,${alpha})`,
+      background: `rgba(19,179,100,${alpha})`,
       fontSize: 12, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums',
     }}>%{value.toFixed(1)}</span>
   );
@@ -1425,7 +1774,7 @@ function GrowthPage() {
 
 function TabBar({ tabs, active, onChange }) {
   return (
-    <div style={{ display: 'flex', gap: 4, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 11, padding: 4, marginBottom: 16, width: 'fit-content', maxWidth: '100%', overflowX: 'auto' }}>
+    <div style={{ display: 'flex', gap: 4, background: C.panel2, border: `1px solid ${C.border}`, borderRadius: R.pill, padding: 4, marginBottom: 16, width: 'fit-content', maxWidth: '100%', overflowX: 'auto' }}>
       {tabs.map(t => {
         const on = t.id === active;
         return (
@@ -1434,9 +1783,11 @@ function TabBar({ tabs, active, onChange }) {
             data-tab={t.id} aria-pressed={on}
             whileTap={{ scale: 0.98 }} transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
             style={{
-              border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 14px',
-              background: on ? C.panel2 : 'transparent', color: on ? C.text : C.dim,
-              fontFamily: FB, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap',
+              border: on ? `1px solid ${C.border}` : '1px solid transparent',
+              cursor: 'pointer', borderRadius: R.pill, padding: '7px 15px',
+              background: on ? C.panel : 'transparent', color: on ? C.text : C.dim,
+              boxShadow: on ? '0 1px 3px rgba(15,18,25,0.10)' : 'none',
+              fontFamily: FB, fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap',
               display: 'inline-flex', alignItems: 'center', gap: 7, outline: 'none',
             }}>
             {t.label}
@@ -2535,7 +2886,10 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
       {/* ─── 1. DASHBOARD — platformun bu hizmetlerden toplam cirosu ─── */}
       <section style={{
         ...CARD, boxShadow: ELEV.raised, padding: '22px 24px', marginBottom: 16,
-        background: `linear-gradient(135deg, ${C.panel} 0%, #1B1710 62%, #241A10 100%)`,
+        // Koyu panelde açık metin varsayıyordu; panel açık temaya geçince
+        // metin jetonları koyulaştı ve şerit okunmaz oldu. Artık beyaz kart
+        // üstünde çok hafif sıcak bir yıkama — One'ın kart dili.
+        background: `linear-gradient(135deg, ${C.panel} 0%, #FFF6EE 100%)`,
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 28, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 240 }}>
@@ -2561,7 +2915,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
               { label: 'Abonelik ve içerik', value: subRev, tone: C.orange, note: 'İşletme planları, Gastro paketi' },
               { label: 'Performans', value: txRev, tone: C.green, note: 'Anlık fırsat, İkinci Şans' },
             ].map(b => (
-              <div key={b.label} style={{ background: 'rgba(255,255,255,0.035)', border: `1px solid ${C.border}`, borderRadius: R.control, padding: '13px 15px' }}>
+              <div key={b.label} style={{ background: C.panel2, border: `1px solid ${C.border}`, borderRadius: R.control, padding: '13px 15px' }}>
                 <div style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: b.tone, marginBottom: 5 }}>{b.label}</div>
                 <div style={{ fontSize: 19, fontWeight: 800, fontVariantNumeric: 'tabular-nums', marginBottom: 7 }}>{money(b.value)}</div>
                 <div style={{ height: 5, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
@@ -2664,7 +3018,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
 
         {/* Toplamı kapatan satır: listede adı geçmeyen işletmeler */}
         {!kind && otherCount > 0 && (
-          <div style={{ padding: '13px 18px', display: 'flex', alignItems: 'center', gap: 14, background: 'rgba(255,255,255,0.015)' }}>
+          <div style={{ padding: '13px 18px', display: 'flex', alignItems: 'center', gap: 14, background: C.panel2 }}>
             <div style={{ width: 34, height: 34, borderRadius: 10, background: C.panel2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Icon path={icons.store} size={15} color={C.faint} />
             </div>
