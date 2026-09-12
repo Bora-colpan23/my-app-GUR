@@ -118,8 +118,8 @@ function OwnerServices({ restaurant }) {
   return (
     <div style={{ background: "rgba(255,102,0,0.07)", border: "1px solid rgba(255,102,0,0.2)", borderRadius: 20, padding: "14px 16px", marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: 0 }}>Aldığın hizmetler</p>
-        <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, letterSpacing: 0.3, color: plan === "Ücretsiz" ? "rgba(255,255,255,0.5)" : "var(--c-warn)", background: "rgba(255,255,255,0.07)", borderRadius: 6, padding: "3px 9px" }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#fff", margin: 0 }}>Aldığın hizmetler</p>
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, letterSpacing: 0.3, color: plan === "Ücretsiz" ? "rgba(255,255,255,0.5)" : "var(--c-warn)", background: "rgba(255,255,255,0.07)", borderRadius: 6, padding: "3px 9px" }}>
           {plan.toLocaleUpperCase("tr")} PLAN
         </span>
       </div>
@@ -137,7 +137,7 @@ function OwnerServices({ restaurant }) {
               <span style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 600, color: "#fff" }}>
                 {c.label} kartı
               </span>
-              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, color: "rgba(255,255,255,0.45)", letterSpacing: 0.3 }}>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", letterSpacing: 0.3 }}>
                 {String(c.pricing || "").toLocaleUpperCase("tr")}
               </span>
             </div>
@@ -194,7 +194,7 @@ function OwnerInfoTab({ restaurant }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
               <label style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>{f.label}</label>
               <span style={{
-                fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4,
+                fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 700, letterSpacing: 0.4,
                 padding: "2px 8px", borderRadius: 6,
                 color: fromOwner ? "var(--c-ok-light)" : "rgba(255,255,255,0.45)",
                 background: fromOwner ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.07)",
@@ -286,7 +286,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
         <div style={{ padding: "44px 20px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
             <BackBtn onClick={onBack} variant="light" />
-            <h2 style={{ fontFamily: "var(--f-body)", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "#1C1917", margin: 0 }}>İşletmemi sahiplen</h2>
+            <h2 style={{ fontFamily: "var(--f-body)", fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", color: "#1C1917", margin: 0 }}>İşletmemi sahiplen</h2>
           </div>
           <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#8A7A68", lineHeight: 1.55, margin: "0 0 18px" }}>
             İşletmen büyük ihtimalle GUR'da zaten var: harita servislerinden otomatik olarak
@@ -444,7 +444,7 @@ function StepHeader({ step, title, subtitle, onBack }) {
         <div style={{ width: 38 }} /> {/* spacer for centering */}
       </div>
       <StepProgress current={step} />
-      <h2 style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 800, color: "#2D2419", margin: "0 0 6px", textAlign: "center" }}>{title}</h2>
+      <h2 style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 700, color: "#2D2419", margin: "0 0 6px", textAlign: "center" }}>{title}</h2>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#8A7A68", textAlign: "center", marginBottom: 24 }}>{subtitle}</p>
     </>
   );
@@ -624,7 +624,7 @@ function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
           </div>
 
           <h2 style={{
-            fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "#2D2419",
+            fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em", color: "#2D2419",
             textAlign: "center", margin: "0 0 10px",
             animation: "fadeInUp 0.5s ease-out 0.1s both",
           }}>Başvurunuz Alındı!</h2>
@@ -763,7 +763,7 @@ function GrowthSection({ title, locked, children }) {
   return (
     <div style={{ marginBottom: 22, opacity: locked ? 0.55 : 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", margin: 0, textTransform: "uppercase", letterSpacing: 0.6 }}>{title}</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", margin: 0, textTransform: "uppercase", letterSpacing: 0.6 }}>{title}</p>
       </div>
       {children}
     </div>
@@ -787,7 +787,7 @@ function GrowthCard({ title, price, desc, active, locked, onBuy }) {
       borderRadius: 18, padding: "16px 18px", marginBottom: 12, opacity: locked ? 0.5 : 1,
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0 }}>{title}</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{title}</p>
         <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "#FF9A4D", flexShrink: 0 }}>{price}</span>
       </div>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>{desc}</p>
@@ -993,7 +993,7 @@ function TableRequests({ restaurant }) {
           <Icon n="clock" size={17} color="#FF9A4D" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 2px" }}>
             {x.day} · {x.time} · {x.people} kişi
           </p>
           <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0 }}>
@@ -1002,7 +1002,7 @@ function TableRequests({ restaurant }) {
         </div>
         {!actionable && (
           <span style={{
-            fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, borderRadius: 999, padding: "4px 11px",
+            fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "4px 11px",
             color: x.status === "confirmed" ? "var(--c-ok-light)" : "rgba(255,255,255,0.4)",
             background: x.status === "confirmed" ? "rgba(76,175,80,0.14)" : "rgba(255,255,255,0.06)",
           }}>{x.status === "confirmed" ? "Onaylandı" : "Reddedildi"}</span>
@@ -1019,7 +1019,7 @@ function TableRequests({ restaurant }) {
 
   return (
     <div>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Bekleyen talepler</p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>Bekleyen talepler</p>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 12px", lineHeight: 1.5 }}>
         Uygulamadan gelen masa talepleri. Onaylayana kadar misafire "iletildi"
         görünür — masayı veren taraf sizsiniz.
@@ -1033,7 +1033,7 @@ function TableRequests({ restaurant }) {
 
       {past.length > 0 && (
         <>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "18px 0 10px" }}>Geçmiş</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#fff", margin: "18px 0 10px" }}>Geçmiş</p>
           {past.map(x => row(x, false))}
         </>
       )}
@@ -1066,14 +1066,14 @@ function PriceOffers({ restaurant }) {
             <Icon n="sparkle" size={17} color="#FF9A4D" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>{o.streamName}</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 2px" }}>{o.streamName}</p>
             <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0 }}>
               GUR'dan fiyat teklifi
             </p>
           </div>
           {!actionable && (
             <span style={{
-              fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, borderRadius: 999, padding: "4px 11px",
+              fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "4px 11px",
               color: o.status === "accepted" ? "var(--c-ok-light)" : "rgba(255,255,255,0.4)",
               background: o.status === "accepted" ? "rgba(76,175,80,0.14)" : "rgba(255,255,255,0.06)",
             }}>{o.status === "accepted" ? "Kabul edildi" : "Reddedildi"}</span>
@@ -1089,10 +1089,10 @@ function PriceOffers({ restaurant }) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.4" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="13 6 19 12 13 18" /></svg>
           <div>
             <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Teklif</p>
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 800, color: cheaper ? "var(--c-ok-light)" : "var(--c-warn)", margin: 0 }}>{fmt(o.offerMonthly)}<span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}> /ay</span></p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 700, color: cheaper ? "var(--c-ok-light)" : "var(--c-warn)", margin: 0 }}>{fmt(o.offerMonthly)}<span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}> /ay</span></p>
           </div>
           {diff !== null && diff !== 0 && (
-            <span style={{ marginLeft: "auto", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: cheaper ? "var(--c-ok-light)" : "var(--c-warn)" }}>
+            <span style={{ marginLeft: "auto", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: cheaper ? "var(--c-ok-light)" : "var(--c-warn)" }}>
               {diff > 0 ? "+" : ""}{diff}%
             </span>
           )}
@@ -1114,7 +1114,7 @@ function PriceOffers({ restaurant }) {
 
   return (
     <div>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Size gelen teklifler</p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>Size gelen teklifler</p>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 12px", lineHeight: 1.5 }}>
         Kullandığınız hizmetlerin fiyatına dair GUR'dan gelen teklifler.
         Kabul etmediğiniz sürece mevcut fiyatınız değişmez.
@@ -1128,7 +1128,7 @@ function PriceOffers({ restaurant }) {
 
       {past.length > 0 && (
         <>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "18px 0 10px" }}>Geçmiş</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#fff", margin: "18px 0 10px" }}>Geçmiş</p>
           {past.map(o => card(o, false))}
         </>
       )}
@@ -1210,7 +1210,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
             <LogoUpload restaurant={ownerRestaurant} />
             <div>
-              <h2 style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>{ownerRestaurant?.name || "Restoranınız"}</h2>
+              <h2 style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 3px" }}>{ownerRestaurant?.name || "Restoranınız"}</h2>
               <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.7)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{ownerRestaurant?.addr || "Kadıköy, İstanbul"} • Aktif</p>
             </div>
           </div>
@@ -1220,14 +1220,14 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
             <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)" }}>
 <Icon n="star" color="#fff" size={18} />
               <div>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.avgRating}</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.avgRating}</p>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Ortalama Puan</p>
               </div>
             </div>
             <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)" }}>
 <Icon n="chat" color="#fff" size={18} />
               <div>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.totalReviews}</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.totalReviews}</p>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Toplam Yorum</p>
               </div>
             </div>
@@ -1236,7 +1236,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
             <div style={{ background: "#fff", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, boxShadow: "var(--sh-1)" }}>
 <Icon n="flame" color="#FF6600" size={18} />
               <div>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-brand-ink)", margin: 0, lineHeight: 1 }}>%{stats.favRate}</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-brand-ink)", margin: 0, lineHeight: 1 }}>%{stats.favRate}</p>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,102,0,0.75)", margin: 0 }}>Beğeni Oranı</p>
               </div>
             </div>
@@ -1268,7 +1268,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                   {tab.label}
                   {/* Bekleyen talep sayısı: işletmenin ilk bakacağı yer */}
                   {tab.badge > 0 && (
-                    <span style={{ minWidth: 15, height: 15, borderRadius: 8, background: "var(--c-bad)", color: "#fff", fontSize: 9, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{tab.badge}</span>
+                    <span style={{ minWidth: 15, height: 15, borderRadius: 8, background: "var(--c-bad)", color: "#fff", fontSize: 9, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{tab.badge}</span>
                   )}
                 </span>
               </div>
@@ -1303,7 +1303,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 <div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(76,175,80,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="heart" color="var(--c-ok-light)" size={16} /></div>
                     <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(76,175,80,0.8)", fontWeight: 600 }}>Sağ Kaydırma</span>
                   </div>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ok-light)", margin: "0 0 2px" }}>{stats.swipeRight}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--c-ok-light)", margin: "0 0 2px" }}>{stats.swipeRight}</p>
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>kişi beğendi</p>
                 </div>
                 {/* Sol kaydırma */}
@@ -1312,7 +1312,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 <div style={{ width: 36, height: 36, borderRadius: 12, background: "var(--c-bad-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="cross" color="var(--c-bad-ink)" size={16} /></div>
                     <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,59,48,0.8)", fontWeight: 600 }}>Sol Kaydırma</span>
                   </div>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-bad-ink)", margin: "0 0 2px" }}>{stats.swipeLeft}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--c-bad-ink)", margin: "0 0 2px" }}>{stats.swipeLeft}</p>
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>kişi geçti</p>
                 </div>
               </div>
@@ -1323,7 +1323,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(255,165,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="eye" color="var(--c-warn)" size={18} /></div>
                   <div>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Toplam Görüntülenme</p>
-                    <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: 0 }}>{stats.totalViews.toLocaleString()}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: "#fff", margin: 0 }}>{stats.totalViews.toLocaleString()}</p>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -1400,7 +1400,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 12, background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 800 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 12, background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 700 }}>
                         {rev.user.charAt(0)}
                       </div>
                       <div>
@@ -1502,7 +1502,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                 {(
                   <div style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)", borderRadius: 18, padding: "16px 18px", marginBottom: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                      <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0 }}>Anlık İndirim Yayınla</p>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>Anlık İndirim Yayınla</p>
                       <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-ok-light)" }}>₺450 / yayın</span>
                     </div>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
@@ -1539,7 +1539,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 
                 {(
                   <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: "16px 18px" }}>
-                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Rezervasyon</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>Rezervasyon</p>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
                       Kullanıcı uygulamadan masa ayırtır, talep panelinize düşer. Ücretsizdir — GUR rezervasyondan komisyon almaz.
                     </p>
@@ -1547,7 +1547,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                       {[["Bu ay", "38"], ["Ciro", "₺52.400"], ["GUR payı", "₺0"]].map(([k, v]) => (
                         <div key={k} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "11px 12px" }}>
                           <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 3px" }}>{k}</p>
-                          <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "#fff", margin: 0 }}>{v}</p>
+                          <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "#fff", margin: 0 }}>{v}</p>
                         </div>
                       ))}
                     </div>
@@ -1669,7 +1669,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                     <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
                   </svg>
                 </div>
-                <h3 style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>Çıkış Yap</h3>
+                <h3 style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 8px" }}>Çıkış Yap</h3>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.5 }}>
                   İşletme panelinden çıkış yapmak istediğinize emin misiniz?
                 </p>

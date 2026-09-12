@@ -19,7 +19,7 @@ const GurBusiness = lazy(() => import('./business/GurBusiness.jsx'));
 
 // Panel indirilirken beyaz ekran kalmasın diye paneli anımsatan koyu bir zemin
 const AdminFallback = () => (
-  <div style={{ height: '100vh', background: '#0B0B0D', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B6B72', fontFamily: 'Poppins, system-ui, sans-serif', fontSize: 13 }}>
+  <div style={{ height: '100vh', background: '#0B0B0D', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B6B72', fontFamily: "'Instrument Sans', system-ui, sans-serif", fontSize: 13 }}>
     Panel yükleniyor…
   </div>
 );

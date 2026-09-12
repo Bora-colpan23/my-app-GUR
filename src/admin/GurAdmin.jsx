@@ -48,13 +48,14 @@ const C = {
   onBrand:   '#2B1400',   /* turuncu DOLGU üstünde yazı, 6.0:1 */
 };
 
-const F = "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+const F = "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 // Gövde ve sayılar uygulamanın gövde yazı tipiyle aynı: iki panel yan yana
 // açıldığında aynı ürüne ait olduğu okunmalı.
-const FB = "'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
-// Sayı sütunları: referans panoda fiyatlar sabit genişlikli. Sistem mono'su
-// kullanılıyor — ek bir font isteği getirmeden rakamlar hizalanıyor.
-const FM = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace";
+const FB = "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+// Sayı sütunları da aynı ailede: Instrument Sans tabular rakam taşıyor
+// (111111 / 000000 / 888888 aynı genişlikte ölçüldü), o yüzden ayrı bir
+// mono aileye gerek yok — hizalamayı NUM'daki tabular-nums sağlıyor.
+const FM = FB;
 
 // ─── Uygulamayla ortak tasarım dili ──────────────────────────────────────
 // GurApp.jsx'teki ELEV/BRAND_GRAD kalıbının koyu zemin karşılığı. Değerler
@@ -431,7 +432,7 @@ const CHEFS = [
 // ─── GUR Logo ───
 function GurLogo({ size = 28 }) {
   return (
-    <span style={{ fontSize: size, fontWeight: 900, fontFamily: F, letterSpacing: -size / 22, lineHeight: 1 }}>
+    <span style={{ fontSize: size, fontWeight: 700, fontFamily: F, letterSpacing: -size / 22, lineHeight: 1 }}>
       <span style={{ color: '#FFA500' }}>G</span>
       <span style={{ color: '#FF6600' }}>U</span>
       <span style={{ color: '#FF3B30' }}>R</span>
@@ -768,7 +769,7 @@ function AdminLogin({ onLogin }) {
 
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: C.yellowSoft, border: `1px solid ${C.yellow}33`, borderRadius: 6, padding: '3px 8px', marginBottom: 8 }}>
-              <span style={{ fontSize: 9.5, fontWeight: 800, color: C.yellowInk, letterSpacing: 1 }}>DEMO</span>
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: C.yellowInk, letterSpacing: 1 }}>DEMO</span>
             </div>
             <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
               Kullanıcı adı <code style={{ color: C.dim, background: C.panel2, padding: '1px 5px', borderRadius: 4 }}>{DEMO_USER}</code>
@@ -869,7 +870,7 @@ export default function GurAdmin() {
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes spin { to { transform: rotate(360deg); } }
         .row-hover:hover { background: ${C.panel2} !important; }
-        h1, h2, h3 { font-family: ${FB}; font-weight: 800; letter-spacing: -0.02em; }
+        h1, h2, h3 { font-family: ${FB}; font-weight: 700; letter-spacing: -0.02em; }
 
         /* ── BUTON DURUMLARI — uygulamadaki .gur-btn ile aynı sistem ──
            Renk ve gölge değişkenlerden okunuyor; buton bunları inline
@@ -936,7 +937,7 @@ export default function GurAdmin() {
 
         <div style={{ padding: '12px', borderTop: `1px solid ${C.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#FF7A1A,#F04E00)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: C.onBrand }}>A</div>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#FF7A1A,#F04E00)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: C.onBrand }}>A</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Admin</div>
               <div style={{ fontSize: 10.5, color: C.faint }}>admin@gur.app</div>
@@ -2081,7 +2082,7 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
           {engagement.funnel.map((f, i) => (
             <div key={f.label}>
-              <div style={{ fontSize: 19, fontWeight: 800, color: f.tone, fontVariantNumeric: 'tabular-nums', marginBottom: 2 }}>
+              <div style={{ fontSize: 19, fontWeight: 700, color: f.tone, fontVariantNumeric: 'tabular-nums', marginBottom: 2 }}>
                 {f.value.toLocaleString('tr')}
               </div>
               <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 6 }}>{f.label}</div>
@@ -2497,7 +2498,7 @@ function GastroPage({ restaurants, onGoRestaurants }) {
               background: Number(v.score) >= 9 ? C.greenSoft : Number(v.score) >= 8 ? C.orangeSoft : C.panel2,
               border: `1px solid ${Number(v.score) >= 9 ? C.green + '55' : Number(v.score) >= 8 ? C.orange + '55' : C.border}`,
             }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: Number(v.score) >= 9 ? C.green : Number(v.score) >= 8 ? C.orange : C.dim, fontVariantNumeric: 'tabular-nums' }}>{v.score}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: Number(v.score) >= 9 ? C.green : Number(v.score) >= 8 ? C.orange : C.dim, fontVariantNumeric: 'tabular-nums' }}>{v.score}</div>
               <div style={{ fontSize: 9.5, color: C.faint }}>/ 10</div>
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
@@ -2766,7 +2767,7 @@ function PricingPage({ restaurants = [], query = '' }) {
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{money(storeMonthly(r))}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(storeMonthly(r))}</div>
                 <div style={{ fontFamily: FB, fontSize: 10.5, color: C.faint }}>aylık</div>
               </div>
               <Icon path={open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} size={16} color={C.faint} />
@@ -2934,7 +2935,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
               Platform cirosu · bu ay
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                 ₺{total.toLocaleString('tr')}
               </div>
               <span style={{ fontFamily: FB, fontSize: 13, fontWeight: 700, color: C.greenInk }}>↑ 18%</span>
@@ -2954,7 +2955,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
             ].map(b => (
               <div key={b.label} style={{ background: C.panel2, border: `1px solid ${C.border}`, borderRadius: R.control, padding: '13px 15px' }}>
                 <div style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: b.tone, marginBottom: 5 }}>{b.label}</div>
-                <div style={{ fontSize: 19, fontWeight: 800, fontVariantNumeric: 'tabular-nums', marginBottom: 7 }}>{money(b.value)}</div>
+                <div style={{ fontSize: 19, fontWeight: 700, fontVariantNumeric: 'tabular-nums', marginBottom: 7 }}>{money(b.value)}</div>
                 <div style={{ height: 5, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
                   <div style={{ width: `${(b.value / total) * 100}%`, height: '100%', borderRadius: 3, background: b.tone }} />
                 </div>
@@ -2976,7 +2977,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
           ].map(([k, v, n]) => (
             <div key={k}>
               <div style={{ fontFamily: FB, fontSize: 11, color: C.faint, marginBottom: 4 }}>{k}</div>
-              <div style={{ fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
               <div style={{ fontFamily: FB, fontSize: 11, color: C.dim, marginTop: 2 }}>{n}</div>
             </div>
           ))}

@@ -21,21 +21,21 @@
     <meta name="color-scheme" content="light" />
     <!-- Uygulama ikonu: turuncu GUR marka pili. Satır içi SVG favicon
          masaüstü tarayıcılarda, PNG ise iOS ana ekran kısayolunda kullanılır. -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23FF6600'/%3E%3Ctext x='32' y='42.5' font-family='Poppins,Helvetica,Arial,sans-serif' font-size='23' font-weight='800' fill='%23ffffff' text-anchor='middle'%3EGUR%3C/text%3E%3C/svg%3E" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23FF6600'/%3E%3Ctext x='32' y='42.5' font-family='Instrument Sans,Helvetica,Arial,sans-serif' font-size='23' font-weight='800' fill='%23ffffff' text-anchor='middle'%3EGUR%3C/text%3E%3C/svg%3E" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Fontlar bloke etmeden yüklenir: normal bir <link rel="stylesheet">
          yavaş/erişilemez olduğunda modül scriptinin çalışmasını da geciktirip
-         uygulamayı bomboş bırakıyor. Bu yolla Poppins gelene kadar sistem
+         uygulamayı bomboş bırakıyor. Bu yolla yazı tipi gelene kadar sistem
          yazı tipiyle açılır. -->
-    <!-- İKİ aile de buradan gelir. Daha önce Outfit yalnızca GurStyles
-         içindeki bir @import ile isteniyordu; @import başka kurallardan
-         sonra geldiği için CSS kuralınca geçersizdi ve Outfit hiç
-         yüklenmiyordu: arayüz iOS'ta Helvetica, Android'de Roboto ile
-         çiziliyordu. Tek istekte ikisi birden alınır. -->
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" /></noscript>
+    <!-- Tek aile: Instrument Sans (değişken, 400–700). Buraya @import
+         yazmayın — @import bir stil sayfasında ilk sırada olmak zorunda,
+         GurStyles içindeki :root kuralından sonra gelseydi tarayıcı
+         sessizce atardı (bir aile uzun süre bu yüzden hiç yüklenmedi).
+         latin-ext dilimi Türkçe karakterleri kapsıyor (ğ ş İ ı ç ö ü). -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" /></noscript>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       /* iOS yatay çevrildiğinde metni kendiliğinden büyütür; kapatıyoruz.
@@ -45,7 +45,7 @@
         -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
         overscroll-behavior: none;
       }
-      body { font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0d0d1a; overscroll-behavior: none; }
+      body { font-family: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0d0d1a; overscroll-behavior: none; }
       /* dvh: mobil tarayıcıda adres çubuğu gizlenince 100vh ekranı taşırıyor */
       #root { min-height: 100vh; min-height: 100dvh; }
     </style>

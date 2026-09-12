@@ -71,7 +71,7 @@ sormaz, bu cepheyi çağırır.
 
 ```
 gur/
-├── index.html                 # Giriş; fontlar bloke etmeden yüklenir
+├── index.html                 # Giriş; Instrument Sans bloke etmeden yüklenir
 ├── shared/                    # İSTEMCİ VE SUNUCUNUN ORTAK KULLANDIĞI SAF MODÜLLER
 │   ├── deck.js                # buildDeck / rankCampaigns / quotaState
 │   └── deeplink.js            # harita derin bağlantıları, Haversine
@@ -133,17 +133,34 @@ düşüyor ve 844px'lik kutu kısa ekranları taşırıyordu.
 Kurallar `!important` — uygulama satır içi stille yazılı ve satır içi stil
 sınıf kuralını yener; tersini yapmanın tek yolu bu.
 
-### Yazı tipi: jetondan oku
-`--f-display` (Poppins) ve `--f-body` (Outfit) `GurStyles` içinde tanımlı;
-kodda `fontFamily: "var(--f-body)"` yazılır, aile adı elle yazılmaz. Yedek
-zincirde `system-ui` var: yazı tipi gelene kadar iOS'ta San Francisco,
-Android'de Roboto çizilir — genel `sans-serif` iki platformda iki ayrı
-yazı tipi seçiyordu.
+### Yazı tipi: tek aile, jetondan oku
+Uygulamanın tamamı **Instrument Sans** — müşteri, işletme, yönetici ve
+artifact önizleme kabuğu. `--f-display` ve `--f-body` `GurStyles` içinde
+tanımlı ve ikisi de aynı aileyi gösteriyor; iki jeton duruyor ki ileride
+ayrı bir başlık yazı tipi gelirse tek satır değişsin. Kodda
+`fontFamily: "var(--f-body)"` yazılır, aile adı elle yazılmaz. Yönetici
+paneli kendi stil bloğunu taşıdığı için sabitleri kendinde tutar
+(`F` / `FB` / `FM`, üçü de aynı aile).
 
-Her iki aile de **index.html'den** yüklenir. `GurStyles` içine `@import`
-yazmayın: `@import` bir stil sayfasında ilk sırada olmak zorundadır, oradaki
-`:root` kuralından sonra geldiği için tarayıcı sessizce atar (Outfit uzun
-süre bu yüzden hiç yüklenmedi).
+**Ağırlık tavanı 700.** Instrument Sans değişken bir yazı tipi ve ekseni
+`400..700`'de bitiyor. 800/900 istemek tarayıcıya sentetik kalınlaştırma
+yaptırır, harfler bulanır — kodda 700'ün üstü **yazılmaz**. Ölçek:
+400 (gövde) / 500 / 600 / 700 (başlık, buton, rozet).
+
+**Sayı sütunlarında ayrı bir mono aile yok.** Instrument Sans tabular
+rakam taşıyor (`111111`, `000000`, `888888` aynı genişlikte ölçüldü);
+hizalamayı `NUM` yayılımındaki `tabular-nums` sağlıyor.
+
+Yedek zincirde `system-ui` var: yazı tipi gelene kadar iOS'ta San
+Francisco, Android'de Roboto çizilir — genel `sans-serif` iki platformda
+iki ayrı yazı tipi seçiyordu. Türkçe karakterler (ğ ş İ ı ç ö ü)
+Google Fonts'un latin-ext diliminden geliyor.
+
+Aile **index.html'den** yüklenir (artifact için ayrıca
+`scripts/artifact-shell.html`). `GurStyles` içine `@import` yazmayın:
+`@import` bir stil sayfasında ilk sırada olmak zorundadır, oradaki
+`:root` kuralından sonra geldiği için tarayıcı sessizce atar (bir aile
+uzun süre bu yüzden hiç yüklenmedi).
 
 ### Metin alanları 16px
 iOS Safari 16px'ten küçük bir alana odaklanınca sayfayı yakınlaştırır ve
@@ -351,8 +368,8 @@ sabit aralık kullanıcı tarafından fark ediliyor.
 - Stil: **inline style** (CSS-in-JS yok, Tailwind yok). `GRAD = "#FF6600"`.
 - Hareket: Motion (`motion/react` + imperatif `animate`). Springler Apple HIG'e
   göre: damping 1.0 varsayılan, momentum taşıyan hareketlerde bounce 0.2.
-- Font: **Poppins** + **Outfit**, jetondan: `var(--f-display)` / `var(--f-body)`.
-  Başka font kullanma. Sayı sütunlarında sistem mono (yönetici: `FM`).
+- Font: **Instrument Sans**, jetondan: `var(--f-display)` / `var(--f-body)`.
+  Başka font kullanma; ağırlık 700'ü aşmasın.
 
 ### Konum doğrulamalı ziyaret
 `src/lib/visits.js` ve `server/src/visits/tracker.js` **aynı kuralları** taşır:
