@@ -115,7 +115,7 @@ export function Sheet({ title, subtitle, onClose, children }) {
           <div style={{ width: 40, height: 4, borderRadius: 2, background: dragging ? "#C9C1B8" : "#E5E0DA", margin: "0 auto 16px", transition: "background 0.2s" }} />
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
             <div style={{ minWidth: 0 }}>
-              <h3 style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 3px" }}>{title}</h3>
+              <h3 style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 3px" }}>{title}</h3>
               <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</p>
             </div>
             <IconBtn onClick={close} tone="subtle" size={34} title="Kapat"

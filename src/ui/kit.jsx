@@ -84,7 +84,7 @@ export function usePrefersReducedMotion() {
 
 // Logo: beyaz hap şeklinde arka plan ile her yerde okunur
 export function GurLogo({ size = 48, pill = false }) {
-  const logo = <span style={{ fontSize: size, fontWeight: 700, fontFamily: "var(--f-display)", letterSpacing: -size/24, lineHeight: 1 }}>
+  const logo = <span style={{ fontSize: size, fontWeight: 900, fontFamily: "var(--f-display)", letterSpacing: -size/24, lineHeight: 1 }}>
     <span style={{ color: "#FFA500" }}>G</span><span style={{ color: "#FF6600" }}>U</span><span style={{ color: "#FF0000" }}>R</span>
   </span>;
   if (pill) return <div style={{ background: "#fff", borderRadius: size * 0.5, padding: `${size*0.12}px ${size*0.35}px`, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--sh-1)" }}>{logo}</div>;
@@ -665,19 +665,12 @@ export function GurStyles() {
 
           /* ── YAZI TİPİ JETONLARI ──────────────────────────────────
              Renk gibi yazı tipi de tek yerden. Yedek zincirde önce
-             sistem yazı tipi var: Instrument Sans gelene kadar (ya da
+             sistem yazı tipi var: Outfit/Poppins gelene kadar (ya da
              hiç gelmezse) iOS'ta San Francisco, Android'de Roboto
              çizilir — genel "sans-serif" iki platformda iki ayrı
              yazı tipi seçiyordu ve arayüz farklı görünüyordu. */
-          /* Tek aile. İki jeton duruyor ki ileride bir başlık yazı tipi
-             gelirse tek satır değişsin — bugün ikisi de aynı aileyi
-             gösteriyor.
-
-             Instrument Sans DEĞİŞKEN bir yazı tipi ve ekseni 400–700'de
-             bitiyor: 800/900 istemek tarayıcıya sentetik kalınlaştırma
-             yaptırır, harfler bulanır. Kodda 700'ün üstü YAZILMAZ. */
-          --f-display: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-          --f-body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          --f-display: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          --f-body: 'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         }
         /* Tarayıcı form denetimlerini ve kaydırma çubuğunu açık temaya uydursun */
         :root { color-scheme: light; }
@@ -685,7 +678,7 @@ export function GurStyles() {
         /* Yazı tipleri index.html'den yükleniyor. Burada @import vardı ama
            @import bir stil sayfasında ilk sırada olmak zorunda: yukarıdaki
            :root kuralından sonra geldiği için tarayıcı ikisini de atıyordu
-           ve istenen aile hiçbir zaman yüklenmiyordu. */
+           ve Outfit hiçbir zaman istenmiyordu. */
         @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
         @keyframes badgeMarquee { from { transform:translateX(0); } to { transform:translateX(-50%); } }
         @keyframes spin { to { transform:rotate(360deg); } }

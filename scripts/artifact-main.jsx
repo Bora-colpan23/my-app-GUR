@@ -38,7 +38,7 @@ function ArtifactSwitcher() {
   const go = (to) => { router.navigate(to); };
   const style = (active) => ({
     border: 'none', cursor: 'pointer', borderRadius: 999, padding: '6px 14px',
-    fontFamily: "'Instrument Sans', system-ui, sans-serif", fontSize: 12.5, fontWeight: 700,
+    fontFamily: "'Outfit', system-ui, sans-serif", fontSize: 12.5, fontWeight: 700,
     background: active ? '#FF6600' : 'transparent',
     color: active ? '#fff' : 'rgba(255,255,255,0.65)',
   });
