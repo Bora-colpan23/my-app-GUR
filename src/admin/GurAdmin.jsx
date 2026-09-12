@@ -25,7 +25,7 @@ const C = {
   border: '#E4E7EC',
   text: '#12141A',          /* saf siyah değil */
   dim: '#5A6474',
-  faint: '#8B95A5',
+  faint: '#646E7C',      /* 5.2:1 — eski #8B95A5 3.0:1 idi */
   orange: '#FF6600',
   orangeSoft: 'rgba(255,102,0,0.12)',
   green: '#13B364',
@@ -36,6 +36,16 @@ const C = {
   yellowSoft: 'rgba(224,135,0,0.12)',
   blue: '#2563EB',
   blueSoft: 'rgba(37,99,235,0.12)',
+
+  // ── AYNI RENGİN İKİ TONU ────────────────────────────────────────
+  // Parlak turuncu/yeşil/kırmızı/sarı beyaz kâğıt üstünde YAZI olarak
+  // 2.7–3.9:1'de kalıyordu. Dolgu parlak tonunu korur, yazı ve simge
+  // koyu tonunu alır — yeni bir renk eklemeden vurgu kuruluyor.
+  orangeInk: '#B4530A',   /* 5.0:1 */
+  greenInk:  '#0A7C46',   /* 5.3:1 */
+  redInk:    '#C2282D',   /* 5.8:1 */
+  yellowInk: '#8A5200',   /* 6.3:1 */
+  onBrand:   '#2B1400',   /* turuncu DOLGU üstünde yazı, 6.0:1 */
 };
 
 const F = "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
@@ -105,13 +115,17 @@ const SWIPE_TREND = [
   { d: 'Per', v: 128000 }, { d: 'Cum', v: 165000 }, { d: 'Cmt', v: 190000 }, { d: 'Paz', v: 178000 },
 ];
 
+// Sıralı bir büyüklük: altı ayrı renk değil, TEK rengin altı tonu.
+// Turuncu-kırmızı-amber karışımı hem kategorileri eşit ağırlıkta
+// gösteriyor hem de paletle çakışıyordu. "Diğer" toplama kalemi
+// olduğu için rampanın dışında, nötr bir tonda.
 const CAT_DIST = [
-  { name: 'Türk Mutfağı', count: 89, color: '#FF6600' },
-  { name: 'Kafe', count: 64, color: '#FF8C00' },
-  { name: 'Fast Food', count: 47, color: '#FFA500' },
-  { name: 'İtalyan', count: 38, color: '#FF6347' },
-  { name: 'Uzak Doğu', count: 31, color: '#FF4500' },
-  { name: 'Diğer', count: 73, color: '#8B98A9' },
+  { name: 'Türk Mutfağı', count: 89, color: '#A8420A' },
+  { name: 'Kafe', count: 64, color: '#D0530A' },
+  { name: 'Fast Food', count: 47, color: '#F1650F' },
+  { name: 'İtalyan', count: 38, color: '#FF8A3D' },
+  { name: 'Uzak Doğu', count: 31, color: '#FFB27A' },
+  { name: 'Diğer', count: 73, color: '#9AA3B0' },
 ];
 
 // account: işletme kaydını sahiplenmiş, panel girişi olan müşterimiz mi.
@@ -163,7 +177,7 @@ const KIND_TONE = {
 
 // İşletme abonelik paketleri. Adetler STATS.totalRestaurants ile uyumlu.
 const PLANS = [
-  { id: 'Premium', price: 4999, count: 42,  color: C.orange },
+  { id: 'Premium', price: 4999, count: 42,  color: C.orangeInk },
   { id: 'Pro',     price: 1999, count: 118, color: C.blue },
   { id: 'Ücretsiz', price: 0,   count: 182, color: C.faint },
 ];
@@ -463,9 +477,9 @@ function Badge({ text, color, soft }) {
 
 function StatusBadge({ status }) {
   const map = {
-    active: { text: 'Aktif', color: C.green, soft: C.greenSoft },
-    suspended: { text: 'Askıda', color: C.yellow, soft: C.yellowSoft },
-    banned: { text: 'Yasaklı', color: C.red, soft: C.redSoft },
+    active: { text: 'Aktif', color: C.greenInk, soft: C.greenSoft },
+    suspended: { text: 'Askıda', color: C.yellowInk, soft: C.yellowSoft },
+    banned: { text: 'Yasaklı', color: C.redInk, soft: C.redSoft },
   };
   const s = map[status] || map.active;
   return <Badge {...s} />;
@@ -484,7 +498,7 @@ function StoreAvatar({ restaurant, size = 36, radius = 11, font = 14 }) {
       background: logo ? C.panel2 : 'linear-gradient(135deg,#FF660033,#FF3B3033)',
       border: logo ? `1px solid ${C.border}` : 'none',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontWeight: 700, fontSize: font, color: C.orange,
+      fontWeight: 700, fontSize: font, color: C.orangeInk,
     }}>
       {logo
         ? <img src={logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -562,12 +576,17 @@ function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size
   const paddings = { sm: '7px 13px', md: '9px 15px', lg: '12px 19px' };
   const fontSizes = { sm: 12, md: 12.5, lg: 14 };
   const brand = tone === 'orange';
+  // Dolu hapta zemin ile yazı birlikte seçilir: parlak yeşil/kırmızı
+  // üstünde beyaz 2.7–3.9:1'de, turuncu üstünde 2.9:1'de kalıyordu.
+  // Yeşil ve kırmızı dolgu koyu tonuna iner, turuncu ise yazıyı koyultur.
+  const FILL_BG = { neutral: C.text, orange: BRAND_GRAD, green: C.greenInk, red: C.redInk, blue: C.blue, yellow: C.yellow };
+  const FILL_INK = { orange: C.onBrand, yellow: '#241c00' };
   const variants = {
     filled: {
-      bg: brand ? BRAND_GRAD : toneColor,
-      hover: brand ? BRAND_GRAD_HOVER : toneColor,
-      press: brand ? BRAND_GRAD : toneColor,
-      color: tone === 'yellow' ? '#241c00' : '#fff', border: '1px solid transparent',
+      bg: FILL_BG[tone] || toneColor,
+      hover: brand ? BRAND_GRAD_HOVER : (FILL_BG[tone] || toneColor),
+      press: FILL_BG[tone] || toneColor,
+      color: FILL_INK[tone] || '#fff', border: '1px solid transparent',
       elev: brand ? ELEV.brand : `0 6px 16px ${toneColor}33`, pressElev: brand ? ELEV.pressBrand : ELEV.pressDark,
     },
     // Yumuşak hap: %12 tonlu zemin, renkli kalın yazı, gölge yok.
@@ -633,7 +652,7 @@ function NavItem({ item, active, onClick }) {
         <span style={{
           fontSize: 11, fontWeight: 700, minWidth: 20, height: 20, borderRadius: 10, padding: '0 6px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: item.alert ? C.orange : C.panel2, color: item.alert ? '#fff' : C.dim,
+          background: item.alert ? C.orange : C.panel2, color: item.alert ? C.onBrand : C.dim,
         }}>{item.count}</span>
       )}
     </motion.button>
@@ -740,8 +759,8 @@ function AdminLogin({ onLogin }) {
 
           {error && (
             <div style={{ background: C.redSoft, border: `1px solid ${C.red}44`, borderRadius: 9, padding: '9px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon path={icons.ban} size={14} color={C.red} />
-              <span style={{ fontSize: 12, color: C.red }}>{error}</span>
+              <Icon path={icons.ban} size={14} color={C.redInk} />
+              <span style={{ fontSize: 12, color: C.redInk }}>{error}</span>
             </div>
           )}
 
@@ -749,7 +768,7 @@ function AdminLogin({ onLogin }) {
 
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: C.yellowSoft, border: `1px solid ${C.yellow}33`, borderRadius: 6, padding: '3px 8px', marginBottom: 8 }}>
-              <span style={{ fontSize: 9.5, fontWeight: 800, color: C.yellow, letterSpacing: 1 }}>DEMO</span>
+              <span style={{ fontSize: 9.5, fontWeight: 800, color: C.yellowInk, letterSpacing: 1 }}>DEMO</span>
             </div>
             <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
               Kullanıcı adı <code style={{ color: C.dim, background: C.panel2, padding: '1px 5px', borderRadius: 4 }}>{DEMO_USER}</code>
@@ -917,7 +936,7 @@ export default function GurAdmin() {
 
         <div style={{ padding: '12px', borderTop: `1px solid ${C.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#FF6600,#FF3B30)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff' }}>A</div>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#FF6600,#FF3B30)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: C.onBrand }}>A</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Admin</div>
               <div style={{ fontSize: 10.5, color: C.faint }}>admin@gur.app</div>
@@ -1016,7 +1035,7 @@ export default function GurAdmin() {
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{ flex: 1 }}>
-                  <Btn label="Reddet" onClick={() => rejectApp(reviewDoc.id)} variant="soft" tone="red" size="lg" fullWidth icon={<Icon path={icons.x} size={16} color={C.red} />} />
+                  <Btn label="Reddet" onClick={() => rejectApp(reviewDoc.id)} variant="soft" tone="red" size="lg" fullWidth icon={<Icon path={icons.x} size={16} color={C.redInk} />} />
                 </div>
                 <div style={{ flex: 2 }}>
                   <Btn label="Onayla ve Yayına Al" onClick={() => approveApp(reviewDoc.id)} variant="filled" tone="green" size="lg" fullWidth icon={<Icon path={icons.check} size={16} color="#fff" />} />
@@ -1090,7 +1109,7 @@ function Sparkline({ points, up, w = 78, h = 26 }) {
   }).join(' ');
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden focusable="false" style={{ display: 'block' }}>
-      <path d={d} fill="none" stroke={up ? C.green : C.red} strokeWidth="2"
+      <path d={d} fill="none" stroke={up ? C.greenInk : C.redInk} strokeWidth="2"
         strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -1216,7 +1235,7 @@ function KpiCard({ label, value, delta, deltaUp, deltaNeutral, icon, accent }) {
           <span style={{
             fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3,
             padding: '4px 9px', borderRadius: R.pill,
-            color: deltaNeutral ? C.dim : (deltaUp ? C.green : C.red),
+            color: deltaNeutral ? C.dim : (deltaUp ? C.greenInk : C.redInk),
             background: deltaNeutral ? C.panel2 : (deltaUp ? C.greenSoft : C.redSoft),
           }}>
             {deltaNeutral ? '' : (deltaUp ? '▲' : '▼')} {delta}
@@ -1276,7 +1295,7 @@ function ChangeCell({ value }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
-      color: up ? C.green : C.red, fontSize: 12.5, fontWeight: 700, ...NUM,
+      color: up ? C.greenInk : C.redInk, fontSize: 12.5, fontWeight: 700, ...NUM,
     }}>
       <span aria-hidden>{up ? '↗' : '↘'}</span>
       {up ? '+' : ''}{value.toFixed(1)}%
@@ -1314,11 +1333,11 @@ function DashboardPage({ restaurants = [] }) {
     <div style={{ animation: 'fadeIn 0.2s' }}>
       {/* Dört ölçü — panonun tepesindeki özet */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, marginBottom: 16 }}>
-        <KpiCard label="Toplam Restoran" value={STATS.totalRestaurants} delta="8%" deltaUp icon={icons.store} accent={{ color: C.orange, soft: C.orangeSoft }} />
+        <KpiCard label="Toplam Restoran" value={STATS.totalRestaurants} delta="8%" deltaUp icon={icons.store} accent={{ color: C.orangeInk, soft: C.orangeSoft }} />
         <KpiCard label="Günlük Aktif Kullanıcı" value={STATS.dailyActive.toLocaleString('tr')} delta="12%" deltaUp icon={icons.users} accent={{ color: C.blue, soft: C.blueSoft }} />
-        <KpiCard label="Bekleyen Başvuru" value={STATS.pendingApps} icon={icons.inbox} accent={{ color: C.yellow, soft: C.yellowSoft }} />
+        <KpiCard label="Bekleyen Başvuru" value={STATS.pendingApps} icon={icons.inbox} accent={{ color: C.yellowInk, soft: C.yellowSoft }} />
         {/* Ciro tek yerden: Gelir sayfasıyla aynı toplam (PLATFORM_TOTAL) */}
-        <KpiCard label="Aylık Ciro" value={money(PLATFORM_TOTAL)} delta="18%" deltaUp icon={icons.money} accent={{ color: C.green, soft: C.greenSoft }} />
+        <KpiCard label="Aylık Ciro" value={money(PLATFORM_TOTAL)} delta="18%" deltaUp icon={icons.money} accent={{ color: C.greenInk, soft: C.greenSoft }} />
       </div>
 
       {/* Referans düzen: solda dar liderler kartı, sağda geniş grafik */}
@@ -1337,7 +1356,7 @@ function DashboardPage({ restaurants = [] }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 8 }}>
             {leaders.map((c, i) => (
               <div key={c.name} style={{ borderLeft: i ? `1px solid ${C.border}` : 'none', paddingLeft: i ? 10 : 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 7, color: C.green, fontSize: 11.5, fontWeight: 700, ...NUM }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 7, color: C.greenInk, fontSize: 11.5, fontWeight: 700, ...NUM }}>
                   <span aria-hidden>▲</span>{(period === 'week' ? 1.3 + i * 0.9 : 3.1 - i * 0.9).toFixed(1)}%
                 </div>
                 <div style={{ height: 14, borderRadius: 4, background: C.orange, opacity: 1 - i * 0.32, width: `${(c.count / leaderMax) * 100}%`, minWidth: 12 }} />
@@ -1388,7 +1407,7 @@ function DashboardPage({ restaurants = [] }) {
       <section style={{ ...CARD, overflow: 'hidden' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px', flexWrap: 'wrap' }}>
           <div style={{ width: 38, height: 38, borderRadius: 12, background: C.orangeSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon path={icons.trend} size={19} color={C.orange} />
+            <Icon path={icons.trend} size={19} color={C.orangeInk} />
           </div>
           <div style={{ flex: 1, minWidth: 170 }}>
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, letterSpacing: -0.2 }}>Mekân hareketi</h3>
@@ -1505,8 +1524,8 @@ function fromApi(c) {
 }
 
 const CAMPAIGN_STATUS = {
-  active:    { label: 'Yayında',      color: C.green,  soft: C.greenSoft },
-  paused:    { label: 'Duraklatıldı', color: C.yellow, soft: C.yellowSoft },
+  active:    { label: 'Yayında',      color: C.greenInk,  soft: C.greenSoft },
+  paused:    { label: 'Duraklatıldı', color: C.yellowInk, soft: C.yellowSoft },
   exhausted: { label: 'Bütçe bitti',  color: C.faint,  soft: C.panel2 },
 };
 
@@ -1559,10 +1578,10 @@ function CampaignsPage() {
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
-        <KpiCard label="Yayındaki Kampanya" value={`${activeRows.length}`} delta={`${rows.length} toplam`} deltaNeutral icon={icons.trend} accent={{ color: C.green, soft: C.greenSoft }} />
-        <KpiCard label="Bugünkü Harcama" value={money(totalSpend)} delta="12%" deltaUp icon={icons.money} accent={{ color: C.orange, soft: C.orangeSoft }} />
+        <KpiCard label="Yayındaki Kampanya" value={`${activeRows.length}`} delta={`${rows.length} toplam`} deltaNeutral icon={icons.trend} accent={{ color: C.greenInk, soft: C.greenSoft }} />
+        <KpiCard label="Bugünkü Harcama" value={money(totalSpend)} delta="12%" deltaUp icon={icons.money} accent={{ color: C.orangeInk, soft: C.orangeSoft }} />
         <KpiCard label="Gösterim" value={totalImp.toLocaleString('tr')} delta="8%" deltaUp icon={icons.chart} accent={{ color: C.blue, soft: C.blueSoft }} />
-        <KpiCard label="Etkileşim Oranı" value={`%${((totalEng / Math.max(totalImp, 1)) * 100).toFixed(1)}`} delta="sağa kaydırma" deltaNeutral icon={icons.star} accent={{ color: C.yellow, soft: C.yellowSoft }} />
+        <KpiCard label="Etkileşim Oranı" value={`%${((totalEng / Math.max(totalImp, 1)) * 100).toFixed(1)}`} delta="sağa kaydırma" deltaNeutral icon={icons.star} accent={{ color: C.yellowInk, soft: C.yellowSoft }} />
       </div>
 
       <div style={{ ...CARD, padding: '14px 18px', marginBottom: 20, display: 'flex', gap: 14, alignItems: 'center' }}>
@@ -1707,9 +1726,9 @@ function GrowthPage() {
     <div style={{ animation: 'fadeIn 0.2s' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
         <KpiCard label="Toplam Kullanıcı" value={totalUsers.toLocaleString('tr')} delta={`+${latest.size.toLocaleString('tr')} bu hafta`} deltaUp icon={icons.users} accent={{ color: C.blue, soft: C.blueSoft }} />
-        <KpiCard label="Ortalama LTV" value={money(weightedLtv)} delta="11%" deltaUp icon={icons.money} accent={{ color: C.green, soft: C.greenSoft }} />
-        <KpiCard label="ARPU (aylık)" value={money(weightedLtv / AVG_LIFETIME_MONTHS)} delta={`${AVG_LIFETIME_MONTHS} ay ort. ömür`} deltaNeutral icon={icons.chart} accent={{ color: C.orange, soft: C.orangeSoft }} />
-        <KpiCard label="Kaydet → Git Dönüşümü" value={`%${latest.dirPct.toFixed(1)}`} delta={`ziyaret %${latest.visitPct.toFixed(1)}`} deltaUp icon={icons.trend} accent={{ color: C.yellow, soft: C.yellowSoft }} />
+        <KpiCard label="Ortalama LTV" value={money(weightedLtv)} delta="11%" deltaUp icon={icons.money} accent={{ color: C.greenInk, soft: C.greenSoft }} />
+        <KpiCard label="ARPU (aylık)" value={money(weightedLtv / AVG_LIFETIME_MONTHS)} delta={`${AVG_LIFETIME_MONTHS} ay ort. ömür`} deltaNeutral icon={icons.chart} accent={{ color: C.orangeInk, soft: C.orangeSoft }} />
+        <KpiCard label="Kaydet → Git Dönüşümü" value={`%${latest.dirPct.toFixed(1)}`} delta={`ziyaret %${latest.visitPct.toFixed(1)}`} deltaUp icon={icons.trend} accent={{ color: C.yellowInk, soft: C.yellowSoft }} />
       </div>
 
       <TabBar
@@ -1761,7 +1780,7 @@ function GrowthPage() {
                   {metric === 'conversion' && <>
                     <td style={{ padding: '11px 18px', textAlign: 'right' }}><HeatCell value={c.dirPct} /></td>
                     <td style={{ padding: '11px 18px', textAlign: 'right' }}><HeatCell value={c.visitPct} /></td>
-                    <td style={{ padding: '11px 18px', textAlign: 'right', fontSize: 12.5, fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{money(c.ltv)}</td>
+                    <td style={{ padding: '11px 18px', textAlign: 'right', fontSize: 12.5, fontWeight: 700, color: C.greenInk, fontVariantNumeric: 'tabular-nums' }}>{money(c.ltv)}</td>
                   </>}
                 </tr>
               ))}
@@ -1780,7 +1799,7 @@ function GrowthPage() {
             ['LTV', 'Reklam + abonelik gelirinin kullanıcı başına kümülatif toplamı; ARPU bunun aylığa bölünmüşü.'],
           ].map(([k, v]) => (
             <div key={k} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: C.orange, minWidth: 74 }}>{k}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: C.orangeInk, minWidth: 74 }}>{k}</span>
               <span style={{ fontSize: 12, color: C.faint, lineHeight: 1.55 }}>{v}</span>
             </div>
           ))}
@@ -1825,7 +1844,7 @@ function TabBar({ tabs, active, onChange }) {
 
 function StarRow({ n, size = 12 }) {
   return (
-    <span style={{ fontSize: size, color: C.orange, letterSpacing: 1 }}>
+    <span style={{ fontSize: size, color: C.orangeInk, letterSpacing: 1 }}>
       {'★'.repeat(n)}<span style={{ color: C.border }}>{'★'.repeat(5 - n)}</span>
     </span>
   );
@@ -1863,8 +1882,8 @@ function ReviewCard({ v, showRestaurant, onOpenRestaurant, hidden, onHide }) {
         <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
           {daysAgoLabel(v.days)} • {formatDate(v.date)}
         </span>
-        {v.flagged && <Badge text="Şikayet edildi" color={C.red} soft={C.redSoft} />}
-        {low && !v.flagged && <Badge text={`${v.stars} puan`} color={C.yellow} soft={C.yellowSoft} />}
+        {v.flagged && <Badge text="Şikayet edildi" color={C.redInk} soft={C.redSoft} />}
+        {low && !v.flagged && <Badge text={`${v.stars} puan`} color={C.yellowInk} soft={C.yellowSoft} />}
       </div>
       <p style={{ margin: 0, fontSize: 13, color: C.dim, lineHeight: 1.55, maxWidth: '68ch', textDecoration: hidden ? 'line-through' : 'none' }}>{v.text}</p>
       {v.photos?.length > 0 && (
@@ -1926,7 +1945,7 @@ function StoreFeatures({ restaurant }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {f.label}
-                {!globalOn && <Badge text="platformda kapalı" color={C.yellow} soft={C.yellowSoft} />}
+                {!globalOn && <Badge text="platformda kapalı" color={C.yellowInk} soft={C.yellowSoft} />}
               </div>
               <div style={{ fontFamily: FB, fontSize: 12, color: C.dim, lineHeight: 1.5 }}>{f.desc}</div>
             </div>
@@ -1985,7 +2004,7 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{r.name}</h2>
-            {r.gastro && <Badge text="★ Gastro Onaylı" color={C.orange} soft={C.orangeSoft} />}
+            {r.gastro && <Badge text="★ Gastro Onaylı" color={C.orangeInk} soft={C.orangeSoft} />}
           </div>
           <div style={{ fontSize: 12.5, color: C.dim, marginTop: 2 }}>{r.cat} • {r.district}</div>
         </div>
@@ -1998,7 +2017,7 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
       {/* Özet şeridi — listedeki bölge/puan/plan/durum bilgileri burada da görünür */}
       <div style={{ ...CARD, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', marginBottom: 16, overflow: 'hidden' }}>
         <MetaCell label="Bölge">{r.district}</MetaCell>
-        <MetaCell label="Puan"><span style={{ color: C.orange }}>★</span> {r.rating} <span style={{ color: C.faint, fontWeight: 500, fontSize: 12 }}>({r.reviews.toLocaleString('tr')})</span></MetaCell>
+        <MetaCell label="Puan"><span style={{ color: C.orangeInk }}>★</span> {r.rating} <span style={{ color: C.faint, fontWeight: 500, fontSize: 12 }}>({r.reviews.toLocaleString('tr')})</span></MetaCell>
         <MetaCell label="Plan"><span style={{ color: PLAN_COLOR[r.plan] }}>{r.plan}</span></MetaCell>
         <MetaCell label="Aylık ciro">{money(storeMonthly(r))}</MetaCell>
         <MetaCell label="Durum"><StatusBadge status={r.status} /></MetaCell>
@@ -2091,7 +2110,7 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
             {menus.map((m, i) => (
               <div key={m.name} style={{ padding: '12px 16px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: C.orangeSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon path={icons.doc} size={15} color={C.orange} />
+                  <Icon path={icons.doc} size={15} color={C.orangeInk} />
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>{m.name}</div>
@@ -2115,7 +2134,7 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
           <header style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Yorumlar</span>
             <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
-              son {reviews.length} yorum{flagged > 0 && <span style={{ color: C.red }}> • {flagged} şikayetli</span>}
+              son {reviews.length} yorum{flagged > 0 && <span style={{ color: C.redInk }}> • {flagged} şikayetli</span>}
             </span>
           </header>
 
@@ -2172,7 +2191,7 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
                   <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
                     {daysAgoLabel(v.days)} • {formatDate(v.date)}
                   </span>
-                  {v.flagged && <Badge text="Şikayet edildi" color={C.red} soft={C.redSoft} />}
+                  {v.flagged && <Badge text="Şikayet edildi" color={C.redInk} soft={C.redSoft} />}
                 </div>
                 <p style={{ margin: 0, fontSize: 13, color: C.dim, lineHeight: 1.55, maxWidth: '68ch' }}>{v.text}</p>
               </article>
@@ -2205,7 +2224,7 @@ function RestaurantsPage({ restaurants, query, onSuspend, onOpen }) {
                       sarılınca yıldız hücrenin ucuna kaçıyordu. */}
                   <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.35 }}>
                     {r.name}
-                    {r.gastro && <span title="Gastro Onaylı" style={{ color: C.orange, display: 'inline-block', marginLeft: 5, verticalAlign: '-1px' }}><Icon path={icons.star} size={13} color={C.orange} fill={C.orange} /></span>}
+                    {r.gastro && <span title="Gastro Onaylı" style={{ color: C.orangeInk, display: 'inline-block', marginLeft: 5, verticalAlign: '-1px' }}><Icon path={icons.star} size={13} color={C.orangeInk} fill={C.orange} /></span>}
                   </div>
                   <div style={{ fontSize: 11, color: C.faint }}>{r.reviews.toLocaleString('tr')} yorum</div>
                 </div>
@@ -2276,7 +2295,7 @@ function RestaurantsWorkspace({ restaurants, query, tab, onTab, onSuspend, onOpe
       {tab === 'low' && (
         <>
           <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.red}`, borderRadius: 12, padding: '13px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Icon path={icons.ban} size={16} color={C.red} />
+            <Icon path={icons.ban} size={16} color={C.redInk} />
             <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
               1 ve 2 puanlı son yorumlar, en yenisi üstte. İşletmeyle iletişime geçmeden önce
               yorumun kuralları ihlal edip etmediğini kontrol edin.
@@ -2340,9 +2359,9 @@ function ClaimsPanel() {
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
               <span style={{ fontSize: 13.5, fontWeight: 600 }}>{c.restaurantName}</span>
-              {c.status === 'approved' && <Badge text="Onaylandı" color={C.green} soft={C.greenSoft} />}
-              {c.status === 'rejected' && <Badge text="Reddedildi" color={C.red} soft={C.redSoft} />}
-              {c.status === 'pending' && <Badge text="Beklemede" color={C.yellow} soft={C.yellowSoft} />}
+              {c.status === 'approved' && <Badge text="Onaylandı" color={C.greenInk} soft={C.greenSoft} />}
+              {c.status === 'rejected' && <Badge text="Reddedildi" color={C.redInk} soft={C.redSoft} />}
+              {c.status === 'pending' && <Badge text="Beklemede" color={C.yellowInk} soft={C.yellowSoft} />}
             </div>
             <div style={{ fontSize: 11.5, color: C.faint }}>
               {c.legalName}{c.taxId ? ` · VKN ${c.taxId}` : ''} · {c.contactName} · {c.phone}
@@ -2367,7 +2386,7 @@ function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
       <ClaimsPanel />
       <div style={{ ...CARD, padding: 60, textAlign: 'center' }}>
         <div style={{ display: 'inline-flex', width: 64, height: 64, borderRadius: 16, background: C.greenSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-          <Icon path={icons.check} size={30} color={C.green} />
+          <Icon path={icons.check} size={30} color={C.greenInk} />
         </div>
         <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700 }}>Bekleyen başvuru yok</h3>
         <p style={{ margin: 0, fontSize: 13.5, color: C.dim }}>Tüm restoran başvuruları değerlendirildi.</p>
@@ -2379,13 +2398,13 @@ function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
     <div style={{ animation: 'fadeIn 0.2s' }}>
       <ClaimsPanel />
       <div style={{ marginBottom: 16, padding: '12px 16px', background: C.yellowSoft, border: `1px solid ${C.yellow}44`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Icon path={icons.inbox} size={18} color={C.yellow} />
+        <Icon path={icons.inbox} size={18} color={C.yellowInk} />
         <span style={{ fontSize: 13, color: C.text }}><b>{apps.length} başvuru</b> vergi levhası doğrulaması bekliyor.</span>
       </div>
       <div style={{ display: 'grid', gap: 12 }}>
         {apps.map(a => (
           <div key={a.id} style={{ ...CARD, padding: 18, display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 46, height: 46, borderRadius: 12, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18, color: C.orange, flexShrink: 0 }}>{a.name[0]}</div>
+            <div style={{ width: 46, height: 46, borderRadius: 12, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18, color: C.orangeInk, flexShrink: 0 }}>{a.name[0]}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 3 }}>{a.name}</div>
               <div style={{ fontSize: 12, color: C.dim }}>{a.cat} • {a.district} • {a.owner}</div>
@@ -2420,7 +2439,7 @@ function GastroPage({ restaurants, onGoRestaurants }) {
     <div style={{ animation: 'fadeIn 0.2s' }}>
       {/* Rozet atamasının nerede yapıldığını söyle — bu sayfa artık salt değerlendirme */}
       <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.orange}`, borderRadius: 12, padding: '13px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <Icon path={icons.star} size={16} color={C.orange} fill={C.orange} />
+        <Icon path={icons.star} size={16} color={C.orangeInk} fill={C.orange} />
         <div style={{ flex: 1, minWidth: 220, fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
           Onaylı gurmelerin değerlendirmeleri ve verdikleri puanlar. Rozet ataması
           Restoranlar bölümünde, restoranın yorumlarının olduğu yerde yapılır.
@@ -2451,7 +2470,7 @@ function GastroPage({ restaurants, onGoRestaurants }) {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 14, fontSize: 11.5, color: C.dim, fontVariantNumeric: 'tabular-nums' }}>
-                <span><b style={{ color: C.orange, fontSize: 13 }}>{c.list.length}</b> değerlendirme</span>
+                <span><b style={{ color: C.orangeInk, fontSize: 13 }}>{c.list.length}</b> değerlendirme</span>
                 <span>ort. <b style={{ color: C.text, fontSize: 13 }}>{avg(c.list)}</b></span>
               </div>
             </motion.button>
@@ -2486,7 +2505,7 @@ function GastroPage({ restaurants, onGoRestaurants }) {
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{v.chef.name}</span>
                 <span style={{ fontSize: 12.5, color: C.faint }}>→</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: C.blue }}>{v.restName}</span>
-                {v.gastro && <Badge text="★ Gastro Onaylı" color={C.orange} soft={C.orangeSoft} />}
+                {v.gastro && <Badge text="★ Gastro Onaylı" color={C.orangeInk} soft={C.orangeSoft} />}
                 <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
                   {daysAgoLabel(v.days)} • {formatDate(v.date)}
                 </span>
@@ -2568,9 +2587,9 @@ function VenuePoolPage({ restaurants = [], query = '', onOpen }) {
       {/* Havuzun neresindeyiz: sahiplenme oranı satışın tek ölçüsü */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 16, marginBottom: 16 }}>
         <KpiCard label="Listedeki mekan" value={total} delta={`portföy ${STATS.totalRestaurants}`} deltaNeutral icon={icons.store} accent={{ color: C.blue, soft: C.blueSoft }} />
-        <KpiCard label="Sahiplenilmiş" value={owned} delta={`%${Math.round((owned / total) * 100)}`} deltaNeutral icon={icons.check} accent={{ color: C.green, soft: C.greenSoft }} />
-        <KpiCard label="Sahiplenilmemiş" value={pool.length} icon={icons.inbox} accent={{ color: C.yellow, soft: C.yellowSoft }} />
-        <KpiCard label="Gönderilen davet" value={invited.size} icon={icons.msg} accent={{ color: C.orange, soft: C.orangeSoft }} />
+        <KpiCard label="Sahiplenilmiş" value={owned} delta={`%${Math.round((owned / total) * 100)}`} deltaNeutral icon={icons.check} accent={{ color: C.greenInk, soft: C.greenSoft }} />
+        <KpiCard label="Sahiplenilmemiş" value={pool.length} icon={icons.inbox} accent={{ color: C.yellowInk, soft: C.yellowSoft }} />
+        <KpiCard label="Gönderilen davet" value={invited.size} icon={icons.msg} accent={{ color: C.orangeInk, soft: C.orangeSoft }} />
       </div>
 
       <section style={{ ...CARD, overflow: 'hidden' }}>
@@ -2716,7 +2735,7 @@ function PricingPage({ restaurants = [], query = '' }) {
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
       <section style={{ ...CARD, padding: '15px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <Icon path={icons.store} size={17} color={C.orange} />
+        <Icon path={icons.store} size={17} color={C.orangeInk} />
         <span style={{ fontFamily: FB, fontSize: 12.5, color: C.dim, lineHeight: 1.5, flex: 1, minWidth: 220 }}>
           Teklifler işletme bazlı gönderilir. Burada yalnızca kaydını
           sahiplenmiş, panel girişi olan müşteriler görünür
@@ -2739,8 +2758,8 @@ function PricingPage({ restaurants = [], query = '' }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 2 }}>
                   <span style={{ fontSize: 14, fontWeight: 700 }}>{r.name}</span>
-                  {r.gastro && <Icon path={icons.star} size={12} color={C.orange} fill={C.orange} />}
-                  {pending > 0 && <Badge text={`${pending} teklif bekliyor`} color={C.yellow} soft={C.yellowSoft} />}
+                  {r.gastro && <Icon path={icons.star} size={12} color={C.orangeInk} fill={C.orange} />}
+                  {pending > 0 && <Badge text={`${pending} teklif bekliyor`} color={C.yellowInk} soft={C.yellowSoft} />}
                 </div>
                 <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
                   {r.district} · <span style={{ color: PLAN_COLOR[r.plan], fontWeight: 700 }}>{r.plan}</span> · {services.length} ücretli özellik
@@ -2918,7 +2937,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
               <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                 ₺{total.toLocaleString('tr')}
               </div>
-              <span style={{ fontFamily: FB, fontSize: 13, fontWeight: 700, color: C.green }}>↑ 18%</span>
+              <span style={{ fontFamily: FB, fontSize: 13, fontWeight: 700, color: C.greenInk }}>↑ 18%</span>
             </div>
             <div style={{ fontFamily: FB, fontSize: 12.5, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
               Yıllıklandırılmış {money(total * 12)} · {STATS.totalRestaurants} işletmenin
@@ -3008,7 +3027,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
             <div style={{ width: 190, flexShrink: 0, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
                 {c.name}
-                {c.gastro && <Icon path={icons.star} size={12} color={C.orange} fill={C.orange} />}
+                {c.gastro && <Icon path={icons.star} size={12} color={C.orangeInk} fill={C.orange} />}
               </div>
               <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>
                 {c.district} · <span style={{ color: PLAN_COLOR[c.plan], fontWeight: 700 }}>{c.plan}</span>
@@ -3197,7 +3216,7 @@ function SettingsPage() {
                   )}
                   {/* Kapalı özelliğin kaç işletmede ayrıca kapatıldığı */}
                   {it.perStore && closedStores(settings, it.key) > 0 && (
-                    <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.yellow, background: C.yellowSoft, borderRadius: R.pill, padding: '4px 10px' }}>
+                    <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.yellowInk, background: C.yellowSoft, borderRadius: R.pill, padding: '4px 10px' }}>
                       {closedStores(settings, it.key)} işletmede ayrıca kapalı
                     </span>
                   )}

@@ -162,6 +162,53 @@ Sabit `#fff` yalnızca turuncu/koyu zemin üstündeki metin ve ikonlar için.
 Yönetici paneli kendi jeton kümesini taşır (`GurAdmin.jsx` → `C`), ama o da
 açık: koyu masaüstü sürümü kaldırıldı.
 
+### Kontrast: dengeli, ölçülmüş
+Beyaz yazı `#FF6600` üstünde **2.94:1** — küçük metinde de büyük metinde
+de kalıyor. Turuncuyu beyazın geçeceği kadar koyultmak (`#C24B00`) markayı
+kiremite çeviriyordu; onun yerine **turuncu kalır, üstündeki mürekkep
+koyulur**:
+
+| Jeton | Nerede | Oran |
+|---|---|---|
+| `--c-on-brand` | turuncu DOLGU üstünde ana metin | 5.95:1 |
+| `--c-on-brand-2` | turuncu üstünde ikincil metin | 4.63:1 |
+| `--c-brand-ink` | kâğıt üstünde turuncu METİN | 5.02:1 |
+
+Kâğıt üstünde `#FF6600`'ı metin rengi olarak **kullanma** — `--c-brand-ink`
+var. Turuncu zeminde `#fff` **kullanma** — `--c-on-brand` var.
+
+Aynı kural durum renklerinde: parlak ton dolgu, koyu ton yazı.
+`--c-ok` / `--c-ok-ink` / `--c-ok-on`, `--c-bad` / `--c-bad-ink`; panelde
+`C.orangeInk`, `C.greenInk`, `C.redInk`, `C.yellowInk`, `C.onBrand`.
+
+**Pasif durumu `opacity` ile kurma.** `opacity: 0.4` bir etiketi ~2:1'e
+düşürüyordu ve denetimden de kaçıyordu. Aktif/pasif farkı renkle: pasif
+`--c-muted` (5.6:1), aktif marka mürekkebi.
+
+Denetleme betiği ata zincirindeki opaklığı ve fotoğraf perdesini hesaba
+katarak on ekranı tarıyor; GUR kelime markası (tek harfli G/U/R) logotype
+olduğu için kural dışı.
+
+### Tonlu griler
+Nötr gri (`#ccc`, `#bbb`, `#333`, `#aaa`…) kremsi kâğıdın ve sıcak
+fotoğrafların yanında ölü duruyor. Hepsi paletin sıcak ekseninde:
+`--c-warm-1` … `--c-warm-4`, `--c-warm-ink`, `--c-warm-dark`. Panelin
+kâğıdı soğuk olduğu için oradaki griler soğuk eksende (`C.dim`, `C.faint`).
+
+Dikkat: `--c-warm-3` / `--c-warm-4` **koyu zemin için**. Açık kâğıtta
+okunmazlar — orada `--c-muted` kullan.
+
+### Tonlarla vurgu
+Sıralı bir büyüklüğü altı ayrı renkle değil, tek rengin tonlarıyla göster.
+`CAT_DIST` altı ayrı turuncu-kırmızı-amber karışımıydı; şimdi tek bir
+turuncu rampa, "Diğer" toplama kalemi olduğu için rampanın dışında nötr.
+
+### Doğal gradyanlar
+İki duraklı siyah→saydam geçişi ortada gri bir pus ve bittiği yerde görünür
+bir kesim bırakıyor: alfa doğrusal artıyor, algılanan parlaklık öyle
+artmıyor. `scrim(peak, end%, floor)` (`src/ui/kit.jsx`) durakları yumuşatma
+eğrisine oturtuyor. Fotoğraf üstüne elle `linear-gradient` yazma.
+
 ### Gölge: tek katman yok
 Her gölge **üç katmandan** oluşur — dar ve yakın olan temas çizgisini,
 geniş ve soluk olan yayılan ışığı taşır. Kurallar:

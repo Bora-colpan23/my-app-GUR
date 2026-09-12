@@ -14,6 +14,7 @@ import {
   usePrefersReducedMotion, GurLogo, Icon, BackBtn, Img,
   InputField, SelectField, ELEV, BRAND_GRAD,
   Spinner, Btn, IconBtn, HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
+  scrim,
 } from '../ui/kit.jsx';
 import { I, RESTAURANTS, CATEGORIES, fetchLiveRestaurants, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { Sheet, DangerConfirm, Chip } from '../ui/sheets.jsx';
@@ -257,7 +258,7 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
             <span style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "#4CAF50" }}>FAV!</span>
           </motion.div>
           <motion.div style={{ opacity: nopeOpacity, position: "absolute", top: 90, right: 24, zIndex: 10, border: "4px solid #FF3B30", borderRadius: 14, padding: "8px 22px", transform: "rotate(15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "#FF3B30" }}>NOPE</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-bad-ink)" }}>NOPE</span>
           </motion.div>
           {/* Yukarı kaydırma etiketi ortada: yön hangi karara gittiğini
               hareketin kendisiyle aynı eksende söylüyor (§8) */}
@@ -289,7 +290,7 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
       <div style={{ position: "absolute", top: 40, left: 14, right: 14, display: "flex", gap: 4, zIndex: 5 }}>
         {r.imgs.map((_, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === ii ? "#fff" : "rgba(255,255,255,0.3)", transition: "background 0.2s" }} />)}
       </div>
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 30%, transparent 55%)", borderRadius: 24 }} />
+      <div style={{ position: "absolute", inset: 0, background: scrim(0.9, 55), borderRadius: 24 }} />
       {/* Content */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
         <h3 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", gap: 7 }}>
@@ -375,7 +376,7 @@ function SplashScreen({ onNext }) {
         {/* Alt yazı — harfler birleştikten sonra */}
         <p style={{
           fontFamily: "var(--f-body)", fontSize: 14,
-          color: "#bbb",
+          color: "var(--c-warm-4)",
           marginTop: 20,
           opacity: phase >= 4 ? 1 : 0,
           transform: phase >= 4 ? "translateY(0)" : "translateY(20px)",
@@ -413,7 +414,8 @@ function WelcomeScreen({ onStart }) {
           </div>
 
           <p style={{
-            fontFamily: "var(--f-body)", fontSize: 16, color: "#ccc",
+            // Açık kâğıt üstünde: sıcak açık gri (--c-warm-3) 1.5:1 kalıyordu
+            fontFamily: "var(--f-body)", fontSize: 16, color: "var(--c-muted)",
             marginTop: 10, letterSpacing: 2,
             opacity: show ? 1 : 0, transform: show ? "translateY(0)" : "translateY(10px)",
             transition: "all 0.5s ease-out 0.4s",
@@ -440,14 +442,13 @@ function WelcomeScreen({ onStart }) {
           </div>
 
           <h2 style={{
-            fontFamily: "var(--f-body)", fontSize: 28, color: "#fff",
+            fontFamily: "var(--f-body)", fontSize: 28, color: "var(--c-on-brand)",
             textAlign: "center", margin: "14px 0 6px",
-            textShadow: "0 2px 8px rgba(0,0,0,0.1)",
           }}>
             Hoş geldin!
           </h2>
           <p style={{
-            fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.75)",
+            fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-on-brand-2)",
             textAlign: "center", margin: "0 0 28px", lineHeight: 1.5,
           }}>
             İstanbul'un en iyi restoranlarını keşfet, favorilerini kaydet
@@ -462,9 +463,9 @@ function WelcomeScreen({ onStart }) {
               çalışıyor (dev/üretimde yol tabanlı, tek dosyalık artifact
               önizlemesinde hash tabanlı). <Link> hedefi hangisiyse ona göre
               yazar; sabit "/isletme" önizlemede olmayan bir yola giderdi. */}
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.6)", textAlign: "center", margin: "16px 0 0", lineHeight: 1.55 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-on-brand-2)", textAlign: "center", margin: "16px 0 0", lineHeight: 1.55 }}>
             Restoran sahibi misin?{" "}
-            <Link to="/isletme" style={{ color: "#fff", fontWeight: 700, textDecoration: "underline" }}>Doyurucu uygulamasına geç</Link>
+            <Link to="/isletme" style={{ color: "var(--c-on-brand)", fontWeight: 700, textDecoration: "underline" }}>Doyurucu uygulamasına geç</Link>
           </p>
         </div>
       </div>
@@ -500,8 +501,10 @@ function SocialAuthRow({ onDone, tone = "light" }) {
     }
   };
 
-  const dim = tone === "light" ? "rgba(255,255,255,0.6)" : "rgba(45,36,25,0.45)";
-  const line = tone === "light" ? "rgba(255,255,255,0.25)" : "var(--c-border)";
+  // Üç bağlam: koyu zemin (light), kâğıt (dark) ve turuncu (brand).
+  // Turuncunun kendi tonu olmadan beyaz yazı 2.94:1'de kalıyordu.
+  const dim = tone === "brand" ? "var(--c-on-brand-2)" : tone === "light" ? "rgba(255,255,255,0.6)" : "rgba(45,36,25,0.45)";
+  const line = tone === "brand" ? "rgba(43,20,0,0.22)" : tone === "light" ? "rgba(255,255,255,0.25)" : "var(--c-border)";
 
   return (
     <div>
@@ -547,7 +550,7 @@ function SocialAuthRow({ onDone, tone = "light" }) {
       )}
 
       {error && (
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "#FF3B30", textAlign: "center", margin: "9px 0 0" }}>{error}</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-bad-ink)", textAlign: "center", margin: "9px 0 0" }}>{error}</p>
       )}
       {!socialConfigured.google && (
         <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: dim, textAlign: "center", margin: "9px 0 0", lineHeight: 1.5 }}>
@@ -573,12 +576,12 @@ function LoginScreen({ onBack, onLogin, onRegister, live }) {
     catch (err) { setError(err.message || "Giriş yapılamadı"); }
     finally { setBusy(false); }
   };
-  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "#fff", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>Giriş yap</h2><div style={{ marginBottom: 32, display: "flex", justifyContent: "center" }}><Btn variant="plain" size="sm" fullWidth={false} onClick={onRegister} text="Üyeliğiniz yoksa lütfen kayıt için dokununuz" /></div><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR uldamaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="light" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
+  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--c-warm-1)" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "var(--c-on-brand)", margin: "0 0 6px", textAlign: "center" }}>Giriş yap</h2><div style={{ marginBottom: 32, display: "flex", justifyContent: "center" }}><Btn variant="plainBrand" size="sm" fullWidth={false} onClick={onRegister} text="Üyeliğiniz yoksa lütfen kayıt için dokununuz" /></div><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR uldamaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="brand" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
 }
 
 function RegisterScreen({ onBack, onDone, onLegal, live }) {
   const [n,setN]=useState(""); const [e,setE]=useState(""); const [p,setP]=useState(""); const [d,setD]=useState(""); const [a,setA]=useState(false);
-  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "var(--f-body)", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "#FF6600", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" onClick={async () => { if (live) { try { await backend.signIn({ email: e, password: p, name: n }); } catch { /* var olan hesap: giriş ekranı denenmeli */ } } onDone(); }} /><SocialAuthRow tone="dark" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onDone(); }} /></div></Screen>;
+  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "var(--f-body)", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "var(--c-brand-ink)", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" onClick={async () => { if (live) { try { await backend.signIn({ email: e, password: p, name: n }); } catch { /* var olan hesap: giriş ekranı denenmeli */ } } onDone(); }} /><SocialAuthRow tone="dark" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onDone(); }} /></div></Screen>;
 }
 
 // ═══════════════════════════════════════════════
@@ -610,7 +613,7 @@ function HeroCarousel({ slides, intervalMs = 4500 }) {
           style={{ position: "absolute", inset: 0 }}
         >
           <Img src={slide.img} style={{ position: "absolute", inset: 0 }} bg={slide.accent || "#2c1810"} />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.25) 60%)" }} />
+          <div style={{ position: "absolute", inset: 0, background: scrim(0.78, 100, 0.25) }} />
           {slide.ad && (
             <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "2px 7px", fontFamily: "var(--f-body)", fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.85)", letterSpacing: 0.5 }}>REKLAM</span>
           )}
@@ -733,7 +736,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                 onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
                 onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
                 <Img src={c.img} style={{ position: "absolute", inset: 0 }} bg="#d4c8bc" />
-                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.05) 55%)" }} />
+                <div style={{ position: "absolute", inset: 0, background: scrim(0.75, 55, 0.05) }} />
                 <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "14px 16px" }}>
                   <span style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{c.name}</span>
                 </div>
@@ -774,7 +777,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           <GurLogo size={38} pill />
           <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
             <IconBtn onClick={onProfile} tone="solidLight" size={40} title="Profil">
-              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800 }}>B</div>
+              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--c-on-brand)", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800 }}>B</div>
             </IconBtn>
           </div>
         </div>
@@ -853,7 +856,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           <div style={{ marginBottom: 16, flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "var(--c-ink)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22C55E", animation: "pulse 1.6s ease-in-out infinite" }} />
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--c-ok)", animation: "pulse 1.6s ease-in-out infinite" }} />
                 Şu an yakınında
               </p>
               <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)" }}>{liveDeals.length} fırsat</span>
@@ -865,9 +868,9 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                   whileTap={{ scale: 0.97 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
                   style={{ flexShrink: 0, width: 178, borderRadius: 18, overflow: "hidden", position: "relative", height: 96, cursor: "pointer", boxShadow: "var(--sh-1)" }}>
                   <Img src={d.r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.88), rgba(0,0,0,0.15))" }} />
-                  <div style={{ position: "absolute", top: 8, left: 8, background: "#22C55E", borderRadius: 8, padding: "3px 8px" }}>
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 800, color: "#fff" }}>%{d.pct}</span>
+                  <div style={{ position: "absolute", inset: 0, background: scrim(0.88, 100, 0.15) }} />
+                  <div style={{ position: "absolute", top: 8, left: 8, background: "var(--c-ok)", borderRadius: 8, padding: "3px 8px" }}>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 800, color: "var(--c-ok-on)" }}>%{d.pct}</span>
                   </div>
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "8px 10px" }}>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "#fff", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.r.name}</p>
@@ -893,14 +896,14 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
               boxShadow: "var(--sh-brand)",
             }}
           >
-            <div style={{ width: 38, height: 38, borderRadius: 13, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <Icon n="sparkle" size={18} color="#fff" />
+            <div style={{ width: 38, height: 38, borderRadius: 13, background: "rgba(43,20,0,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon n="sparkle" size={18} color="var(--c-on-brand)" />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>GUR Match</p>
-              <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.8)", margin: 0 }}>Arkadaşınla birlikte kaydır, birlikte karar ver</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 800, color: "var(--c-on-brand)", margin: "0 0 2px" }}>GUR Match</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-on-brand-2)", margin: 0 }}>Arkadaşınla birlikte kaydır, birlikte karar ver</p>
             </div>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--c-on-brand-2)" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
           </motion.div>
         )}
 
@@ -909,7 +912,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, flexShrink: 0 }}>
           <h3 style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "var(--c-ink)", margin: 0 }}>Ne canın çekti?</h3>
           <button type="button" className="gur-btn" onClick={() => setShowAll(true)}
-            style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
+            style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-brand-ink)" }}>
             Tümü
           </button>
         </div>
@@ -935,7 +938,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
               <h3 style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "var(--c-ink)", margin: 0 }}>Yakınında popüler</h3>
               <button type="button" className="gur-btn" onClick={onSwipe}
-                style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
+                style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-brand-ink)" }}>
                 Kaydırarak gez
               </button>
             </div>
@@ -965,7 +968,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                         <Icon n="pin" size={11} color="var(--c-muted)" />
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{distText(r)}</span>
                       </span>
-                      <span style={{ flexShrink: 0, fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "#fff", background: BRAND_GRAD, borderRadius: 999, padding: "6px 13px", boxShadow: ELEV.restBrand }}>
+                      <span style={{ flexShrink: 0, fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "var(--c-on-brand)", background: BRAND_GRAD, borderRadius: 999, padding: "6px 13px", boxShadow: ELEV.restBrand }}>
                         Aç
                       </span>
                     </div>
@@ -990,11 +993,11 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
             </div>
             <div>
-              <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "#333", margin: 0 }}>Tüm Kategoriler</p>
-              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "#aaa", margin: 0 }}>{CATEGORIES.length} mutfak türü</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "var(--c-warm-ink)", margin: 0 }}>Tüm Kategoriler</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", margin: 0 }}>{CATEGORIES.length} mutfak türü</p>
             </div>
           </div>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c-warm-3)" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
         </div>
         </>
         )}
@@ -1005,12 +1008,12 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", margin: "12px 0 16px", boxShadow: "var(--sh-2)", flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF6600" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-brand-ink)", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
-          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
 
@@ -1045,7 +1048,7 @@ function RewardedAdOverlay({ ad, onComplete, onAbort }) {
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg, ${ad.accent}, #0a0500)` }} />
         <Img src={ad.img} style={{ position: "absolute", inset: 0, opacity: 0.45 }} bg="transparent" />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.2) 55%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: scrim(0.9, 55, 0.2) }} />
 
         {/* Üst şerit: reklam etiketi + geri sayım */}
         <div style={{ position: "absolute", top: 44, left: 16, right: 16, display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 5 }}>
@@ -1439,7 +1442,7 @@ function ExternalReviews({ reviews = [], restaurant, loading }) {
           ))}
           {reviews.length > 2 && (
             <button type="button" className="gur-btn" onClick={() => setOpen(o => !o)}
-              style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "#FF6600" }}>
+              style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-brand-ink)" }}>
               {open ? "Daha az göster" : `${reviews.length - 2} yorum daha`}
             </button>
           )}
@@ -1466,7 +1469,7 @@ function NotYetSheet({ r, onClose }) {
         {r.name} GUR'daki kaydını henüz sahiplenmedi. Sahiplendiği gün menüsü ve
         masa ayırtma tam burada açılacak.
       </p>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "#FF6600", margin: "0 0 16px" }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "var(--c-brand-ink)", margin: "0 0 16px" }}>
         Çok yakında.
       </p>
       <Btn text="Tamam, beklerim" onClick={onClose} variant="filled" />
@@ -1712,7 +1715,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
           <button
             type="button" className="gur-btn"
             onClick={full ? collapse : expand}
-            style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 6, fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "#FF6600" }}>
+            style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 6, fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "var(--c-brand-ink)" }}>
             {full ? "Küçült" : "Tam ekran"}
           </button>
           <IconBtn onClick={close} tone="subtle" size={30} title="Kapat"
@@ -2082,16 +2085,19 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
           </div>
         )}
 
-        {/* Alt bar — beyaz, keşfet sayfası ile aynı */}
+        {/* Alt bar — beyaz, keşfet sayfası ile aynı.
+            Pasif öğe SOLUKLAŞTIRILMIYOR: opacity 0.4 etiketi ~2:1'e
+            düşürüyordu. Aktif/pasif farkı renkle kuruluyor — pasif
+            --c-muted (5.6:1), aktif marka mürekkebi. */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "var(--shadow-bar)", flexShrink: 0 }}>
-          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
-          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
       </div>
@@ -2170,7 +2176,7 @@ function MatchStartScreen({ onBack, onStart }) {
         )}
 
         <div style={{ marginTop: "auto", paddingTop: 20 }}>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.22)", textAlign: "center", margin: 0, lineHeight: 1.5 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.62)", textAlign: "center", margin: 0, lineHeight: 1.5 }}>
             Demo sürümü — arkadaşın kararları davet kodundan üretilir. Gerçek eş zamanlı oturum için backend gerekir.
           </p>
         </div>
@@ -2259,7 +2265,7 @@ function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#FFA500", fontWeight: 700, letterSpacing: 3, margin: "0 0 10px" }}>EŞLEŞTİNİZ!</p>
                 <div style={{ width: "100%", height: 220, borderRadius: 24, overflow: "hidden", position: "relative", marginBottom: 18, boxShadow: "var(--sh-brand-lg)" }}>
                   <Img src={popup.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.85), transparent 60%)" }} />
+                  <div style={{ position: "absolute", inset: 0, background: scrim(0.85, 60) }} />
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px 18px", textAlign: "left" }}>
                     <h3 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 4px" }}>{popup.name}</h3>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.65)", margin: 0 }}>{popup.cat} • {popup.dist}</p>
@@ -2308,7 +2314,7 @@ function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h4 style={{ fontFamily: "var(--f-body)", fontSize: 14.5, fontWeight: 800, color: "#2D2419", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</h4>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(45,36,25,0.5)", margin: "0 0 6px" }}>{r.cat} • {r.dist}</p>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,102,0,0.1)", borderRadius: 10, padding: "3px 9px", fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "#FF6600" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,102,0,0.1)", borderRadius: 10, padding: "3px 9px", fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-brand-ink)" }}>
                   <Icon n="sparkle" size={10} color="#FF6600" /> Eşleşme
                 </span>
               </div>
@@ -2365,7 +2371,7 @@ function ReservationSheet({ r, onClose, onConfirm }) {
 
       {deal && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 14, padding: "11px 14px", marginBottom: 18 }}>
-          <span style={{ background: "#22C55E", borderRadius: 8, padding: "3px 8px", fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "#fff" }}>%{deal.pct}</span>
+          <span style={{ background: "var(--c-ok)", borderRadius: 8, padding: "3px 8px", fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "var(--c-ok-on)" }}>%{deal.pct}</span>
           <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#166534", margin: 0, lineHeight: 1.4 }}>
             Anlık fırsat bu rezervasyona uygulanır — {formatCountdown(deal.minutesLeft)} kaldı
           </p>
@@ -2523,7 +2529,7 @@ function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
               }}>
               <Icon n="camera" size={19} color="#FF6600" />
-              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, color: "#FF6600" }}>Ekle</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, color: "var(--c-brand-ink)" }}>Ekle</span>
             </motion.button>
           )}
         </div>
@@ -2627,8 +2633,8 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
           {/* Info chips */}
           <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 10, flexWrap: "wrap" }}>
-            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: "#FF6600", fontFamily: "var(--f-body)", boxShadow: "var(--sh-1)" }}>★ {r.rating}</span>
-            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontFamily: "var(--f-body)", fontSize: 16, color: "#333", boxShadow: "var(--sh-1)", display: "inline-flex", alignItems: "center", gap: 7 }}>
+            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: "var(--c-brand-ink)", fontFamily: "var(--f-body)", boxShadow: "var(--sh-1)" }}>★ {r.rating}</span>
+            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontFamily: "var(--f-body)", fontSize: 16, color: "var(--c-warm-ink)", boxShadow: "var(--sh-1)", display: "inline-flex", alignItems: "center", gap: 7 }}>
               {r.name}
               {claimed && <VerifiedStar size={14} />}
             </span>
@@ -2703,9 +2709,9 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           {/* Yorumlar — tek tek gösterim */}
           <div style={{ marginBottom: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
-<p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "#333", margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icon n="chat" color="#333" size={16} />Yorumlar</p>
+<p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "var(--c-warm-ink)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icon n="chat" color="var(--c-warm-ink)" size={16} />Yorumlar</p>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "#bbb" }}>{revIdx + 1} / {reviews.length}</span>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-warm-4)" }}>{revIdx + 1} / {reviews.length}</span>
               </div>
             </div>
 
@@ -2734,15 +2740,15 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <div style={{ width: 34, height: 34, borderRadius: 12, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 800 }}>{rev.user.charAt(0)}</div>
                           <div>
-                            <p style={{ fontFamily: "var(--f-body)", fontWeight: 800, fontSize: 14, color: "#FF6600", margin: 0 }}>{rev.user}</p>
+                            <p style={{ fontFamily: "var(--f-body)", fontWeight: 800, fontSize: 14, color: "var(--c-brand-ink)", margin: 0 }}>{rev.user}</p>
                             <div style={{ display: "flex", gap: 2 }}>
-                              {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "#FFA500" : "#ddd" }}>★</span>)}
+                              {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "#FFA500" : "var(--c-warm-2)" }}>★</span>)}
                             </div>
                           </div>
                         </div>
-                        <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "#ccc" }}>{rev.date}</span>
+                        <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-warm-3)" }}>{rev.date}</span>
                       </div>
-                      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#666", margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{rev.text}</p>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)", margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{rev.text}</p>
                       {rev.photos && rev.photos.length > 0 && (
                         <div style={{ display: "flex", gap: 6 }}>
                           {rev.photos.slice(0, 3).map((p, pi) => (
@@ -2751,7 +2757,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                             </div>
                           ))}
                           <div style={{ display: "flex", alignItems: "center" }}>
-                            <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "#ccc" }}>detay →</span>
+                            <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-warm-3)" }}>detay →</span>
                           </div>
                         </div>
                       )}
@@ -2766,7 +2772,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
               {reviews.map((_, i) => (
                 <div key={i} onClick={() => setRevIdx(i)} style={{
                   width: i === revIdx ? 20 : 7, height: 7, borderRadius: 4,
-                  background: i === revIdx ? "#FF6600" : "#e0e0e0",
+                  background: i === revIdx ? "#FF6600" : "var(--c-warm-2)",
                   transition: "all 0.3s", cursor: "pointer",
                 }} />
               ))}
@@ -2775,15 +2781,15 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
           {/* Tags */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "0 16px", marginBottom: 18 }}>
-            {r.tags.map(t => <span key={t} style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "var(--f-body)", fontWeight: 600 }}>{t}</span>)}
-            <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "var(--f-body)", fontWeight: 600 }}>🕐 {r.hours}</span>
+            {r.tags.map(t => <span key={t} style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "var(--c-brand-ink)", fontFamily: "var(--f-body)", fontWeight: 600 }}>{t}</span>)}
+            <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "var(--c-brand-ink)", fontFamily: "var(--f-body)", fontWeight: 600 }}>🕐 {r.hours}</span>
           </div>
 
           {/* Anlık fırsat */}
           {deal && (
             <div style={{ margin: "0 16px 16px", display: "flex", alignItems: "center", gap: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", borderRadius: 18, padding: "13px 15px" }}>
-              <div style={{ background: "#22C55E", borderRadius: 10, padding: "6px 11px", flexShrink: 0 }}>
-                <span style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff" }}>%{deal.pct}</span>
+              <div style={{ background: "var(--c-ok)", borderRadius: 10, padding: "6px 11px", flexShrink: 0 }}>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-ok-on)" }}>%{deal.pct}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#166534", margin: "0 0 2px" }}>Şu an geçerli</p>
@@ -2815,12 +2821,12 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
         <div style={{ position: "sticky", bottom: 0, background: "var(--c-card)", display: "flex", alignItems: "center", justifyContent: "space-around", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "var(--sh-2)" }}>
           <div onClick={() => (claimed && canMenu ? setShowMenu(true) : setSheet("soon"))} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: claimed ? 0.5 : 0.35 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /></svg>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Menü</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-brand-ink)", fontWeight: 700 }}>Menü</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
-          <div onClick={openMaps} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.5 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Konum</span>
+          <div onClick={openMaps} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Konum</span>
           </div>
         </div>
 
@@ -2935,7 +2941,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 <div style={{ background: "rgba(255,102,0,0.1)", borderRadius: 18, padding: "14px 16px", marginTop: 20, display: "flex", alignItems: "center", gap: 12, border: "1px solid rgba(255,102,0,0.15)" }}>
 <Icon n="plate" color="#FF6600" size={16} />
                   <div>
-                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#FF6600", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-brand-ink)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.4)", margin: 0 }}>{r.cat} • {r.addr}</p>
                   </div>
                 </div>
@@ -2971,7 +2977,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                   {r.menu.map((menuImg, mi) => (
                     <div key={mi} style={{ borderRadius: 18, overflow: "hidden", boxShadow: "var(--sh-2)", animation: `fadeInUp 0.4s ease-out ${mi * 0.1}s both` }}>
                       <div style={{ position: "relative" }}>
-                        <Img src={menuImg} style={{ width: "100%", height: 380, borderRadius: 18 }} bg="#1a1a1a" />
+                        <Img src={menuImg} style={{ width: "100%", height: 380, borderRadius: 18 }} bg="var(--c-warm-dark)" />
                         <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.5)", borderRadius: 10, padding: "4px 10px", backdropFilter: "blur(6px)" }}>
                           <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.7)" }}>{mi + 1} / {r.menu.length}</span>
                         </div>
@@ -3012,7 +3018,7 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
           <GurLogo size={42} pill />
           <div style={{ position: "absolute", right: 0 }}>
             <IconBtn onClick={onProfile} tone="solidLight" size={40} title="Profil">
-              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800 }}>B</div>
+              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--c-on-brand)", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800 }}>B</div>
             </IconBtn>
           </div>
         </div>
@@ -3065,7 +3071,7 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
                 {/* Üst kısım — fotoğraf */}
                 <div onClick={() => onDetail(r)} style={{ cursor: "pointer", position: "relative", height: 160 }}>
                   <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#d4c8bc" />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 45%)" }} />
+                  <div style={{ position: "absolute", inset: 0, background: scrim(0.7, 45) }} />
 
                   {/* Puan ve kategori */}
                   <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6 }}>
@@ -3090,7 +3096,7 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
                       <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4CAF50" }} />
                       <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "#4CAF50", fontWeight: 700 }}>Açık</span>
                     </div>
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "#bbb" }}>{r.hours}</span>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-warm-4)" }}>{r.hours}</span>
                   </div>
 
                   {/* Silme — onaylı */}
@@ -3110,8 +3116,8 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
 
                 {/* Adres */}
                 <div style={{ padding: "0 16px 14px" }}>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "#bbb", margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-warm-4)", margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-warm-3)" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
                     {r.addr}
                   </p>
                 </div>
@@ -3124,14 +3130,14 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
       {/* Alt bar — beyaz, keşfet sayfası ile aynı */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 16px 16px", zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", boxShadow: "var(--sh-2)" }}>
-          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF3B30" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-bad-ink)", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
       </div>
@@ -3379,14 +3385,14 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
       {/* Alt bar */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 16px 16px", zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", boxShadow: "var(--sh-2)" }}>
-          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
+          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
             <Icon n="search" color="#FF6600" size={22} />
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
-          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
+          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
             <Icon n="heart" color="#FF3B30" size={22} />
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
       </div>
@@ -3836,13 +3842,15 @@ export default function GurApp(props = {}) {
           <div style={{
             position: "absolute", top: 8, right: 10, zIndex: 700,
             display: "inline-flex", alignItems: "center", gap: 5,
-            background: "rgba(0,0,0,0.42)", backdropFilter: "blur(8px)",
+            // %42 cam açık zeminin üstünde griye dönüyor, beyaz yazı 2.5:1
+            // kalıyordu. Sıcak ve daha opak: hem kâğıtta hem fotoğrafta okunur.
+            background: "rgba(28,20,12,0.82)", backdropFilter: "blur(8px)",
             border: "1px solid rgba(255,255,255,0.14)", borderRadius: 20, padding: "3px 9px",
           }} title={session.mode === "live"
             ? `Sunucuya bağlı — ${session.info?.restaurants ?? 0} mekan`
             : "Sunucu yok: veriler yalnızca bu tarayıcıda saklanıyor"}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: session.mode === "live" ? "#22C55E" : "#F59E0B" }} />
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 700, color: "#fff" }}>
               {session.mode === "live" ? "CANLI" : "YEREL"}
             </span>
           </div>

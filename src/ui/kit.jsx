@@ -16,6 +16,22 @@ import { motion } from 'motion/react';
 
 export const GRAD = "#FF6600";
 
+// ── DOĞAL PERDE (scrim) ─────────────────────────────────────────────────
+// İki duraklı siyah→saydam geçişi ortada gri bir pus ve bittiği yerde
+// görünür bir kesim bırakıyor: alfa doğrusal artıyor ama algılanan
+// parlaklık öyle artmıyor. Duraklar yumuşatma eğrisine oturtuldu —
+// fotoğrafın üstündeki yazı okunur kalırken geçiş göze görünmüyor.
+const SCRIM_EASE = [
+  [0, 1], [0.12, 0.966], [0.24, 0.879], [0.36, 0.751], [0.48, 0.601],
+  [0.60, 0.447], [0.72, 0.297], [0.84, 0.158], [0.93, 0.06], [1, 0],
+];
+/** @param peak en koyu uç, end yüzde olarak bitiş, floor sönümlenmeyen taban */
+export function scrim(peak = 0.9, end = 100, floor = 0, dir = "to top") {
+  const stops = SCRIM_EASE.map(([t, a]) =>
+    `rgba(0,0,0,${+(floor + (peak - floor) * a).toFixed(3)}) ${+(t * end).toFixed(1)}%`);
+  return `linear-gradient(${dir}, ${stops.join(", ")})`;
+}
+
 // Apple "Designing Fluid Interfaces" momentum projection: nereye bırakılacağını
 // bırakma anındaki konum değil, hızın taşıdığı yönü kullanarak tahmin eder.
 export function projectMomentum(velocity, decelerationRate = 0.998) {
@@ -235,18 +251,28 @@ export function Btn({
   const palettes = {
     onColor:   { bg: "#fff", hover: "#FFF4EC", press: "#FFE8D8", color: "#B4530A", elev: "oneRest", pressElev: "onePress",
                  chip: { bg: "#FF6600", ink: "#fff" }, badge: { bg: "rgba(255,102,0,0.14)", ink: "#B4530A" } },
-    filled:    { bg: BRAND_GRAD, hover: BRAND_GRAD_HOVER, press: BRAND_GRAD, color: "#fff", elev: "oneBrand", pressElev: "oneBrandPress",
-                 chip: { bg: "#fff", ink: "#FF6600" }, badge: { bg: "rgba(255,255,255,0.28)", ink: "#fff" } },
+    // Turuncunun üstünde beyaz 2.94:1 — küçük metinde de büyük metinde de
+    // kalıyor. Turuncuyu beyazın geçeceği kadar koyultmak markayı kiremite
+    // çeviriyordu; hap turuncu kalıyor, yazı koyu mürekkebe geçiyor.
+    filled:    { bg: BRAND_GRAD, hover: BRAND_GRAD_HOVER, press: BRAND_GRAD, color: "var(--c-on-brand)", elev: "oneBrand", pressElev: "oneBrandPress",
+                 chip: { bg: "#2B1400", ink: "#FF9A4D" }, badge: { bg: "rgba(43,20,0,0.18)", ink: "var(--c-on-brand)" } },
     // Siyah hap: referansın "Download" düğmesi. Turuncuyla yarışmadan
     // birincil olabilen tek renk.
     ink:       { bg: "#17130F", hover: "#241E18", press: "#0D0A08", color: "#fff", elev: "oneInk", pressElev: "oneInkPress",
                  chip: { bg: "#fff", ink: "#17130F" }, badge: { bg: "rgba(255,255,255,0.22)", ink: "#fff" } },
     outline:   { bg: "rgba(255,255,255,0.10)", hover: "rgba(255,255,255,0.18)", press: "rgba(255,255,255,0.06)", color: "#fff", border: "1px solid rgba(255,255,255,0.45)",
                  chip: { bg: "#fff", ink: "#17130F" }, badge: { bg: "rgba(255,255,255,0.22)", ink: "#fff" } },
+    // Turuncu zemin beyaz yazıyı taşıyamıyor (2.94:1). Aynı iki varyantın
+    // turuncu karşılığı: hap koyu mürekkep alıyor, kenarlık da öyle.
+    outlineBrand: { bg: "rgba(43,20,0,0.06)", hover: "rgba(43,20,0,0.12)", press: "rgba(43,20,0,0.18)", color: "var(--c-on-brand)", border: "1px solid rgba(43,20,0,0.35)",
+                 chip: { bg: "#2B1400", ink: "#FF9A4D" }, badge: { bg: "rgba(43,20,0,0.16)", ink: "var(--c-on-brand)" } },
+    plainBrand: { bg: "transparent", hover: "rgba(43,20,0,0.08)", press: "rgba(43,20,0,0.14)", color: "var(--c-on-brand-2)",
+                 chip: { bg: "#2B1400", ink: "#FF9A4D" }, badge: { bg: "rgba(43,20,0,0.16)", ink: "var(--c-on-brand)" } },
     outlineDark: { bg: "#fff", hover: "#FAF8F6", press: "#F1ECE7", color: "var(--c-ink)", border: "1px solid var(--c-line)", elev: "oneRest", pressElev: "onePress",
                  chip: { bg: "#17130F", ink: "#fff" }, badge: { bg: "rgba(45,36,25,0.09)", ink: "var(--c-ink-2)" } },
-    destructive: { bg: "#E5484D", hover: "#EE5A5F", press: "#CE3A3F", color: "#fff", elev: "oneDanger", pressElev: "oneDangerPress",
-                 chip: { bg: "#fff", ink: "#E5484D" }, badge: { bg: "rgba(255,255,255,0.26)", ink: "#fff" } },
+    // Beyaz yazı #E5484D üstünde 3.91:1'de kalıyordu; dolgu koyu tona indi (5.8:1).
+    destructive: { bg: "#C2282D", hover: "#D13439", press: "#A81F24", color: "#fff", elev: "oneDanger", pressElev: "oneDangerPress",
+                 chip: { bg: "#fff", ink: "#C2282D" }, badge: { bg: "rgba(255,255,255,0.26)", ink: "#fff" } },
     // Yumuşak haplar: %10-12 tonlu zemin, renkli kalın yazı, gölge yok.
     destructiveSoft: { bg: "rgba(229,72,77,0.10)", hover: "rgba(229,72,77,0.16)", press: "rgba(229,72,77,0.22)", color: "#C2282D", border: "1px solid rgba(229,72,77,0.16)",
                  chip: { bg: "#E5484D", ink: "#fff" }, badge: { bg: "rgba(229,72,77,0.18)", ink: "#C2282D" } },
@@ -483,7 +509,7 @@ export function UploadBox({ label, icon, accept, files, setFiles, multiple = tru
         onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,102,0,0.3)"}>
         {files.length === 0 ? <><div style={{ display: "flex", justifyContent: "center" }}>{icon}</div><p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: "10px 0 0" }}>Dosya seçmek için tıklayın</p></> : (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-            {files.map((f, i) => <div key={i} style={{ position: "relative" }}>{f.type?.startsWith("image/") ? <img src={f.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "2px solid rgba(255,102,0,0.2)" }} /> : <div style={{ width: 72, height: 72, borderRadius: 12, background: "#FFF3EA", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="doc" size={20} color="#FF6600" /></div>}<button type="button" className="gur-icon-btn" title="Kaldır" aria-label="Kaldır" onClick={e => { e.stopPropagation(); remove(i); }} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", border: "none", padding: 0, outline: "none", background: "#FF3B30", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", cursor: "pointer", fontWeight: 700, boxShadow: "var(--sh-1)" }}>✕</button></div>)}
+            {files.map((f, i) => <div key={i} style={{ position: "relative" }}>{f.type?.startsWith("image/") ? <img src={f.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "2px solid rgba(255,102,0,0.2)" }} /> : <div style={{ width: 72, height: 72, borderRadius: 12, background: "#FFF3EA", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="doc" size={20} color="#FF6600" /></div>}<button type="button" className="gur-icon-btn" title="Kaldır" aria-label="Kaldır" onClick={e => { e.stopPropagation(); remove(i); }} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", border: "none", padding: 0, outline: "none", background: "var(--c-bad)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", cursor: "pointer", fontWeight: 700, boxShadow: "var(--sh-1)" }}>✕</button></div>)}
             <div style={{ width: 72, height: 72, borderRadius: 12, border: "2px dashed rgba(255,102,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 18, color: "rgba(255,102,0,0.4)" }}>+</span></div>
           </div>
         )}
@@ -584,7 +610,37 @@ export function GurStyles() {
           /* Aşağıdan yükselen sayfa gölgesini yukarı atar. */
           --sh-up: 0 -2px 6px rgba(var(--sh-tint),0.04), 0 -8px 20px rgba(var(--sh-tint),0.06), 0 -20px 46px rgba(var(--sh-tint),0.08);
           --c-brand-soft: rgba(255,102,0,0.08);
-          --c-brand-ink: #B4530A;       /* turuncu zemin üstünde metin */
+          --c-brand-ink: #B4530A;       /* turuncu TONLU açık zemin üstünde metin (5.0:1) */
+
+          /* ── BAĞLAMA DUYARLI MÜREKKEP ────────────────────────────
+             Aynı metin her zeminde aynı rengi alamaz. Beyaz yazı
+             #FF6600 üstünde 2.94:1 — küçük metinde de büyük metinde
+             de kalıyor. Turuncuyu beyazın geçeceği kadar koyultmak
+             (#C24B00) markayı kiremite çeviriyordu; onun yerine
+             turuncu kalıyor, üstündeki mürekkep koyuluyor. */
+          --c-on-brand: #2B1400;        /* turuncu üstünde ana metin (5.95:1) */
+          --c-on-brand-2: #4A2400;      /* turuncu üstünde ikincil (4.63:1) */
+
+          /* ── DURUM RENKLERİ: DOLGU VE YAZI AYRI TONLAR ───────────
+             Tek parlak yeşil hem rozet zemini hem yazı rengi olarak
+             kullanılınca yazı 2.3:1'e düşüyordu. Aynı rengin iki
+             tonu: dolgu parlak kalır, yazı koyu tonu alır. */
+          --c-ok: #13B364;              /* yeşil dolgu */
+          --c-ok-ink: #0A7C46;          /* beyaz üstünde yeşil yazı (5.3:1) */
+          --c-ok-on: #08301C;           /* yeşil dolgu üstünde yazı (5.3:1) */
+          --c-bad: #E5484D;             /* kırmızı dolgu */
+          --c-bad-ink: #C2282D;         /* beyaz üstünde kırmızı yazı (5.8:1) */
+
+          /* ── TONLU GRİLER ────────────────────────────────────────
+             Nötr gri (#ccc, #bbb, #333…) kremsi kâğıdın ve sıcak
+             fotoğrafların yanında ölü duruyor. Hepsi paletin sıcak
+             ekseninde. */
+          --c-warm-1: #F6F3EE;
+          --c-warm-2: #E0D9D0;
+          --c-warm-3: #D6CFC7;
+          --c-warm-4: #BDB4AA;
+          --c-warm-ink: #2E2A26;
+          --c-warm-dark: #1B1714;
           --shadow-bar: var(--sh-3);
 
           /* ── YAZI TİPİ JETONLARI ──────────────────────────────────
