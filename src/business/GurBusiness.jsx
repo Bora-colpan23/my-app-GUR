@@ -119,7 +119,7 @@ function OwnerServices({ restaurant }) {
     <div style={{ background: "rgba(255,102,0,0.07)", border: "1px solid rgba(255,102,0,0.2)", borderRadius: 20, padding: "14px 16px", marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: 0 }}>Aldığın hizmetler</p>
-        <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, letterSpacing: 0.3, color: plan === "Ücretsiz" ? "rgba(255,255,255,0.5)" : "#FFA500", background: "rgba(255,255,255,0.07)", borderRadius: 6, padding: "3px 9px" }}>
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, letterSpacing: 0.3, color: plan === "Ücretsiz" ? "rgba(255,255,255,0.5)" : "var(--c-warn)", background: "rgba(255,255,255,0.07)", borderRadius: 6, padding: "3px 9px" }}>
           {plan.toLocaleUpperCase("tr")} PLAN
         </span>
       </div>
@@ -182,7 +182,7 @@ function OwnerInfoTab({ restaurant }) {
           Kaydın harita servislerinden otomatik oluşturuldu. Doldurduğun alanlar bu veriyi
           ezer; boş bıraktıkların API'den gelmeye devam eder.
         </p>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "#FFA500", margin: "9px 0 0" }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "var(--c-warn)", margin: "9px 0 0" }}>
           {filled}/{OVERRIDABLE.length} alan işletmeden
         </p>
       </div>
@@ -196,7 +196,7 @@ function OwnerInfoTab({ restaurant }) {
               <span style={{
                 fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4,
                 padding: "2px 8px", borderRadius: 6,
-                color: fromOwner ? "#4ADE80" : "rgba(255,255,255,0.45)",
+                color: fromOwner ? "var(--c-ok-light)" : "rgba(255,255,255,0.45)",
                 background: fromOwner ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.07)",
               }}>{fromOwner ? "İŞLETMEDEN" : "API'DEN"}</span>
             </div>
@@ -336,7 +336,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
                       <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
                       <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "#8A7A68", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.addr}</p>
                     </div>
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, flexShrink: 0, color: st === "approved" ? "#16A34A" : st === "pending" ? "#D97706" : "#FF6600" }}>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, flexShrink: 0, color: st === "approved" ? "var(--c-ok-ink)" : st === "pending" ? "var(--c-warn-ink)" : "#FF6600" }}>
                       {st === "approved" ? "Sahiplenilmiş" : st === "pending" ? "Beklemede" : "Sahiplen"}
                     </span>
                   </button>
@@ -620,7 +620,7 @@ function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
             marginBottom: 24, animation: "fadeInUp 0.5s ease-out",
             boxShadow: "var(--sh-2)",
           }}>
-            <Icon n="check" color="#22A34D" size={32} strokeWidth={2.5} />
+            <Icon n="check" color="var(--c-ok-ink)" size={32} strokeWidth={2.5} />
           </div>
 
           <h2 style={{
@@ -656,7 +656,7 @@ function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
               }}>
                 {item.icon}
                 <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#4A3F33", flex: 1 }}>{item.text}</span>
-                {item.done ? <Icon n="check" size={16} color="#22A34D" /> : <Icon n="clock" size={16} color="#C9A24B" />}
+                {item.done ? <Icon n="check" size={16} color="var(--c-ok-ink)" /> : <Icon n="clock" size={16} color="var(--c-warn)" />}
               </div>
             ))}
           </div>
@@ -667,8 +667,8 @@ function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
             borderRadius: 16, padding: "14px 16px", marginBottom: 24, display: "flex", gap: 12,
             animation: "fadeInUp 0.5s ease-out 0.4s both",
           }}>
-            <Icon n="clock" size={16} color="#2F8C46" />
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "#2F8C46", margin: 0, lineHeight: 1.5 }}>
+            <Icon n="clock" size={16} color="var(--c-ok-ink)" />
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-ok-ink)", margin: 0, lineHeight: 1.5 }}>
               Başvurunuz en geç 24 saat içinde incelenecek ve onaylandığında restoranınız GUR'da yayınlanacaktır.
             </p>
           </div>
@@ -750,9 +750,9 @@ function DarkChip({ label, active, onClick }) {
       onClick={onClick} className="gur-btn"
       whileTap={{ scale: 0.95 }} transition={{ type: "spring", bounce: 0, duration: 0.25 }}
       style={{
-        border: `1.5px solid ${active ? "#22C55E" : "rgba(255,255,255,0.14)"}`,
+        border: `1.5px solid ${active ? "var(--c-ok)" : "rgba(255,255,255,0.14)"}`,
         background: active ? "rgba(34,197,94,0.14)" : "transparent",
-        color: active ? "#4ADE80" : "rgba(255,255,255,0.6)",
+        color: active ? "var(--c-ok-light)" : "rgba(255,255,255,0.6)",
         borderRadius: 11, padding: "7px 13px", cursor: "pointer", outline: "none",
         fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700,
       }}>{label}</motion.button>
@@ -795,8 +795,8 @@ function GrowthCard({ title, price, desc, active, locked, onBuy }) {
         <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.35)", margin: 0 }}>Bu paket sonraki fazda açılıyor</p>
       ) : active ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Icon n="check" size={14} color="#4ADE80" />
-          <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "#4ADE80" }}>Aktif</span>
+          <Icon n="check" size={14} color="var(--c-ok-light)" />
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-ok-light)" }}>Aktif</span>
         </div>
       ) : (
         <Btn text="Satın Al" onClick={onBuy} variant="filled" size="sm" fullWidth={false} />
@@ -963,10 +963,10 @@ function InteractionHeatmap({ restaurant }) {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-        <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "#4CAF50", background: "rgba(76,175,80,0.14)", borderRadius: 999, padding: "5px 11px" }}>
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-ok-light)", background: "rgba(76,175,80,0.14)", borderRadius: 999, padding: "5px 11px" }}>
           En yoğun: {HEAT_DAYS[best.di]} {HEAT_SLOTS[best.si].label}
         </span>
-        <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "#FFA500", background: "rgba(255,165,0,0.14)", borderRadius: 999, padding: "5px 11px" }}>
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-warn)", background: "rgba(255,165,0,0.14)", borderRadius: 999, padding: "5px 11px" }}>
           En sakin: {HEAT_DAYS[worst.di]} {HEAT_SLOTS[worst.si].label} — anlık fırsat için uygun
         </span>
       </div>
@@ -1003,7 +1003,7 @@ function TableRequests({ restaurant }) {
         {!actionable && (
           <span style={{
             fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, borderRadius: 999, padding: "4px 11px",
-            color: x.status === "confirmed" ? "#4CAF50" : "rgba(255,255,255,0.4)",
+            color: x.status === "confirmed" ? "var(--c-ok-light)" : "rgba(255,255,255,0.4)",
             background: x.status === "confirmed" ? "rgba(76,175,80,0.14)" : "rgba(255,255,255,0.06)",
           }}>{x.status === "confirmed" ? "Onaylandı" : "Reddedildi"}</span>
         )}
@@ -1074,7 +1074,7 @@ function PriceOffers({ restaurant }) {
           {!actionable && (
             <span style={{
               fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, borderRadius: 999, padding: "4px 11px",
-              color: o.status === "accepted" ? "#4CAF50" : "rgba(255,255,255,0.4)",
+              color: o.status === "accepted" ? "var(--c-ok-light)" : "rgba(255,255,255,0.4)",
               background: o.status === "accepted" ? "rgba(76,175,80,0.14)" : "rgba(255,255,255,0.06)",
             }}>{o.status === "accepted" ? "Kabul edildi" : "Reddedildi"}</span>
           )}
@@ -1089,10 +1089,10 @@ function PriceOffers({ restaurant }) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.4" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="13 6 19 12 13 18" /></svg>
           <div>
             <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Teklif</p>
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 800, color: cheaper ? "#4CAF50" : "#FFA500", margin: 0 }}>{fmt(o.offerMonthly)}<span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}> /ay</span></p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 800, color: cheaper ? "var(--c-ok-light)" : "var(--c-warn)", margin: 0 }}>{fmt(o.offerMonthly)}<span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}> /ay</span></p>
           </div>
           {diff !== null && diff !== 0 && (
-            <span style={{ marginLeft: "auto", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: cheaper ? "#4CAF50" : "#FFA500" }}>
+            <span style={{ marginLeft: "auto", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: cheaper ? "var(--c-ok-light)" : "var(--c-warn)" }}>
               {diff > 0 ? "+" : ""}{diff}%
             </span>
           )}
@@ -1300,16 +1300,16 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                 {/* Sağ kaydırma */}
                 <div style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.15)", borderRadius: 20, padding: "18px 16px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-<div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(76,175,80,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="heart" color="#4CAF50" size={16} /></div>
+<div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(76,175,80,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="heart" color="var(--c-ok-light)" size={16} /></div>
                     <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(76,175,80,0.8)", fontWeight: 600 }}>Sağ Kaydırma</span>
                   </div>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#4CAF50", margin: "0 0 2px" }}>{stats.swipeRight}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ok-light)", margin: "0 0 2px" }}>{stats.swipeRight}</p>
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>kişi beğendi</p>
                 </div>
                 {/* Sol kaydırma */}
                 <div style={{ background: "rgba(255,59,48,0.08)", border: "1px solid rgba(255,59,48,0.15)", borderRadius: 20, padding: "18px 16px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-<div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(255,59,48,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="cross" color="#FF3B30" size={16} /></div>
+<div style={{ width: 36, height: 36, borderRadius: 12, background: "var(--c-bad-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="cross" color="var(--c-bad-ink)" size={16} /></div>
                     <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,59,48,0.8)", fontWeight: 600 }}>Sol Kaydırma</span>
                   </div>
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-bad-ink)", margin: "0 0 2px" }}>{stats.swipeLeft}</p>
@@ -1320,14 +1320,14 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
               {/* Toplam görüntülenme */}
               <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-<div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(255,165,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="eye" color="#FFA500" size={18} /></div>
+<div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(255,165,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="eye" color="var(--c-warn)" size={18} /></div>
                   <div>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Toplam Görüntülenme</p>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: 0 }}>{stats.totalViews.toLocaleString()}</p>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#4CAF50", fontWeight: 700 }}>↑ 12%</span>
+                  <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ok-light)", fontWeight: 700 }}>↑ 12%</span>
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.3)", margin: "2px 0 0" }}>bu hafta</p>
                 </div>
               </div>
@@ -1378,7 +1378,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                 ].map((r, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: i < 4 ? 8 : 0 }}>
                     <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", width: 14, textAlign: "right" }}>{r.stars}</span>
-                    <span style={{ fontSize: 12, color: "#FFA500" }}>★</span>
+                    <span style={{ fontSize: 12, color: "var(--c-warn)" }}>★</span>
                     <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
                       <div style={{ width: `${r.pct}%`, height: "100%", borderRadius: 4, background: r.stars >= 4 ? "rgba(76,175,80,0.5)" : r.stars === 3 ? "rgba(255,165,0,0.5)" : "rgba(255,59,48,0.4)", transition: "width 0.6s ease-out", transitionDelay: `${i * 0.1}s` }} />
                     </div>
@@ -1407,7 +1407,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                         <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{rev.user}</p>
                         <div style={{ display: "flex", gap: 2, marginTop: 2 }}>
                           {[1, 2, 3, 4, 5].map(s => (
-                            <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "#FFA500" : "rgba(255,255,255,0.12)" }}>★</span>
+                            <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "var(--c-warn)" : "rgba(255,255,255,0.12)" }}>★</span>
                           ))}
                         </div>
                       </div>
@@ -1444,7 +1444,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                       <IconBtn
                         onClick={() => setMenuUploads(p => { if (p[i]?.url) URL.revokeObjectURL(p[i].url); return p.filter((_, idx) => idx !== i); })}
                         tone="dangerSoft" shape="rounded" size={32} title="Menüyü kaldır"
-                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-bad-light)" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
                       />
                     </div>
                   ))}
@@ -1463,7 +1463,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 
               {menuUploads.length > 0 && (
                 <div style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.15)", borderRadius: 16, padding: "12px 16px", marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
-<Icon n="check" color="#4CAF50" size={16} />
+<Icon n="check" color="var(--c-ok-light)" size={16} />
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(76,175,80,0.8)", margin: 0 }}>{menuUploads.length} menü sayfası yüklendi</p>
                 </div>
               )}
@@ -1503,7 +1503,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                   <div style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)", borderRadius: 18, padding: "16px 18px", marginBottom: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                       <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0 }}>Anlık İndirim Yayınla</p>
-                      <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "#4ADE80" }}>₺450 / yayın</span>
+                      <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-ok-light)" }}>₺450 / yayın</span>
                     </div>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
                       Ölü saatlerinizi doldurun: yakındaki kullanıcılara süreli indirim bildirimi gider.
@@ -1526,7 +1526,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                     {dealLive ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(34,197,94,0.12)", borderRadius: 14, padding: "11px 14px" }}>
                         <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--c-ok)", animation: "pulse 1.6s ease-in-out infinite", flexShrink: 0 }} />
-                        <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#4ADE80", margin: 0, flex: 1 }}>
+                        <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-ok-light)", margin: 0, flex: 1 }}>
                           %{dealPct} indirim {dealHours} saat boyunca yayında
                         </p>
                         <Btn text="Durdur" onClick={() => setDealLive(false)} variant="destructiveSoft" size="sm" fullWidth={false} />
@@ -1613,7 +1613,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 
               {photoUploads.length > 0 && (
                 <div style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.15)", borderRadius: 16, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
-<Icon n="check" color="#4CAF50" size={16} />
+<Icon n="check" color="var(--c-ok-light)" size={16} />
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(76,175,80,0.8)", margin: 0 }}>{photoUploads.length} fotoğraf yüklendi — keşif kartınızda ilk sırada gösteriliyor</p>
                 </div>
               )}
@@ -1665,7 +1665,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                   background: "rgba(255,59,48,0.1)", margin: "0 auto 16px",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--c-bad-light)" strokeWidth="2" strokeLinecap="round">
                     <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
                   </svg>
                 </div>

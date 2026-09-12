@@ -189,6 +189,46 @@ Denetleme betiği ata zincirindeki opaklığı ve fotoğraf perdesini hesaba
 katarak on ekranı tarıyor; GUR kelime markası (tek harfli G/U/R) logotype
 olduğu için kural dışı.
 
+### Renkle hiyerarşi
+Renk **yalnızca aktif ve birincil olanda** kalır; gerisi nötr. Keşfet
+ekranında dokuz ayrı turuncu vardı (konum iğnesi, arama çubuğundaki eylem,
+"Tümü", "Kaydırarak gez", kategori halkaları, ızgara simgesi, "Aç" çipi,
+alt bar, Match şeridi) — hepsi doygun olunca hiçbiri birincil olmuyordu.
+
+Turuncu kalanlar: **alt bardaki seçili sekme**, **GUR Match şeridi** (öne
+çıkarılan tek özellik) ve **marka logosu**. Süs simgeler, bölüm bağlantıları
+ve seçili olmayan kategori halkaları `--c-ink-2` / `--c-line`.
+
+Bir **durum**u marka rengiyle gösterme: "Aç" çipi marka gradyanı taşıyordu,
+şimdi yeşil ailesinde — durum bilgisi eylem gibi görünmüyor.
+
+Ölçüt: bir ekranda ekranda görünen doygun renk sayısı tek haneli kalmalı ve
+her rengin tek bir işi olmalı.
+
+### Tutarlı renk seçimi
+Her rolün **tek** bir rengi var. Aynı işi yapan dokuz ayrı yeşil
+(`#4CAF50`, `#4ADE80`, `#22C55E`, `#16A34A`, `#166534`, `#22A34D`,
+`#2F8C46`…), altı kırmızı ve dört amber arayüzü tutarsız gösteriyordu.
+Süper beğeni etiketi de paletin dışında bir gök mavisiydi (`#38BDF8`) —
+tek yabancı ton oydu, marka turuncusuna alındı.
+
+Her rol iki zemin için iki ton taşır — `-ink` açık kâğıt, `-light` koyu
+zemin ve fotoğraf için:
+
+| Rol | Dolgu | Açık zemin | Koyu zemin | Yumuşak |
+|---|---|---|---|---|
+| olumlu | `--c-ok` | `--c-ok-ink` | `--c-ok-light` | `--c-ok-soft` |
+| olumsuz | `--c-bad` | `--c-bad-ink` | `--c-bad-light` | `--c-bad-soft` |
+| uyarı / puan | `--c-warn` | `--c-warn-ink` | `--c-warn-light` | `--c-warn-soft` |
+| marka | `#FF6600` | `--c-brand-ink` | `--c-brand-light` | `--c-brand-soft` |
+
+Yeni bir yeşil/kırmızı/amber **yazma** — ailede zaten var. Marka gradyanına
+tehlike kırmızısı karıştırma: `#FF7A1A → #F04E00` turuncunun kendi iki ucu.
+
+Kural dışı olanlar: GUR kelime markasının harfleri (`#FFA500`/`#FF6600`/
+`#FF0000`), Google'ın marka renkleri ve sponsorlu reklam verisindeki
+reklamveren aksanları (`SPONSORED[].accent`).
+
 ### Tonlu griler
 Nötr gri (`#ccc`, `#bbb`, `#333`, `#aaa`…) kremsi kâğıdın ve sıcak
 fotoğrafların yanında ölü duruyor. Hepsi paletin sıcak ekseninde:

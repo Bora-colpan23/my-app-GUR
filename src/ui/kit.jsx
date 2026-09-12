@@ -631,6 +631,26 @@ export function GurStyles() {
           --c-bad: #E5484D;             /* kırmızı dolgu */
           --c-bad-ink: #C2282D;         /* beyaz üstünde kırmızı yazı (5.8:1) */
 
+          /* ── TUTARLI RENK SEÇİMİ ─────────────────────────────────
+             Her rolün TEK bir rengi var. Aynı işi yapan dokuz ayrı
+             yeşil (#4CAF50, #4ADE80, #22C55E, #16A34A, #166534,
+             #22A34D, #2F8C46…), altı kırmızı ve dört amber arayüzü
+             tutarsız gösteriyordu.
+
+             Her rol iki zemin için iki ton taşır: -ink açık kâğıt,
+             -light koyu zemin ve fotoğraf içindir. */
+          --c-ok-soft: rgba(19,179,100,0.12);
+          --c-ok-light: #4ADE80;        /* koyu zeminde yeşil */
+          --c-bad-soft: rgba(229,72,77,0.12);
+          --c-bad-light: #FF7A70;       /* koyu zeminde kırmızı */
+          --c-warn: #F59E0B;            /* puan yıldızı, amber dolgu */
+          --c-warn-ink: #8A5200;        /* açık zeminde amber yazı (6.3:1) */
+          --c-warn-light: #FFB454;      /* koyu zeminde amber */
+          --c-warn-soft: #FEF3C7;
+          /* Koyu zeminde marka turuncusu — süper beğeni etiketi paletin
+             dışında bir gök mavisiydi (#38BDF8), tek yabancı ton oydu. */
+          --c-brand-light: #FF9A4D;
+
           /* ── TONLU GRİLER ────────────────────────────────────────
              Nötr gri (#ccc, #bbb, #333…) kremsi kâğıdın ve sıcak
              fotoğrafların yanında ölü duruyor. Hepsi paletin sıcak

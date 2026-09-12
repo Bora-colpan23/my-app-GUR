@@ -495,7 +495,7 @@ function StoreAvatar({ restaurant, size = 36, radius = 11, font = 14 }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: radius, flexShrink: 0, overflow: 'hidden',
-      background: logo ? C.panel2 : 'linear-gradient(135deg,#FF660033,#FF3B3033)',
+      background: logo ? C.panel2 : 'linear-gradient(135deg,#FF7A1A33,#F04E0033)',
       border: logo ? `1px solid ${C.border}` : 'none',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontWeight: 700, fontSize: font, color: C.orangeInk,
@@ -936,7 +936,7 @@ export default function GurAdmin() {
 
         <div style={{ padding: '12px', borderTop: `1px solid ${C.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#FF6600,#FF3B30)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: C.onBrand }}>A</div>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#FF7A1A,#F04E00)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: C.onBrand }}>A</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Admin</div>
               <div style={{ fontSize: 10.5, color: C.faint }}>admin@gur.app</div>
@@ -2404,7 +2404,7 @@ function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
       <div style={{ display: 'grid', gap: 12 }}>
         {apps.map(a => (
           <div key={a.id} style={{ ...CARD, padding: 18, display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 46, height: 46, borderRadius: 12, background: 'linear-gradient(135deg,#FF660033,#FF3B3033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18, color: C.orangeInk, flexShrink: 0 }}>{a.name[0]}</div>
+            <div style={{ width: 46, height: 46, borderRadius: 12, background: 'linear-gradient(135deg,#FF7A1A33,#F04E0033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18, color: C.orangeInk, flexShrink: 0 }}>{a.name[0]}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 3 }}>{a.name}</div>
               <div style={{ fontSize: 12, color: C.dim }}>{a.cat} • {a.district} • {a.owner}</div>
@@ -2463,7 +2463,7 @@ function GastroPage({ restaurants, onGoRestaurants }) {
                 borderRadius: 12, padding: 15,
               }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#FF6600,#FF3B30)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#fff', fontSize: 15, flexShrink: 0 }}>{c.name.split(' ')[1][0]}</div>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#FF7A1A,#F04E00)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#fff', fontSize: 15, flexShrink: 0 }}>{c.name.split(' ')[1][0]}</div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{c.name}</div>
                   <div style={{ fontSize: 11, color: C.faint }}>{c.specialty}</div>
