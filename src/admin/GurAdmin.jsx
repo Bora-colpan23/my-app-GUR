@@ -54,12 +54,30 @@ const BRAND_GRAD = 'linear-gradient(145deg, #FF7A1A 0%, #FF6600 55%, #F04E00 100
 const BRAND_GRAD_HOVER = 'linear-gradient(145deg, #FF8A33 0%, #FF7311 55%, #FF5A05 100%)';
 // One'ın kartları içeriden parlamıyor: geniş yayılan, çok açık tek bir
 // düşüş var. Basılınca gölge kısalıyor — yüzey kâğıda yaklaşıyor.
+// ── GÖLGE ÖLÇEĞİ ────────────────────────────────────────────────────────
+// Uygulamadaki --sh-* ölçeğinin panel karşılığı (panel kendi stil bloğunu
+// taşıyor, GurStyles jetonlarını görmüyor). Aynı kural: üç katman, yalnızca
+// dikey kaydırma, kaydırmadan çok daha büyük bulanıklık, düşük opaklık ve
+// zeminin tonunda renk — panelin kâğıdı soğuk gri olduğu için ton da soğuk.
+const SH = {
+  s1:      '0 1px 2px rgba(15,18,25,0.04), 0 2px 6px rgba(15,18,25,0.04), 0 5px 14px rgba(15,18,25,0.04)',
+  s2:      '0 1px 2px rgba(15,18,25,0.04), 0 3px 8px rgba(15,18,25,0.05), 0 10px 24px rgba(15,18,25,0.05)',
+  s3:      '0 2px 4px rgba(15,18,25,0.04), 0 7px 18px rgba(15,18,25,0.05), 0 18px 42px rgba(15,18,25,0.07)',
+  s4:      '0 4px 8px rgba(15,18,25,0.05), 0 14px 30px rgba(15,18,25,0.08), 0 32px 70px rgba(15,18,25,0.10)',
+  // Koyu yüzeyler (ipucu kutusu, bildirim hapı) ve turuncu haplar
+  d2:      '0 2px 5px rgba(0,0,0,0.12), 0 6px 16px rgba(0,0,0,0.14), 0 14px 34px rgba(0,0,0,0.16)',
+  d3:      '0 3px 8px rgba(0,0,0,0.14), 0 10px 26px rgba(0,0,0,0.18), 0 24px 56px rgba(0,0,0,0.22)',
+  brand:   '0 1px 2px rgba(190,70,0,0.10), 0 4px 10px rgba(190,70,0,0.16), 0 10px 24px rgba(190,70,0,0.18)',
+  brandSm: '0 1px 2px rgba(190,70,0,0.12), 0 2px 6px rgba(190,70,0,0.16)',
+};
+
+// Basılınca gölge bir basamak kısalır: nesne kâğıda yaklaşır.
 const ELEV = {
-  card:      '0 20px 40px -18px rgba(15,18,25,0.10), 0 1px 2px rgba(15,18,25,0.04)',
-  raised:    '0 28px 56px -20px rgba(15,18,25,0.16), 0 2px 6px rgba(15,18,25,0.05)',
-  brand:     '0 6px 16px rgba(255,102,0,0.32)',
-  pressDark: '0 1px 3px rgba(15,18,25,0.14)',
-  pressBrand:'0 2px 5px rgba(255,102,0,0.30)',
+  card:      SH.s2,
+  raised:    SH.s3,
+  brand:     SH.brand,
+  pressDark: SH.s1,
+  pressBrand: SH.brandSm,
 };
 // Köşe yarıçapları uygulamayla aynı ölçekte: kart 18, kontrol 12, pill 999.
 const R = { card: 24, control: 14, pill: 999 };
@@ -556,7 +574,7 @@ function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size
     soft:    { bg: toneSoft, hover: toneSoft.replace('0.12', '0.2'), press: toneSoft.replace('0.12', '0.26'), color: toneColor, border: `1px solid ${toneColor}29` },
     // Beyaz hap: One'ın nötr birincil-olmayan düğmesi — kâğıttan bir tık
     // yukarıda durur, o yüzden zemini panel değil kart rengi.
-    outline: { bg: C.panel, hover: '#FAFBFC', press: C.panel2, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}`, elev: '0 2px 6px rgba(15,18,25,0.07)', pressElev: ELEV.pressDark },
+    outline: { bg: C.panel, hover: '#FAFBFC', press: C.panel2, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}`, elev: SH.s1, pressElev: ELEV.pressDark },
     ghost:   { bg: 'transparent', hover: C.panel2, press: C.border, color: toneColor, border: `1px solid ${C.border}` },
     plain:   { bg: 'transparent', hover: C.panel2, press: C.border, color: toneColor, border: '1px solid transparent' },
   };
@@ -605,7 +623,7 @@ function NavItem({ item, active, onClick }) {
         width: '100%', display: 'flex', alignItems: 'center', gap: 12,
         padding: '10px 12px', marginBottom: 2, borderRadius: 12, border: 'none',
         backgroundColor: active ? C.panel : 'transparent', cursor: 'pointer',
-        boxShadow: active ? '0 2px 8px rgba(15,18,25,0.08)' : 'none',
+        boxShadow: active ? SH.s1 : 'none',
         color: active ? C.text : C.dim, fontFamily: FB, fontSize: 13.5, fontWeight: active ? 700 : 500,
         textAlign: 'left', outline: 'none',
       }}>
@@ -634,7 +652,7 @@ function IconBtn({ onClick, icon, size = 38, title, danger, disabled }) {
         '--btn-bg': C.panel,
         '--btn-bg-hover': danger ? C.redSoft : C.panel2,
         '--btn-bg-press': danger ? 'rgba(229,72,77,0.22)' : C.border,
-        '--btn-shadow': '0 2px 6px rgba(15,18,25,0.07)',
+        '--btn-shadow': SH.s1,
         '--btn-shadow-press': ELEV.pressDark,
         width: size, height: size, minWidth: size, borderRadius: R.control,
         borderWidth: 1, borderStyle: 'solid', borderColor: danger ? `${C.red}44` : C.border,
@@ -1016,7 +1034,7 @@ export default function GurAdmin() {
         <motion.div
           initial={{ opacity: 0, y: 16, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.95 }}
           transition={{ type: 'spring', bounce: 0.2, duration: 0.35 }}
-          style={{ position: 'fixed', bottom: 24, right: 24, background: toast.type === 'error' ? C.red : C.green, color: '#fff', padding: '12px 20px', borderRadius: 12, fontFamily: FB, fontSize: 13.5, fontWeight: 600, zIndex: 200, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 30px rgba(0,0,0,0.4)' }}>
+          style={{ position: 'fixed', bottom: 24, right: 24, background: toast.type === 'error' ? C.red : C.green, color: '#fff', padding: '12px 20px', borderRadius: 12, fontFamily: FB, fontSize: 13.5, fontWeight: 600, zIndex: 200, display: 'flex', alignItems: 'center', gap: 8, boxShadow: SH.d3 }}>
           <Icon path={toast.type === 'error' ? icons.x : icons.check} size={16} color="#fff" />
           {toast.msg}
         </motion.div>
@@ -1047,7 +1065,7 @@ function Segmented({ options, value, onChange, label }) {
               border: on ? `1px solid ${C.border}` : '1px solid transparent',
               borderRadius: R.pill, padding: '5px 12px',
               background: on ? C.panel : 'transparent',
-              boxShadow: on ? '0 1px 3px rgba(15,18,25,0.10)' : 'none',
+              boxShadow: on ? SH.s1 : 'none',
               color: on ? C.text : C.dim,
               fontFamily: FB, fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap',
               outline: 'none',
@@ -1172,7 +1190,7 @@ function TrendChart({ data, height = 200, format }) {
           position: 'absolute', left: Math.min(Math.max(xAt(hover) - 62, 0), Math.max(w - 124, 0)),
           top: 0, width: 124, pointerEvents: 'none',
           background: '#17130F', color: '#fff', borderRadius: 12, padding: '9px 11px',
-          boxShadow: '0 10px 24px rgba(15,18,25,0.28)',
+          boxShadow: SH.d3,
         }}>
           <div style={{ fontFamily: FB, fontSize: 10.5, color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>{active.d}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1602,7 +1620,7 @@ function CampaignsPage() {
       </div>
 
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 18px', fontSize: 13, color: C.text, boxShadow: '0 8px 30px rgba(0,0,0,0.5)', zIndex: 100 }}>
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 18px', fontSize: 13, color: C.text, boxShadow: SH.d3, zIndex: 100 }}>
           {toast}
         </div>
       )}
@@ -1786,7 +1804,7 @@ function TabBar({ tabs, active, onChange }) {
               border: on ? `1px solid ${C.border}` : '1px solid transparent',
               cursor: 'pointer', borderRadius: R.pill, padding: '7px 15px',
               background: on ? C.panel : 'transparent', color: on ? C.text : C.dim,
-              boxShadow: on ? '0 1px 3px rgba(15,18,25,0.10)' : 'none',
+              boxShadow: on ? SH.s1 : 'none',
               fontFamily: FB, fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap',
               display: 'inline-flex', alignItems: 'center', gap: 7, outline: 'none',
             }}>
@@ -3103,7 +3121,7 @@ function Toggle({ on, onChange, label, disabled }) {
       <motion.span
         animate={{ x: on ? 22 : 3 }}
         transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
-        style={{ position: 'absolute', top: 3, left: 0, width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.35)' }} />
+        style={{ position: 'absolute', top: 3, left: 0, width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: SH.s1 }} />
     </motion.button>
   );
 }

@@ -162,6 +162,29 @@ Sabit `#fff` yalnızca turuncu/koyu zemin üstündeki metin ve ikonlar için.
 Yönetici paneli kendi jeton kümesini taşır (`GurAdmin.jsx` → `C`), ama o da
 açık: koyu masaüstü sürümü kaldırıldı.
 
+### Gölge: tek katman yok
+Her gölge **üç katmandan** oluşur — dar ve yakın olan temas çizgisini,
+geniş ve soluk olan yayılan ışığı taşır. Kurallar:
+
+- Kaydırma **yalnızca dikey** (ışık tepeden). Yana kaçan gölge nesneyi
+  eğri durur gibi gösteriyor.
+- Bulanıklık kaydırmadan belirgin biçimde büyük.
+- Her katman düşük opaklıkta (0.03–0.09), toplamı yumuşak bir yükseklik
+  veriyor — sert kenarlı koyu bir leke değil.
+- Renk **zeminin tonunda**: saf siyah, kremsi kâğıdın (#FDFBF7) üstünde
+  gri duruyor. Uygulama sıcak (`--sh-tint: 45, 36, 25`), yönetici paneli
+  soğuk (`rgba(15,18,25,…)`), turuncu yüzeyler turuncu (`--sh-brand`).
+- Basılınca gölge **kısalır**, içeri dönmez: nesne kâğıda yaklaşır,
+  yüzey çukurlaşmaz.
+
+Ölçek `GurStyles` içinde: `--sh-1` … `--sh-4` (açık kâğıt), `--sh-d1` …
+`--sh-d4` (fotoğraf ve koyu zemin), `--sh-brand` / `--sh-brand-lg` /
+`--sh-brand-sm`, ve aşağıdan yükselen sayfa için `--sh-up`. Adlandırılmış
+karşılıkları `ELEV` üzerinden okunur. Yönetici paneli kendi stil bloğunu
+taşıdığı için aynı ölçeği JS'te tutar (`GurAdmin.jsx` → `SH`).
+
+**Satır içine gölge yazmayın** — ölçekten okuyun.
+
 ### "One" buton dili
 Bütün haplar tek tarifte: tam yuvarlak (`999`), kalın yazı (700), rengine
 göre tonlanmış **dar** bir düşüş gölgesi, basılınca hem küçülme hem gölgenin

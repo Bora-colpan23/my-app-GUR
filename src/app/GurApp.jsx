@@ -243,7 +243,7 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
         // istiyorum" hareketini yutabiliyor. sheets.jsx da bunu açıkça yazıyor.
         touchAction: isTop ? "none" : "auto",
         borderRadius: 24, overflow: "hidden",
-        boxShadow: isTop ? "0 12px 48px rgba(0,0,0,0.35)" : "0 4px 16px rgba(0,0,0,0.1)",
+        boxShadow: isTop ? "var(--sh-d3)" : "var(--sh-d1)",
       }}
       animate={{ scale: isTop ? 1 : 0.96 }}
       transition={{ type: "spring", bounce: 0, duration: 0.35 }}
@@ -434,7 +434,7 @@ function WelcomeScreen({ onStart }) {
           <div style={{
             position: "absolute", top: -22, left: "50%", transform: "translateX(-50%)",
             background: "#fff", borderRadius: 20, padding: "8px 20px",
-            boxShadow: "0 4px 20px rgba(255,69,0,0.2)",
+            boxShadow: "var(--sh-brand)",
           }}>
             <GurLogo size={22} pill />
           </div>
@@ -601,7 +601,7 @@ function HeroCarousel({ slides, intervalMs = 4500 }) {
   if (!slide) return null;
 
   return (
-    <div style={{ borderRadius: 24, overflow: "hidden", marginBottom: 18, height: 148, position: "relative", boxShadow: "0 8px 30px rgba(0,0,0,0.12)", flexShrink: 0 }}>
+    <div style={{ borderRadius: 24, overflow: "hidden", marginBottom: 18, height: 148, position: "relative", boxShadow: "var(--sh-2)", flexShrink: 0 }}>
       <AnimatePresence mode="wait">
         <motion.div
           key={slide.id}
@@ -726,7 +726,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             {CATEGORIES.map((c, i) => (
               <div key={i} onClick={() => onCategoryTap(c.name)} style={{
                 borderRadius: 22, overflow: "hidden", height: 130, position: "relative", cursor: "pointer",
-                transition: "transform 0.15s", boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
+                transition: "transform 0.15s", boxShadow: "var(--sh-2)",
                 animation: `fadeInUp 0.35s ease-out ${i * 0.04}s both`,
               }}
                 onMouseDown={e => e.currentTarget.style.transform = "scale(0.95)"}
@@ -863,7 +863,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                 <motion.div
                   key={d.restaurantId} onClick={() => onDetail?.(d.r)}
                   whileTap={{ scale: 0.97 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-                  style={{ flexShrink: 0, width: 178, borderRadius: 18, overflow: "hidden", position: "relative", height: 96, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.1)" }}>
+                  style={{ flexShrink: 0, width: 178, borderRadius: 18, overflow: "hidden", position: "relative", height: 96, cursor: "pointer", boxShadow: "var(--sh-1)" }}>
                   <Img src={d.r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
                   <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.88), rgba(0,0,0,0.15))" }} />
                   <div style={{ position: "absolute", top: 8, left: 8, background: "#22C55E", borderRadius: 8, padding: "3px 8px" }}>
@@ -890,7 +890,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             style={{
               display: "flex", alignItems: "center", gap: 12, marginBottom: 16, cursor: "pointer", flexShrink: 0,
               background: "linear-gradient(100deg, #FF6600, #FF3B30)", borderRadius: 18, padding: "13px 14px",
-              boxShadow: "0 6px 20px rgba(255,69,0,0.28)",
+              boxShadow: "var(--sh-brand)",
             }}
           >
             <div style={{ width: 38, height: 38, borderRadius: 13, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -947,7 +947,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                   <div style={{ position: "relative", height: 116 }}>
                     <Img src={r.imgs?.[0]} box={416} style={{ position: "absolute", inset: 0 }} bg="var(--c-img-bg)" />
                     {r.claimed && (
-                      <div style={{ position: "absolute", top: 9, right: 9, background: "rgba(255,255,255,0.92)", borderRadius: 999, padding: "3px 5px", display: "flex", alignItems: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }}>
+                      <div style={{ position: "absolute", top: 9, right: 9, background: "rgba(255,255,255,0.92)", borderRadius: 999, padding: "3px 5px", display: "flex", alignItems: "center", boxShadow: "var(--sh-d1)" }}>
                         <VerifiedStar size={12} />
                       </div>
                     )}
@@ -980,7 +980,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         <div onClick={() => setShowAll(true)} style={{
           margin: "14px 0", background: "var(--c-card)", borderRadius: 20, padding: "14px 20px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          cursor: "pointer", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px var(--c-border), inset 0 1px 0 rgba(255,255,255,0.9)",
+          cursor: "pointer", boxShadow: "var(--sh-2)",
           transition: "transform 0.15s",
         }}
           onMouseDown={e => e.currentTarget.style.transform = "scale(0.97)"}
@@ -1002,7 +1002,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         </div>
 
         {/* Alt bar — beyaz, sabit */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", margin: "12px 0 16px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px var(--c-border), inset 0 1px 0 rgba(255,255,255,0.9)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", margin: "12px 0 16px", boxShadow: "var(--sh-2)", flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF6600" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
@@ -1233,7 +1233,7 @@ function VisitPrompt({ visit, onWrite, onDismiss }) {
         position: "absolute", left: 12, right: 12, bottom: 92, zIndex: 800,
         background: "rgba(20,14,8,0.94)", backdropFilter: "blur(14px)",
         border: "1px solid rgba(255,255,255,0.1)", borderRadius: 22,
-        padding: "14px 15px", boxShadow: "0 14px 44px rgba(0,0,0,0.45)",
+        padding: "14px 15px", boxShadow: "var(--sh-d3)",
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
@@ -1271,7 +1271,7 @@ function ReservationNotice({ record, onOpen, onDismiss }) {
         position: "absolute", left: 12, right: 12, bottom: 92, zIndex: 800,
         background: "rgba(20,14,8,0.94)", backdropFilter: "blur(14px)",
         border: `1px solid ${ok ? "rgba(76,175,80,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: 22,
-        padding: "14px 15px", boxShadow: "0 14px 44px rgba(0,0,0,0.45)",
+        padding: "14px 15px", boxShadow: "var(--sh-d3)",
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
@@ -1327,7 +1327,7 @@ function ChefOverlay({ chefName, compact = false }) {
   return (
     <>
       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.28)", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-        <div style={{ width: compact ? 44 : 52, height: compact ? 44 : 52, borderRadius: "50%", background: "rgba(255,255,255,0.92)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 18px rgba(0,0,0,0.35)" }}>
+        <div style={{ width: compact ? 44 : 52, height: compact ? 44 : 52, borderRadius: "50%", background: "rgba(255,255,255,0.92)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--sh-d2)" }}>
           <svg width={compact ? 17 : 20} height={compact ? 17 : 20} viewBox="0 0 24 24" fill="#FF6600"><polygon points="6 3 20 12 6 21" /></svg>
         </div>
       </div>
@@ -1580,7 +1580,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
         style={{
           y, position: "absolute", left: 0, right: 0, bottom: 0, top: `${SHEET_FULL * 100}%`,
           zIndex: 310, background: "var(--c-card)", borderTopLeftRadius: 26, borderTopRightRadius: 26,
-          boxShadow: "0 -18px 60px rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", overflow: "hidden",
+          boxShadow: "var(--sh-up)", display: "flex", flexDirection: "column", overflow: "hidden",
         }}
       >
         {/* Sürükleme bölgesi */}
@@ -2073,7 +2073,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             background: toast.t === "fav" ? "#4CAF50" : "#FF3B30",
             color: "#fff", padding: "10px 22px", borderRadius: 16,
             fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700,
-            zIndex: 100, boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
+            zIndex: 100, boxShadow: "var(--sh-d2)",
             animation: "fadeInUp 0.3s ease-out",
             display: "flex", alignItems: "center", gap: 8,
           }}>
@@ -2257,7 +2257,7 @@ function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
                 style={{ width: "100%", textAlign: "center" }}
               >
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#FFA500", fontWeight: 700, letterSpacing: 3, margin: "0 0 10px" }}>EŞLEŞTİNİZ!</p>
-                <div style={{ width: "100%", height: 220, borderRadius: 24, overflow: "hidden", position: "relative", marginBottom: 18, boxShadow: "0 18px 60px rgba(255,102,0,0.25)" }}>
+                <div style={{ width: "100%", height: 220, borderRadius: 24, overflow: "hidden", position: "relative", marginBottom: 18, boxShadow: "var(--sh-brand-lg)" }}>
                   <Img src={popup.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
                   <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.85), transparent 60%)" }} />
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px 18px", textAlign: "left" }}>
@@ -2627,12 +2627,12 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
           {/* Info chips */}
           <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 10, flexWrap: "wrap" }}>
-            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: "#FF6600", fontFamily: "var(--f-body)", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>★ {r.rating}</span>
-            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontFamily: "var(--f-body)", fontSize: 16, color: "#333", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", display: "inline-flex", alignItems: "center", gap: 7 }}>
+            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: "#FF6600", fontFamily: "var(--f-body)", boxShadow: "var(--sh-1)" }}>★ {r.rating}</span>
+            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontFamily: "var(--f-body)", fontSize: 16, color: "#333", boxShadow: "var(--sh-1)", display: "inline-flex", alignItems: "center", gap: 7 }}>
               {r.name}
               {claimed && <VerifiedStar size={14} />}
             </span>
-            <span style={{ background: "#FF6600", borderRadius: 14, padding: "5px 14px", fontSize: 13, color: "#fff", fontWeight: 700, fontFamily: "var(--f-body)", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>{distText(r)}</span>
+            <span style={{ background: "#FF6600", borderRadius: 14, padding: "5px 14px", fontSize: 13, color: "#fff", fontWeight: 700, fontFamily: "var(--f-body)", boxShadow: "var(--sh-1)" }}>{distText(r)}</span>
           </div>
 
           {/* Açıklama */}
@@ -2727,7 +2727,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                       style={{
                         background: "#FFF8F4", border: "2px solid #FF6600",
                         borderRadius: 20, padding: "16px 18px",
-                        boxShadow: "0 2px 12px rgba(255,102,0,0.06)",
+                        boxShadow: "var(--sh-1)",
                         cursor: "pointer",
                       }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -2812,7 +2812,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
         </div>
 
         {/* Alt bar — Explore ile aynı stil */}
-        <div style={{ position: "sticky", bottom: 0, background: "var(--c-card)", display: "flex", alignItems: "center", justifyContent: "space-around", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px var(--c-border), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
+        <div style={{ position: "sticky", bottom: 0, background: "var(--c-card)", display: "flex", alignItems: "center", justifyContent: "space-around", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "var(--sh-2)" }}>
           <div onClick={() => (claimed && canMenu ? setShowMenu(true) : setSheet("soon"))} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: claimed ? 0.5 : 0.35 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /></svg>
             <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Menü</span>
@@ -2923,7 +2923,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: "0 0 12px" }}>Fotoğraflar</p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {selectedReview.photos.map((p, pi) => (
-                        <div key={pi} style={{ borderRadius: 18, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
+                        <div key={pi} style={{ borderRadius: 18, overflow: "hidden", boxShadow: "var(--sh-2)" }}>
                           <Img src={p} style={{ width: "100%", height: 200, borderRadius: 18 }} bg="#2a1a0a" />
                         </div>
                       ))}
@@ -2969,7 +2969,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
               {r.menu && r.menu.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {r.menu.map((menuImg, mi) => (
-                    <div key={mi} style={{ borderRadius: 18, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.3)", animation: `fadeInUp 0.4s ease-out ${mi * 0.1}s both` }}>
+                    <div key={mi} style={{ borderRadius: 18, overflow: "hidden", boxShadow: "var(--sh-2)", animation: `fadeInUp 0.4s ease-out ${mi * 0.1}s both` }}>
                       <div style={{ position: "relative" }}>
                         <Img src={menuImg} style={{ width: "100%", height: 380, borderRadius: 18 }} bg="#1a1a1a" />
                         <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.5)", borderRadius: 10, padding: "4px 10px", backdropFilter: "blur(6px)" }}>
@@ -3047,7 +3047,7 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
                 { label: "Ort. Puan", value: (favorites.reduce((a, r) => a + r.rating, 0) / favorites.length).toFixed(1), icon: <Icon n="star" color="#FF6600" size={18} /> },
                 { label: "Kategori", value: [...new Set(favorites.map(r => r.cat))].length, icon: <Icon n="plate" color="#FF6600" size={18} /> },
               ].map((s, i) => (
-                <div key={i} style={{ flex: 1, background: "var(--c-card)", borderRadius: 18, padding: "14px 10px", textAlign: "center", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
+                <div key={i} style={{ flex: 1, background: "var(--c-card)", borderRadius: 18, padding: "14px 10px", textAlign: "center", boxShadow: "var(--sh-1)" }}>
                   <div style={{ display: "flex", justifyContent: "center" }}>{s.icon}</div>
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: "4px 0 2px" }}>{s.value}</p>
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-muted)", margin: 0 }}>{s.label}</p>
@@ -3059,7 +3059,7 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
             {favorites.map((r, i) => (
               <div key={r.id} style={{
                 background: "var(--c-card)", borderRadius: 22, overflow: "hidden", marginBottom: 14,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+                boxShadow: "var(--sh-1)",
                 animation: `fadeInUp 0.4s ease-out ${i * 0.06}s both`,
               }}>
                 {/* Üst kısım — fotoğraf */}
@@ -3123,7 +3123,7 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
       </div>
       {/* Alt bar — beyaz, keşfet sayfası ile aynı */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 16px 16px", zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px var(--c-border), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", boxShadow: "var(--sh-2)" }}>
           <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
@@ -3206,7 +3206,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
               <div style={{ width: 84, height: 84, borderRadius: "50%", background: photo ? "transparent" : accentColor, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "var(--f-body)", fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em" }}>
                 {photo ? <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "B"}
               </div>
-              <div style={{ position: "absolute", bottom: 0, right: 0, width: 26, height: 26, borderRadius: "50%", background: "var(--c-card)", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
+              <div style={{ position: "absolute", bottom: 0, right: 0, width: 26, height: 26, borderRadius: "50%", background: "var(--c-card)", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--sh-1)" }}>
                 <Icon n="camera" size={13} color={accentColor} />
               </div>
             </div>
@@ -3378,7 +3378,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
 
       {/* Alt bar */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 16px 16px", zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", boxShadow: "0 10px 30px rgba(45,36,25,0.12), 0 2px 6px var(--c-border), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", boxShadow: "var(--sh-2)" }}>
           <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <Icon n="search" color="#FF6600" size={22} />
             <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
@@ -3457,7 +3457,7 @@ function ConsentBanner({ onDecide, onLegal }) {
       position: "absolute", left: 12, right: 12, bottom: 12, zIndex: 900,
       background: "rgba(20,14,8,0.92)", backdropFilter: "blur(12px)",
       border: "1px solid rgba(255,255,255,0.1)", borderRadius: 22, padding: "16px 16px 14px",
-      boxShadow: "0 12px 40px rgba(0,0,0,0.4)", animation: "fadeInUp 0.4s ease-out",
+      boxShadow: "var(--sh-d3)", animation: "fadeInUp 0.4s ease-out",
     }}>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#fff", margin: "0 0 5px" }}>Ölçümleme çerezleri</p>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.5, margin: "0 0 13px" }}>

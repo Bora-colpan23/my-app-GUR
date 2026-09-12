@@ -60,7 +60,7 @@ function DoyurucuAuthScreen({ onLogin, onRegister, onClaim }) {
               yer yok, geri düğmesi de yok. Tıklandığında hiçbir şey
               yapmayan bir düğme, olmayan düğmeden kötü. */}
 
-          <div style={{ position: "absolute", top: -22, left: "50%", transform: "translateX(-50%)", background: "#fff", borderRadius: 20, padding: "8px 20px", boxShadow: "0 4px 20px rgba(255,69,0,0.2)" }}>
+          <div style={{ position: "absolute", top: -22, left: "50%", transform: "translateX(-50%)", background: "#fff", borderRadius: 20, padding: "8px 20px", boxShadow: "var(--sh-brand)" }}>
             <GurLogo size={22} pill />
           </div>
 
@@ -500,13 +500,13 @@ function RestRegStep1({ onBack, onNext }) {
               value={location} onChange={e => setLocation(e.target.value)}
               onFocus={e => { setLocFocused(true); keepVisible(e); }} onBlur={() => setTimeout(() => setLocFocused(false), 200)}
               placeholder="İlçe veya adres yazın..."
-              style={{ width: "100%", padding: "15px 18px 15px 42px", borderRadius: 16, border: "none", outline: "none", fontSize: 16, fontFamily: "var(--f-body)", background: "#fff", color: "#2D2419", WebkitTextFillColor: "#2D2419", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box" }}
+              style={{ width: "100%", padding: "15px 18px 15px 42px", borderRadius: 16, border: "none", outline: "none", fontSize: 16, fontFamily: "var(--f-body)", background: "#fff", color: "#2D2419", WebkitTextFillColor: "#2D2419", boxShadow: "var(--sh-1)", boxSizing: "border-box" }}
             />
             <svg style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
           </div>
           {/* Öneri dropdown */}
           {locFocused && filteredLocs.length > 0 && (
-            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", borderRadius: 14, boxShadow: "0 8px 30px rgba(0,0,0,0.15)", zIndex: 20, marginTop: 4, overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", borderRadius: 14, boxShadow: "var(--sh-2)", zIndex: 20, marginTop: 4, overflow: "hidden" }}>
               {filteredLocs.slice(0, 4).map((l, i) => (
                 <div key={i} onMouseDown={() => { setLocation(l); setLocFocused(false); }}
                   style={{ padding: "12px 16px", cursor: "pointer", borderBottom: i < Math.min(filteredLocs.length, 4) - 1 ? "1px solid #f5f5f5" : "none", display: "flex", alignItems: "center", gap: 10, transition: "background 0.15s" }}
@@ -618,7 +618,7 @@ function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
             background: "#EAF7EC",
             display: "flex", alignItems: "center", justifyContent: "center",
             marginBottom: 24, animation: "fadeInUp 0.5s ease-out",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.06)",
+            boxShadow: "var(--sh-2)",
           }}>
             <Icon n="check" color="#22A34D" size={32} strokeWidth={2.5} />
           </div>
@@ -640,7 +640,7 @@ function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
           {/* Yükleme özeti */}
           <div style={{
             width: "100%", background: "#fff", borderRadius: 20,
-            padding: "18px 18px 14px", marginBottom: 28, boxShadow: "0 2px 16px rgba(0,0,0,0.05)",
+            padding: "18px 18px 14px", marginBottom: 28, boxShadow: "var(--sh-1)",
             animation: "fadeInUp 0.5s ease-out 0.3s both",
           }}>
             <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#8A7A68", margin: "0 0 12px" }}>Yükleme Özeti</p>
@@ -856,7 +856,7 @@ function LogoUpload({ restaurant, size = 56 }) {
         <span style={{
           position: "absolute", right: -2, bottom: -2, width: 20, height: 20, borderRadius: "50%",
           background: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+          boxShadow: "var(--sh-1)",
         }}>
           <Icon n="camera" size={11} color="#FF6600" />
         </span>
@@ -1233,7 +1233,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
             </div>
             {/* Turuncu zeminde yeşil-üstüne-yeşil okunmuyordu: beyaz kart,
                 marka turuncusu yazı. */}
-            <div style={{ background: "#fff", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 4px 14px rgba(0,0,0,0.12)" }}>
+            <div style={{ background: "#fff", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, boxShadow: "var(--sh-1)" }}>
 <Icon n="flame" color="#FF6600" size={18} />
               <div>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#FF6600", margin: 0, lineHeight: 1 }}>%{stats.favRate}</p>
@@ -1631,7 +1631,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
             style={{
               position: "absolute", left: 16, right: 16, bottom: 22, zIndex: 200,
               background: "#22C55E", borderRadius: 16, padding: "12px 16px",
-              display: "flex", alignItems: "center", gap: 9, boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
+              display: "flex", alignItems: "center", gap: 9, boxShadow: "var(--sh-d2)",
             }}>
             <Icon n="check" size={15} color="#fff" />
             <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "#fff" }}>{notice}</span>
@@ -1657,7 +1657,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
               style={{
                 background: "#1a1a1a", borderRadius: 24, padding: "30px 24px 24px",
                 width: "100%", maxWidth: 320, border: "1px solid rgba(255,255,255,0.08)",
-                boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+                boxShadow: "var(--sh-d4)",
               }}>
               <div style={{ textAlign: "center", marginBottom: 20 }}>
                 <div style={{

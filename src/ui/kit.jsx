@@ -71,7 +71,7 @@ export function GurLogo({ size = 48, pill = false }) {
   const logo = <span style={{ fontSize: size, fontWeight: 900, fontFamily: "var(--f-display)", letterSpacing: -size/24, lineHeight: 1 }}>
     <span style={{ color: "#FFA500" }}>G</span><span style={{ color: "#FF6600" }}>U</span><span style={{ color: "#FF0000" }}>R</span>
   </span>;
-  if (pill) return <div style={{ background: "#fff", borderRadius: size * 0.5, padding: `${size*0.12}px ${size*0.35}px`, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 12px rgba(0,0,0,0.12)" }}>{logo}</div>;
+  if (pill) return <div style={{ background: "#fff", borderRadius: size * 0.5, padding: `${size*0.12}px ${size*0.35}px`, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--sh-1)" }}>{logo}</div>;
   return logo;
 }
 
@@ -151,14 +151,14 @@ export function InputField({ label, value, onChange, placeholder, type = "text" 
   const id = React.useId();
   return <div style={{ marginBottom: 20 }}>
     <label htmlFor={id} style={{ display: "block", marginBottom: 7, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
-    <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)} onFocus={keepVisible} placeholder={placeholder} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 16, fontFamily: "var(--f-body)", background: "var(--c-card)", color: "var(--c-ink)", WebkitTextFillColor: "var(--c-ink)", boxShadow: "0 2px 16px var(--c-border)", boxSizing: "border-box" }} />
+    <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)} onFocus={keepVisible} placeholder={placeholder} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 16, fontFamily: "var(--f-body)", background: "var(--c-card)", color: "var(--c-ink)", WebkitTextFillColor: "var(--c-ink)", boxShadow: "var(--sh-1)", boxSizing: "border-box" }} />
   </div>;
 }
 
 export function SelectField({ label, value, onChange, options }) {
   return <div style={{ marginBottom: 20 }}>
     <label style={{ display: "block", marginBottom: 7, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
-    <select value={value} onChange={e => onChange(e.target.value)} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 16, fontFamily: "var(--f-body)", background: "var(--c-card)", color: value ? "var(--c-ink)" : "var(--c-muted)", appearance: "none", boxShadow: "0 2px 16px var(--c-border)", boxSizing: "border-box", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 18px center" }}>
+    <select value={value} onChange={e => onChange(e.target.value)} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 16, fontFamily: "var(--f-body)", background: "var(--c-card)", color: value ? "var(--c-ink)" : "var(--c-muted)", appearance: "none", boxShadow: "var(--sh-1)", boxSizing: "border-box", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 18px center" }}>
       <option value="">Seçiniz</option>{options.map(o => <option key={o} value={o}>{o}</option>)}
     </select>
   </div>;
@@ -166,30 +166,30 @@ export function SelectField({ label, value, onChange, options }) {
 
 // Kabartma katmanları. Yüzeyin üstünde mi altında mı olduğumuzu gölgenin
 // yönü söylüyor; basılı durumda gölge içeri dönüyor.
+// Adlandırılmış yükseklikler, tamamı GurStyles'taki katmanlı ölçekten
+// okunuyor. Basılınca gölge KISALIR (bir alt basamağa iner) — nesne
+// kâğıda yaklaşır. Eskiden içeri gölge basılıyordu; o, yükseklik
+// değiştirmek değil yüzeyi çukurlaştırmaktı.
 export const ELEV = {
-  restLight: "0 6px 18px rgba(45,36,25,0.10), 0 1px 2px rgba(45,36,25,0.06), inset 0 1px 0 rgba(255,255,255,0.9)",
-  // Koyu zeminde havada duran disk: açık gölge okunmaz, o yüzden
-  // derinlik ışıkla kuruluyor — dışta yumuşak bir hâle, üst kenarda
-  // parlama, altta ince bir iç gölge.
-  floatLight: "0 14px 34px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06), 0 0 22px rgba(255,255,255,0.05), inset 0 2px 0 rgba(255,255,255,0.95), inset 0 -3px 6px rgba(45,36,25,0.10)",
-  restDark:  "0 10px 26px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.14)",
-  restBrand: "0 8px 22px rgba(255,102,0,0.34), inset 0 1px 0 rgba(255,255,255,0.34)",
-  pressLight: "inset 0 3px 8px rgba(45,36,25,0.18), inset 0 -1px 0 rgba(255,255,255,0.7)",
-  pressDark:  "inset 0 3px 10px rgba(0,0,0,0.55)",
-  pressBrand: "inset 0 3px 10px rgba(120,40,0,0.45)",
+  restLight:  "var(--sh-2)",
+  // Koyu zeminde / fotoğraf üstünde duran disk: sıcak-soluk katmanlar
+  // okunmaz, koyu ölçek + ince bir kenar halkası.
+  floatLight: "var(--sh-d3), 0 0 0 1px rgba(255,255,255,0.06)",
+  restDark:   "var(--sh-d2)",
+  restBrand:  "var(--sh-brand)",
+  pressLight: "var(--sh-1)",
+  pressDark:  "var(--sh-d1)",
+  pressBrand: "var(--sh-brand-sm)",
 
-  // ── "One" gölgeleri ───────────────────────────────────────────────────
-  // One'ın hapları içeriden parlamıyor: pilin hemen altında, rengine göre
-  // tonlanmış dar bir düşüş var. Basılınca gölge kısalıyor — pil masaya
-  // yaklaşıyor, kaybolmuyor.
-  oneRest:       "0 4px 12px rgba(28,22,15,0.10), 0 1px 2px rgba(28,22,15,0.05)",
-  onePress:      "0 1px 3px rgba(28,22,15,0.14)",
-  oneBrand:      "0 6px 16px rgba(255,102,0,0.32)",
-  oneBrandPress: "0 2px 5px rgba(255,102,0,0.30)",
-  oneInk:        "0 6px 16px rgba(12,10,8,0.30)",
-  oneInkPress:   "0 2px 5px rgba(12,10,8,0.28)",
-  oneDanger:     "0 6px 16px rgba(229,72,77,0.30)",
-  oneDangerPress:"0 2px 5px rgba(229,72,77,0.28)",
+  // ── "One" hapları ─────────────────────────────────────────────────────
+  oneRest:       "var(--sh-2)",
+  onePress:      "var(--sh-1)",
+  oneBrand:      "var(--sh-brand)",
+  oneBrandPress: "var(--sh-brand-sm)",
+  oneInk:        "var(--sh-d2)",
+  oneInkPress:   "var(--sh-d1)",
+  oneDanger:     "0 1px 2px rgba(150,30,34,0.10), 0 4px 10px rgba(150,30,34,0.16), 0 10px 24px rgba(150,30,34,0.18)",
+  oneDangerPress:"0 1px 2px rgba(150,30,34,0.12), 0 2px 6px rgba(150,30,34,0.16)",
 };
 
 // Marka gradyanı — referanstaki gradyan dolgunun GUR karşılığı.
@@ -483,7 +483,7 @@ export function UploadBox({ label, icon, accept, files, setFiles, multiple = tru
         onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,102,0,0.3)"}>
         {files.length === 0 ? <><div style={{ display: "flex", justifyContent: "center" }}>{icon}</div><p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: "10px 0 0" }}>Dosya seçmek için tıklayın</p></> : (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-            {files.map((f, i) => <div key={i} style={{ position: "relative" }}>{f.type?.startsWith("image/") ? <img src={f.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "2px solid rgba(255,102,0,0.2)" }} /> : <div style={{ width: 72, height: 72, borderRadius: 12, background: "#FFF3EA", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="doc" size={20} color="#FF6600" /></div>}<button type="button" className="gur-icon-btn" title="Kaldır" aria-label="Kaldır" onClick={e => { e.stopPropagation(); remove(i); }} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", border: "none", padding: 0, outline: "none", background: "#FF3B30", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", cursor: "pointer", fontWeight: 700, boxShadow: "0 2px 6px rgba(0,0,0,0.2)" }}>✕</button></div>)}
+            {files.map((f, i) => <div key={i} style={{ position: "relative" }}>{f.type?.startsWith("image/") ? <img src={f.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "2px solid rgba(255,102,0,0.2)" }} /> : <div style={{ width: 72, height: 72, borderRadius: 12, background: "#FFF3EA", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="doc" size={20} color="#FF6600" /></div>}<button type="button" className="gur-icon-btn" title="Kaldır" aria-label="Kaldır" onClick={e => { e.stopPropagation(); remove(i); }} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", border: "none", padding: 0, outline: "none", background: "#FF3B30", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", cursor: "pointer", fontWeight: 700, boxShadow: "var(--sh-1)" }}>✕</button></div>)}
             <div style={{ width: 72, height: 72, borderRadius: 12, border: "2px dashed rgba(255,102,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 18, color: "rgba(255,102,0,0.4)" }}>+</span></div>
           </div>
         )}
@@ -493,7 +493,7 @@ export function UploadBox({ label, icon, accept, files, setFiles, multiple = tru
 }
 
 export function PhoneFrame({ children }) {
-  return <div className="gur-frame" style={{ width: 390, maxWidth: "100%", height: 844, borderRadius: 44, overflow: "hidden", boxShadow: "0 25px 80px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05)", position: "relative", background: "var(--c-bg)", margin: "0 auto" }}>
+  return <div className="gur-frame" style={{ width: 390, maxWidth: "100%", height: 844, borderRadius: 44, overflow: "hidden", boxShadow: "var(--sh-d4), inset 0 0 0 1px rgba(255,255,255,0.05)", position: "relative", background: "var(--c-bg)", margin: "0 auto" }}>
     <div className="gur-notch" style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 126, height: 30, background: "#000", borderBottomLeftRadius: 18, borderBottomRightRadius: 18, zIndex: 999 }} />
     {children}
   </div>;
@@ -544,9 +544,48 @@ export function GurStyles() {
           --c-border: rgba(45,36,25,0.10);
           --c-img-bg: #e8e0d8;          /* görsel yüklenene kadar */
           --c-shadow: rgba(45,36,25,0.12);
+
+          /* ── GÖLGE ÖLÇEĞİ ────────────────────────────────────────
+             Tek sert katman yerine üç katman: dar ve yakın olan
+             temas çizgisini, geniş ve soluk olan yayılan ışığı
+             taşır. Gerçek bir gölge tek bulanıklıkta değildir —
+             tek katman kartı kâğıda yapıştırılmış bir leke gibi
+             gösteriyordu.
+
+             Kaydırma yalnızca dikey: ışık tepeden gelir. Yana
+             kaçan gölge nesneyi eğri durur gibi gösteriyor.
+
+             Bulanıklık kaydırmadan belirgin biçimde büyük ve her
+             katman düşük opaklıkta — sert kenarlı koyu bir gölge
+             yerine yumuşak bir yükseklik.
+
+             Renk zeminin tonunda: saf siyah kremsi kâğıdın
+             (#FDFBF7) üstünde gri bir leke bırakıyor; sıcak
+             kahve-siyah kâğıda ait görünüyor. */
+          --sh-tint: 45, 36, 25;
+          --sh-1: 0 1px 2px rgba(var(--sh-tint),0.04), 0 2px 6px rgba(var(--sh-tint),0.04), 0 5px 14px rgba(var(--sh-tint),0.035);
+          --sh-2: 0 1px 2px rgba(var(--sh-tint),0.04), 0 3px 8px rgba(var(--sh-tint),0.045), 0 10px 24px rgba(var(--sh-tint),0.05);
+          --sh-3: 0 2px 4px rgba(var(--sh-tint),0.04), 0 7px 18px rgba(var(--sh-tint),0.05), 0 18px 42px rgba(var(--sh-tint),0.06);
+          --sh-4: 0 4px 8px rgba(var(--sh-tint),0.05), 0 14px 30px rgba(var(--sh-tint),0.07), 0 32px 70px rgba(var(--sh-tint),0.09);
+
+          /* Fotoğraf ve koyu zemin üstünde sıcak-soluk gölge okunmaz;
+             aynı katman mantığı, daha koyu tonlarla. */
+          --sh-d1: 0 1px 3px rgba(0,0,0,0.10), 0 3px 8px rgba(0,0,0,0.10), 0 7px 18px rgba(0,0,0,0.10);
+          --sh-d2: 0 2px 5px rgba(0,0,0,0.12), 0 6px 16px rgba(0,0,0,0.14), 0 14px 34px rgba(0,0,0,0.16);
+          --sh-d3: 0 3px 8px rgba(0,0,0,0.14), 0 10px 26px rgba(0,0,0,0.18), 0 24px 56px rgba(0,0,0,0.22);
+          --sh-d4: 0 6px 14px rgba(0,0,0,0.16), 0 18px 40px rgba(0,0,0,0.22), 0 42px 88px rgba(0,0,0,0.30);
+
+          /* Turuncu yüzeyin gölgesi de turuncu: nötr gri gölge
+             markanın altını kirletiyor. */
+          --sh-brand: 0 1px 2px rgba(190,70,0,0.10), 0 4px 10px rgba(190,70,0,0.16), 0 10px 24px rgba(190,70,0,0.18);
+          --sh-brand-lg: 0 2px 6px rgba(190,70,0,0.10), 0 10px 24px rgba(190,70,0,0.16), 0 26px 56px rgba(190,70,0,0.20);
+          --sh-brand-sm: 0 1px 2px rgba(190,70,0,0.12), 0 2px 6px rgba(190,70,0,0.16);
+
+          /* Aşağıdan yükselen sayfa gölgesini yukarı atar. */
+          --sh-up: 0 -2px 6px rgba(var(--sh-tint),0.04), 0 -8px 20px rgba(var(--sh-tint),0.06), 0 -20px 46px rgba(var(--sh-tint),0.08);
           --c-brand-soft: rgba(255,102,0,0.08);
           --c-brand-ink: #B4530A;       /* turuncu zemin üstünde metin */
-          --shadow-bar: 0 10px 30px rgba(45,36,25,0.12), 0 2px 6px rgba(45,36,25,0.05), inset 0 1px 0 rgba(255,255,255,0.9);
+          --shadow-bar: var(--sh-3);
 
           /* ── YAZI TİPİ JETONLARI ──────────────────────────────────
              Renk gibi yazı tipi de tek yerden. Yedek zincirde önce
