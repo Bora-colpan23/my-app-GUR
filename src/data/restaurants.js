@@ -145,6 +145,13 @@ export function osmToRestaurant(el, idx) {
     hours: t.opening_hours ? t.opening_hours.slice(0, 20) : "11:00 - 23:00",
     tags: [cat, cuisineRaw ? cuisineRaw.charAt(0).toUpperCase() + cuisineRaw.slice(1) : "Restoran"].filter((v, i, a) => a.indexOf(v) === i),
     lat: el.lat, lng: el.lon,
+    // İletişim: sahiplenmeye davet gönderebilmek için. Google Places
+    // API e-posta DÖNDÜRMEZ — böyle bir alanı yok; OSM ise mekanın
+    // kendi bildirdiği `email`/`contact:email` etiketini taşıyabiliyor.
+    // Etiket yoksa alan boş kalır ve panel bunu açıkça söyler.
+    email: t.email || t["contact:email"] || null,
+    website: t.website || t["contact:website"] || null,
+    phone: t.phone || t["contact:phone"] || null,
     isLive: true, // OSM'den geldiğini işaretle
   };
 }

@@ -98,6 +98,9 @@ gur/
     │   ├── visits.js          # konum doğrulamalı ziyaret (sunucu kurallarının aynısı)
     │   ├── b2b.js             # sahiplenme başvuruları + işletmenin girdiği alanlar
     │   ├── campaigns.js       # demo kampanya envanteri
+    │   ├── badges.js          # rozet kataloğu + atamalar (Gastro + editoryal)
+    │   ├── invites.js         # havuz daveti: kanal seçimi + mailto taslağı
+    │   ├── geo.js             # konum izni, elle ilçe seçimi, başlangıç noktası
     │   └── social-auth.js     # Google / Apple ile giriş
     ├── app/GurApp.jsx         # Tüketici uygulaması
     ├── business/GurBusiness.jsx  # Doyurucu: işletme uygulaması
@@ -117,6 +120,9 @@ yazıyorlar. Bağ ekranlarda değil depolarda:
 | `lib/reservations.js` | tüketici (talep) → işletme (karar) | tüketici (bildirim) |
 | `lib/pricing.js` | yönetici (teklif) → işletme (karar) | yönetici gelir tabloları |
 | `lib/ad-frequency.js` | tüketici (gösterim) | deste kurulumu |
+| `lib/badges.js` | yönetici (editoryal rozet) | tüketici kartı, kaydırma, detay |
+| `lib/invites.js` | yönetici (havuz daveti) | yönetici havuz listesi |
+| `lib/geo.js` | tüketici (izin / seçilen ilçe) | deste sıralaması, konum çipi |
 | `data/restaurants.js` | tohum/besleme | üçü de |
 
 Bir mekanın kimliği tek yerde: `account` alanı işletmenin hesabı olup
@@ -162,20 +168,27 @@ Sabit `#fff` yalnızca turuncu/koyu zemin üstündeki metin ve ikonlar için.
 Yönetici paneli kendi jeton kümesini taşır (`GurAdmin.jsx` → `C`), ama o da
 açık: koyu masaüstü sürümü kaldırıldı.
 
-### Kontrast: dengeli, ölçülmüş
-Beyaz yazı `#FF6600` üstünde **2.94:1** — küçük metinde de büyük metinde
-de kalıyor. Turuncuyu beyazın geçeceği kadar koyultmak (`#C24B00`) markayı
-kiremite çeviriyordu; onun yerine **turuncu kalır, üstündeki mürekkep
-koyulur**:
+### Turuncu zeminde yazı BEYAZ (ürün kararı)
+Tabanı turuncu olan her yüzeyde metin beyaz. Bu **bilinçli bir tercih** ve
+bedeli ölçüldü: beyaz `#FF6600` üstünde **2.94:1**, marka gradyanının açık
+ucunda (`#FF7A1A`) **2.61:1** — WCAG AA eşiği 4.5'in altında. Denetleme
+betiği bu yüzden 21 uyarı veriyor ve **hepsi budur**; başka kaynaklı tek
+bir kontrast hatası yok. Listeyi bu şekilde okuyun: sıfır beklemeyin,
+21 bekleyin, 22 olursa yeni bir hata girmiş demektir.
 
-| Jeton | Nerede | Oran |
-|---|---|---|
-| `--c-on-brand` | turuncu DOLGU üstünde ana metin | 5.95:1 |
-| `--c-on-brand-2` | turuncu üstünde ikincil metin | 4.63:1 |
-| `--c-brand-ink` | kâğıt üstünde turuncu METİN | 5.02:1 |
+Geçirmenin tek yolu metin taşıyan turuncu yüzeyi koyultmaktı
+(`#C24B00`, beyazla 4.88:1) — marka turuncusu o zaman kiremite dönüyor,
+onun yerine turuncu korundu.
+
+| Jeton | Nerede |
+|---|---|
+| `--c-on-brand` | turuncu DOLGU üstünde ana metin (`#fff`) |
+| `--c-on-brand-2` | turuncu üstünde ikincil metin (`rgba(255,255,255,0.86)`) |
+| `--c-brand-ink` | kâğıt üstünde turuncu METİN — 5.02:1, AA geçer |
 
 Kâğıt üstünde `#FF6600`'ı metin rengi olarak **kullanma** — `--c-brand-ink`
-var. Turuncu zeminde `#fff` **kullanma** — `--c-on-brand` var.
+var. Turuncu zeminde elle `#fff` **yazma** — `--c-on-brand` var; jetondan
+okumak paletin tek yerden değişmesini sağlıyor.
 
 Aynı kural durum renklerinde: parlak ton dolgu, koyu ton yazı.
 `--c-ok` / `--c-ok-ink` / `--c-ok-on`, `--c-bad` / `--c-bad-ink`; panelde
@@ -354,6 +367,81 @@ sabit aralık kullanıcı tarafından fark ediliyor.
 - Font: **Poppins** + **Outfit**, jetondan: `var(--f-display)` / `var(--f-body)`.
   Başka font kullanma. Sayı sütunlarında sistem mono (yönetici: `FM`).
 
+### Konum: giriş biter bitmez sorulur
+Kimlik akışı (`login` / `register`) bittiğinde ekran **doğrudan Keşfet'e
+gitmez**: `afterAuth()` önce `geo.consentAsked()` bakar, hiç sorulmadıysa
+`location` ekranına götürür. Tarayıcının izin kutusu deste kurulurken
+habersiz açılmasın diye niyet önce yazıyla anlatılıyor.
+
+Üç yol da eşit ağırlıkta (karanlık kalıp yok): **Konumumu kullan**,
+**İlçemi seçeyim**, **Şimdi değil**.
+
+İzin reddedilirse akış tıkanmaz — `src/lib/geo.js` iki ayrı başlangıç
+noktası tanıyor:
+
+| `source` | Nereden | Ne zaman |
+|---|---|---|
+| `device` | Geolocation API | izin verildi |
+| `manual` | `DISTRICTS` listesinden seçilen ilçe | izin yok/reddedildi |
+
+`origin()` ikisini de döndürür, `hasOrigin()` ikisini de sayar; sıralama
+kodu hangisi olduğunu bilmez. Seçim `gur.geo.choice` altında saklanır ve
+açılışta `restore()` ile geri yüklenir.
+
+**Sol üstteki konum çipi bir düğmedir.** Dokununca `LocationSheet` açılır:
+izni tekrar isteyebilir ya da ilçeyi değiştirebilirsin. Reddeden kullanıcı
+tarayıcı ayarlarına gitmeden geri dönebilsin diye bu yol her ekranda
+duruyor. Çipin üst satırı durumu söyler: "Konumun" / "Seçtiğin ilçe" /
+"Konum kapalı".
+
+Ham koordinat hiçbir yere gönderilmez; ekran da bunu yazar.
+
+### Rozetler: bir mekanda birden fazla nişan
+`src/lib/badges.js` altı rozetlik bir katalog taşıyor. **Gastro Onaylı
+kaydın kendi alanı** (`r.gastro`) olarak kalıyor — bağımsız şef
+değerlendirmesine dayanıyor ve satın alınamıyor. Diğer beşi (Günün
+Restoranı, Haftanın Keşfi, Editör Seçimi, Yeni Açıldı, Semtin Favorisi)
+yönetici panelinden elle veriliyor ve **ayrı depoda** (`gur.badges`):
+besleme kaydı tazelediğinde editoryal karar silinmesin.
+
+`badgesOf(r, map)` ikisini birleştirip **katalog sırasında** döndürür —
+rozetler her ekranda aynı sırada görünür.
+
+Üç gösterim, üçü de aynı katalogdan:
+
+| Bileşen | Nerede | Ne gösterir |
+|---|---|---|
+| `BadgeChips` | Keşfet listesinde fotoğraf üstünde | doygun dolgu + beyaz kısa ad |
+| `BadgeChips onLight` | detay sayfasında adın altında | yumuşak zemin + koyu mürekkep, **tam ad** |
+| `BadgeMarks` | kaydırma kartında ismin yanında | renkli disk içinde yalnız simge |
+
+Kurallar:
+- **Aynı rozeti bir kartta iki kez çizme.** Kaydırma kartında rozet yalnız
+  ismin yanında; fotoğrafın üstündeki çip oradan kaldırıldı.
+- `BadgeMarks` **diskin içinde**. Çıplak simge çizilince Gastro'nun yıldızı,
+  hesabın doğrulandığını söyleyen `VerifiedStar` ile tek şey gibi okunuyordu.
+  Sıra: isim → rozetler → `VerifiedStar`.
+- Nişan sayısı **üçle sınırlı** (`max`); tamamı detayda adlarıyla yazılı.
+- Rozetin rengi paletin durum ailesinden; **yeni bir yeşil/amber/kırmızı
+  tanımlama**. Katalogda `hex`/`hexInk` de var: yönetici paneli `GurStyles`
+  render etmediği için orada `var()` çözülmez.
+
+### Havuz daveti: e-posta nereden geliyor
+`src/lib/invites.js`. Burada iki şeyi doğru bilmek gerekiyor:
+
+- **Google Places API e-posta DÖNDÜRMEZ** — böyle bir alanı yok. Havuzdaki
+  adresler mekanın kendi bildirdiği OSM `email` / `contact:email`
+  etiketinden geliyor (`osmToRestaurant` bunları okuyor) ve çoğu kayıtta yok.
+- **Projede posta taşıması yok** (SMTP/nodemailer kurulu değil). Bu yüzden
+  davet, yöneticinin kendi posta istemcisinde hazır bir taslak olarak
+  açılıyor (`mailto:`) — gönderildi numarası yapmıyoruz.
+
+`channelOf(r)` sırayla e-posta → site → telefon bakar ve düğme dört
+durumdan birini çizer: **E-posta ile davet et** / **Siteden ulaş** /
+**iletişim bilgisi yok** (pasif) / **Davet edildi**. Kim, ne zaman, hangi
+adrese — hepsi `gur.invites` altında; gerçek dağıtımda buranın yerine
+sunucuda bir kuyruk gelir, arayüz değişmeden.
+
 ### Konum doğrulamalı ziyaret
 `src/lib/visits.js` ve `server/src/visits/tracker.js` **aynı kuralları** taşır:
 120 m yarıçap, 15 dk kalış, 100 m'den iyi hassasiyet. Ham konum hiçbir yerde
@@ -391,6 +479,10 @@ Google Places + Foursquare + Tripadvisor + OSM'den cron ile beslenir.
   demo profiliyle tamamlanır ve bunu ekranda söyler.
 - **Besleme dış ağ ister.** Anahtarsız OSM yolu bile giden HTTPS gerektirir;
   kapalı ağda tohum listesi devreye girer.
+- **Posta taşıması yok.** Havuz daveti `mailto:` ile yöneticinin posta
+  istemcisinde taslak açıyor; sunucudan giden posta yok. Ayrıca Google
+  Places API e-posta alanı döndürmüyor — adresler OSM etiketlerinden
+  geliyor ve çoğu kayıtta yok.
 - **Ödeme entegrasyonu yok** (iyzico/Stripe). GUR Plus ve işletme abonelikleri
   arayüzde var, tahsilat yok.
 - Yasal metinlerdeki işletme bilgileri yer tutucu; yayına çıkmadan doldurulmalı.

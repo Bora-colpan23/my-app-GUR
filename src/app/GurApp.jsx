@@ -14,6 +14,7 @@ import {
   usePrefersReducedMotion, GurLogo, Icon, BackBtn, Img,
   InputField, SelectField, ELEV,
   Spinner, Btn, IconBtn, HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
+  BadgeChips, BadgeMarks,
   scrim,
 } from '../ui/kit.jsx';
 import { I, RESTAURANTS, CATEGORIES, fetchLiveRestaurants, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
@@ -25,6 +26,7 @@ import * as reservations from '../lib/reservations.js';
 import * as pricing from '../lib/pricing.js';
 import * as geo from '../lib/geo.js';
 import { seenCampaigns, markShown } from '../lib/ad-frequency.js';
+import { badgesOf, useBadgeMap } from '../lib/badges.js';
 import { signIn as socialSignIn, isAppleDevice, isConfigured as socialConfigured } from '../lib/social-auth.js';
 
 // ── GUR Match: arkadaşın kararları ───────────────────────────────────────
@@ -161,6 +163,9 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
   const movedRef = useRef(false);
   const [dragging, setDragging] = useState(false);
   const [ii, setIi] = useState(0);
+  // Rozetler yönetici panelinden verilir; deposu canlı dinleniyor ki
+  // panelde takılan rozet uygulamada anında görünsün.
+  const badges = badgesOf(r, useBadgeMap());
 
   // İki eksen ayrı motion değeri: tek bir 2B mesafeye bağlamak, X ve Y
   // hızları farklı olduğunda senkronu bozuyor (§3 — eksenleri ayır).
@@ -295,6 +300,7 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
         <h3 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", gap: 7 }}>
           {r.name}
+          <BadgeMarks badges={badges} size={15} onLight={false} />
           {(r.claimed || r.ownerClaimed) && <VerifiedStar size={15} title="İşletme hesabı doğrulanmış" />}
         </h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
@@ -454,7 +460,7 @@ function WelcomeScreen({ onStart }) {
             İstanbul'un en iyi restoranlarını keşfet, favorilerini kaydet
           </p>
 
-          <Btn text="GUR uldamaya başla sende" onClick={onStart} />
+          <Btn text="GUR'u kullanmaya başla" onClick={onStart} />
           {/* İşletme girişi bu uygulamada yok: işletmeler kendi
               uygulamalarından (/isletme) giriyor. Aynı ürünün iki ayrı
               tarafı — müşteriye işletme paneli göstermenin anlamı yok.
@@ -576,7 +582,7 @@ function LoginScreen({ onBack, onLogin, onRegister, live }) {
     catch (err) { setError(err.message || "Giriş yapılamadı"); }
     finally { setBusy(false); }
   };
-  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--c-warm-1)" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "var(--c-on-brand)", margin: "0 0 6px", textAlign: "center" }}>Giriş yap</h2><div style={{ marginBottom: 32, display: "flex", justifyContent: "center" }}><Btn variant="plainBrand" size="sm" fullWidth={false} onClick={onRegister} text="Üyeliğiniz yoksa lütfen kayıt için dokununuz" /></div><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR uldamaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="brand" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
+  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--c-warm-1)" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "var(--c-on-brand)", margin: "0 0 6px", textAlign: "center" }}>Giriş yap</h2><div style={{ marginBottom: 32, display: "flex", justifyContent: "center" }}><Btn variant="plainBrand" size="sm" fullWidth={false} onClick={onRegister} text="Üyeliğiniz yoksa lütfen kayıt için dokununuz" /></div><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR'u kullanmaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="brand" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
 }
 
 function RegisterScreen({ onBack, onDone, onLegal, live }) {
@@ -664,7 +670,12 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
   const loc = geo.useUserLocation();
   useEffect(() => { geo.requestLocation({ silent: true }); }, []);
   const precise = loc.source === "device";
-  const origin = precise ? { lat: loc.lat, lng: loc.lng } : geo.DEFAULT_ORIGIN;
+  // Elle seçilen ilçe de bir başlangıç noktası: izin vermeyen kullanıcı da
+  // "yakınımdakiler" görebilmeli, yalnızca hassasiyeti farklı.
+  const placed = precise || loc.source === "manual";
+  const origin = placed ? { lat: loc.lat, lng: loc.lng } : geo.DEFAULT_ORIGIN;
+  const [locSheet, setLocSheet] = useState(false);
+  const badgeMap = useBadgeMap();
 
   // Yakınlık sırası bir kez hesaplanıp hem arama hem "yakınında popüler"
   // için kullanılıyor: iki liste aynı mesafeyi iki türlü söylemesin.
@@ -701,11 +712,12 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
   // Başlıkta gösterilen semt: koordinattan değil, en yakın kaydın adresinden
   // türetiliyor — ters coğrafi kodlama için ağa çıkmaya değmez.
   const districtLabel = useMemo(() => {
+    if (loc.source === "manual") return loc.label || "İstanbul merkezi";
     if (!precise) return "İstanbul merkezi";
     const closest = nearby.find(r => Number.isFinite(r.distanceKm));
     const part = closest?.addr?.split(",").map(x => x.trim()).filter(Boolean);
     return part?.[part.length - 2] || part?.[0] || "Yakınındakiler";
-  }, [precise, nearby]);
+  }, [precise, nearby, loc.source, loc.label]);
 
   // Tüm Kategoriler overlay
   if (showAll) {
@@ -760,14 +772,14 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             Konum satırı yeni: "yakınında" diyen bir uygulamanın nereye göre
             konuştuğunu söylemesi gerekir. Dokununca hassas konum istenir. */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, animation: "fadeInUp 0.6s ease-out" }}>
-          <button type="button" className="gur-btn" onClick={() => geo.requestLocation()}
+          <button type="button" className="gur-btn" onClick={() => setLocSheet(true)}
             style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, border: "none", background: "transparent", padding: 0, cursor: precise ? "default" : "pointer", outline: "none", textAlign: "left" }}>
             <div style={{ width: 34, height: 34, borderRadius: 12, background: "var(--c-subtle)", border: "1px solid var(--c-line)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Icon n="pin" size={16} color="var(--c-ink-2)" />
             </div>
             <div style={{ minWidth: 0 }}>
               <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 600, color: "var(--c-muted)", margin: 0, letterSpacing: 0.3 }}>
-                {precise ? "Konumun" : "Konum kapalı"}
+                {precise ? "Konumun" : loc.source === "manual" ? "Seçtiğin ilçe" : "Konum kapalı"}
               </p>
               <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 800, color: "var(--c-ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {districtLabel}{!precise && " ▾"}
@@ -954,6 +966,10 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                         <VerifiedStar size={12} />
                       </div>
                     )}
+                    {/* Anasayfada rozet restoranın üstünde */}
+                    <div style={{ position: "absolute", top: 9, left: 9 }}>
+                      <BadgeChips badges={badgesOf(r, badgeMap)} max={1} size="sm" />
+                    </div>
                   </div>
                   <div style={{ padding: "11px 13px 13px" }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 3 }}>
@@ -1018,6 +1034,9 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
         </div>
 
       </div>
+
+      {/* Konum sayfası: izni yeniden dene ya da ilçe değiştir */}
+      {locSheet && <LocationSheet onClose={() => setLocSheet(false)} />}
     </Screen>
   );
 }
@@ -1193,6 +1212,166 @@ function PremiumSheet({ onClose }) {
 
 // İzin istemi gerekçesiz açılmaz: reddedilen konum izni geri alınması
 // zor bir karar, önce ne işe yaradığını anlatıyoruz (§16 — sorumluluk).
+// ═══════════════════════════════════════════════
+// KONUM KURULUMU — girişten hemen sonra
+//
+// İzin istemini gerekçesiz açmak reddedilme oranını yükseltiyor ve
+// reddedildikten sonra tarayıcı bir daha sormuyor. Bu yüzden önce neden
+// istediğimizi söyleyen bir adım var; reddedilirse akış tıkanmıyor,
+// kullanıcı ilçesini elle seçip devam edebiliyor.
+// ═══════════════════════════════════════════════
+function DistrictGrid({ onPick, selected }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 8 }}>
+      {geo.DISTRICTS.map(d => {
+        const on = selected === d.name;
+        return (
+          <button
+            key={d.name} type="button" className="gur-btn"
+            onClick={() => onPick(d)} aria-pressed={on}
+            style={{
+              "--btn-bg": on ? "var(--c-brand-soft)" : "var(--c-subtle)",
+              "--btn-bg-hover": "var(--c-brand-soft)",
+              "--btn-bg-press": "rgba(255,102,0,0.18)",
+              border: `1px solid ${on ? "rgba(255,102,0,0.4)" : "var(--c-line)"}`,
+              borderRadius: 14, padding: "11px 8px", outline: "none",
+              fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700,
+              color: on ? "var(--c-brand-ink)" : "var(--c-ink)",
+            }}>{d.name}</button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LocationSetupScreen({ onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [denied, setDenied] = useState(false);
+  const [picking, setPicking] = useState(false);
+
+  const izinIste = async () => {
+    setBusy(true);
+    const o = await geo.requestLocation();
+    setBusy(false);
+    if (o) { onDone(); return; }
+    // Reddedildi ya da alınamadı: akışı tıkamıyoruz, ilçe seçimine geçiyoruz.
+    setDenied(true);
+    setPicking(true);
+  };
+
+  return (
+    <Screen>
+      <div style={{ padding: "56px 26px 40px", minHeight: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ textAlign: "center", marginBottom: 26 }}>
+          <div style={{
+            width: 68, height: 68, borderRadius: 24, margin: "0 auto 16px",
+            background: "var(--c-brand-soft)", border: "1px solid rgba(255,102,0,0.18)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Icon n="pin" size={30} color="#FF6600" />
+          </div>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 24, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 8px" }}>
+            Nerede yemek arıyorsun?
+          </h2>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.55, margin: 0 }}>
+            Konumunu bilirsek deste sana en yakın mekanlarla başlar ve
+            uzaklaştıkça açılır. Vermezsen ilçeni seçebilirsin.
+          </p>
+        </div>
+
+        {denied && (
+          <div role="status" style={{
+            background: "var(--c-warn-soft)", border: "1px solid rgba(245,158,11,0.28)",
+            borderRadius: 14, padding: "11px 13px", marginBottom: 16,
+            fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-warn-ink)", lineHeight: 1.5,
+          }}>
+            Konum izni alınamadı. Tarayıcı ayarlarından açabilir ya da aşağıdan
+            ilçeni seçebilirsin — sonradan sol üstteki konum satırından değiştirebilirsin.
+          </div>
+        )}
+
+        {picking ? (
+          <>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-muted)", margin: "0 0 10px", letterSpacing: 0.3 }}>
+              İLÇENİ SEÇ
+            </p>
+            <DistrictGrid onPick={d => { geo.setManualOrigin(d); onDone(); }} />
+            {!denied && (
+              <div style={{ marginTop: 14 }}>
+                <Btn text="Konumumu kullan" onClick={izinIste} loading={busy} variant="outlineDark" size="md" />
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <Btn text="Konumumu kullan" onClick={izinIste} loading={busy} variant="filled" />
+            <div style={{ height: 10 }} />
+            <Btn text="İlçemi seçeyim" onClick={() => setPicking(true)} variant="outlineDark" />
+          </>
+        )}
+
+        <div style={{ marginTop: "auto", paddingTop: 22 }}>
+          {/* "Şimdi değil" de bir karar: reddetmek kabul etmek kadar kolay
+              olmalı ve her açılışta tekrar sorulmamalı. */}
+          <Btn text="Şimdi değil" onClick={() => { geo.markConsentSkipped(); onDone(); }} variant="plainDark" size="sm" />
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", textAlign: "center", margin: "10px 0 0", lineHeight: 1.5 }}>
+            Ham koordinatın sunucuya gönderilmez; yalnızca sıralama için bellekte tutulur.
+          </p>
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+// Başlıktaki konum satırından açılır: izni yeniden dene ya da ilçe değiştir.
+function LocationSheet({ onClose }) {
+  const loc = geo.useUserLocation();
+  const [busy, setBusy] = useState(false);
+  const [durum, setDurum] = useState(null);
+  useEffect(() => { geo.permissionState().then(setDurum); }, []);
+
+  const izinIste = async () => {
+    setBusy(true);
+    const o = await geo.requestLocation();
+    setBusy(false);
+    setDurum(await geo.permissionState());
+    if (o) onClose();
+  };
+
+  return (
+    <Sheet title="Konum" subtitle="Deste buna göre sıralanır" onClose={onClose}>
+      {loc.source === "device" && (
+        <p role="status" style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-ok-ink)", margin: "0 0 14px", lineHeight: 1.5 }}>
+          Cihaz konumun kullanılıyor.
+        </p>
+      )}
+      {durum === "denied" && (
+        <p role="status" style={{
+          background: "var(--c-warn-soft)", border: "1px solid rgba(245,158,11,0.28)", borderRadius: 12,
+          padding: "10px 12px", fontFamily: "var(--f-body)", fontSize: 12.5,
+          color: "var(--c-warn-ink)", margin: "0 0 14px", lineHeight: 1.5,
+        }}>
+          Konum izni tarayıcıda reddedilmiş. Tarayıcı ayarlarından açman gerekiyor —
+          o zamana kadar ilçeni seçebilirsin.
+        </p>
+      )}
+
+      {durum !== "denied" && (
+        <div style={{ marginBottom: 16 }}>
+          <Btn text={loc.source === "device" ? "Konumu yenile" : "Konumumu kullan"}
+            onClick={izinIste} loading={busy} variant="filled" size="md" />
+        </div>
+      )}
+
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-muted)", margin: "0 0 10px", letterSpacing: 0.3 }}>
+        İLÇE SEÇ
+      </p>
+      <DistrictGrid selected={loc.source === "manual" ? loc.label : null}
+        onPick={d => { geo.setManualOrigin(d); onClose(); }} />
+    </Sheet>
+  );
+}
+
 function LocationRationale({ onAllow, onDemo, onClose }) {
   return (
     <Sheet title="Konumla doğrulanmış yorumlar" subtitle="Neden konum istiyoruz" onClose={onClose}>
@@ -1565,6 +1744,9 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
 
   // Şef tanıtımı galerinin bir karesi (bkz. galleryOf); ayrı bölüm değil.
   const gallery = galleryOf(r, chefVideoOn);
+  // Rozetlerin adı yalnız burada yazılı: karttaki simge kısa, açıklaması
+  // detayda. Aynı depodan okunuyor, panelden verilen rozet anında düşer.
+  const detayRozet = badgesOf(r, useBadgeMap());
   const provider = defaultMapProvider(typeof navigator !== "undefined" ? navigator.userAgent : "");
   const place = { name: r.name, address: r.addr, lat: r.lat, lng: r.lng };
   const openMap = (p) => {
@@ -1625,6 +1807,11 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
             {r.name}
             {claimed && <VerifiedStar size={16} />}
           </h2>
+          {detayRozet.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <BadgeChips badges={detayRozet} max={4} size="sm" onLight />
+            </div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)" }}>
               <Icon n="star" color="var(--c-warn)" size={13} />{r.rating}
@@ -1750,7 +1937,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   const loc = geo.useUserLocation();
   useEffect(() => { geo.requestLocation({ silent: true }); }, []);
   const precise = loc.source === "device";
-  const origin = precise ? { lat: loc.lat, lng: loc.lng } : geo.DEFAULT_ORIGIN;
+  const origin = (precise || loc.source === "manual") ? { lat: loc.lat, lng: loc.lng } : geo.DEFAULT_ORIGIN;
 
   // Bu kullanıcıya daha önce gösterilmiş kampanyalar destede yeniden
   // çıkmaz. Sınır destenin KURULDUĞU ANDA okunuyor, canlı dinlenmiyor:
@@ -3777,12 +3964,18 @@ export default function GurApp(props = {}) {
     // nav kimliği her çizimde değişiyor; bağımlılığa alınırsa döngü olur.
   }, [platform.matchEnabled, screen]);
 
+  // Girişten sonra: konum kararı verilmediyse önce o adım.
+  const afterAuth = () => nav(geo.consentAsked() ? "explore" : "location");
+
   const render = () => {
     switch (screen) {
       case "splash": return <SplashScreen onNext={() => setScreen("welcome")} />;
       case "welcome": return <WelcomeScreen onStart={() => nav("login")} />;
-      case "login": return <LoginScreen onBack={back} onLogin={() => nav("explore")} onRegister={() => nav("register")} live={session.mode === "live"} />;
-      case "register": return <RegisterScreen onBack={back} onDone={() => nav("explore")} onLegal={() => nav("legal")} live={session.mode === "live"} />;
+      // Girişten sonra konum adımı: kullanıcı daha önce karar verdiyse
+      // (izin verdi, ilçe seçti ya da "şimdi değil" dedi) tekrar sorulmaz.
+      case "login": return <LoginScreen onBack={back} onLogin={afterAuth} onRegister={() => nav("register")} live={session.mode === "live"} />;
+      case "register": return <RegisterScreen onBack={back} onDone={afterAuth} onLegal={() => nav("legal")} live={session.mode === "live"} />;
+      case "location": return <LocationSetupScreen onDone={goExplore} />;
       case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} matchEnabled={platform.matchEnabled} restaurants={feed} onDetail={openDetail} />;
       case "match-start": return <MatchStartScreen onBack={back} onStart={startMatch} />;
       case "match-swipe": return <MatchSwipeScreen code={matchCode} restaurants={feed} onExit={goExplore} onFinish={finishMatch} />;

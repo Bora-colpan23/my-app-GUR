@@ -5,6 +5,8 @@ import * as api from '../lib/api.js';
 import { motion, AnimatePresence } from 'motion/react';
 import { usePlatformSettings, toggleSetting, setStoreFeature, FEATURES, PER_STORE_FEATURES } from '../lib/platform.js';
 import * as pricing from '../lib/pricing.js';
+import { ASSIGNABLE, badgesOf, toggleBadge, useBadgeMap } from '../lib/badges.js';
+import { channelOf, inviteOf, sendInvite, useInvites } from '../lib/invites.js';
 
 // ═══════════════════════════════════════════════════════════════
 // GUR YÖNETİCİ PANELİ — Platform kontrol merkezi
@@ -45,7 +47,7 @@ const C = {
   greenInk:  '#0A7C46',   /* 5.3:1 */
   redInk:    '#C2282D',   /* 5.8:1 */
   yellowInk: '#8A5200',   /* 6.3:1 */
-  onBrand:   '#2B1400',   /* turuncu DOLGU üstünde yazı, 6.0:1 */
+  onBrand:   '#ffffff',   /* turuncu DOLGU üstünde yazı — beyaz (ürün kararı) */
 };
 
 const F = "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
@@ -137,14 +139,14 @@ const RESTAURANTS = [
   { id: 2, name: 'Mikla Restaurant', cat: 'Fine Dining', district: 'Beyoğlu', rating: 4.9, reviews: 890, status: 'active', gastro: true, plan: 'Premium', joined: '2024-01-08', account: true, source: 'owner' },
   { id: 9, name: 'Çiya Sofrası', cat: 'Türk Mutfağı', district: 'Kadıköy', rating: 4.7, reviews: 2100, status: 'active', gastro: true, plan: 'Pro', joined: '2024-02-20', account: true, source: 'owner' },
   { id: 3, name: 'La Sagrata Famila', cat: 'Uzak Doğu', district: 'Kadıköy', rating: 4.6, reviews: 620, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-05', account: true, source: 'owner' },
-  { id: 4, name: 'Green Bowl', cat: 'Sağlıklı', district: 'Şişli', rating: 4.5, reviews: 340, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2024-06-15', account: false, source: 'api' },
-  { id: 6, name: 'Klein Bistro', cat: 'Kafe', district: 'Beyoğlu', rating: 4.4, reviews: 560, status: 'suspended', gastro: false, plan: 'Ücretsiz', joined: '2024-05-02', account: false, source: 'api' },
+  { id: 4, name: 'Green Bowl', cat: 'Sağlıklı', district: 'Şişli', rating: 4.5, reviews: 340, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2024-06-15', account: false, source: 'api', email: 'merhaba@greenbowl.com.tr', website: 'greenbowl.com.tr' },
+  { id: 6, name: 'Klein Bistro', cat: 'Kafe', district: 'Beyoğlu', rating: 4.4, reviews: 560, status: 'suspended', gastro: false, plan: 'Ücretsiz', joined: '2024-05-02', account: false, source: 'api', email: null, website: 'kleinbistro.co' },
   { id: 11, name: 'The Burger Joint', cat: 'Fast Food', district: 'Nişantaşı', rating: 4.2, reviews: 780, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-18', account: true, source: 'owner' },
   { id: 12, name: 'Karaköy Güllüoğlu', cat: 'Tatlıcı', district: 'Karaköy', rating: 4.9, reviews: 3200, status: 'active', gastro: true, plan: 'Premium', joined: '2023-12-01', account: true, source: 'owner' },
   // Dış beslemeden gelen, henüz sahiplenilmemiş mekanlar
-  { id: 5, name: 'Ateş Mangal', cat: 'Mangal', district: 'Beykoz', rating: 4.7, reviews: 210, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-02-14', account: false, source: 'api' },
-  { id: 13, name: 'Balıkçı Sabahattin', cat: 'Deniz Ürünleri', district: 'Fatih', rating: 4.6, reviews: 980, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-01-22', account: false, source: 'api' },
-  { id: 14, name: 'Spice Market', cat: 'Uzak Doğu', district: 'Şişli', rating: 4.4, reviews: 150, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-03-30', account: false, source: 'api' },
+  { id: 5, name: 'Ateş Mangal', cat: 'Mangal', district: 'Beykoz', rating: 4.7, reviews: 210, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-02-14', account: false, source: 'api', email: 'iletisim@atesmangal.com', website: null },
+  { id: 13, name: 'Balıkçı Sabahattin', cat: 'Deniz Ürünleri', district: 'Fatih', rating: 4.6, reviews: 980, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-01-22', account: false, source: 'api', email: 'rezervasyon@balikcisabahattin.com', website: 'balikcisabahattin.com' },
+  { id: 14, name: 'Spice Market', cat: 'Uzak Doğu', district: 'Şişli', rating: 4.4, reviews: 150, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-03-30', account: false, source: 'api', email: null, website: null },
   { id: 7, name: 'Lucca Lounge', cat: 'Gece Hayatı', district: 'Bebek', rating: 4.3, reviews: 450, status: 'active', gastro: false, plan: 'Pro', joined: '2024-07-22', account: true, source: 'owner' },
 ];
 
@@ -1962,6 +1964,9 @@ function StoreFeatures({ restaurant }) {
 }
 
 function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
+  // Depo canlı dinleniyor: rozet takılınca hem burası hem tüketici
+  // uygulaması aynı anda tazeleniyor.
+  const takili = badgesOf(r, useBadgeMap());
   const menus = useMemo(() => restaurantMenus(r), [r.id]);
   const reviews = useMemo(() => restaurantReviews(r), [r.id]);
   const services = storeServices(r);
@@ -2164,8 +2169,52 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
               variant={r.gastro ? 'outline' : 'filled'}
               tone={r.gastro ? 'red' : 'orange'}
               size="md"
-              icon={<Icon path={r.gastro ? icons.x : icons.star} size={14} color={r.gastro ? C.red : '#fff'} fill={r.gastro ? 'none' : '#fff'} />}
+              icon={<Icon path={r.gastro ? icons.x : icons.star} size={14} color={r.gastro ? C.redInk : '#fff'} fill={r.gastro ? 'none' : '#fff'} />}
             />
+          </div>
+
+          {/* Editoryal rozetler — Gastro'nun yanında, ama ayrı.
+              Gastro şef değerlendirmesine dayanır ve kaydın kendi alanıdır;
+              buradakiler editör kararıdır ve ayrı depoda tutulur
+              (src/lib/badges.js), besleme kaydı tazelese de silinmezler.
+              Bir mekan birden fazla rozet taşıyabilir. */}
+          <div style={{ margin: '0 16px 16px', padding: '14px 16px', borderRadius: 12, background: C.panel2, border: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: C.text, marginBottom: 3 }}>Editoryal rozetler</div>
+            <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 12 }}>
+              Uygulamada kartın üstünde ve mekan adının yanında görünür. Birden fazla seçilebilir.
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {ASSIGNABLE.map(b => {
+                const on = takili.some(x => x.id === b.id);
+                return (
+                  <button
+                    key={b.id} type="button" className="gur-admin-btn"
+                    onClick={() => toggleBadge(r.id, b.id)}
+                    aria-pressed={on} title={b.desc}
+                    style={{
+                      '--btn-bg': on ? b.hex : C.panel,
+                      '--btn-bg-hover': on ? b.hex : C.panel2,
+                      '--btn-bg-press': on ? b.hexInk : C.border,
+                      display: 'inline-flex', alignItems: 'center', gap: 7,
+                      border: `1px solid ${on ? b.hex : C.border}`, borderRadius: R.pill,
+                      padding: '7px 13px', outline: 'none',
+                      fontFamily: FB, fontSize: 12.5, fontWeight: 700,
+                      color: on ? '#fff' : C.text,
+                    }}>
+                    <span aria-hidden style={{
+                      width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                      background: on ? '#fff' : b.hex,
+                    }} />
+                    {b.label}
+                  </button>
+                );
+              })}
+            </div>
+            {takili.length > 0 && (
+              <div style={{ fontSize: 11.5, color: C.dim, marginTop: 11 }}>
+                Bu mekanda {takili.length} rozet: {takili.map(b => b.label).join(', ')}.
+              </div>
+            )}
           </div>
 
           {/* Puan dağılımı */}
@@ -2562,8 +2611,43 @@ function UsersPage({ query }) {
 // ═══════════════════════════════════════════════════════════════════════
 const SOURCE_LABEL = { api: 'Dış besleme', owner: 'Sahiplenilmiş' };
 
+// Havuzdaki mekana sahiplenme daveti.
+//
+// E-posta varsa yöneticinin posta istemcisinde hazır bir taslak açılır
+// (mailto:) — projede sunucu tarafı posta taşıması yok, "gönderildi"
+// numarası yapmıyoruz. E-posta yoksa siteye/telefona yönlendirir; hiçbir
+// kanal yoksa düğme kapalı ve nedeni yazıyor.
+//
+// NOT: havuzun e-postaları Google Places'ten GELMEZ — Places API'nin
+// e-posta alanı yoktur. Bunlar mekanın kendi bildirdiği OSM
+// `email`/`contact:email` etiketinden geliyor, çoğu kayıtta yok.
+function InviteButton({ r, invite }) {
+  const k = channelOf(r);
+  if (invite) {
+    return (
+      <Btn label={`Davet edildi · ${formatDate(invite.at)}`} variant="soft" tone="green" size="sm"
+        title={invite.adres ? `${invite.adres} adresine` : undefined}
+        icon={<Icon path={icons.check} size={13} color={C.greenInk} />}
+        onClick={() => sendInvite(r)} disabled={!k || k.kind !== 'email'} />
+    );
+  }
+  if (!k) {
+    return <Btn label="İletişim bilgisi yok" variant="ghost" size="sm" disabled
+      title="Beslemede e-posta, site veya telefon yok — davet gönderilecek adres bulunamadı." />;
+  }
+  if (k.kind !== 'email') {
+    return <Btn label={k.kind === 'website' ? 'Siteden ulaş' : 'Telefonla ara'} variant="outline" size="sm"
+      title={`Beslemede e-posta yok; ${k.value} üzerinden ulaşabilirsiniz.`}
+      onClick={() => window.open(k.kind === 'website' ? `https://${k.value.replace(/^https?:\/\//, '')}` : `tel:${k.value}`, '_blank', 'noopener')} />;
+  }
+  return <Btn label="E-posta ile davet et" variant="filled" tone="orange" size="sm"
+    title={`${k.value} adresine davet taslağı açılır`}
+    onClick={() => sendInvite(r)} />;
+}
+
 function VenuePoolPage({ restaurants = [], query = '', onOpen }) {
-  const [invited, setInvited] = useState(() => new Set());
+  // Davetler depoda: sayfa yenilenince kimin davet edildiği unutulmasın.
+  const invites = useInvites();
   const [sort, setSort] = useState('rating');   // 'rating' | 'reviews' | 'name'
 
   const pool = useMemo(() => {
@@ -2589,7 +2673,7 @@ function VenuePoolPage({ restaurants = [], query = '', onOpen }) {
         <KpiCard label="Listedeki mekan" value={total} delta={`portföy ${STATS.totalRestaurants}`} deltaNeutral icon={icons.store} accent={{ color: C.blue, soft: C.blueSoft }} />
         <KpiCard label="Sahiplenilmiş" value={owned} delta={`%${Math.round((owned / total) * 100)}`} deltaNeutral icon={icons.check} accent={{ color: C.greenInk, soft: C.greenSoft }} />
         <KpiCard label="Sahiplenilmemiş" value={pool.length} icon={icons.inbox} accent={{ color: C.yellowInk, soft: C.yellowSoft }} />
-        <KpiCard label="Gönderilen davet" value={invited.size} icon={icons.msg} accent={{ color: C.orangeInk, soft: C.orangeSoft }} />
+        <KpiCard label="Gönderilen davet" value={Object.keys(invites).length} icon={icons.msg} accent={{ color: C.orangeInk, soft: C.orangeSoft }} />
       </div>
 
       <section style={{ ...CARD, overflow: 'hidden' }}>
@@ -2619,15 +2703,16 @@ function VenuePoolPage({ restaurants = [], query = '', onOpen }) {
               </div>
               <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
                 {r.cat} · {r.district} · ★ {r.rating} ({r.reviews.toLocaleString('tr')} yorum) · havuza {formatDate(r.joined)} girdi
+                {(() => {
+                  const k = channelOf(r);
+                  if (!k) return <> · <span style={{ color: C.yellowInk }}>iletişim bilgisi yok</span></>;
+                  return <> · {k.kind === 'email' ? 'e-posta' : k.kind === 'website' ? 'site' : 'telefon'}: {k.value}</>;
+                })()}
               </div>
             </div>
             <Btn label="Detay" onClick={() => onOpen?.(r.id)} variant="outline" size="sm"
               icon={<Icon path={icons.eye} size={13} color={C.dim} />} />
-            <Btn
-              label={invited.has(r.id) ? 'Davet gönderildi' : 'Sahiplenmeye davet et'}
-              onClick={() => setInvited(s => new Set(s).add(r.id))}
-              disabled={invited.has(r.id)}
-              variant={invited.has(r.id) ? 'soft' : 'filled'} tone={invited.has(r.id) ? 'green' : 'orange'} size="sm" />
+            <InviteButton r={r} invite={inviteOf(r.id, invites)} />
           </div>
         ))}
 

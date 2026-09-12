@@ -255,7 +255,7 @@ export function Btn({
     // kalıyor. Turuncuyu beyazın geçeceği kadar koyultmak markayı kiremite
     // çeviriyordu; hap turuncu kalıyor, yazı koyu mürekkebe geçiyor.
     filled:    { bg: BRAND_GRAD, hover: BRAND_GRAD_HOVER, press: BRAND_GRAD, color: "var(--c-on-brand)", elev: "oneBrand", pressElev: "oneBrandPress",
-                 chip: { bg: "#2B1400", ink: "#FF9A4D" }, badge: { bg: "rgba(43,20,0,0.18)", ink: "var(--c-on-brand)" } },
+                 chip: { bg: "#fff", ink: "#C24B00" }, badge: { bg: "rgba(255,255,255,0.26)", ink: "var(--c-on-brand)" } },
     // Siyah hap: referansın "Download" düğmesi. Turuncuyla yarışmadan
     // birincil olabilen tek renk.
     ink:       { bg: "#17130F", hover: "#241E18", press: "#0D0A08", color: "#fff", elev: "oneInk", pressElev: "oneInkPress",
@@ -264,10 +264,10 @@ export function Btn({
                  chip: { bg: "#fff", ink: "#17130F" }, badge: { bg: "rgba(255,255,255,0.22)", ink: "#fff" } },
     // Turuncu zemin beyaz yazıyı taşıyamıyor (2.94:1). Aynı iki varyantın
     // turuncu karşılığı: hap koyu mürekkep alıyor, kenarlık da öyle.
-    outlineBrand: { bg: "rgba(43,20,0,0.06)", hover: "rgba(43,20,0,0.12)", press: "rgba(43,20,0,0.18)", color: "var(--c-on-brand)", border: "1px solid rgba(43,20,0,0.35)",
-                 chip: { bg: "#2B1400", ink: "#FF9A4D" }, badge: { bg: "rgba(43,20,0,0.16)", ink: "var(--c-on-brand)" } },
-    plainBrand: { bg: "transparent", hover: "rgba(43,20,0,0.08)", press: "rgba(43,20,0,0.14)", color: "var(--c-on-brand-2)",
-                 chip: { bg: "#2B1400", ink: "#FF9A4D" }, badge: { bg: "rgba(43,20,0,0.16)", ink: "var(--c-on-brand)" } },
+    outlineBrand: { bg: "rgba(255,255,255,0.12)", hover: "rgba(255,255,255,0.2)", press: "rgba(255,255,255,0.08)", color: "var(--c-on-brand)", border: "1px solid rgba(255,255,255,0.5)",
+                 chip: { bg: "#fff", ink: "#C24B00" }, badge: { bg: "rgba(255,255,255,0.24)", ink: "var(--c-on-brand)" } },
+    plainBrand: { bg: "transparent", hover: "rgba(255,255,255,0.12)", press: "rgba(255,255,255,0.2)", color: "var(--c-on-brand-2)",
+                 chip: { bg: "#fff", ink: "#C24B00" }, badge: { bg: "rgba(255,255,255,0.24)", ink: "var(--c-on-brand)" } },
     outlineDark: { bg: "#fff", hover: "#FAF8F6", press: "#F1ECE7", color: "var(--c-ink)", border: "1px solid var(--c-line)", elev: "oneRest", pressElev: "onePress",
                  chip: { bg: "#17130F", ink: "#fff" }, badge: { bg: "rgba(45,36,25,0.09)", ink: "var(--c-ink-2)" } },
     // Beyaz yazı #E5484D üstünde 3.91:1'de kalıyordu; dolgu koyu tona indi (5.8:1).
@@ -543,6 +543,84 @@ export function VerifiedStar({ size = 14, title = "İşletme hesabı doğrulanm�
   );
 }
 
+// ─── ROZETLER ────────────────────────────────────────────────────────────
+// İki gösterim: fotoğraf üstünde çip (ne olduğu yazar), isim yanında
+// yalnızca simge (yer dar, ad zaten yanında). İkisi de aynı katalogdan
+// (src/lib/badges.js) besleniyor, sıra her ekranda aynı.
+
+/** Fotoğraf üstünde: cam zeminli, simgeli, yazılı çipler. */
+/**
+ * Rozet çipleri.
+ *
+ * `onLight` iki ayrı zemin içindir, süs değil: fotoğrafın üstünde doygun
+ * dolgu + beyaz yazı okunur; açık kâğıtta aynı doygunluk yan yana dizilince
+ * ekranda beş ayrı birincil renk oluyor. Kâğıtta yumuşak zemin + koyu
+ * mürekkep (bkz. CLAUDE.md → Renkle hiyerarşi). Kâğıtta yer de var, o
+ * yüzden rozetin tam adı yazılır — kısaltma yalnız fotoğraf üstünde.
+ */
+export function BadgeChips({ badges = [], max = 2, size = "md", onLight = false }) {
+  if (!badges.length) return null;
+  const göster = badges.slice(0, max);
+  const kalan = badges.length - göster.length;
+  const fs = size === "sm" ? 9.5 : 10.5;
+  const ic = size === "sm" ? 10 : 12;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+      {göster.map(b => (
+        <span key={b.id} title={b.desc} style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          background: onLight ? b.soft : b.fill, borderRadius: 999,
+          padding: size === "sm" ? "3px 8px" : "4px 9px",
+          fontFamily: "var(--f-body)", fontSize: fs, fontWeight: 800,
+          color: onLight ? b.ink : "#fff", whiteSpace: "nowrap",
+          boxShadow: onLight ? "none" : "var(--sh-d1)",
+        }}>
+          <Icon n={b.icon} size={ic} color={onLight ? b.ink : "#fff"} strokeWidth={2.4} />
+          {onLight ? b.label : b.short}
+        </span>
+      ))}
+      {kalan > 0 && (
+        <span title={badges.slice(max).map(b => b.label).join(", ")} style={{
+          display: "inline-flex", alignItems: "center",
+          background: onLight ? "var(--c-subtle)" : "rgba(0,0,0,0.55)",
+          backdropFilter: onLight ? "none" : "blur(6px)",
+          borderRadius: 999, padding: size === "sm" ? "3px 7px" : "4px 8px",
+          fontFamily: "var(--f-body)", fontSize: fs, fontWeight: 800,
+          color: onLight ? "var(--c-ink-2)" : "#fff",
+        }}>+{kalan}</span>
+      )}
+    </div>
+  );
+}
+
+/** İsim yanında: yalnızca simge. Renk tek başına bilgi taşımasın diye
+ *  her simgenin başlığı rozetin adını söylüyor. */
+export function BadgeMarks({ badges = [], size = 13, onLight = true, max = 3 }) {
+  if (!badges.length) return null;
+  // Üçten fazlası ismin yanında bir renk şeridi oluyor (bkz. CLAUDE.md →
+  // Renkle hiyerarşi). Tamamı detay sayfasında adlarıyla yazılı.
+  const göster = badges.slice(0, max);
+  // Simge RENKLİ BİR DİSKİN içinde. Çıplak simge çizilince Gastro'nun
+  // yıldızı, hesabın doğrulandığını söyleyen VerifiedStar'ın yanında ikinci
+  // bir yıldız oluyordu ve ikisi tek bir şey gibi okunuyordu; disk rozeti
+  // ayrı bir nesne yapıyor. Diskin rengi rozetin kendi rengi, yazısı beyaz.
+  const kutu = Math.round(size * 1.55);
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0, verticalAlign: "middle" }}>
+      {göster.map(b => (
+        <span key={b.id} title={b.label} aria-label={b.label}
+          style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0, width: kutu, height: kutu, borderRadius: 999,
+            background: b.fill, boxShadow: onLight ? "var(--sh-1)" : "var(--sh-d1)",
+          }}>
+          <Icon n={b.icon} size={size} color="#fff" strokeWidth={2.4} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
 // ─── Ortak stil bloğu ────────────────────────────────────────────────
 // Buton durumları, dokunma hedefi, güvenli alan payı ve erişilebilirlik
 // tercihleri. Üç uygulama da aynı kuralları kullanıyor: kopyalanan bir
@@ -618,8 +696,13 @@ export function GurStyles() {
              de kalıyor. Turuncuyu beyazın geçeceği kadar koyultmak
              (#C24B00) markayı kiremite çeviriyordu; onun yerine
              turuncu kalıyor, üstündeki mürekkep koyuluyor. */
-          --c-on-brand: #2B1400;        /* turuncu üstünde ana metin (5.95:1) */
-          --c-on-brand-2: #4A2400;      /* turuncu üstünde ikincil (4.63:1) */
+          /* Turuncu yüzeyde yazı BEYAZ (ürün kararı). Ölçülen kontrast
+             #FF6600 üstünde 2.94:1, gradyanın açık ucunda 2.61:1 — WCAG AA
+             eşiğinin (4.5) altında. Geçirmek istenirse tek yol metin taşıyan
+             turuncu yüzeyi koyultmak (#C24B00 → beyazla 4.88:1); marka
+             turuncusu o zaman kiremite yaklaşıyor. */
+          --c-on-brand: #ffffff;        /* turuncu üstünde ana metin */
+          --c-on-brand-2: rgba(255,255,255,0.86);   /* turuncu üstünde ikincil */
 
           /* ── DURUM RENKLERİ: DOLGU VE YAZI AYRI TONLAR ───────────
              Tek parlak yeşil hem rozet zemini hem yazı rengi olarak
