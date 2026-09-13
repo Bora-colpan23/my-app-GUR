@@ -20,10 +20,33 @@ import { channelOf, inviteOf, sendInvite, useInvites } from '../lib/invites.js';
 //
 // Yumuşak tonlarda alfa değeri bilerek 0.12: Btn'in soft varyantı hover ve
 // press için bu dizgiyi 0.2 / 0.26 ile değiştiriyor.
-const C = {
+// ═══════════════════════════════════════════════════════════════════════
+// PANELİN PALETİ — iki tema
+//
+// Panel kendi stil bloğunu taşıyor ve GurStyles'ın jetonlarını GÖRMÜYOR;
+// renkler bu yüzden CSS değişkeni değil JS. Tema anahtarlanınca `C`nin
+// alanları YERİNDE değiştiriliyor (applyAdminTheme) ve kök bir state
+// bump'ı bütün ağacı yeniden çizdiriyor. Böylece 560'tan fazla `C.x`
+// kullanımı olduğu gibi kalıyor — SVG öznitelikleri (fill/stopColor) ve
+// `${C.red}44` gibi hex birleştirmeleri dahil, ki bunların ikisi de
+// var() ile çalışmazdı.
+//
+// DİKKAT: modül düzeyinde `const X = { a: C.foo }` yazmayın — o değer
+// modül yüklenirken DONAR ve tema değişince güncellenmez. Türev sabitler
+// aşağıdaki `live()` ile getter'a çevrildi.
+//
+// İki tema arasındaki bölünme uygulamanınkiyle aynı kural: dolgu parlak
+// tonunu korur, YAZI zemine göre ton değiştirir. Açık kâğıtta koyu
+// mürekkep (`-Ink`), koyu zeminde açık tint. Koyu zemin tintleri
+// uygulamanın `--c-*-light` jetonlarıyla birebir aynı hexler — iki panel
+// yan yana açıldığında aynı ürüne ait görünsün.
+// ═══════════════════════════════════════════════════════════════════════
+
+const LIGHT = {
   bg: '#EEF0F3',
   panel: '#FFFFFF',
   panel2: '#F3F4F7',
+  panelHover: '#FAFBFC',
   border: '#E4E7EC',
   text: '#12141A',          /* saf siyah değil */
   dim: '#5A6474',
@@ -48,7 +71,155 @@ const C = {
   redInk:    '#C2282D',   /* 5.8:1 */
   yellowInk: '#8A5200',   /* 6.3:1 */
   onBrand:   '#ffffff',   /* turuncu DOLGU üstünde yazı — beyaz (ürün kararı) */
+
+  // ── DOLU HAPLARIN ZEMİNİ ────────────────────────────────────────
+  // Yazının rengiyle birlikte seçilir, o yüzden ayrı jeton: koyu temada
+  // yeşil/kırmızı mürekkep açılıyor ama DOLGU açılamaz, yoksa beyaz yazı
+  // taşıyan düğme okunmaz olur.
+  fillGreen: '#0A7C46',
+  fillRed:   '#C2282D',
+  fillNeutral: '#12141A',   /* nötr dolu hap: koyu zemin, beyaz yazı */
+  fillNeutralInk: '#ffffff',
+
+  // Devre dışı hap: soluklaştırma değil, kendi rengi olan gri hap.
+  offBg: '#E7E9EE', offInk: '#98A0AE', offBorder: '#E0E3E9',
+  // Gelir şeridinin sıcak yıkaması ve grafik ipucu kutusu.
+  heroTint: '#FFF6EE',
+  tooltipBg: '#17130F',
 };
+
+// Koyu tema. Griler soğuk eksende kalıyor (panelin kimliği bu), yüzeyler
+// yükseldikçe açılıyor: koyu arayüzde yükseklik gölgeyle değil zeminin
+// açılmasıyla anlatılır — siyah bir gölge zaten siyah zeminde görünmez.
+const DARK = {
+  bg: '#0E1116',
+  panel: '#171C23',
+  panel2: '#212832',
+  panelHover: '#1D232B',
+  border: '#2C333E',
+  text: '#E9ECF1',       /* panel üstünde 14.7:1 */
+  dim: '#A8B2BF',        /* 8.1:1 */
+  faint: '#8E99A7',      /* 6.0:1 — açık temadaki 5.2:1'in karşılığı */
+  orange: '#FF6600',
+  orangeSoft: 'rgba(255,122,26,0.12)',
+  green: '#4ADE80',
+  greenSoft: 'rgba(74,222,128,0.12)',
+  red: '#FF7A70',
+  redSoft: 'rgba(255,122,112,0.12)',
+  yellow: '#FFB454',
+  yellowSoft: 'rgba(255,180,84,0.12)',
+  blue: '#7DA6FF',
+  blueSoft: 'rgba(125,166,255,0.12)',
+
+  // Koyu zeminde mürekkep AÇILIR. Hexler uygulamanın --c-*-light
+  // jetonlarının aynısı: yeni bir yeşil/amber/kırmızı tanımlanmadı.
+  orangeInk: '#FF9A4D',   /* 8.3:1 */
+  greenInk:  '#4ADE80',   /* 10.0:1 */
+  redInk:    '#FF7A70',   /* 6.9:1 */
+  yellowInk: '#FFB454',   /* 9.9:1 */
+  onBrand:   '#ffffff',   /* turuncu dolgu iki temada da aynı */
+
+  // Dolgular koyu kalır: üstlerindeki yazı beyaz.
+  fillGreen: '#0A7C46',
+  fillRed:   '#C2282D',
+  fillNeutral: '#E9ECF1',   /* koyu temada nötr hap AÇIK olur */
+  fillNeutralInk: '#12141A',
+
+  // Devre dışı hap koyu temada da kendi rengini alır: açık gri bir blok
+  // koyu zeminde en parlak nesne olurdu ve pasif olan şey öne çıkardı.
+  offBg: '#252B34', offInk: '#8B95A3', offBorder: '#2C333E',   /* 4.7:1 */
+  // Sıcak yıkama koyu zeminde de sıcak ama karanlık kalıyor.
+  heroTint: '#241A12',
+  // İpucu kutusu koyu panelden bir tık AÇIK: siyah üstünde siyah kutu
+  // kaybolur, ayrımı gölge değil zemin farkı yapar.
+  tooltipBg: '#2E3641',
+};
+
+// Canlı palet. Yerinde değişiyor; okuyan her yer render anındaki değeri alır.
+const C = { ...LIGHT };
+
+/**
+ * Modül düzeyindeki türev sabitleri getter'a çevirir. `{ a: C.foo }`
+ * değeri modül yüklenirken dondurur; `live({ a: () => C.foo })` her
+ * okumada tazesini verir ve yayma (`{...CARD}`) getter'ları çağırdığı
+ * için çağrı yerlerinde hiçbir şey değişmiyor.
+ */
+const live = spec => Object.defineProperties({}, Object.fromEntries(
+  Object.entries(spec).map(([k, get]) => [k, { get, enumerable: true }])));
+
+/**
+ * Buton durumları — HER İKİ stil bloğu da bunu kullanır.
+ *
+ * Eskiden yalnızca panelin stil bloğunda vardı; giriş ekranı ayrı ve daha
+ * kısa bir blok taşıdığı için oradaki "Giriş yap" hapı hiç
+ * biçimlendirilmiyordu: tarayıcının varsayılan gri düğmesi üstünde beyaz
+ * yazı, 1.15:1 — düğme neredeyse görünmezdi.
+ *
+ * Fonksiyon olmasının sebebi tema: sabit bir dizge açık temanın
+ * renklerini donduruyordu.
+ */
+const btnCss = () => `
+        /* Renk ve gölge değişkenlerden okunuyor; buton bunları inline
+           veriyor. Böylece :hover / :active / :disabled kuralları satır içi
+           stile ezilmeden çalışıyor. */
+        .gur-admin-btn {
+          background: var(--btn-bg, transparent);
+          box-shadow: var(--btn-shadow, none);
+          cursor: pointer;
+          transition: background 160ms ease, box-shadow 200ms ease, opacity 160ms ease, border-color 160ms ease;
+        }
+        @media (hover: hover) and (pointer: fine) {
+          .gur-admin-btn:not(:disabled):hover {
+            background: var(--btn-bg-hover, var(--btn-bg));
+            filter: brightness(1.03);
+          }
+        }
+        .gur-admin-btn:not(:disabled):active {
+          background: var(--btn-bg-press, var(--btn-bg));
+          box-shadow: var(--btn-shadow-press, var(--btn-shadow, none));
+        }
+        .gur-admin-btn:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 3px ${C.orange}66, var(--btn-shadow, 0 0 0 0 transparent);
+        }
+        /* Devre dışı: soluklaştırmak yerine kendi rengi olan gri hap.
+           Turuncu bir hapı %42 saydamlığa düşürmek beyaz yazıyı okunmaz
+           bırakıyordu — referanstaki gri 'Comment' hapı gibi davranıyor. */
+        .gur-admin-btn:disabled {
+          cursor: not-allowed; box-shadow: none; filter: none; opacity: 1;
+          background: ${C.offBg} !important; color: ${C.offInk} !important;
+          border-color: ${C.offBorder} !important;
+        }
+        .gur-admin-btn[data-state="loading"] { opacity: 0.9; cursor: progress; filter: none; }
+
+        /* Apple HIG: dokunma hedefi en az 44×44. İkon butonun görsel boyutu
+           korunur, tıklama alanı görünmez bir katmanla büyür. */
+        .gur-admin-icon::after {
+          content: ""; position: absolute; top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: max(100%, 44px); height: max(100%, 44px);
+        }
+        @media (prefers-reduced-motion: reduce) { .gur-admin-btn { transition: none !important; } }
+`;
+
+const THEME_KEY = 'gur.admin.theme';
+
+export function adminThemePref() {
+  try {
+    const v = localStorage.getItem(THEME_KEY);
+    if (v === 'dark' || v === 'light') return v;
+  } catch { /* depolama kapalı */ }
+  try {
+    if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
+  } catch { /* eski tarayıcı */ }
+  return 'light';
+}
+
+/** Paleti ve gölge ölçeğini yerinde değiştirir. Çizimden ÖNCE çağrılır. */
+export function applyAdminTheme(mode) {
+  Object.assign(C, mode === 'dark' ? DARK : LIGHT);
+  Object.assign(SHV, mode === 'dark' ? SH_DARK : SH_LIGHT);
+}
 
 const F = "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 // Gövde ve sayılar uygulamanın gövde yazı tipiyle aynı: iki panel yan yana
@@ -71,7 +242,7 @@ const BRAND_GRAD_HOVER = 'linear-gradient(145deg, #FF8A33 0%, #FF7311 55%, #FF5A
 // taşıyor, GurStyles jetonlarını görmüyor). Aynı kural: üç katman, yalnızca
 // dikey kaydırma, kaydırmadan çok daha büyük bulanıklık, düşük opaklık ve
 // zeminin tonunda renk — panelin kâğıdı soğuk gri olduğu için ton da soğuk.
-const SH = {
+const SH_LIGHT = {
   s1:      '0 1px 2px rgba(15,18,25,0.04), 0 2px 6px rgba(15,18,25,0.04), 0 5px 14px rgba(15,18,25,0.04)',
   s2:      '0 1px 2px rgba(15,18,25,0.04), 0 3px 8px rgba(15,18,25,0.05), 0 10px 24px rgba(15,18,25,0.05)',
   s3:      '0 2px 4px rgba(15,18,25,0.04), 0 7px 18px rgba(15,18,25,0.05), 0 18px 42px rgba(15,18,25,0.07)',
@@ -83,19 +254,49 @@ const SH = {
   brandSm: '0 1px 2px rgba(190,70,0,0.12), 0 2px 6px rgba(190,70,0,0.16)',
 };
 
-// Basılınca gölge bir basamak kısalır: nesne kâğıda yaklaşır.
-const ELEV = {
-  card:      SH.s2,
-  raised:    SH.s3,
-  brand:     SH.brand,
-  pressDark: SH.s1,
-  pressBrand: SH.brandSm,
+// Koyu temanın gölgeleri. Aynı üç katmanlı tarif ama iki fark var:
+// siyah zeminde soluk bir siyah gölge GÖRÜNMEZ, o yüzden opaklık belirgin
+// biçimde yüksek; ve yüksekliği asıl anlatan şey gölge değil, yükselen
+// yüzeyin açılması (panel > bg) ile ince bir üst kenar ışığı.
+const SH_DARK = {
+  s1:      '0 1px 2px rgba(0,0,0,0.30), 0 2px 6px rgba(0,0,0,0.26), 0 5px 14px rgba(0,0,0,0.22)',
+  s2:      '0 1px 2px rgba(0,0,0,0.32), 0 3px 8px rgba(0,0,0,0.30), 0 10px 24px rgba(0,0,0,0.26)',
+  s3:      '0 2px 4px rgba(0,0,0,0.34), 0 7px 18px rgba(0,0,0,0.32), 0 18px 42px rgba(0,0,0,0.30)',
+  s4:      '0 4px 8px rgba(0,0,0,0.36), 0 14px 30px rgba(0,0,0,0.36), 0 32px 70px rgba(0,0,0,0.40)',
+  d2:      '0 2px 5px rgba(0,0,0,0.40), 0 6px 16px rgba(0,0,0,0.40), 0 14px 34px rgba(0,0,0,0.44)',
+  d3:      '0 3px 8px rgba(0,0,0,0.44), 0 10px 26px rgba(0,0,0,0.46), 0 24px 56px rgba(0,0,0,0.50)',
+  // Marka gölgesi koyu zeminde turuncu bir hâle bırakır; sıcak ton korunuyor
+  // ama opaklık yükseliyor, yoksa hiç görünmüyor.
+  brand:   '0 1px 2px rgba(120,44,0,0.40), 0 4px 10px rgba(160,58,0,0.34), 0 10px 24px rgba(190,70,0,0.28)',
+  brandSm: '0 1px 2px rgba(120,44,0,0.44), 0 2px 6px rgba(160,58,0,0.34)',
 };
+
+// Canlı gölge ölçeği — palet gibi yerinde değişiyor.
+const SHV = { ...SH_LIGHT };
+const SH = live({
+  s1: () => SHV.s1, s2: () => SHV.s2, s3: () => SHV.s3, s4: () => SHV.s4,
+  d2: () => SHV.d2, d3: () => SHV.d3,
+  brand: () => SHV.brand, brandSm: () => SHV.brandSm,
+});
+
+// Basılınca gölge bir basamak kısalır: nesne kâğıda yaklaşır.
+const ELEV = live({
+  card:      () => SH.s2,
+  raised:    () => SH.s3,
+  brand:     () => SH.brand,
+  pressDark: () => SH.s1,
+  pressBrand: () => SH.brandSm,
+});
 // Köşe yarıçapları uygulamayla aynı ölçekte: kart 18, kontrol 12, pill 999.
 const R = { card: 24, control: 14, pill: 999 };
 // Panellerin tamamı tek bir kart tarifinden geçiyor — 20 ayrı yerde
 // tekrarlanan literal, tek yerden değişebilen bir jetona indi.
-const CARD = { background: C.panel, border: `1px solid ${C.border}`, borderRadius: R.card, boxShadow: ELEV.card };
+const CARD = live({
+  background: () => C.panel,
+  border: () => `1px solid ${C.border}`,
+  borderRadius: () => R.card,
+  boxShadow: () => ELEV.card,
+});
 
 // Referans panoda kart başlıkları kartın İÇİNDE, ayırıcı çizgiyle değil
 // boşlukla ayrılıyor; sayılar mono. İki yardımcı bunu tek yerden verir.
@@ -173,17 +374,18 @@ const REVENUE_STREAMS = [
   { key: 'gastroPackage', short: 'Gastro paketi', name: 'Gastro şef videosu paketi', kind: 'İçerik', monthly: 91000, unit: '8 çekim / ay', note: 'Şef çekimi + 15 sn dikey videonun süresiz kullanım hakkı. Gastro Onaylı rozetini getirir.' },
 ];
 
-const KIND_TONE = {
-  'Reklam': C.blue, 'Sponsorluk': C.orange, 'Performans': C.green, 'İçerik': C.red,
-};
+const KIND_TONE = live({
+  'Reklam': () => C.blue, 'Sponsorluk': () => C.orange,
+  'Performans': () => C.green, 'İçerik': () => C.red,
+});
 
 // İşletme abonelik paketleri. Adetler STATS.totalRestaurants ile uyumlu.
 const PLANS = [
-  { id: 'Premium', price: 4999, count: 42,  color: C.orangeInk },
-  { id: 'Pro',     price: 1999, count: 118, color: C.blue },
-  { id: 'Ücretsiz', price: 0,   count: 182, color: C.faint },
+  { id: 'Premium', price: 4999, count: 42,  get color() { return C.orangeInk; } },
+  { id: 'Pro',     price: 1999, count: 118, get color() { return C.blue; } },
+  { id: 'Ücretsiz', price: 0,   count: 182, get color() { return C.faint; } },
 ];
-const PLAN_COLOR = Object.fromEntries(PLANS.map(p => [p.id, p.color]));
+const PLAN_COLOR = live(Object.fromEntries(PLANS.map(p => [p.id, () => p.color])));
 const PLAN_PRICE = Object.fromEntries(PLANS.map(p => [p.id, p.price]));
 const STREAM_BY_KEY = Object.fromEntries(REVENUE_STREAMS.map(x => [x.key, x]));
 
@@ -461,6 +663,10 @@ const icons = {
   search: <><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></>,
   bell: <><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" /></>,
   logout: <><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></>,
+  // Tema anahtarı: gösterilen simge GİDİLECEK temayı anlatır — koyudayken
+  // güneş (aydınlığa dön), açıktayken ay.
+  sun: <><circle cx="12" cy="12" r="4" /><line x1="12" y1="2" x2="12" y2="5" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="2" y1="12" x2="5" y2="12" /><line x1="19" y1="12" x2="22" y2="12" /><line x1="4.9" y1="4.9" x2="7" y2="7" /><line x1="17" y1="17" x2="19.1" y2="19.1" /><line x1="4.9" y1="19.1" x2="7" y2="17" /><line x1="17" y1="7" x2="19.1" y2="4.9" /></>,
+  moon: <><path d="M20 14.5A8.5 8.5 0 019.5 4a7 7 0 108.9 10.4c.5.1 1 .1 1.6.1z" /></>,
   eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>,
   doc: <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></>,
   trend: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></>,
@@ -556,8 +762,17 @@ function SectionHead({ title, right }) {
 }
 
 // ─── Buton — Apple HIG tonlu: filled/soft/outline/ghost/plain, tutarlı hover + basılma geri bildirimi ───
-const TONE_COLOR = { neutral: C.text, orange: C.orange, green: C.green, red: C.red, blue: C.blue, yellow: C.yellow };
-const TONE_SOFT = { neutral: C.panel2, orange: C.orangeSoft, green: C.greenSoft, red: C.redSoft, blue: C.blueSoft, yellow: C.yellowSoft };
+// Hapın YAZI rengi: zemine göre ton değiştiren mürekkep jetonları.
+const TONE_COLOR = live({
+  neutral: () => C.text, orange: () => C.orangeInk, green: () => C.greenInk,
+  red: () => C.redInk, blue: () => C.blue, yellow: () => C.yellowInk,
+});
+// Yumuşak hapın zemini. Alfa iki temada da tam olarak 0.12: aşağıdaki
+// hover/press tonlaması bu dizgiyi arayıp değiştiriyor.
+const TONE_SOFT = live({
+  neutral: () => C.panel2, orange: () => C.orangeSoft, green: () => C.greenSoft,
+  red: () => C.redSoft, blue: () => C.blueSoft, yellow: () => C.yellowSoft,
+});
 
 function Spinner({ size = 14, color = 'currentColor' }) {
   return (
@@ -581,8 +796,8 @@ function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size
   // Dolu hapta zemin ile yazı birlikte seçilir: parlak yeşil/kırmızı
   // üstünde beyaz 2.7–3.9:1'de, turuncu üstünde 2.9:1'de kalıyordu.
   // Yeşil ve kırmızı dolgu koyu tonuna iner, turuncu ise yazıyı koyultur.
-  const FILL_BG = { neutral: C.text, orange: BRAND_GRAD, green: C.greenInk, red: C.redInk, blue: C.blue, yellow: C.yellow };
-  const FILL_INK = { orange: C.onBrand, yellow: '#241c00' };
+  const FILL_BG = { neutral: C.fillNeutral, orange: BRAND_GRAD, green: C.fillGreen, red: C.fillRed, blue: C.blue, yellow: C.yellow };
+  const FILL_INK = { neutral: C.fillNeutralInk, orange: C.onBrand, yellow: '#241c00' };
   const variants = {
     filled: {
       bg: FILL_BG[tone] || toneColor,
@@ -595,7 +810,7 @@ function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size
     soft:    { bg: toneSoft, hover: toneSoft.replace('0.12', '0.2'), press: toneSoft.replace('0.12', '0.26'), color: toneColor, border: `1px solid ${toneColor}29` },
     // Beyaz hap: One'ın nötr birincil-olmayan düğmesi — kâğıttan bir tık
     // yukarıda durur, o yüzden zemini panel değil kart rengi.
-    outline: { bg: C.panel, hover: '#FAFBFC', press: C.panel2, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}`, elev: SH.s1, pressElev: ELEV.pressDark },
+    outline: { bg: C.panel, hover: C.panelHover, press: C.panel2, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}`, elev: SH.s1, pressElev: ELEV.pressDark },
     ghost:   { bg: 'transparent', hover: C.panel2, press: C.border, color: toneColor, border: `1px solid ${C.border}` },
     plain:   { bg: 'transparent', hover: C.panel2, press: C.border, color: toneColor, border: '1px solid transparent' },
   };
@@ -711,7 +926,7 @@ function AdminField({ label, value, onChange, type = 'text', autoFocus, onEnter 
   );
 }
 
-function AdminLogin({ onLogin }) {
+function AdminLogin({ onLogin, theme, onTheme }) {
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
@@ -737,14 +952,24 @@ function AdminLogin({ onLogin }) {
   };
 
   return (
-    <div lang="tr" style={{ minHeight: '100dvh', background: C.bg, fontFamily: FB, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, colorScheme: 'light' }}>
+    <div lang="tr" style={{ minHeight: '100dvh', background: C.bg, fontFamily: FB, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, colorScheme: theme }}>
       <style>{`
         /* Yazı tipleri index.html'den yükleniyor — buraya @import yazmayın. */
         * { box-sizing: border-box; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .gur-admin-btn:focus-visible { box-shadow: 0 0 0 3px ${C.orange}55 !important; }
-        @media (prefers-reduced-motion: reduce) { .gur-admin-btn { transition: none !important; } }
+        ${btnCss()}
       `}</style>
+
+      {/* Tema anahtarı girişte de duruyor: koyu temayı seçen kullanıcı
+          önce beyaz bir ekranla karşılaşmasın. */}
+      <div style={{ position: 'fixed', top: 18, right: 18 }}>
+        <IconBtn
+          size={32}
+          title={theme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'}
+          onClick={() => onTheme(theme === 'dark' ? 'light' : 'dark')}
+          icon={<Icon path={theme === 'dark' ? icons.sun : icons.moon} size={16} color={C.faint} />}
+        />
+      </div>
 
       <div style={{ width: '100%', maxWidth: 380, animation: 'fadeIn 0.3s ease-out' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 26 }}>
@@ -787,6 +1012,17 @@ function AdminLogin({ onLogin }) {
 }
 
 export default function GurAdmin() {
+  // Tema. applyAdminTheme render gövdesinde, JSX üretilmeden ÖNCE
+  // çağrılıyor: çocuklar bundan sonra çizildiği için hepsi taze paleti
+  // okuyor. Kökteki bu state değişince ağaçta React.memo sınırı olmadığı
+  // için her şey yeniden çiziliyor — sayfa, filtre ve arama durumu
+  // korunuyor (key ile remount edilseydi kaybolurdu).
+  const [theme, setTheme] = useState(adminThemePref);
+  applyAdminTheme(theme);
+  useEffect(() => {
+    try { localStorage.setItem(THEME_KEY, theme); } catch { /* depolama kapalı */ }
+  }, [theme]);
+
   const [authed, setAuthed] = useState(false);
   const [page, setPage] = useState('dashboard');
   const [query, setQuery] = useState('');
@@ -853,12 +1089,12 @@ export default function GurAdmin() {
   const logout = () => { setAuthed(false); setPage('dashboard'); setQuery(''); setReviewDoc(null); setOpenRestaurantId(null); setRestTab('list'); };
 
   // Giriş yapılmadan panel hiç render edilmez
-  if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />;
+  if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} theme={theme} onTheme={setTheme} />;
 
   return (
     // lang: Türkçe büyük harf kuralı (i→İ). Artifact kabuğunda <html lang>
     // bize ait değil, o yüzden kökte bildiriyoruz.
-    <div lang="tr" style={{ display: 'flex', height: '100dvh', background: C.bg, fontFamily: FB, color: C.text, overflow: 'hidden', colorScheme: 'light' }}>
+    <div lang="tr" style={{ display: 'flex', height: '100dvh', background: C.bg, fontFamily: FB, color: C.text, overflow: 'hidden', colorScheme: theme }}>
       <style>{`
         /* Yazı tipleri index.html'den yükleniyor — buraya @import yazmayın:
            @import stil sayfasında ilk sırada olmak zorunda, aşağıdaki
@@ -873,48 +1109,7 @@ export default function GurAdmin() {
         .row-hover:hover { background: ${C.panel2} !important; }
         h1, h2, h3 { font-family: ${FB}; font-weight: 800; letter-spacing: -0.02em; }
 
-        /* ── BUTON DURUMLARI — uygulamadaki .gur-btn ile aynı sistem ──
-           Renk ve gölge değişkenlerden okunuyor; buton bunları inline
-           veriyor. Böylece :hover / :active / :disabled kuralları satır içi
-           stile ezilmeden çalışıyor. */
-        .gur-admin-btn {
-          background: var(--btn-bg, transparent);
-          box-shadow: var(--btn-shadow, none);
-          cursor: pointer;
-          transition: background 160ms ease, box-shadow 200ms ease, opacity 160ms ease, border-color 160ms ease;
-        }
-        @media (hover: hover) and (pointer: fine) {
-          .gur-admin-btn:not(:disabled):hover {
-            background: var(--btn-bg-hover, var(--btn-bg));
-            filter: brightness(1.03);
-          }
-        }
-        .gur-admin-btn:not(:disabled):active {
-          background: var(--btn-bg-press, var(--btn-bg));
-          box-shadow: var(--btn-shadow-press, var(--btn-shadow, none));
-        }
-        .gur-admin-btn:focus-visible {
-          outline: none;
-          box-shadow: 0 0 0 3px ${C.orange}66, var(--btn-shadow, 0 0 0 0 transparent);
-        }
-        /* Devre dışı: soluklaştırmak yerine kendi rengi olan gri hap.
-           Turuncu bir hapı %42 saydamlığa düşürmek beyaz yazıyı okunmaz
-           bırakıyordu — referanstaki gri 'Comment' hapı gibi davranıyor. */
-        .gur-admin-btn:disabled {
-          cursor: not-allowed; box-shadow: none; filter: none; opacity: 1;
-          background: #E7E9EE !important; color: #98A0AE !important;
-          border-color: #E0E3E9 !important;
-        }
-        .gur-admin-btn[data-state="loading"] { opacity: 0.9; cursor: progress; filter: none; }
-
-        /* Apple HIG: dokunma hedefi en az 44×44. İkon butonun görsel boyutu
-           korunur, tıklama alanı görünmez bir katmanla büyür. */
-        .gur-admin-icon::after {
-          content: ""; position: absolute; top: 50%; left: 50%;
-          transform: translate(-50%, -50%);
-          width: max(100%, 44px); height: max(100%, 44px);
-        }
-        @media (prefers-reduced-motion: reduce) { .gur-admin-btn { transition: none !important; } }
+        ${btnCss()}
       `}</style>
 
       {/* ─── SIDEBAR ─── */}
@@ -943,6 +1138,12 @@ export default function GurAdmin() {
               <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Admin</div>
               <div style={{ fontSize: 10.5, color: C.faint }}>admin@gur.app</div>
             </div>
+            <IconBtn
+              size={30}
+              title={theme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              icon={<Icon path={theme === 'dark' ? icons.sun : icons.moon} size={16} color={C.faint} />}
+            />
             <IconBtn size={30} title="Çıkış yap" danger onClick={logout} icon={<Icon path={icons.logout} size={16} color={C.faint} />} />
           </div>
         </div>
@@ -1210,7 +1411,7 @@ function TrendChart({ data, height = 200, format }) {
         <div role="status" style={{
           position: 'absolute', left: Math.min(Math.max(xAt(hover) - 62, 0), Math.max(w - 124, 0)),
           top: 0, width: 124, pointerEvents: 'none',
-          background: '#17130F', color: '#fff', borderRadius: 12, padding: '9px 11px',
+          background: C.tooltipBg, color: '#fff', borderRadius: 12, padding: '9px 11px',
           boxShadow: SH.d3,
         }}>
           <div style={{ fontFamily: FB, fontSize: 10.5, color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>{active.d}</div>
@@ -1525,11 +1726,11 @@ function fromApi(c) {
   };
 }
 
-const CAMPAIGN_STATUS = {
-  active:    { label: 'Yayında',      color: C.greenInk,  soft: C.greenSoft },
-  paused:    { label: 'Duraklatıldı', color: C.yellowInk, soft: C.yellowSoft },
-  exhausted: { label: 'Bütçe bitti',  color: C.faint,  soft: C.panel2 },
-};
+const CAMPAIGN_STATUS = live({
+  active:    () => ({ label: 'Yayında',      color: C.greenInk,  soft: C.greenSoft }),
+  paused:    () => ({ label: 'Duraklatıldı', color: C.yellowInk, soft: C.yellowSoft }),
+  exhausted: () => ({ label: 'Bütçe bitti',  color: C.faint,     soft: C.panel2 }),
+});
 
 function CampaignsPage() {
   const [rows, setRows] = useState(CAMPAIGN_SEED);
@@ -1603,7 +1804,7 @@ function CampaignsPage() {
           const st = CAMPAIGN_STATUS[r.status];
           const pct = Math.min(100, (r.spent / r.daily) * 100);
           return (
-            <div key={r.id} style={{ padding: '14px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.2fr 140px', gap: 12, alignItems: 'center', opacity: r.status === 'active' ? 1 : 0.6 }}>
+            <div key={r.id} style={{ padding: '14px 18px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.2fr 140px', gap: 12, alignItems: 'center' }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                   <span style={{ fontSize: 13.5, fontWeight: 600 }}>{r.restaurant}</span>
@@ -1869,7 +2070,6 @@ function ReviewCard({ v, showRestaurant, onOpenRestaurant, hidden, onHide }) {
       padding: '14px 18px',
       borderTop: `1px solid ${C.border}`,
       background: hidden ? C.bg : (v.flagged ? C.redSoft : 'transparent'),
-      opacity: hidden ? 0.5 : 1,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>{v.user}</span>
@@ -3011,7 +3211,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
         // Koyu panelde açık metin varsayıyordu; panel açık temaya geçince
         // metin jetonları koyulaştı ve şerit okunmaz oldu. Artık beyaz kart
         // üstünde çok hafif sıcak bir yıkama — One'ın kart dili.
-        background: `linear-gradient(135deg, ${C.panel} 0%, #FFF6EE 100%)`,
+        background: `linear-gradient(135deg, ${C.panel} 0%, ${C.heroTint} 100%)`,
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 28, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 240 }}>

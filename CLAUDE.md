@@ -156,8 +156,10 @@ iOS Safari 16px'ten küçük bir alana odaklanınca sayfayı yakınlaştırır v
 düzen bozulur. `input`/`textarea`/`select` taban ölçüsü 16px; satır içinde
 daha küçük yazmayın.
 
-### Renk paleti: tek açık tema
-Uygulamanın tek bir açık teması var; koyu tema **bilinçli olarak yok**.
+### Renk paleti: uygulama açık, panel iki temalı
+Tüketici ve işletme uygulamasının tek bir açık teması var; orada koyu tema
+**bilinçli olarak yok**. **Yönetici panelinin koyu teması var** (bkz.
+"Yönetici paneli: iki tema").
 Uygulama satır içi stille yazıldığı için renkler yine CSS değişkenlerinden
 okunuyor (`src/ui/kit.jsx` → `GurStyles`): satır içi stil sınıf kuralını
 yener ama `var()` değerini okur. Böylece palet tek yerden değişir.
@@ -165,16 +167,17 @@ yener ama `var()` değerini okur. Böylece palet tek yerden değişir.
 Yeni renk yazarken **jeton kullan**: `var(--c-card)`, `var(--c-ink)`,
 `var(--c-ink-2)`, `var(--c-muted)`, `var(--c-border)`, `var(--c-subtle)`.
 Sabit `#fff` yalnızca turuncu/koyu zemin üstündeki metin ve ikonlar için.
-Yönetici paneli kendi jeton kümesini taşır (`GurAdmin.jsx` → `C`), ama o da
-açık: koyu masaüstü sürümü kaldırıldı.
+Yönetici paneli kendi jeton kümesini taşır (`GurAdmin.jsx` → `C`).
 
 ### Turuncu zeminde yazı BEYAZ (ürün kararı)
 Tabanı turuncu olan her yüzeyde metin beyaz. Bu **bilinçli bir tercih** ve
 bedeli ölçüldü: beyaz `#FF6600` üstünde **2.94:1**, marka gradyanının açık
 ucunda (`#FF7A1A`) **2.61:1** — WCAG AA eşiği 4.5'in altında. Denetleme
-betiği bu yüzden 25 uyarı veriyor ve **hepsi budur**; başka kaynaklı tek
-bir kontrast hatası yok. Listeyi bu şekilde okuyun: sıfır beklemeyin,
-25 bekleyin, 26 olursa yeni bir hata girmiş demektir.
+betiği bu yüzden uyarı veriyor. Tüketici ve işletme taramasında çıkan 25
+uyarının **tamamı** budur; başka kaynaklı tek bir kontrast hatası yok.
+Listeyi bu şekilde okuyun: sıfır beklemeyin, 25 bekleyin, 26 olursa yeni
+bir hata girmiş demektir. Yönetici panelinin kendi rakamları için bkz.
+"Yönetici paneli: iki tema".
 
 Geçirmenin tek yolu metin taşıyan turuncu yüzeyi koyultmaktı
 (`#C24B00`, beyazla 4.88:1) — marka turuncusu o zaman kiremite dönüyor,
@@ -335,6 +338,59 @@ Panel açık gri kâğıt (`C.bg`) üzerinde beyaz kartlar. Üç imza parçası
 
 Sayı sütunları `NUM` yayılımını kullanır (sistem mono + `tabular-nums`):
 rakamlar hizalanır, ek font isteği gitmez.
+
+### Yönetici paneli: iki tema
+Panelin açık ve **koyu** teması var (uygulamanın hâlâ yok). Anahtar iki
+yerde: kenar çubuğunun altında ve giriş ekranının sağ üstünde. Seçim
+`gur.admin.theme`'de saklanıyor; hiç seçilmemişse işletim sisteminin
+tercihi (`prefers-color-scheme`) okunuyor.
+
+**Nasıl çalışıyor.** Panel kendi stil bloğunu taşıyor ve `GurStyles`
+jetonlarını görmüyor; renkler bu yüzden CSS değişkeni değil JS. Tema
+değişince `LIGHT`/`DARK` paleti `C`nin üstüne **yerinde** yazılıyor
+(`applyAdminTheme`) ve kökteki state bump'ı bütün ağacı yeniden çizdiriyor.
+Böylece 560'tan fazla `C.x` kullanımı olduğu gibi kalıyor — SVG
+öznitelikleri (`fill`, `stopColor`) ve `${C.red}44` gibi hex
+birleştirmeleri dahil, ki bunların ikisi de `var()` ile çalışmazdı.
+Ağaçta `React.memo` sınırı yok, o yüzden sayfa/filtre/arama durumu
+korunuyor (kök `key` ile remount edilseydi kaybolurdu).
+
+**Modül düzeyinde `const X = { a: C.foo }` YAZMAYIN.** O değer modül
+yüklenirken donar ve tema değişince güncellenmez — koyu temada açık tema
+renkleri sızar. Türev sabitler `live()` ile getter'a çevrildi: `CARD`,
+`SH`, `ELEV`, `TONE_COLOR`, `TONE_SOFT`, `KIND_TONE`, `PLAN_COLOR`,
+`CAMPAIGN_STATUS`. Yenisini eklerken aynısını yapın.
+
+Bölünme kuralı uygulamanınkiyle aynı: **dolgu parlak tonunu korur, YAZI
+zemine göre ton değiştirir.** Açık kâğıtta koyu mürekkep (`-Ink`), koyu
+zeminde açık tint — ve koyu zemin tintleri uygulamanın `--c-*-light`
+jetonlarıyla birebir aynı hexler (`#4ADE80`, `#FF7A70`, `#FFB454`,
+`#FF9A4D`). Yeni renk tanımlanmadı.
+
+Dolgu olarak kullanılan tonların ayrı jetonu var (`fillGreen`, `fillRed`,
+`fillNeutral`): koyu temada `greenInk` açılıyor, dolgu olarak kullanılsaydı
+üstündeki beyaz yazı okunmaz olurdu. `offBg`/`offInk`/`offBorder` devre
+dışı hap, `heroTint` gelir şeridinin sıcak yıkaması, `tooltipBg` grafik
+ipucu kutusu — hepsi iki temalı.
+
+Koyu temada **gölge yükseklik anlatmaz**: siyah zeminde soluk siyah gölge
+görünmez. Yüksekliği yüzeyin AÇILMASI anlatıyor (`bg` → `panel` →
+`panel2`), gölge yalnızca ayırıcı. `SH_DARK` opaklıkları bu yüzden belirgin
+biçimde yüksek.
+
+Buton CSS'i tek yerde (`btnCss()`): iki stil bloğu da onu kullanıyor. Ayrı
+tutulduğu dönemde giriş ekranındaki "Giriş yap" hapı hiç
+biçimlendirilmiyordu — tarayıcının gri varsayılanı üstünde beyaz yazı,
+1.15:1, düğme neredeyse görünmezdi.
+
+**Ölçüm.** Koyu temada on bir sayfa tarandığında 28 uyarı çıkıyor ve
+hepsi beyaz-turuncu kararından; başka kaynaklı sıfır. Açık temada aynı
+tarama 62 uyarı veriyor ve bunun **34'ü turuncu değil**: parlak dolgu
+tonları (`C.green`, `C.orange`, `C.yellow`, `C.red`) beyaz kâğıtta
+doğrudan YAZI rengi olarak kullanılmış — yukarıdaki iki-ton kuralının
+ihlali, koyu temadan önce de vardı. Daha önce raporlanan "hepsi turuncu"
+rakamı yalnızca panoyu tarayan dar bir taramadan geliyordu; on bir sayfanın
+tamamı ilk kez tarandı.
 
 ### Erişilebilirlik kuralları (uyulacak)
 - Alan etiketleri `htmlFor` ile bağlı (`InputField`), `<label>` süs değil.
