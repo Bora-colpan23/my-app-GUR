@@ -55,7 +55,7 @@ function DoyurucuAuthScreen({ onLogin, onRegister, onClaim }) {
         </div>
 
         {/* Alt turuncu alan */}
-        <div style={{ background: GRAD, padding: "28px 28px 50px", borderTopLeftRadius: 40, borderTopRightRadius: 40, position: "relative" }}>
+        <div className="gur-on-brand" style={{ background: GRAD, padding: "28px 28px 50px", borderTopLeftRadius: 40, borderTopRightRadius: 40, position: "relative" }}>
           {/* Bu ekran işletme uygulamasının başlangıcı: geri gidilecek bir
               yer yok, geri düğmesi de yok. Tıklandığında hiçbir şey
               yapmayan bir düğme, olmayan düğmeden kötü. */}
@@ -399,7 +399,7 @@ function DoyurucuLoginScreen({ onBack, onLogin }) {
         </div>
 
         {/* Alt gradient */}
-        <div style={{ flex: 1, background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}>
+        <div className="gur-on-brand" style={{ flex: 1, background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}>
           <div style={{ position: "absolute", left: 14, top: 18 }}>
             <BackBtn onClick={onBack} />
           </div>
@@ -1193,7 +1193,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
     <Screen grad={false}>
       <div style={{ height: "100%", background: "#100D0B", overflowY: "auto" }}>
         {/* Header */}
-        <div style={{ background: GRAD, padding: "44px 20px 24px", borderBottomLeftRadius: 32, borderBottomRightRadius: 32, marginBottom: 20 }}>
+        <div className="gur-on-brand" style={{ background: GRAD, padding: "44px 20px 24px", borderBottomLeftRadius: 32, borderBottomRightRadius: 32, marginBottom: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <Btn
               text="Çıkış" onClick={() => setShowLogout(true)}

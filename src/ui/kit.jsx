@@ -164,16 +164,22 @@ export function Img({ src, style, bg = "var(--c-img-bg)", box, alt = "" }) {
 export function InputField({ label, value, onChange, placeholder, type = "text" }) {
   // Etiket alana htmlFor ile bağlı: etikete dokunmak alanı odaklıyor,
   // ekran okuyucu da alanı adıyla okuyor. Serbest bir <p> bunu yapamaz.
+  //
+  // Etiketin rengi --c-field-label'dan okunuyor, --c-ink'ten değil: alan
+  // hem kâğıt hem turuncu yüzeyde kullanılıyor ve turuncunun üstünde koyu
+  // mürekkep göze batıyordu. Turuncu kabuk kendi üstünde bu değişkeni
+  // beyaza çeviriyor (aşağıdaki .gur-on-brand), içindeki bütün alanlar
+  // devralıyor — her çağrıya bayrak geçmek gerekmiyor.
   const id = React.useId();
   return <div style={{ marginBottom: 20 }}>
-    <label htmlFor={id} style={{ display: "block", marginBottom: 7, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
+    <label htmlFor={id} style={{ display: "block", marginBottom: 7, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-field-label)" }}>{label}</label>
     <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)} onFocus={keepVisible} placeholder={placeholder} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 16, fontFamily: "var(--f-body)", background: "var(--c-card)", color: "var(--c-ink)", WebkitTextFillColor: "var(--c-ink)", boxShadow: "var(--sh-1)", boxSizing: "border-box" }} />
   </div>;
 }
 
 export function SelectField({ label, value, onChange, options }) {
   return <div style={{ marginBottom: 20 }}>
-    <label style={{ display: "block", marginBottom: 7, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)" }}>{label}</label>
+    <label style={{ display: "block", marginBottom: 7, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-field-label)" }}>{label}</label>
     <select value={value} onChange={e => onChange(e.target.value)} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 16, fontFamily: "var(--f-body)", background: "var(--c-card)", color: value ? "var(--c-ink)" : "var(--c-muted)", appearance: "none", boxShadow: "var(--sh-1)", boxSizing: "border-box", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 18px center" }}>
       <option value="">Seçiniz</option>{options.map(o => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -704,6 +710,10 @@ export function GurStyles() {
           --c-on-brand: #ffffff;        /* turuncu üstünde ana metin */
           --c-on-brand-2: rgba(255,255,255,0.86);   /* turuncu üstünde ikincil */
 
+          /* Alan etiketinin rengi. Varsayılan kâğıt için koyu; turuncu
+             kabuk .gur-on-brand ile bunu beyaza çeviriyor. */
+          --c-field-label: var(--c-ink);
+
           /* ── DURUM RENKLERİ: DOLGU VE YAZI AYRI TONLAR ───────────
              Tek parlak yeşil hem rozet zemini hem yazı rengi olarak
              kullanılınca yazı 2.3:1'e düşüyordu. Aynı rengin iki
@@ -814,6 +824,15 @@ export function GurStyles() {
         .gur-btn[data-state="loading"], .gur-icon-btn[data-state="loading"] {
           opacity: 0.9; cursor: progress; filter: none;
         }
+
+        /* Turuncu kabuk. İçindeki alan etiketleri beyaza döner: koyu
+           mürekkep turuncunun üstünde göze batıyordu. Değişken kalıtımla
+           iniyor, o yüzden kabuğa bir kez yazmak yetiyor — alanların
+           kendisine bayrak geçmeye gerek yok.
+
+           Alanın İÇİ beyaz kart olarak kalıyor: kutunun içindeki yazıyı da
+           beyaza çevirmek beyaz zeminde beyaz metin demek olurdu. */
+        .gur-on-brand { --c-field-label: var(--c-on-brand); }
 
         /* Apple HIG: her dokunma hedefi en az 44×44pt. Küçük ikon butonların
            görsel boyutu korunur, tıklama alanı görünmez bir katmanla büyür. */

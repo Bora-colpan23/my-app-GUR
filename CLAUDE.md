@@ -172,9 +172,9 @@ açık: koyu masaüstü sürümü kaldırıldı.
 Tabanı turuncu olan her yüzeyde metin beyaz. Bu **bilinçli bir tercih** ve
 bedeli ölçüldü: beyaz `#FF6600` üstünde **2.94:1**, marka gradyanının açık
 ucunda (`#FF7A1A`) **2.61:1** — WCAG AA eşiği 4.5'in altında. Denetleme
-betiği bu yüzden 21 uyarı veriyor ve **hepsi budur**; başka kaynaklı tek
+betiği bu yüzden 25 uyarı veriyor ve **hepsi budur**; başka kaynaklı tek
 bir kontrast hatası yok. Listeyi bu şekilde okuyun: sıfır beklemeyin,
-21 bekleyin, 22 olursa yeni bir hata girmiş demektir.
+25 bekleyin, 26 olursa yeni bir hata girmiş demektir.
 
 Geçirmenin tek yolu metin taşıyan turuncu yüzeyi koyultmaktı
 (`#C24B00`, beyazla 4.88:1) — marka turuncusu o zaman kiremite dönüyor,
@@ -185,6 +185,18 @@ onun yerine turuncu korundu.
 | `--c-on-brand` | turuncu DOLGU üstünde ana metin (`#fff`) |
 | `--c-on-brand-2` | turuncu üstünde ikincil metin (`rgba(255,255,255,0.86)`) |
 | `--c-brand-ink` | kâğıt üstünde turuncu METİN — 5.02:1, AA geçer |
+| `--c-field-label` | alan etiketi; kâğıtta koyu, turuncu kabukta beyaz |
+
+**Alan etiketleri için `.gur-on-brand` kullan.** `InputField`/`SelectField`
+etiketi rengini `--c-field-label`'dan okuyor. Aynı alan hem kremsi kâğıtta
+hem turuncu kabukta kullanılıyor; turuncunun üstünde koyu mürekkep göze
+batıyordu. Turuncu kabuğa `className="gur-on-brand"` yazmak yetiyor —
+değişken kalıtımla iniyor, içindeki her alan devralıyor, tek tek bayrak
+geçmeye gerek yok. Kâğıt üstündeki formlar (tüketici kaydı, işletme kayıt
+adımları) sınıfı ALMAZ, koyu mürekkep orada doğru.
+
+Alanın **içi** beyaz kart olarak kalır: kutunun içindeki yazıyı da beyaza
+çevirmek beyaz zeminde beyaz metin demek olurdu.
 
 Kâğıt üstünde `#FF6600`'ı metin rengi olarak **kullanma** — `--c-brand-ink`
 var. Turuncu zeminde elle `#fff` **yazma** — `--c-on-brand` var; jetondan

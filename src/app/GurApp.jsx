@@ -431,7 +431,7 @@ function WelcomeScreen({ onStart }) {
         </div>
 
         {/* Alt kısım — turuncu gradient eğri */}
-        <div style={{
+        <div className="gur-on-brand" style={{
           background: GRAD, padding: "40px 30px 50px",
           borderTopLeftRadius: 40, borderTopRightRadius: 40,
           position: "relative", zIndex: 3,
@@ -582,7 +582,7 @@ function LoginScreen({ onBack, onLogin, onRegister, live }) {
     catch (err) { setError(err.message || "Giriş yapılamadı"); }
     finally { setBusy(false); }
   };
-  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--c-warm-1)" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "var(--c-on-brand)", margin: "0 0 6px", textAlign: "center" }}>Giriş yap</h2><div style={{ marginBottom: 32, display: "flex", justifyContent: "center" }}><Btn variant="plainBrand" size="sm" fullWidth={false} onClick={onRegister} text="Üyeliğiniz yoksa lütfen kayıt için dokununuz" /></div><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR'u kullanmaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="brand" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
+  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--c-warm-1)" }}><GurLogo size={60} pill /></div><div className="gur-on-brand" style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "var(--c-on-brand)", margin: "0 0 6px", textAlign: "center" }}>Giriş yap</h2><div style={{ marginBottom: 32, display: "flex", justifyContent: "center" }}><Btn variant="plainBrand" size="sm" fullWidth={false} onClick={onRegister} text="Üyeliğiniz yoksa lütfen kayıt için dokununuz" /></div><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR'u kullanmaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="brand" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
 }
 
 function RegisterScreen({ onBack, onDone, onLegal, live }) {
