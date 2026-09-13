@@ -323,6 +323,47 @@ Devre dışı hap **soluklaştırılmaz**: uygulamada kendi rengini koruyup geri
 çekilir, yönetici panelinde gri hapa döner. `opacity: 0.42 + grayscale`
 beyaz yazıyı okunmaz bırakıyordu.
 
+### Parlak turuncu simge ve basınca dolan hap
+Kaydırma düğmelerinin simgeleri düz turuncu değil, üstten aydınlık alta
+doğru koyulaşan bir rampa (`#FFB067 → #FF7A1A → #EF4A00`, markanın kendi
+uçları) artık — cam gibi duran referans düğmelerin yaptığı iş bu.
+
+Gradyan **bir kez** tanımlanıyor (`GlossDefs`, uygulama kökünde) ve
+simgeler `GLOSS` sabitiyle (`url(#gur-gloss)`) bağlanıyor. Her düğmede
+ayrı bir `<defs>` çizerseniz aynı id çoğalır ve tarayıcı hepsini ilkine
+bağlar. Gradyan bulunamazsa simge **siyah** çizilir — ekleyip görmeden
+geçmeyin.
+
+Kaydırma düğmelerinde renk artık ayrım taşımıyor, **şekil** taşıyor:
+çarpı = geç, çift ok = detay, kalp = favori. Üçü de turuncu; ayrımı
+simgenin biçimi yapıyor.
+
+Bütün haplar basılınca **içeriden turuncu doluyor**: `.gur-btn::before`
+merkezden büyüyen bir daire. Kurallar:
+- Dolgu hapın zeminini değiştirmiyor, ÜSTÜNE biniyor — her varyantta çalışır.
+- `transform: scale()` ile büyüyor; genişlik animasyonu her karede yeniden
+  yerleşim yaptırırdı.
+- İçerik `isolation: isolate` + `z-index: -1` ile dolgunun üstünde kalıyor.
+- Hap tam yuvarlak olduğu için `overflow: hidden` dolguyu kenarda kesiyor.
+- Kendi düğmesini elle yazan yerler `.gur-fill` sınıfını doğrudan kullanır.
+
+### Yemek zili: iki an, tek nesne
+`DinnerBell` iki yerde çalıyor — kota dolduğunda ("mutfak kapandı") ve GUR
+Match'te eşleşme olduğunda ("masa hazır"). İkisi de aynı şeyi söylediği
+için tek bileşen.
+
+Zil **gövdesi** sallanıyor, tokmak değil: dönüş ekseni tepedeki topuz
+(`transform-origin: 50% 10%`), yoksa zil havada kayıyor gibi duruyor.
+İki tur sonra duruyor — sürekli dönen bir salınım 0.2 Hz civarında
+rahatsız ediyor. Çevresindeki `.gur-bell-wave` halkaları sesin görsel
+karşılığı.
+
+**Ses yok.** İzinsiz ses çalmak kaba, üstelik sessiz moddaki telefonu da
+yok sayardı. Zil görsel bir işaret.
+
+Azaltılmış hareket tercihinde salınım ve halkalar duruyor, zil görünmeye
+devam ediyor.
+
 ### Yönetici panosu: One düzeni
 Panel açık gri kâğıt (`C.bg`) üzerinde beyaz kartlar. Üç imza parçası
 `GurAdmin.jsx` içinde:

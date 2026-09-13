@@ -601,6 +601,73 @@ export function BadgeChips({ badges = [], max = 2, size = "md", onLight = false 
 
 /** İsim yanında: yalnızca simge. Renk tek başına bilgi taşımasın diye
  *  her simgenin başlığı rozetin adını söylüyor. */
+// ═══════════════════════════════════════════════════════════════════════
+// PARLAK TURUNCU SİMGE + YEMEK ZİLİ
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Kaydırma düğmelerindeki simgelerin dolgusu. Düz turuncu yerine üstten
+ * aydınlık, alta doğru koyulaşan bir rampa + üst kenarda ince bir parlama:
+ * referanstaki cam gibi duran simgelerin yaptığı iş bu.
+ *
+ * Gradyan bir kez tanımlanıyor ve simgeler `url(#gur-gloss)` ile
+ * bağlanıyor — her düğmede ayrı <defs> çizilirse aynı id çoğalır ve
+ * tarayıcı ilkine bağlanır.
+ *
+ * Renkler markanın kendi iki ucundan (#FF9A4D → #F04E00); paletin dışına
+ * çıkılmadı (bkz. CLAUDE.md → Tutarlı renk seçimi).
+ */
+export function GlossDefs() {
+  return (
+    <svg width="0" height="0" aria-hidden="true" focusable="false"
+      style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+      <defs>
+        <linearGradient id="gur-gloss" x1="0" y1="0" x2="0.35" y2="1">
+          <stop offset="0%" stopColor="#FFB067" />
+          <stop offset="42%" stopColor="#FF7A1A" />
+          <stop offset="100%" stopColor="#EF4A00" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
+/** Parlak turuncu dolgu — simgenin `fill`/`stroke` değeri olarak verilir. */
+export const GLOSS = "url(#gur-gloss)";
+
+/**
+ * Yemek zili. Kotanın dolduğu ve GUR Match'te eşleşmenin olduğu an
+ * çalıyor: iki farklı olay ama ikisi de "masaya buyurun" diyor, o yüzden
+ * tek nesne.
+ *
+ * Zil GÖVDESİ sallanıyor, tokmak değil — sarkaç gibi. `ring` false ise
+ * hiç oynamıyor; azaltılmış hareket tercihinde de duruyor (aşağıdaki
+ * @media kuralı animasyonu kapatıyor, zil yine görünüyor).
+ */
+export function DinnerBell({ size = 92, ring = true }) {
+  return (
+    <span
+      className={ring ? "gur-bell gur-bell-ring" : "gur-bell"}
+      style={{ display: "inline-flex", width: size, height: size }}
+      aria-hidden="true"
+    >
+      <svg width={size} height={size} viewBox="0 0 64 64" fill="none">
+        {/* kubbe */}
+        <path className="gur-bell-dome"
+          d="M32 12c-9.4 0-17 7.6-17 17v10c0 2.2-1.3 4.2-3.3 5.1-1.1.5-1.7 1.6-1.7 2.8 0 1.7 1.4 3.1 3.1 3.1h37.8c1.7 0 3.1-1.4 3.1-3.1 0-1.2-.6-2.3-1.7-2.8-2-.9-3.3-2.9-3.3-5.1V29c0-9.4-7.6-17-17-17z"
+          fill={GLOSS} />
+        {/* tepe topuzu */}
+        <circle cx="32" cy="8" r="4.4" fill={GLOSS} />
+        {/* tabla */}
+        <rect x="6" y="50" width="52" height="6" rx="3" fill={GLOSS} opacity="0.75" />
+        {/* üst kenar parlaması: cam hissini veren tek çizgi */}
+        <path d="M22 26c1.8-4.6 5.6-7.6 10-8.2" stroke="rgba(255,255,255,0.6)"
+          strokeWidth="2.6" strokeLinecap="round" />
+      </svg>
+    </span>
+  );
+}
+
 export function BadgeMarks({ badges = [], size = 13, onLight = true, max = 3 }) {
   if (!badges.length) return null;
   // Üçten fazlası ismin yanında bir renk şeridi oluyor (bkz. CLAUDE.md →
@@ -823,6 +890,73 @@ export function GurStyles() {
         /* Yükleniyor: tıklanamaz ama soluk değil — iş sürüyor, kapalı değil. */
         .gur-btn[data-state="loading"], .gur-icon-btn[data-state="loading"] {
           opacity: 0.9; cursor: progress; filter: none;
+        }
+
+        /* ── YEMEK ZİLİ ───────────────────────────────────────────────
+           Zil GÖVDESİ sarkaç gibi sallanıyor: dönüş ekseni tepedeki
+           topuz (transform-origin üstte), yoksa zil havada kayıyor gibi
+           duruyor. Üç salınım sonra duruyor — sürekli dönen bir animasyon
+           0.2 Hz civarında rahatsız ediyor (bkz. azaltılmış hareket). */
+        @keyframes gur-bell-swing {
+          0%   { transform: rotate(0deg); }
+          8%   { transform: rotate(15deg); }
+          22%  { transform: rotate(-13deg); }
+          36%  { transform: rotate(9deg); }
+          50%  { transform: rotate(-6deg); }
+          64%  { transform: rotate(3.5deg); }
+          78%  { transform: rotate(-1.8deg); }
+          100% { transform: rotate(0deg); }
+        }
+        .gur-bell { transform-origin: 50% 10%; }
+        .gur-bell-ring { animation: gur-bell-swing 1.5s cubic-bezier(.36,.07,.19,.97) 0.15s 2 both; }
+
+        /* Zilin çevresine yayılan halka: sesin görsel karşılığı. */
+        @keyframes gur-bell-wave {
+          0%   { transform: scale(0.7); opacity: 0.5; }
+          100% { transform: scale(1.9); opacity: 0; }
+        }
+        .gur-bell-wave {
+          position: absolute; inset: 0; border-radius: 50%;
+          border: 2px solid rgba(255,122,26,0.55);
+          animation: gur-bell-wave 1.8s ease-out infinite;
+          pointer-events: none;
+        }
+        .gur-bell-wave:nth-of-type(2) { animation-delay: 0.6s; }
+
+        /* ── BASINCA İÇİ TURUNCU DOLAN DÜĞME ──────────────────────────
+           Dolgu merkezden büyüyen bir daire; düğmenin kendi zeminini
+           değiştirmiyor, ÜSTÜNE biniyor, o yüzden her varyantta çalışıyor.
+           İçerik z-index ile dolgunun üstünde kalıyor, yoksa yazı
+           turuncunun altında kayboluyor.
+
+           transform ile büyüyor: genişlik/yükseklik animasyonu her
+           karede yeniden yerleşim (layout) yaptırıyor, transform
+           yaptırmıyor. */
+        /* Her hapa uygulanıyor (.gur-btn), ayrıca kendi düğmesini
+           elle yazan yerler .gur-fill sınıfını doğrudan kullanabilir.
+           Haplar tam yuvarlak olduğu için overflow:hidden dolguyu hapın
+           kenarında kesiyor — köşelerden taşmıyor. */
+        .gur-btn, .gur-fill { position: relative; overflow: hidden; isolation: isolate; }
+        .gur-btn::before, .gur-fill::before {
+          content: ""; position: absolute; left: 50%; top: 50%;
+          width: 150%; aspect-ratio: 1; border-radius: 50%;
+          background: radial-gradient(circle, rgba(255,122,26,0.38) 0%, rgba(255,102,0,0.26) 70%);
+          transform: translate(-50%, -50%) scale(0);
+          transition: transform 260ms cubic-bezier(.22,1,.36,1), opacity 240ms ease;
+          opacity: 0; z-index: -1; pointer-events: none;
+        }
+        .gur-btn:not(:disabled):active::before,
+        .gur-fill:active::before { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        /* Dokunmatikte :active bırakınca hemen sönüyor; sönüş biraz uzun
+           olsun ki dolgu görülsün. */
+        .gur-btn::before, .gur-fill::before { transition-duration: 260ms, 420ms; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .gur-bell-ring { animation: none; }
+          .gur-bell-wave { animation: none; opacity: 0; }
+          .gur-btn::before, .gur-fill::before { transition: opacity 120ms ease; }
+          .gur-btn:not(:disabled):active::before,
+          .gur-fill:active::before { transform: translate(-50%, -50%) scale(1); }
         }
 
         /* Turuncu kabuk. İçindeki alan etiketleri beyaza döner: koyu

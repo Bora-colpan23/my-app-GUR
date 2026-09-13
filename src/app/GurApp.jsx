@@ -14,7 +14,7 @@ import {
   usePrefersReducedMotion, GurLogo, Icon, BackBtn, Img,
   InputField, SelectField, ELEV,
   Spinner, Btn, IconBtn, HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
-  BadgeChips, BadgeMarks,
+  BadgeChips, BadgeMarks, GlossDefs, GLOSS, DinnerBell,
   scrim,
 } from '../ui/kit.jsx';
 import { I, RESTAURANTS, CATEGORIES, fetchLiveRestaurants, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
@@ -1144,17 +1144,23 @@ function PremiumOffer({ onWatch, onExplore, onPlus }) {
         transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
         style={{ width: "100%", textAlign: "center" }}
       >
-        <div style={{ width: 74, height: 74, borderRadius: "50%", background: "rgba(255,102,0,0.14)", border: "1px solid rgba(255,102,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
-          <Icon n="clock" size={28} color="var(--c-warn)" />
+        {/* Zil çalıyor: kota dolduğunda "mutfak kapandı" demenin görsel
+            hâli. Ses YOK — izinsiz ses çalmak kaba, üstelik sessiz moddaki
+            telefonu da yok sayardı. */}
+        <div style={{ position: "relative", width: 120, height: 120, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span className="gur-bell-wave" />
+          <span className="gur-bell-wave" />
+          <DinnerBell size={96} />
         </div>
         <h3 style={{ fontFamily: "var(--f-body)", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px" }}>Bugünlük bu kadar keşif</h3>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: "0 0 22px", lineHeight: 1.55 }}>
-          Yarın taze bir deste seni bekliyor. Şimdi devam etmek istersen iki yolun var.
+          Yarın taze bir deste seni bekliyor. Şimdi devam etmek istersen
+          kısa bir reklam izleyip aramaya devam edebilirsin.
         </p>
         <Btn text="GUR Plus ile sınırsız keşfet" onClick={onPlus} variant="filled"
           icon={<Icon n="sparkle" size={15} color="#fff" />} />
         <div style={{ marginTop: 10 }}>
-          <Btn text="Kısa bir reklam izle, keşfe devam et" onClick={onWatch} variant="onColor" size="md" />
+          <Btn text="Reklam izle, aramaya devam et" onClick={onWatch} variant="onColor" size="md" />
         </div>
         <div style={{ marginTop: 10 }}>
           <Btn text="Keşfete dön" onClick={onExplore} variant="outline" size="sm" />
@@ -2187,19 +2193,19 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             <IconBtn
               onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.fling(-1))}
               tone="solidLight" size={ACTION_SIZE} elevated title="Geç"
-              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--c-bad)" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
+              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={GLOSS} strokeWidth="3.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
             />
 
             <IconBtn
               onClick={() => openSheet(deck[cursor])}
               tone="solidLight" size={ACTION_SIZE} elevated title="Restorana git"
-              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--c-brand-light)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11" /><polyline points="17 18 12 13 7 18" /></svg>}
+              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={GLOSS} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11" /><polyline points="17 18 12 13 7 18" /></svg>}
             />
 
             <IconBtn
               onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.fling(1))}
               tone="solidLight" size={ACTION_SIZE} elevated title="Favorilere ekle"
-              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="var(--c-ok)" stroke="var(--c-ok)" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>}
+              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill={GLOSS} stroke={GLOSS} strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>}
             />
           </div>
         )}
@@ -2430,9 +2436,9 @@ function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
         {/* Aksiyonlar */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 22, padding: "10px 16px 20px", zIndex: 10 }}>
           <IconBtn onClick={() => topCardRef.current?.fling(-1)} tone="solidLight" size={ACTION_SIZE} elevated title="Geç"
-            icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--c-bad)" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+            icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={GLOSS} strokeWidth="3.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
           <IconBtn onClick={() => topCardRef.current?.fling(1)} tone="solidLight" size={ACTION_SIZE} elevated title="Beğen"
-            icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="var(--c-ok)" stroke="var(--c-ok)" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>} />
+            icon={<svg width="26" height="26" viewBox="0 0 24 24" fill={GLOSS} stroke={GLOSS} strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>} />
         </div>
 
         {/* Eşleşme anı */}
@@ -2449,7 +2455,14 @@ function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
                 transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                 style={{ width: "100%", textAlign: "center" }}
               >
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-warn)", fontWeight: 700, letterSpacing: 3, margin: "0 0 10px" }}>EŞLEŞTİNİZ!</p>
+                {/* Aynı zil: kota dolunca "mutfak kapandı", eşleşince
+                    "masa hazır" diyor. Tek nesne, iki an. */}
+                <div style={{ position: "relative", width: 104, height: 104, margin: "0 auto 6px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span className="gur-bell-wave" />
+                  <span className="gur-bell-wave" />
+                  <DinnerBell size={82} />
+                </div>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-brand-light)", fontWeight: 800, letterSpacing: 3, margin: "0 0 10px" }}>EŞLEŞTİNİZ!</p>
                 <div style={{ width: "100%", height: 220, borderRadius: 24, overflow: "hidden", position: "relative", marginBottom: 18, boxShadow: "var(--sh-brand-lg)" }}>
                   <Img src={popup.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
                   <div style={{ position: "absolute", inset: 0, background: scrim(0.85, 60) }} />
@@ -3993,6 +4006,10 @@ export default function GurApp(props = {}) {
   return (
     <div className="gur-stage" style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", colorScheme: "light" }}>
       <GurStyles />
+      {/* Parlak turuncu simge gradyanı bir kez tanımlanıyor; simgeler
+          url(#gur-gloss) ile buna bağlanıyor. Her düğmede ayrı <defs>
+          çizilseydi aynı id çoğalır, tarayıcı ilkine bağlanırdı. */}
+      <GlossDefs />
       <PhoneFrame>
         {render()}
         {/* Splash geçilene kadar sorulmaz — ilk izlenim bir onay kutusu olmasın */}

@@ -19,7 +19,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import {
-  GurLogo, Icon, Img, InputField, SelectField, Btn, IconBtn, Spinner,
+  GurLogo, Icon, Img, InputField, SelectField, Btn, IconBtn, Spinner, GlossDefs,
   HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
   GRAD, BackBtn, haptic, keepVisible, toMediaFiles,
 } from '../ui/kit.jsx';
@@ -1745,6 +1745,10 @@ export default function GurBusiness() {
   return (
     <div className="gur-stage" style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", colorScheme: "light" }}>
       <GurStyles />
+      {/* Parlak turuncu simge gradyanı bir kez tanımlanıyor; simgeler
+          url(#gur-gloss) ile buna bağlanıyor. Her düğmede ayrı <defs>
+          çizilseydi aynı id çoğalır, tarayıcı ilkine bağlanırdı. */}
+      <GlossDefs />
       <PhoneFrame>
         <AnimatePresence mode="wait">
           <motion.div
