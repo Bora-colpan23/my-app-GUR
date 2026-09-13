@@ -14,7 +14,7 @@ import {
   usePrefersReducedMotion, GurLogo, Icon, BackBtn, Img,
   InputField, SelectField, ELEV,
   Spinner, Btn, IconBtn, HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
-  BadgeChips, BadgeMarks, GlossDefs, GLOSS, DinnerBell,
+  BadgeChips, BadgeMarks, GlossDefs, GLOSS, DinnerBell, SplitText, Orb, Skeleton,
   scrim,
 } from '../ui/kit.jsx';
 import { I, RESTAURANTS, CATEGORIES, fetchLiveRestaurants, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
@@ -447,11 +447,12 @@ function WelcomeScreen({ onStart }) {
             <GurLogo size={22} pill />
           </div>
 
-          <h2 style={{
-            fontFamily: "var(--f-body)", fontSize: 28, color: "var(--c-on-brand)",
-            textAlign: "center", margin: "14px 0 6px",
-          }}>
-            Hoş geldin!
+          {/* Uygulamanın ilk cümlesi harf harf beliriyor. Yalnızca
+              BURADA: her başlığı canlandırmak gürültü olur, ilk izlenim
+              tek başına duruyor. */}
+          <h2 style={{ textAlign: "center", margin: "14px 0 6px" }}>
+            <SplitText text="Hoş geldin!" size={28} weight={700}
+              color="var(--c-on-brand)" delay={0.12} />
           </h2>
           <p style={{
             fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-on-brand-2)",
@@ -959,7 +960,13 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                 <motion.div key={r.id} onClick={() => onDetail?.(r)}
                   whileTap={{ scale: 0.97 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
                   style={{ flexShrink: 0, width: 208, background: "var(--c-card)", borderRadius: 22, overflow: "hidden", cursor: "pointer", boxShadow: ELEV.restLight }}>
-                  <div style={{ position: "relative", height: 116 }}>
+                  {/* layoutId ile detaydaki kapak görselinin AYNISI:
+                      karta dokununca görsel büyüyerek detayın kapağına
+                      dönüşüyor, iki ayrı resim arasında kesme olmuyor.
+                      Kimliğin mekan id'sine bağlı olması şart — sabit bir
+                      id verilseydi listedeki bütün kartlar tek bir
+                      görselmiş gibi birbirine morph olurdu. */}
+                  <motion.div layoutId={`gur-kapak-${r.id}`} style={{ position: "relative", height: 116 }}>
                     <Img src={r.imgs?.[0]} box={416} style={{ position: "absolute", inset: 0 }} bg="var(--c-img-bg)" />
                     {r.claimed && (
                       <div style={{ position: "absolute", top: 9, right: 9, background: "rgba(255,255,255,0.92)", borderRadius: 999, padding: "3px 5px", display: "flex", alignItems: "center", boxShadow: "var(--sh-d1)" }}>
@@ -970,7 +977,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                     <div style={{ position: "absolute", top: 9, left: 9 }}>
                       <BadgeChips badges={badgesOf(r, badgeMap)} max={1} size="sm" />
                     </div>
-                  </div>
+                  </motion.div>
                   <div style={{ padding: "11px 13px 13px" }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 3 }}>
                       <p style={{ flex: 1, minWidth: 0, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</p>
@@ -1132,6 +1139,29 @@ function RewardedAdOverlay({ ad, onComplete, onAbort }) {
 // Ekranın hiçbir yerinde "kalan hakkın: X" yazmaz; kullanıcı sayacı
 // izlemek yerine keşfetmeye odaklansın diye. Sınıra gelindiğinde de
 // ceza değil iki yol sunulur: bir reklam ya da GUR Plus.
+// Ekran geçişinin varyantları. Sekmeler arası geçişte içerik yatay
+// kayıyor; sekme olmayan geçişlerde (giriş, detay, yasal metin) yalnızca
+// yumuşak bir ölçek + solma — oralarda "sağ/sol" diye bir anlam yok.
+//
+// Yay Apple HIG'e göre: momentum taşımayan bir geçiş, o yüzden bounce 0.
+const EKRAN_GECIS = {
+  gir: (yon) => ({
+    opacity: 0,
+    x: yon === 0 ? 0 : yon * 34,
+    scale: yon === 0 ? 0.985 : 1,
+  }),
+  dur: {
+    opacity: 1, x: 0, scale: 1,
+    transition: { type: "spring", bounce: 0, duration: 0.42 },
+  },
+  cik: (yon) => ({
+    opacity: 0,
+    x: yon === 0 ? 0 : yon * -28,
+    scale: yon === 0 ? 0.99 : 1,
+    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
+  }),
+};
+
 function PremiumOffer({ onWatch, onExplore, onPlus }) {
   return (
     <motion.div
@@ -1269,12 +1299,16 @@ function LocationSetupScreen({ onDone }) {
     <Screen>
       <div style={{ padding: "56px 26px 40px", minHeight: "100%", display: "flex", flexDirection: "column" }}>
         <div style={{ textAlign: "center", marginBottom: 26 }}>
+          {/* İzin kutusu açıkken konum bulmak saniyeler sürebiliyor ve
+              o sırada ekranda hiçbir şey olmuyordu — kullanıcı düğmenin
+              çalışmadığını sanıyor. Bekleme boyunca iğnenin yerini küre
+              alıyor: aynı kutuda, aynı ölçüde, düzen zıplamıyor. */}
           <div style={{
             width: 68, height: 68, borderRadius: 24, margin: "0 auto 16px",
             background: "var(--c-brand-soft)", border: "1px solid rgba(255,102,0,0.18)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <Icon n="pin" size={30} color="#FF6600" />
+            {busy ? <Orb size={54} label="Konum aranıyor" /> : <Icon n="pin" size={30} color="#FF6600" />}
           </div>
           <h2 style={{ fontFamily: "var(--f-body)", fontSize: 24, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 8px" }}>
             Nerede yemek arıyorsun?
@@ -1602,7 +1636,21 @@ function ExternalReviews({ reviews = [], restaurant, loading }) {
       </div>
 
       {loading ? (
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: 0 }}>Yükleniyor…</p>
+        // Düz "Yükleniyor…" yazısı sayfanın şeklini tutmuyordu: yorumlar
+        // gelince düzen zıplıyordu. İskelet gelecek satırların yerini
+        // şimdiden ayırıyor.
+        <div role="status" aria-label="Yorumlar yükleniyor" style={{ display: "grid", gap: 14 }}>
+          {[0, 1].map(i => (
+            <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+              <Skeleton w={22} h={22} radius={11} />
+              <div style={{ flex: 1, display: "grid", gap: 7 }}>
+                <Skeleton w="42%" h={11} />
+                <Skeleton w="100%" h={10} />
+                <Skeleton w="78%" h={10} />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : reviews.length === 0 ? (
         <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-muted)", lineHeight: 1.55, margin: 0 }}>
           Bu mekan için Google yorumu çekilmedi. Places anahtarı tanımlanınca besleme
@@ -2844,8 +2892,14 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           {/* Açıklama */}
           <p style={{ fontFamily: "var(--f-body)", fontSize: 15, color: "#fff", margin: "0 4px 14px", lineHeight: 1.35, textShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{r.desc}</p>
 
-          {/* Fotoğraf Carousel — kaydırılabilir */}
-          <div style={{ position: "relative", marginBottom: 12 }}>
+          {/* Fotoğraf Carousel — kaydırılabilir.
+              Dış kutu keşfetteki kartın görseliyle AYNI layoutId'yi
+              taşıyor: karta dokununca o görsel buraya kadar büyüyor.
+              layoutId sarmalayıcıda, karusel şeridinde değil — şerit
+              zaten translateX ile kayıyor, ikisi aynı düğümde olsaydı
+              Motion'ın morph'u ile karusel kaydırması aynı transform
+              üzerinde çakışırdı. */}
+          <motion.div layoutId={`gur-kapak-${r.id}`} style={{ position: "relative", marginBottom: 12 }}>
             <div
               onTouchStart={handlePhotoStart}
               onTouchEnd={handlePhotoEnd}
@@ -2874,7 +2928,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 }} />
               ))}
             </div>
-          </div>
+          </motion.div>
 
           {/* Küçük thumbnail'lar */}
           <HScroll style={{ gap: 10, paddingBottom: 16, scrollbarWidth: "none" }}>
@@ -3980,6 +4034,19 @@ export default function GurApp(props = {}) {
   // Girişten sonra: konum kararı verilmediyse önce o adım.
   const afterAuth = () => nav(geo.consentAsked() ? "explore" : "location");
 
+  // Sekme sırası geçişin YÖNÜNÜ belirliyor: alt barda sağdaki sekmeye
+  // giderken içerik sağdan, soldakine dönerken soldan geliyor. Yön
+  // rastgele olsaydı kullanıcı nerede olduğunu kaybederdi.
+  const SEKME_SIRA = ["explore", "swipe", "favorites", "profile"];
+  const oncekiScreen = useRef(screen);
+  const yon = (() => {
+    const a = SEKME_SIRA.indexOf(oncekiScreen.current);
+    const b = SEKME_SIRA.indexOf(screen);
+    if (a === -1 || b === -1 || a === b) return 0;   // sekme değilse kaydırma yok
+    return b > a ? 1 : -1;
+  })();
+  useEffect(() => { oncekiScreen.current = screen; }, [screen]);
+
   const render = () => {
     switch (screen) {
       case "splash": return <SplashScreen onNext={() => setScreen("welcome")} />;
@@ -4011,7 +4078,20 @@ export default function GurApp(props = {}) {
           çizilseydi aynı id çoğalır, tarayıcı ilkine bağlanırdı. */}
       <GlossDefs />
       <PhoneFrame>
-        {render()}
+        {/* Ekran geçişi. mode="popLayout" giden ekranı akıştan çıkarıyor;
+            olmazsa iki ekran bir kare boyunca üst üste yığılıp sayfayı
+            uzatıyor. Yalnızca transform + opacity animasyonu var. */}
+        <AnimatePresence mode="popLayout" initial={false} custom={yon}>
+          <motion.div
+            key={screen}
+            custom={yon}
+            variants={EKRAN_GECIS}
+            initial="gir" animate="dur" exit="cik"
+            style={{ position: "absolute", inset: 0, willChange: "transform" }}
+          >
+            {render()}
+          </motion.div>
+        </AnimatePresence>
         {/* Splash geçilene kadar sorulmaz — ilk izlenim bir onay kutusu olmasın */}
         {!consent && screen !== "splash" && screen !== "legal" && (
           <ConsentBanner onDecide={decideConsent} onLegal={() => nav("legal")} />

@@ -1425,6 +1425,58 @@ function TrendChart({ data, height = 200, format }) {
   );
 }
 
+/**
+ * Sayarak artan KPI değeri.
+ *
+ * KpiCard'a değer HAZIR BİÇİMLENMİŞ dizge olarak geliyor ("4.230", "₺939K",
+ * "%58"). Her çağrı yerini ham sayıya çevirmek yerine dizgeyi ayırıyoruz:
+ * baştaki ek (₺, %), sayı, sondaki ek (K, M). Yalnızca sayı sayıyor.
+ *
+ * Animasyon bitince EKRANDA ORİJİNAL DİZGE duruyor — biçimlendirmeyi
+ * yeniden üretmeye çalışsaydık binlik ayıracı ya da ondalık sayıda
+ * sessiz bir kayma olabilirdi. Ekran okuyucu da baştan sonu görüyor;
+ * ara değerleri okumak işkence olurdu.
+ */
+function AnimatedNumber({ value, duration = 1.0 }) {
+  const metin = String(value);
+  // Türkçe biçim: nokta binlik, virgül ondalık.
+  const m = metin.match(/^(\D*)([\d.,]+)(.*)$/);
+  const reduced = React.useMemo(() => {
+    try { return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+  }, []);
+  const hedef = m ? Number(m[2].replace(/\./g, '').replace(',', '.')) : NaN;
+  const ondalik = m && m[2].includes(',') ? m[2].split(',')[1].length : 0;
+  const [bitti, setBitti] = useState(false);
+  const [v, setV] = useState(0);
+
+  useEffect(() => {
+    if (!m || !Number.isFinite(hedef) || reduced) { setBitti(true); return; }
+    setBitti(false);
+    let raf, t0 = null;
+    const adim = (t) => {
+      if (t0 === null) t0 = t;
+      const g = Math.min(1, (t - t0) / (duration * 1000));
+      // easeOutCubic: hızlı başlar, sona doğru yavaşlar. Doğrusal sayma
+      // mekanik duruyor.
+      setV(hedef * (1 - Math.pow(1 - g, 3)));
+      if (g < 1) raf = requestAnimationFrame(adim); else setBitti(true);
+    };
+    raf = requestAnimationFrame(adim);
+    return () => cancelAnimationFrame(raf);
+    // Bağımlılıklar bilerek `metin` üzerinden: aynı sayı farklı biçimde
+    // gelirse (₺939K → ₺1.02M) animasyon baştan başlasın.
+  }, [metin, hedef, duration, reduced, m]);
+
+  if (!m || !Number.isFinite(hedef) || bitti) return <>{metin}</>;
+  const ara = v.toLocaleString('tr', { minimumFractionDigits: ondalik, maximumFractionDigits: ondalik });
+  return (
+    <>
+      <span aria-hidden="true">{m[1]}{ara}{m[3]}</span>
+      <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{metin}</span>
+    </>
+  );
+}
+
 function KpiCard({ label, value, delta, deltaUp, deltaNeutral, icon, accent }) {
   return (
     <div style={{ ...CARD, padding: 20 }}>
@@ -1445,7 +1497,7 @@ function KpiCard({ label, value, delta, deltaUp, deltaNeutral, icon, accent }) {
           </span>
         )}
       </div>
-      <div style={{ fontSize: 27, fontWeight: 700, marginBottom: 3, ...NUM }}>{value}</div>
+      <div style={{ fontSize: 27, fontWeight: 700, marginBottom: 3, ...NUM }}><AnimatedNumber value={value} /></div>
       <div style={{ fontSize: 12.5, color: C.dim }}>{label}</div>
     </div>
   );

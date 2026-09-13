@@ -602,6 +602,164 @@ export function BadgeChips({ badges = [], max = 2, size = "md", onLight = false 
 /** İsim yanında: yalnızca simge. Renk tek başına bilgi taşımasın diye
  *  her simgenin başlığı rozetin adını söylüyor. */
 // ═══════════════════════════════════════════════════════════════════════
+// HAREKET KİTİ — animasyonlu metin, sayaç, yükleniyor küresi, iskelet
+//
+// SmoothUI'nin hareket dili, GUR'un kendi sistemine yazıldı. Tailwind
+// eklemedik (bkz. CLAUDE.md → satır içi stil) ve zaten aynı motoru
+// kullanıyoruz: Motion. Yaylar Apple HIG'e göre — damping 1.0
+// varsayılan, momentum taşıyan harekette bounce 0.2.
+//
+// Hepsinin ORTAK kuralı: yalnızca transform ve opacity animasyonu var.
+// Genişlik/yükseklik/top animasyonu her karede yeniden yerleşim
+// yaptırıyor, bu ikisi yaptırmıyor.
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Harf harf beliren başlık.
+ *
+ * Metin görsel olarak parçalanıyor ama ekran okuyucuya BÜTÜN gidiyor:
+ * her harf ayrı bir düğüm olsaydı okuyucu "G, U, R" diye tek tek
+ * heceleyebilirdi. Bu yüzden görünür parçalar aria-hidden, yanlarında
+ * ekrandan gizli tam metin duruyor.
+ *
+ * Kelime içi harfler bölünüyor ama kelimeler bölünmüyor: satır sonunda
+ * bir kelimenin ortasından kırılmasın diye her kelime kendi kutusunda.
+ */
+export function SplitText({
+  text = "", size = 28, weight = 800, color = "var(--c-ink)",
+  delay = 0, stagger = 0.028, style = {},
+}) {
+  const reduced = usePrefersReducedMotion();
+  const words = String(text).split(" ");
+  if (reduced) {
+    return <span style={{ fontFamily: "var(--f-body)", fontSize: size, fontWeight: weight, color, ...style }}>{text}</span>;
+  }
+  let i = 0;
+  return (
+    <span style={{ fontFamily: "var(--f-body)", fontSize: size, fontWeight: weight, color, display: "inline-block", ...style }}>
+      <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>{text}</span>
+      {/* data-split: denetleme betiği bu ağacın içindeki tek harfleri
+          ATLIYOR. Harfler ayrı düğüm olduğu için her biri ayrı bir metin
+          gibi sayılıyor ve tek bir başlık on bir satır uyarı üretiyordu —
+          aynı piksel, aynı oran. Ölçülecek bütün metin yukarıdaki
+          ekran-okuyucu ikizinde duruyor. */}
+      <span aria-hidden="true" data-split="1">
+        {words.map((w, wi) => (
+          <span key={wi} style={{ display: "inline-block", whiteSpace: "nowrap" }}>
+            {[...w].map((ch, ci) => {
+              const k = i++;
+              return (
+                <motion.span
+                  key={ci}
+                  initial={{ opacity: 0, y: "0.4em" }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: delay + k * stagger, type: "spring", bounce: 0, duration: 0.5 }}
+                  style={{ display: "inline-block", willChange: "transform" }}
+                >{ch}</motion.span>
+              );
+            })}
+            {wi < words.length - 1 && <span>&nbsp;</span>}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Sayarak artan sayı.
+ *
+ * Rakamlar SABİT GENİŞLİKLİ yazılmalı, yoksa sayarken kutu her karede
+ * genişleyip daralıyor ve yanındaki her şey titriyor — `tabularNums`
+ * bunun için. Bitiş değeri ekran okuyucuya tek seferde veriliyor;
+ * sayarken her ara değeri okumak işkence olurdu.
+ *
+ * `format` ham sayıyı alır (₺, %, binlik ayıracı çağıran yerde).
+ */
+export function CountUp({ to = 0, duration = 1.1, delay = 0, format = v => Math.round(v).toLocaleString("tr"), style = {} }) {
+  const reduced = usePrefersReducedMotion();
+  const [v, setV] = useState(reduced ? to : 0);
+  const son = useRef(to);
+  useEffect(() => {
+    son.current = to;
+    if (reduced) { setV(to); return; }
+    let raf, t0 = null;
+    const bas = 0;
+    const adim = (t) => {
+      if (t0 === null) t0 = t;
+      const g = Math.min(1, (t - t0 - delay * 1000) / (duration * 1000));
+      if (g < 0) { raf = requestAnimationFrame(adim); return; }
+      // Yumuşama: hızlı başlayıp sona doğru yavaşlıyor (easeOutCubic).
+      // Doğrusal sayma mekanik duruyor.
+      const e = 1 - Math.pow(1 - g, 3);
+      setV(bas + (to - bas) * e);
+      if (g < 1) raf = requestAnimationFrame(adim);
+    };
+    raf = requestAnimationFrame(adim);
+    return () => cancelAnimationFrame(raf);
+  }, [to, duration, delay, reduced]);
+  return (
+    <span style={{ fontVariantNumeric: "tabular-nums", ...style }}>
+      <span aria-hidden="true">{format(v)}</span>
+      <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>{format(son.current)}</span>
+    </span>
+  );
+}
+
+/**
+ * Yükleniyor küresi. Üst üste binen üç turuncu katman birbirinden farklı
+ * hızda dönüyor; tek bir dönen daire mekanik, üçü organik duruyor.
+ *
+ * Dönen bir spinner "bekleniyor" der ama NE beklendiğini demez — bu
+ * yüzden yanına bir etiket alıyor ve `role="status"` taşıyor.
+ */
+export function Orb({ size = 72, label = "Yükleniyor" }) {
+  const reduced = usePrefersReducedMotion();
+  const kat = [
+    { s: 1,    d: 3.2, dir: 1,  c: "rgba(255,122,26,0.55)" },
+    { s: 0.82, d: 4.6, dir: -1, c: "rgba(240,78,0,0.45)" },
+    { s: 0.62, d: 2.4, dir: 1,  c: "rgba(255,176,103,0.6)" },
+  ];
+  return (
+    <div role="status" aria-label={label}
+      style={{ position: "relative", width: size, height: size, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+      {kat.map((k, i) => (
+        <motion.span
+          key={i}
+          animate={reduced ? {} : { rotate: 360 * k.dir }}
+          transition={{ duration: k.d, repeat: Infinity, ease: "linear" }}
+          style={{
+            position: "absolute", width: size * k.s, height: size * k.s,
+            borderRadius: "42% 58% 55% 45% / 48% 45% 55% 52%",
+            background: k.c, filter: "blur(6px)", willChange: "transform",
+          }}
+        />
+      ))}
+      <span style={{
+        position: "absolute", width: size * 0.3, height: size * 0.3, borderRadius: "50%",
+        background: "radial-gradient(circle at 35% 30%, #FFD2AA, #FF7A1A)",
+      }} />
+    </div>
+  );
+}
+
+/**
+ * İskelet kutu. İçerik gelene kadar SAYFANIN ŞEKLİNİ tutuyor: boş ekran
+ * gösterip sonra içerik basmak düzeni zıplatıyor.
+ *
+ * Parlama `transform: translateX` ile geçiyor; `background-position`
+ * animasyonu bileşik katmana çıkmıyor ve uzun listede kasıyor.
+ */
+export function Skeleton({ w = "100%", h = 14, radius = 8, style = {} }) {
+  return (
+    <span aria-hidden="true" className="gur-skeleton"
+      style={{ display: "block", width: w, height: h, borderRadius: radius, position: "relative", overflow: "hidden", background: "var(--c-subtle)", ...style }}>
+      <span className="gur-skeleton-shine" />
+    </span>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // PARLAK TURUNCU SİMGE + YEMEK ZİLİ
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -890,6 +1048,23 @@ export function GurStyles() {
         /* Yükleniyor: tıklanamaz ama soluk değil — iş sürüyor, kapalı değil. */
         .gur-btn[data-state="loading"], .gur-icon-btn[data-state="loading"] {
           opacity: 0.9; cursor: progress; filter: none;
+        }
+
+        /* ── İSKELET PARLAMASI ────────────────────────────────────────
+           Parlama transform ile geçiyor: background-position animasyonu
+           bileşik katmana çıkmıyor ve uzun listede kasıyor. */
+        @keyframes gur-shine {
+          from { transform: translateX(-100%); }
+          to   { transform: translateX(100%); }
+        }
+        .gur-skeleton-shine {
+          position: absolute; inset: 0;
+          background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%);
+          animation: gur-shine 1.4s ease-in-out infinite;
+          will-change: transform;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .gur-skeleton-shine { animation: none; }
         }
 
         /* ── YEMEK ZİLİ ───────────────────────────────────────────────

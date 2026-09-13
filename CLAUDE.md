@@ -551,6 +551,56 @@ durumdan birini çizer: **E-posta ile davet et** / **Siteden ulaş** /
 adrese — hepsi `gur.invites` altında; gerçek dağıtımda buranın yerine
 sunucuda bir kuyruk gelir, arayüz değişmeden.
 
+### Hareket kiti
+SmoothUI'nin hareket dili GUR'un kendi sistemine yazıldı. **Tailwind
+eklenmedi** — zaten aynı motoru kullanıyoruz: Motion. (SmoothUI'nin kendi
+bileşenleri bu ortamda indirilemiyor: `smoothui.dev` çıkış kapısında
+engelli. Ayrıca Tailwind v4 + TypeScript istiyor, ikisi de burada yok.)
+
+`src/ui/kit.jsx` içinde dört parça:
+
+| Parça | Ne yapar | Nerede |
+|---|---|---|
+| `SplitText` | başlık harf harf belirir | karşılama ekranı, **yalnız orada** |
+| `CountUp` | sayı sayarak artar | kit'te hazır (panelin kendi kopyası var) |
+| `Orb` | üç katmanlı dönen turuncu küre | konum izni beklenirken |
+| `Skeleton` | parlayan yer tutucu | dış yorumlar yüklenirken |
+
+Ortak kural: **yalnızca `transform` ve `opacity`**. Genişlik/yükseklik/top
+animasyonu her karede yeniden yerleşim yaptırıyor, bu ikisi yaptırmıyor.
+Hepsi `prefers-reduced-motion`'a uyuyor — hareket durur, nesne kalır.
+
+`SplitText` metni görsel olarak parçalıyor ama **ekran okuyucuya bütün
+gönderiyor**: her harf ayrı düğüm olsaydı okuyucu heceleyebilirdi. Görünür
+parçalar `aria-hidden` + `data-split`, yanlarında ekrandan gizli tam metin
+duruyor. **`data-split` denetleme betiği için de gerekli**: harfleri tek tek
+saymak bir başlıktan on bir satır uyarı üretiyordu — aynı piksel, aynı oran.
+
+Panelin `AnimatedNumber`'ı KPI değerini hazır biçimlenmiş dizgeden ayırıyor
+(`₺939K` → ek + sayı + ek) ve yalnızca sayıyı sayıyor. Animasyon bitince
+**ekranda orijinal dizge** duruyor; biçimlendirmeyi yeniden üretmek binlik
+ayıracında sessiz bir kaymaya yol açabilirdi.
+
+### Ekran geçişleri ve genişleyen kart
+Ekranlar `AnimatePresence mode="popLayout"` içinde. `popLayout` giden ekranı
+akıştan çıkarıyor; olmazsa iki ekran bir kare boyunca üst üste yığılıp
+sayfayı uzatıyor.
+
+Geçişin **yönü** alt bardaki sekme sırasından geliyor (`SEKME_SIRA`): sağdaki
+sekmeye giderken içerik sağdan, soldakine dönerken soldan. Yön rastgele
+olsaydı kullanıcı nerede olduğunu kaybederdi. Sekme olmayan geçişlerde
+(giriş, detay, yasal metin) "sağ/sol" diye bir anlam yok — orada yalnızca
+yumuşak ölçek + solma.
+
+**Genişleyen kart:** Keşfet listesindeki kartın görseli ile detay
+sayfasının kapak görseli aynı `layoutId`'yi taşıyor
+(`gur-kapak-${r.id}`), Motion ikisi arasında morph ediyor. Kimlik mekan
+id'sine bağlı olmak **zorunda** — sabit bir id verilirse listedeki bütün
+kartlar tek bir görselmiş gibi birbirine morph olur. `layoutId` karusel
+ŞERİDİNDE değil dış sarmalayıcıda: şerit zaten `translateX` ile kayıyor,
+ikisi aynı düğümde olsaydı morph ile karusel kaydırması aynı transform
+üzerinde çakışırdı.
+
 ### Konum doğrulamalı ziyaret
 `src/lib/visits.js` ve `server/src/visits/tracker.js` **aynı kuralları** taşır:
 120 m yarıçap, 15 dk kalış, 100 m'den iyi hassasiyet. Ham konum hiçbir yerde
