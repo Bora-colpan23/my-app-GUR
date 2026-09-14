@@ -10,6 +10,7 @@
 import * as api from "./api.js";
 import * as visits from "./visits.js";
 import * as b2b from "./b2b.js";
+import * as moderation from "./moderation.js";
 import { DEMO_CAMPAIGNS } from "./campaigns.js";
 
 export const { subscribeApi, apiMode, isLive } = api;
@@ -234,8 +235,21 @@ export async function submitClaim(payload) {
   return b2b.submitClaim(payload);
 }
 
-export async function saveOwnerFields(restaurantId, patch) {
-  b2b.saveOwnerProfile(restaurantId, patch);
+/**
+ * İşletmenin girdiği alanlar.
+ *
+ * ARTIK DOĞRUDAN YAYINLANMIYOR: moderasyon kuyruğuna giriyor, yönetici
+ * onaylayınca yayınlanıyor (bkz. src/lib/moderation.js). Eskiden buradan
+ * çıkan her değer aynı saniyede tüketicinin kartındaydı — yanlış adres ya
+ * da uygunsuz açıklama hiçbir kapıdan geçmiyordu.
+ */
+export async function saveOwnerFields(restaurantId, patch, meta = {}) {
+  moderation.submitChange({
+    restaurantId,
+    restaurantName: meta.restaurantName || String(restaurantId),
+    fields: patch,
+    by: "owner",
+  });
   if (isLive() && api.getToken()) {
     // Sunucu alan adları veritabanı sütunları; istemci kısaltmaları eşlenir.
     const map = { name: "name", desc: "description", hours: "hours", phone: "phone", addr: "address" };

@@ -74,6 +74,8 @@ CREATE INDEX user_devices_user_idx ON user_devices (user_id) WHERE push_enabled;
 
 CREATE TYPE ingest_provider AS ENUM ('google_places', 'foursquare', 'tripadvisor', 'osm', 'manual');
 
+CREATE TYPE review_status AS ENUM ('pending', 'approved', 'rejected');
+
 CREATE TABLE restaurants (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name           text NOT NULL,
@@ -98,6 +100,10 @@ CREATE TABLE restaurants (
   -- Sahiplenilmiş kayıtta işletmenin girdiği alanlar dış kaynağı ezer.
   claimed_by_org uuid,
   is_active      boolean NOT NULL DEFAULT true,
+  -- Moderasyon: yayına çıkmadan önce yönetici görür (bkz. migration 003).
+  -- Beslemenin getirdiği yeni kayıt 'pending' yazılır; elle hazırlanan ve
+  -- yöneticinin oluşturduğu kayıtlar doğrudan 'approved'.
+  review_status  review_status NOT NULL DEFAULT 'approved',
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
@@ -421,9 +427,11 @@ CREATE INDEX analytics_events_name_idx ON analytics_events (name, occurred_at DE
 
 -- ─── 9. Gelir, ARPU ve LTV ────────────────────────────────────────────
 
+-- Rezervasyon komisyonu ve işletme aboneliği KALDIRILDI (bkz. migration 002).
+-- Rezervasyon ücretsiz; işletme paket satın almıyor, tek tek ücretli özellik
+-- alıyor. Tüketici aboneliği (GUR Plus) duruyor: user_subscription.
 CREATE TYPE revenue_source AS ENUM
-  ('sponsored_card', 'directions_affiliate', 'reservation_commission',
-   'rewarded_ad', 'user_subscription', 'org_subscription');
+  ('sponsored_card', 'directions_affiliate', 'rewarded_ad', 'user_subscription');
 
 -- Her gelir satırı bir kullanıcıya bağlanır; ARPU doğrudan buradan çıkar.
 CREATE TABLE revenue_events (
@@ -449,7 +457,9 @@ CREATE TABLE user_ltv (
   days_since_signup integer NOT NULL,
   ad_revenue_minor          integer NOT NULL DEFAULT 0,
   subscription_revenue_minor integer NOT NULL DEFAULT 0,
-  commission_revenue_minor  integer NOT NULL DEFAULT 0,
+  -- Harita iştirak geliri. Eskiden komisyonla aynı kovadaydı; rezervasyon
+  -- komisyonu kaldırılınca kovada yalnızca bu kaldı (bkz. migration 002).
+  affiliate_revenue_minor   integer NOT NULL DEFAULT 0,
   referred_gmv_minor        integer NOT NULL DEFAULT 0,
   ltv_minor         integer NOT NULL DEFAULT 0,
   arpu_minor        integer NOT NULL DEFAULT 0,   -- ltv / aktif ay

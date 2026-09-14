@@ -116,14 +116,14 @@ ON CONFLICT (cohort_week) DO UPDATE
 -- Böylece yeni kullanıcı, uzun süredir üye olanla aynı ölçekte karşılaştırılır.
 INSERT INTO user_ltv (
   user_id, computed_at, days_since_signup,
-  ad_revenue_minor, subscription_revenue_minor, commission_revenue_minor,
+  ad_revenue_minor, subscription_revenue_minor, affiliate_revenue_minor,
   referred_gmv_minor, ltv_minor, arpu_minor,
   sponsored_views, total_swipes, directions_taken, visits_confirmed)
 WITH rev AS (
   SELECT user_id,
          sum(amount_minor) FILTER (WHERE source IN ('sponsored_card','rewarded_ad'))            AS ad_rev,
          sum(amount_minor) FILTER (WHERE source = 'user_subscription')                          AS sub_rev,
-         sum(amount_minor) FILTER (WHERE source IN ('reservation_commission','directions_affiliate')) AS com_rev,
+         sum(amount_minor) FILTER (WHERE source = 'directions_affiliate')                       AS aff_rev,
          sum(gmv_minor)                                                                          AS gmv,
          sum(amount_minor)                                                                       AS total
   FROM revenue_events
@@ -149,7 +149,7 @@ SELECT u.id,
        greatest(extract(day FROM now() - u.created_at)::integer, 0),
        coalesce(r.ad_rev, 0),
        coalesce(r.sub_rev, 0),
-       coalesce(r.com_rev, 0),
+       coalesce(r.aff_rev, 0),
        coalesce(r.gmv, 0),
        coalesce(r.total, 0),
        (coalesce(r.total, 0)::numeric
@@ -167,7 +167,7 @@ ON CONFLICT (user_id) DO UPDATE SET
   days_since_signup          = EXCLUDED.days_since_signup,
   ad_revenue_minor           = EXCLUDED.ad_revenue_minor,
   subscription_revenue_minor = EXCLUDED.subscription_revenue_minor,
-  commission_revenue_minor   = EXCLUDED.commission_revenue_minor,
+  affiliate_revenue_minor    = EXCLUDED.affiliate_revenue_minor,
   referred_gmv_minor         = EXCLUDED.referred_gmv_minor,
   ltv_minor                  = EXCLUDED.ltv_minor,
   arpu_minor                 = EXCLUDED.arpu_minor,

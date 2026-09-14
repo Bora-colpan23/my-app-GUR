@@ -21,7 +21,9 @@ import { I, RESTAURANTS, CATEGORIES, fetchLiveRestaurants, findOwnerRestaurant, 
 import { Sheet, DangerConfirm, Chip } from '../ui/sheets.jsx';
 import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
-import { usePlatformSettings, useFeature } from '../lib/platform.js';
+import { usePlatformSettings, useFeature, visibleRestaurants } from '../lib/platform.js';
+import { useModeration, publishedOnly, markVenuePending } from '../lib/moderation.js';
+import * as secondChance from '../lib/second-chance.js';
 import * as reservations from '../lib/reservations.js';
 import * as pricing from '../lib/pricing.js';
 import * as geo from '../lib/geo.js';
@@ -2025,12 +2027,45 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   // sunucu da çağırıyor (shared/deck.js) — yerleşim hissi iki tarafta
   // birebir aynı olsun diye. Sponsorlu kart mesafeye BAKMAZ: reklamveren
   // uzakta diye elenmez, sırasını açık artırma ve boşluk kuralı belirler.
+  // ─── SATIN ALINMIŞ İKİNCİ ŞANS ───
+  //
+  // Kullanıcının SOLA kaydırdığı ve o mekanın aktif paketi olan kayıtlar
+  // desteye geri giriyor. Organik havuzun içine değil ARKASINA ekleniyor:
+  // kullanıcı bir kez "hayır" demiş, önce hiç görmediklerini görsün.
+  //
+  // Kesişim şart: paket aktif olsa bile kullanıcı o mekanı hiç geçmemişse
+  // hedefte değil — hiç görmemiş kişiye "ikinci şans" diye bir şey yok.
+  // Seçim OTURUM BAŞINDA DONDURULUYOR — ve bu şart.
+  //
+  // Canlı hesaplansaydı şu olurdu: kart en üste gelir, gösterim kaydedilir,
+  // depo değişir, `candidatesFor` "bugün gösterildi" deyip kartı listeden
+  // düşürür ve kart daha kullanıcı görmeden desteden silinir. Sayaç ilerler,
+  // restoran parasını öder, kullanıcı hiçbir şey görmez.
+  //
+  // Bu yüzden aday listesi bir kez alınıp ref'te tutuluyor; deste yeniden
+  // kurulsa da (kategori değişimi, veri tazelenmesi) aynı kimlikler kalıyor.
+  const scState = secondChance.useSecondChance();
+  const scDondurulmus = useRef(null);
+  if (scDondurulmus.current === null) {
+    scDondurulmus.current = secondChance.candidatesFor(secondChance.passedIds(), "demo", scState);
+  }
+  const geriGelenler = useMemo(() => {
+    const idler = scDondurulmus.current;
+    if (!idler.length) return [];
+    const set = new Set(idler);
+    // Geri gelen kart organik listede zaten varsa iki kez çıkmasın.
+    const zatenVar = new Set(organic.map(r => String(r.id)));
+    return inCategory
+      .filter(r => set.has(String(r.id)) && !zatenVar.has(String(r.id)))
+      .map(r => ({ ...r, secondChance: true }));
+  }, [inCategory, organic]);
+
   const allCards = useMemo(
-    () => buildDeck(organic, campaigns, {
+    () => buildDeck([...organic, ...geriGelenler], campaigns, {
       seed: `${filterCat || "all"}:${new Date().toISOString().slice(0, 10)}`,
       seenCampaigns: seenAds,
     }),
-    [organic, campaigns, filterCat, seenAds]
+    [organic, geriGelenler, campaigns, filterCat, seenAds]
   );
 
   const [idx, setIdx] = useState(0);
@@ -2135,6 +2170,10 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   const left = () => {
     const r = deck[cursor];
     if (r && !encore) setPassed(p => (p.find(x => x.id === r.id) ? p : [...p, r]));
+    // Oturum içi tur `passed`ten besleniyor; SATIN ALINAN paketin hedef
+    // kitlesi ise kalıcı kayıttan. İkisi ayrı: biri bu oturumda, diğeri
+    // günler sonra başka bir oturumda iş görüyor.
+    if (r) secondChance.recordPass(r.id);
     sync(r, "left");
     show("Geçildi", "nope");
     next();
@@ -2146,6 +2185,13 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   const topCard = deck[cursor];
   useEffect(() => {
     if (!done && topCard?.sponsored?.campaignId) markShown(topCard.sponsored.campaignId);
+  }, [topCard, done]);
+
+  // Satın alınmış İkinci Şans kartı da EKRANDA GÖRÜNDÜĞÜ an sayılır.
+  // Kota "200 farklı kullanıcı" demek; aynı kullanıcı aynı gün ikinci kez
+  // görürse sayaç ilerlemiyor (kural second-chance.js içinde).
+  useEffect(() => {
+    if (!done && topCard?.secondChance) secondChance.recordImpression(topCard.id, "demo");
   }, [topCard, done]);
 
   // Kaydırma ilerledikçe hangi halkadayız — kullanıcı yarıçapın büyüdüğünü
@@ -3814,6 +3860,7 @@ export default function GurApp(props = {}) {
   const [matchResults, setMatchResults] = useState([]);
   // Yönetici panelinin açıp kapattığı özellik kapıları (src/lib/platform.js).
   const platform = usePlatformSettings();
+  const modState = useModeration();
   // Kullanıcının yazdığı yorumlar restoran id'sine göre — hem restoran
   // detayında hem profildeki "Yorumlarım" listesinde aynı kaynaktan okunur
   const [userReviews, setUserReviews] = useState({});
@@ -3853,27 +3900,48 @@ export default function GurApp(props = {}) {
     () => claimedRestaurant || findOwnerRestaurant(restaurants),
     [restaurants, claimedRestaurant]
   );
-  // Tüketici tarafındaki her ekran bu türetilmiş listeden beslenir
+  // Tüketici tarafındaki her ekran bu türetilmiş listeden beslenir.
+  //
+  // Gizleme süzgeci BURADA, tek yerde: deste, arama, kategori sayıları,
+  // favoriler ve GUR Match hepsi `feed`'den besleniyor. Ekran ekran
+  // süzmek, eklenecek bir sonraki ekranda unutulacak bir kural olurdu.
+  // İki ayrı süzgeç, iki ayrı soru:
+  //   publishedOnly  → bu kayıt yönetici onayından geçti mi (moderasyon)
+  //   visibleRestaurants → onaylı ama elle gizlenmiş mi (görünürlük anahtarı)
+  // Birleştirmek yanlış olurdu: "henüz onaylanmadı" ile "onaylandı ama
+  // yayından kaldırıldı" farklı durumlar ve farklı ekranlarda yönetiliyor.
   const feed = useMemo(
-    () => withOwnerMedia(restaurants, ownerRestaurant?.id, ownerMedia)
+    () => visibleRestaurants(
+      publishedOnly(withOwnerMedia(restaurants, ownerRestaurant?.id, ownerMedia), modState),
+      platform)
       .map(r => applyOwnerProfile(r, ownerProfiles)),
-    [restaurants, ownerRestaurant, ownerMedia, ownerProfiles]
+    [restaurants, ownerRestaurant, ownerMedia, ownerProfiles, platform, modState]
   );
 
   // Veri kaynağı sırası: kendi sunucumuz → Overpass → mock.
   // Kendi sunucumuz varsa oradaki kayıt otoritedir; sahiplenilmiş
   // işletmelerin girdiği bilgiler yalnızca orada.
+  // Beslemeden gelen mekan doğrudan yayına girmiyor: tohum listede
+  // OLMAYAN her kayıt moderasyon kuyruğuna "bekliyor" olarak düşüyor.
+  // Tohumun kendisi onaylı sayılıyor — elle hazırlanmış kayıtlar zaten
+  // denetimden geçmiş, aksi hâlde havuz bir gecede boşalırdı.
+  const kuyrugaAl = (list) => {
+    const tohum = new Set(RESTAURANTS.map(r => String(r.id)));
+    for (const r of list) if (!tohum.has(String(r.id))) markVenuePending(r);
+    return list;
+  };
+
   useEffect(() => {
     let cancelled = false;
     if (session.mode === "live") {
       backend.loadRestaurants({ lat: 41.0082, lng: 28.9784 })
-        .then(list => { if (!cancelled && list?.length) { setRestaurants(list); setDataSource("api"); } })
+        .then(list => { if (!cancelled && list?.length) { setRestaurants(kuyrugaAl(list)); setDataSource("api"); } })
         .catch(() => { /* mock veri zaten yüklü */ });
       return () => { cancelled = true; };
     }
     if (session.mode !== "local") return;   // ölçüm bitmeden dış API'ye gitme
     fetchLiveRestaurants()
-      .then(list => { if (!cancelled) { setRestaurants(list); setDataSource("live"); } })
+      .then(list => { if (!cancelled) { setRestaurants(kuyrugaAl(list)); setDataSource("live"); } })
       .catch(() => { /* mock veri zaten yüklü */ });
     return () => { cancelled = true; };
   }, [session.mode]);

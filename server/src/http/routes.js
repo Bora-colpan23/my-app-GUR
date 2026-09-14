@@ -11,6 +11,7 @@ import { issueToken } from "../auth/session.js";
 import { verifyPassword } from "../auth/password.js";
 import { signInWithProvider } from "../auth/social.js";
 import { getDeck, recordSwipe, grantRewardBonus } from "../swipe/deck.js";
+import { purchasePackage, cancelPackage, secondChanceFor, recordImpression as recordScImpression } from "../swipe/second-chance.js";
 import { ingestLocationSample, reviewPermission, submitVerifiedReview, closeStaleVisits } from "../visits/tracker.js";
 import { logBatch, trackDirections, trackReservation } from "../analytics/events.js";
 import { cohortTable, platformArpu } from "../analytics/rollup.js";
@@ -279,11 +280,68 @@ export function buildRouter() {
     return { ok: true };
   }, { auth: true });
 
+  // Rezervasyon ücretsiz: komisyon alınmıyor, yalnızca yönlendirilen ciro
+  // etki ölçümü için loglanıyor. Yanıtta komisyon alanı yok — istemcinin
+  // okuyup göstereceği bir tutar kalmadı.
+  //
+  // ÜYELİK KAPISI SUNUCUDA DA VAR. Masa ayırtmak işletmenin taahhüdü;
+  // kaydını sahiplenmemiş bir mekan adına söz veremeyiz. Arayüzde düğme
+  // zaten çıkmıyor ama yalnız arayüzde engellemek kapı sayılmaz — uç
+  // doğrudan çağrılabilir.
   r.post("/api/reservations", async ({ db, body, user }) => {
-    const commission = await trackReservation(db, user.sub, asUuid(body.restaurantId, "restaurantId"), {
+    const restaurantId = asUuid(body.restaurantId, "restaurantId");
+    const { rows } = await db.query(
+      "SELECT claimed_by_org FROM restaurants WHERE id = $1 AND is_active", [restaurantId]);
+    if (!rows.length) throw bad("Restoran bulunamadı", 404);
+    if (!rows[0].claimed_by_org) {
+      throw bad("Bu mekan kaydını henüz sahiplenmedi; masa ayırtma yalnızca üye işletmelerde açık.", 409);
+    }
+    await trackReservation(db, user.sub, restaurantId, {
       gmvMinor: Number(body.gmvMinor) || 0,
     });
-    return { ok: true, commissionMinor: commission };
+    return { ok: true };
+  }, { auth: true });
+
+  // ─── İkinci Şans paketi ────────────────────────────────────────────
+  //
+  // Satın alma ve iptal İŞLETMEYE ait; yönetici teklifi ayrı bir akış
+  // (fiyatlandırma). Uç yetkilendirilmiş: paketi kimin aldığı belirteçten
+  // okunuyor, gövdeden değil.
+
+  r.post("/api/second-chance", async ({ db, body, user }) => {
+    const restaurantId = asUuid(body.restaurantId, "restaurantId");
+    const { rows } = await db.query(
+      "SELECT claimed_by_org FROM restaurants WHERE id = $1 AND is_active", [restaurantId]);
+    if (!rows.length) throw bad("Restoran bulunamadı", 404);
+    // Paketi ancak kaydını sahiplenmiş işletme alabilir: sahipsiz mekan
+    // adına satın alma yapılamaz.
+    if (!rows[0].claimed_by_org) throw bad("Paket yalnızca sahiplenilmiş kayıtlar için alınabilir.", 409);
+    const pkg = await purchasePackage(db, {
+      restaurantId, orgId: rows[0].claimed_by_org,
+      priceMinor: Number(body.priceMinor) || undefined,
+    });
+    return { ok: true, package: pkg };
+  }, { auth: true });
+
+  r.del("/api/second-chance/:id", async ({ db, params }) => {
+    const p = await cancelPackage(db, asUuid(params.id, "id"));
+    if (!p) throw bad("Aktif paket bulunamadı", 404);
+    return { ok: true, package: p };
+  }, { auth: true });
+
+  // Kullanıcının destesine geri girecek mekanlar. İstemci bunları
+  // organik akışın ARKASINA ekliyor — kullanıcı bir kez "hayır" demiş,
+  // önce hiç görmediklerini görsün.
+  r.get("/api/second-chance/deck", async ({ db, user }) => {
+    const rows = await secondChanceFor(db, user.sub);
+    return { restaurants: rows };
+  }, { auth: true });
+
+  // Kart EKRANDA GÖRÜNDÜĞÜ an sayılır; deste kurulurken saymak görülmeyen
+  // kartı da harcamak olurdu.
+  r.post("/api/second-chance/:id/impression", async ({ db, params, user }) => {
+    const sonuc = await recordScImpression(db, asUuid(params.id, "id"), user.sub);
+    return { ok: true, progress: sonuc };
   }, { auth: true });
 
   // ─── B2B: sahiplenme ───────────────────────────────────────────────

@@ -113,6 +113,40 @@ export function storeOverrides(storeId) {
   return getSettings().storeOverrides?.[String(storeId)] || {};
 }
 
+// ─── RESTORAN GÖRÜNÜRLÜĞÜ ────────────────────────────────────────────
+//
+// Tek bir mekanı tüketici uygulamasından TAMAMEN gizler. Özellik
+// kapılarından ayrı tutuluyor çünkü farklı bir şey söylüyor: kapılar
+// "bu mekanda şu özellik yok" der, bu ise "bu mekan yok" der.
+//
+// Ayarlar sayfasında DEĞİL, restoranın kendi detay ekranında: genel bir
+// listede yanlış satıra basmak bir mekanı sessizce uygulamadan
+// düşürürdü.
+//
+// Gizli mekan destede, aramada, listede ve kategori sayımlarında yok;
+// kaydı silinmiyor, işletme paneli çalışmaya devam ediyor.
+const HIDDEN = "hiddenFromApp";
+
+export function isRestaurantHidden(storeId, settings = getSettings()) {
+  return (settings.storeOverrides?.[String(storeId)] || {})[HIDDEN] === true;
+}
+
+export function setRestaurantHidden(storeId, hidden) {
+  const all = { ...(getSettings().storeOverrides || {}) };
+  const forStore = { ...(all[String(storeId)] || {}) };
+  if (hidden) forStore[HIDDEN] = true;
+  else delete forStore[HIDDEN];
+  if (Object.keys(forStore).length) all[String(storeId)] = forStore;
+  else delete all[String(storeId)];
+  return setSettings({ storeOverrides: all });
+}
+
+/** Listeyi süz: gizlenen mekanlar tüketici tarafında hiç görünmez. */
+export function visibleRestaurants(list = [], settings = getSettings()) {
+  const ov = settings.storeOverrides || {};
+  return list.filter(r => (ov[String(r.id)] || {})[HIDDEN] !== true);
+}
+
 export function setStoreFeature(storeId, key, enabled) {
   const all = { ...(getSettings().storeOverrides || {}) };
   const forStore = { ...(all[String(storeId)] || {}) };

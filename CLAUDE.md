@@ -18,9 +18,18 @@ Ana farklılaştırıcılar:
 
 Gelir modeli tek ve bütüncül bir sistemdir — **aşamalı faz yapısı kaldırıldı**:
 - Organik akışa harmanlanan sponsorlu kartlar (CPC/CPE açık artırma)
-- İşletme abonelikleri (Ücretsiz / Premium / Pro)
-- Rezervasyon ve anlık fırsat komisyonu
+- İşletmenin **tek tek satın aldığı** ücretli özellikler (banner, push, ödüllü
+  video, anlık fırsat, İkinci Şans paketi, Gastro şef videosu)
 - Ödüllü video reklam ve GUR Plus tüketici aboneliği
+
+**İŞLETME ABONELİĞİ YOK.** Premium / Pro / Ücretsiz kademesi kaldırıldı; bir
+işletmenin ödediği tutarın tamamı satın aldığı kalemlerden gelir. Plana bağlı
+"tam görünürlük / öncelikli yerleşim" diye bir mekanizma da yok — görünürlük
+tek yerden yönetiliyor (restoran bazlı görünürlük anahtarı).
+
+**REZERVASYON KOMİSYONU YOK.** Masa ayırtma tamamen ücretsiz ve yalnızca
+kaydını **sahiplenmiş** işletmelerde açık: sahipsiz bir mekan adına söz
+veremeyiz. Kapı hem arayüzde hem sunucuda (`POST /api/reservations`).
 
 Ürün dört arayüzden oluşur:
 1. **Tüketici mobil uygulaması** — keşif, kaydırma, detay sayfası, favoriler, profil
@@ -74,6 +83,7 @@ gur/
 ├── index.html                 # Giriş; fontlar bloke etmeden yüklenir
 ├── shared/                    # İSTEMCİ VE SUNUCUNUN ORTAK KULLANDIĞI SAF MODÜLLER
 │   ├── deck.js                # buildDeck / rankCampaigns / quotaState
+│   ├── second-chance.js       # paket kotası ve günlük tekrar engeli
 │   └── deeplink.js            # harita derin bağlantıları, Haversine
 ├── server/                    # Node tarafı (bkz. server/README.md)
 │   ├── index.js               # giriş: HTTP + cron + ilk besleme
@@ -101,6 +111,8 @@ gur/
     │   ├── badges.js          # rozet kataloğu + atamalar (Gastro + editoryal)
     │   ├── invites.js         # havuz daveti: kanal seçimi + mailto taslağı
     │   ├── geo.js             # konum izni, elle ilçe seçimi, başlangıç noktası
+    │   ├── moderation.js      # yayın öncesi onay kuyruğu (mekan + alan değişikliği)
+    │   ├── second-chance.js   # haftalık yeniden gösterim paketi + geçilenler
     │   └── social-auth.js     # Google / Apple ile giriş
     ├── app/GurApp.jsx         # Tüketici uygulaması
     ├── business/GurBusiness.jsx  # Doyurucu: işletme uygulaması
@@ -123,6 +135,8 @@ yazıyorlar. Bağ ekranlarda değil depolarda:
 | `lib/badges.js` | yönetici (editoryal rozet) | tüketici kartı, kaydırma, detay |
 | `lib/invites.js` | yönetici (havuz daveti) | yönetici havuz listesi |
 | `lib/geo.js` | tüketici (izin / seçilen ilçe) | deste sıralaması, konum çipi |
+| `lib/moderation.js` | işletme + besleme → yönetici (karar) | tüketici destesi |
+| `lib/second-chance.js` | işletme (paket) + tüketici (gösterim) | deste kurulumu, işletme paneli |
 | `data/restaurants.js` | tohum/besleme | üçü de |
 
 Bir mekanın kimliği tek yerde: `account` alanı işletmenin hesabı olup
@@ -601,6 +615,106 @@ kartlar tek bir görselmiş gibi birbirine morph olur. `layoutId` karusel
 ikisi aynı düğümde olsaydı morph ile karusel kaydırması aynı transform
 üzerinde çakışırdı.
 
+### Moderasyon: yayına çıkmadan önce yönetici görür
+Önceden iki yol da denetimsizdi — beslemenin getirdiği yeni mekan anında
+listedeydi, işletmenin girdiği alan anında karttaydı. Artık ikisi de kuyruğa
+düşüyor (`src/lib/moderation.js`, sunucuda migration 003).
+
+**İki ayrı şey, iki ayrı yer** — tek tabloda tutmak "mekan bekliyor" ile
+"mekanın telefonu bekliyor" durumlarını karıştırırdı:
+
+| Ne | Nerede | Kim karar verir |
+|---|---|---|
+| Kayıt yayında mı | `venues` / `restaurants.review_status` | Moderasyon sayfası |
+| Yayındaki kaydın nesi değişecek | `changes` / `restaurant_change_requests` | Moderasyon sayfası |
+
+**Mevcut kayıtlar ONAYLI sayılır.** Varsayılanı "bekliyor" yapmak havuzu bir
+gecede boşaltırdı; yalnızca beslemenin GETİRDİĞİ yeni kayıt beklemeye düşer
+(`markVenuePending`, tohum listesiyle karşılaştırarak).
+
+Yönetici onaylarken **düzenleyebilir**: gelen metni olduğu gibi kabul etmek
+zorunda değil, düzelttiği hâl yayınlanır ve kayıtta `edited` izi kalır.
+İşletme panelinde alan rozetinin üçüncü hâli bunu söylüyor: **İNCELEMEDE**
+(onaylanmamış bir değere "İŞLETMEDEN" demek yalan olurdu).
+
+Bir mekanın aynı anda **tek bekleyen talebi** olur — işletme formu üç kez
+kaydederse yöneticinin önüne üç iş değil son hâl çıkar. Sunucuda kısmi tekil
+indeksle zorlanıyor.
+
+**Elle restoran oluşturma** (Moderasyon sayfası → "Restoran oluştur")
+sahiplenme akışını atlar ve doğrudan yayınlanır: yönetici zaten onaylayan
+merci, kendi kaydını kendi kuyruğuna atmak boş bir tur olurdu. Kayıt
+**sahiplenilmemiş** açılır (havuza düşer, müşteri listesine değil).
+
+### Restoran bazlı görünürlük anahtarı
+Tek bir mekanı tüketici uygulamasından **tamamen** gizler
+(`platform.js` → `setRestaurantHidden`). Özellik kapılarından ayrı bir kart:
+kapılar "bu mekanda şu özellik yok" der, bu "bu mekan yok" der.
+
+Ayarlar sayfasında **değil**, restoranın kendi detay ekranında — genel bir
+listede yanlış satıra basmak bir mekanı sessizce uygulamadan düşürürdü.
+
+Süzgeç tüketici tarafında **tek yerde** (`GurApp` → `feed`): deste, arama,
+kategori sayıları, favoriler ve GUR Match hepsi oradan besleniyor. İki ayrı
+süzgeç arka arkaya ve ikisi ayrı soru soruyor:
+`publishedOnly` (moderasyondan geçti mi) → `visibleRestaurants` (gizlendi mi).
+
+### İkinci Şans: ücretsiz mekanik + satın alınan paket
+İki ayrı şey, karıştırmayın:
+
+- **Oturum içi tur (ücretsiz)** — deste bitti, geçtiklerine bir daha bak.
+  Eskiden beri var, kaldırılmadı, kimseye para kazandırmıyor.
+- **Haftalık paket (ücretli)** — restoran ödüyor ve kendisini **sola
+  kaydırmış** kullanıcıların destesine geri giriyor. Başka gün, başka
+  oturum, başka kullanıcı.
+
+Paket kuralları `shared/second-chance.js`de (istemci ve sunucu ortak; ayrı
+yazılsaydı sunucu paketi bitmiş sayarken istemci göstermeye devam ederdi):
+
+| Kural | Değer |
+|---|---|
+| Erişim | **200 farklı kullanıcı** (gösterim sayısı değil) |
+| Süre | 7 gün — ama **kotayla biter**, süreyle değil |
+| Aynı kullanıcıya | günde en fazla 1 kez |
+| Restoran başına | aynı anda **tek aktif paket** |
+
+Hedefleme: yalnızca o restoranı **sola kaydırmış** kullanıcı. Hiç görmemiş
+kişiye "ikinci şans" diye bir şey yok — o zaten organik akışta görecek.
+Kart organik havuzun **arkasına** ekleniyor: kullanıcı bir kez "hayır"
+demiş, önce hiç görmediklerini görsün.
+
+**Aday listesi oturum başında DONDURULUYOR** (`scDondurulmus` ref'i) ve bu
+şart. Canlı hesaplansaydı: kart en üste gelir → gösterim kaydedilir → depo
+değişir → `candidatesFor` "bugün gösterildi" deyip kartı düşürür → kart
+kullanıcı görmeden desteden silinir. Sayaç ilerler, restoran öder, kullanıcı
+hiçbir şey görmez. Bu hata geliştirme sırasında gerçekten oluştu.
+
+Mekan o oturumda zaten **organik** çıkıyorsa paket tüketilmiyor: kullanıcının
+zaten göreceği kart için para almıyoruz (`zatenVar` kontrolü).
+
+Sunucu karşılığı: `second_chance_packages` + `second_chance_impressions`
+(migration 004). Tek aktif paket kuralı kısmi tekil indeksle veritabanı
+seviyesinde zorlanıyor — uygulama katmanında kontrol yarış koşulunda yetmez.
+
+### Yönetici paneli: Hizmetler ve arama
+**Hizmetler** sayfası sattığımız her kalemi tek listede gösteriyor: kaç
+müşteride açık, aylık ne getiriyor, kaç teklif havada. Önceden "banner'ı
+kimler almış" sorusunun cevabı yoktu — ciro sayfası toplam veriyordu,
+restoranları tek tek gezmek gerekiyordu. Satırdaki "Teklifler" o hizmetin
+fiyatlandırma sekmesine götürüyor.
+
+**Fiyatlandırma** sayfasında her hizmetin kendi sekmesi var. Sekmedeki sayı
+o hizmet için BEKLEYEN teklif. Sekme seçiliyken liste "o hizmeti alanlar +
+o hizmet için teklif gönderilmiş olanlar"a daralıyor — ikincisi şart, yoksa
+takip etmen gereken tam kişi (teklif gönderdiğin ama henüz almamış müşteri)
+listeden düşerdi.
+
+**Arama** tek bileşen (`SearchBar`) ama her sayfa **kendi alanında** arıyor;
+hangi sayfada ne arandığı `SEARCHABLE` tablosunda. Arama olmayan sayfada
+kutu **hiç çizilmiyor**: çalışmayan bir arama kutusu, olmayan aramadan
+kötüdür. Sayfa değişince sorgu temizleniyor — "pizza" arayıp başka sayfaya
+geçip dönünce boş liste görüp "bozuk" sanmanın önüne geçiyor.
+
 ### Konum doğrulamalı ziyaret
 `src/lib/visits.js` ve `server/src/visits/tracker.js` **aynı kuralları** taşır:
 120 m yarıçap, 15 dk kalış, 100 m'den iyi hassasiyet. Ham konum hiçbir yerde
@@ -642,7 +756,7 @@ Google Places + Foursquare + Tripadvisor + OSM'den cron ile beslenir.
   istemcisinde taslak açıyor; sunucudan giden posta yok. Ayrıca Google
   Places API e-posta alanı döndürmüyor — adresler OSM etiketlerinden
   geliyor ve çoğu kayıtta yok.
-- **Ödeme entegrasyonu yok** (iyzico/Stripe). GUR Plus ve işletme abonelikleri
+- **Ödeme entegrasyonu yok** (iyzico/Stripe). GUR Plus ve ücretli özellikler
   arayüzde var, tahsilat yok.
 - Yasal metinlerdeki işletme bilgileri yer tutucu; yayına çıkmadan doldurulmalı.
 - Artifact önizlemesi tanımı gereği YEREL modda çalışır: statik tek dosya,

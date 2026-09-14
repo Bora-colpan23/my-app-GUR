@@ -61,14 +61,18 @@ export async function trackDirections(db, userId, restaurantId, { provider, affi
   }
 }
 
-/** Rezervasyon tamamlandı: komisyon ve yönlendirilen ciro ayrı ayrı loglanır. */
-export async function trackReservation(db, userId, restaurantId, { gmvMinor, commissionRate = 0.08 }) {
-  const commission = Math.round(gmvMinor * commissionRate);
+/**
+ * Rezervasyon tamamlandı.
+ *
+ * KOMİSYON KALDIRILDI. Eskiden burada aracılık edilen cironun %8'i
+ * `revenue_events`'e `reservation_commission` olarak yazılıyordu; artık
+ * rezervasyon tamamen ücretsiz ve platform ondan gelir elde etmiyor.
+ *
+ * Olayın kendisi loglanmaya devam ediyor: yönlendirilen ciro (`gmvMinor`)
+ * hem işletmeye "GUR sana ne getirdi" diye göstermek hem de kohort/LTV
+ * girdisi olarak lazım. Gelir kaydı değil, ETKİ kaydı.
+ */
+export async function trackReservation(db, userId, restaurantId, { gmvMinor }) {
   await logEvent(db, { userId, name: "reservation_complete", restaurantId, props: { gmvMinor } });
-  await db.query(
-    `INSERT INTO revenue_events (user_id, restaurant_id, source, amount_minor, gmv_minor)
-     VALUES ($1,$2,'reservation_commission',$3,$4)`,
-    [userId, restaurantId, commission, gmvMinor]
-  );
-  return commission;
+  return 0;
 }

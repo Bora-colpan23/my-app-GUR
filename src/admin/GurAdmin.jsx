@@ -3,10 +3,11 @@ import { useClaims, decideClaim, useOwnerProfiles, ownerLogo } from '../lib/b2b.
 
 import * as api from '../lib/api.js';
 import { motion, AnimatePresence } from 'motion/react';
-import { usePlatformSettings, toggleSetting, setStoreFeature, FEATURES, PER_STORE_FEATURES } from '../lib/platform.js';
+import { usePlatformSettings, toggleSetting, setStoreFeature, setRestaurantHidden, isRestaurantHidden, FEATURES, PER_STORE_FEATURES } from '../lib/platform.js';
 import * as pricing from '../lib/pricing.js';
 import { ASSIGNABLE, badgesOf, toggleBadge, useBadgeMap } from '../lib/badges.js';
 import { channelOf, inviteOf, sendInvite, useInvites } from '../lib/invites.js';
+import { useModeration, pendingChanges, pendingVenues, approveChange, rejectChange, decideVenue } from '../lib/moderation.js';
 
 // ═══════════════════════════════════════════════════════════════
 // GUR YÖNETİCİ PANELİ — Platform kontrol merkezi
@@ -366,7 +367,9 @@ const REVENUE_STREAMS = [
   { key: 'bannerAds', short: 'Banner', name: 'Dönen keşfet banner\'ı', kind: 'Reklam', monthly: 128000, unit: '42 aktif kampanya', note: 'Keşfet ekranının üstündeki marka + sponsor karuseli.' },
   { key: 'pushAds', short: 'Push', name: 'Push bildirim reklamları', kind: 'Reklam', monthly: 74000, unit: '41 gönderim / ay', note: 'Semt bazlı tek seferlik bildirim satışı.' },
   { key: 'rewardedAds', short: 'Ödüllü video', name: 'Ödüllü video reklam (kaydırma hakkı)', kind: 'Sponsorluk', monthly: 96000, unit: '~%78 tamamlanma', note: '10 kaydırma sonrası izlenen video, +5 hak kazandırır.' },
-  { key: 'secondChance', short: 'İkinci Şans', name: 'İkinci Şans yerleşimi', kind: 'Performans', monthly: 41000, unit: '86 restoran', note: 'Geçilen restoranın desteye geri girmesi.' },
+  // Haftalık paket, süreyle değil KOTAYLA biter: 200 farklı kullanıcıya
+  // gösterim. Restoran başına aynı anda tek paket (bkz. shared/second-chance.js).
+  { key: 'secondChance', short: 'İkinci Şans', name: 'İkinci Şans paketi (haftalık)', kind: 'Performans', monthly: 41000, unit: '200 kullanıcı / paket', note: 'Restoranı SOLA kaydırmış 200 farklı kullanıcının destesine geri ekler. Aynı kullanıcıya günde bir kez; kota bitince paket kapanır.' },
   { key: 'instantDeals', short: 'Anlık fırsat', name: 'Anlık fırsat bildirimleri', kind: 'Performans', monthly: 63000, unit: '140 yayın / ay', note: 'Ölü saat doldurma; yayın başına ücret.' },
   // Şef videosu ile içerik lisansı tek pakettir: video çekilmeden lisanslanacak
   // içerik yok, çekildiğinde de zaten restorana devrediliyor. Bu paketi alan
@@ -379,14 +382,17 @@ const KIND_TONE = live({
   'Performans': () => C.green, 'İçerik': () => C.red,
 });
 
-// İşletme abonelik paketleri. Adetler STATS.totalRestaurants ile uyumlu.
-const PLANS = [
-  { id: 'Premium', price: 4999, count: 42,  get color() { return C.orangeInk; } },
-  { id: 'Pro',     price: 1999, count: 118, get color() { return C.blue; } },
-  { id: 'Ücretsiz', price: 0,   count: 182, get color() { return C.faint; } },
-];
-const PLAN_COLOR = live(Object.fromEntries(PLANS.map(p => [p.id, () => p.color])));
-const PLAN_PRICE = Object.fromEntries(PLANS.map(p => [p.id, p.price]));
+// İŞLETME ABONELİĞİ KALDIRILDI (Premium / Pro / Ücretsiz).
+//
+// Platform artık paket satmıyor: bir işletmenin ödediği tutarın tamamı
+// satın aldığı ÜCRETLİ ÖZELLİKLERDEN geliyor (REVENUE_STREAMS +
+// STORE_SERVICES). "Plan" diye bir kademe yok, dolayısıyla plana bağlı
+// "tam görünürlük / öncelikli yerleşim" de yok — görünürlük artık tek bir
+// yerden yönetiliyor: restoran bazlı görünürlük anahtarı
+// (`hiddenFromApp`, bkz. RestaurantDetailPage → StoreFeatures).
+//
+// Kayıtlardaki `plan` alanı okunmuyor; sunucudaki subscriptions tablosu da
+// bu kaldırmayla birlikte kullanım dışı.
 const STREAM_BY_KEY = Object.fromEntries(REVENUE_STREAMS.map(x => [x.key, x]));
 
 // Hangi müşteri hangi ücretli özelliği almış. monthly: o işletmenin o kalem
@@ -444,16 +450,17 @@ function storeServices(r) {
 function storeServiceRevenue(r) {
   return storeServices(r).reduce((a, x) => a + x.monthly, 0);
 }
-/** Abonelik + hizmet: mağazanın platforma aylık toplam katkısı. */
+/** Mağazanın platforma aylık katkısı — tamamı satın aldığı ücretli
+ *  özelliklerden. Abonelik kaldırıldığı için ikinci bir kalem yok. */
 function storeMonthly(r) {
-  return (PLAN_PRICE[r.plan] || 0) + storeServiceRevenue(r);
+  return storeServiceRevenue(r);
 }
 
 // Katalogdaki her kalemin platform geneli aylık toplamı; adı geçen sekiz
 // müşteri bu toplamın içinden çıkar, kalanı "diğer işletmeler" satırıdır.
 const STREAM_TOTAL = REVENUE_STREAMS.reduce((a, x) => a + x.monthly, 0);
-const SUBS_TOTAL = PLANS.reduce((a, p) => a + p.price * p.count, 0);
-const PLATFORM_TOTAL = STREAM_TOTAL + SUBS_TOTAL;
+// Abonelik kalemi kaldırıldı: platform cirosunun tamamı ücretli özelliklerden.
+const PLATFORM_TOTAL = STREAM_TOTAL;
 
 const APPLICATIONS = [
   { id: 101, name: 'Balıkçı Deniz', cat: 'Deniz Ürünleri', district: 'Sarıyer', owner: 'Deniz Yılmaz', taxNo: '4820193756', taxOffice: 'Sarıyer VD', submitted: '2 saat önce', docStatus: 'yüklendi' },
@@ -667,6 +674,7 @@ const icons = {
   // güneş (aydınlığa dön), açıktayken ay.
   sun: <><circle cx="12" cy="12" r="4" /><line x1="12" y1="2" x2="12" y2="5" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="2" y1="12" x2="5" y2="12" /><line x1="19" y1="12" x2="22" y2="12" /><line x1="4.9" y1="4.9" x2="7" y2="7" /><line x1="17" y1="17" x2="19.1" y2="19.1" /><line x1="4.9" y1="19.1" x2="7" y2="17" /><line x1="17" y1="7" x2="19.1" y2="4.9" /></>,
   moon: <><path d="M20 14.5A8.5 8.5 0 019.5 4a7 7 0 108.9 10.4c.5.1 1 .1 1.6.1z" /></>,
+  plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
   eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>,
   doc: <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></>,
   trend: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></>,
@@ -787,7 +795,7 @@ function Spinner({ size = 14, color = 'currentColor' }) {
 // Renk ve gölge CSS değişkenlerinden okunuyor (uygulamadaki .gur-btn ile aynı
 // iş bölümü): satır içi background yazsaydık :hover ve :active hiç devreye
 // giremezdi. Basılma hareketi (scale) Motion'da, renk/gölge CSS'te.
-function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size = 'md', fullWidth = false, disabled, loading, title }) {
+function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size = 'md', fullWidth = false, disabled, loading, title, count }) {
   const toneColor = TONE_COLOR[tone] || C.text;
   const toneSoft = TONE_SOFT[tone] || C.panel2;
   const paddings = { sm: '7px 13px', md: '9px 15px', lg: '12px 19px' };
@@ -810,7 +818,9 @@ function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size
     soft:    { bg: toneSoft, hover: toneSoft.replace('0.12', '0.2'), press: toneSoft.replace('0.12', '0.26'), color: toneColor, border: `1px solid ${toneColor}29` },
     // Beyaz hap: One'ın nötr birincil-olmayan düğmesi — kâğıttan bir tık
     // yukarıda durur, o yüzden zemini panel değil kart rengi.
-    outline: { bg: C.panel, hover: C.panelHover, press: C.panel2, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}`, elev: SH.s1, pressElev: ELEV.pressDark },
+    // badgeBg/badgeInk: sayaç rozetinin zemini. Beyaz hapta beyaz rozet
+    // görünmezdi, o yüzden varyant başına ayrı.
+    outline: { badgeBg: C.panel2, badgeInk: C.dim, bg: C.panel, hover: C.panelHover, press: C.panel2, color: tone === 'neutral' ? C.text : toneColor, border: `1px solid ${C.border}`, elev: SH.s1, pressElev: ELEV.pressDark },
     ghost:   { bg: 'transparent', hover: C.panel2, press: C.border, color: toneColor, border: `1px solid ${C.border}` },
     plain:   { bg: 'transparent', hover: C.panel2, press: C.border, color: toneColor, border: '1px solid transparent' },
   };
@@ -842,6 +852,18 @@ function Btn({ label, onClick, icon, variant = 'outline', tone = 'neutral', size
       }}>
       {busy ? <Spinner size={fontSizes[size]} color={p.color} /> : icon}
       {busy ? 'Yükleniyor…' : label}
+      {/* Sayaç rozeti — uygulamadaki hap dilinin panel karşılığı ("Done ①").
+          Zemin hapın kendi tonundan, yoksa turuncu hapta beyaz rozet
+          beyaz yazının üstüne biniyor. */}
+      {count != null && count !== '' && (
+        <span style={{
+          minWidth: 18, height: 18, padding: '0 5px', borderRadius: R.pill,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10.5, fontWeight: 800, ...NUM,
+          background: p.badgeBg || 'rgba(255,255,255,0.22)',
+          color: p.badgeInk || p.color,
+        }}>{count}</span>
+      )}
     </motion.button>
   );
 }
@@ -1031,6 +1053,8 @@ export default function GurAdmin() {
   const [reviewDoc, setReviewDoc] = useState(null);
   const [openRestaurantId, setOpenRestaurantId] = useState(null);
   const [restTab, setRestTab] = useState('list');
+  // Fiyatlandırmada seçili hizmet sekmesi; Hizmetler sayfasından da gelinebiliyor.
+  const [pricingStream, setPricingStream] = useState('all');
   const [hiddenReviews, setHiddenReviews] = useState(() => new Set());
 
   const toggleHideReview = (key) => setHiddenReviews(prev => {
@@ -1063,16 +1087,52 @@ export default function GurAdmin() {
     setRestaurants(p => p.map(r => r.id === id ? { ...r, status: r.status === 'active' ? 'suspended' : 'active' } : r));
   };
 
+  // Moderasyon kuyruğundaki toplam iş — kenar çubuğu rozetinde.
+  const modQueue = useModeration();
+  const modCount = pendingChanges(modQueue).length + pendingVenues(restaurants, modQueue).length;
+
+  /**
+   * Yöneticinin elle eklediği restoran. Sahiplenme akışını atlar ve
+   * doğrudan yayınlanır — yönetici zaten onaylayan merci, kendi kaydını
+   * kendi kuyruğuna atmak boş bir tur olurdu.
+   *
+   * Kimlik çakışmasın diye mevcut en büyük id'nin bir fazlası: kayıtların
+   * bir kısmı canlı beslemeden string id ile geliyor, o yüzden sayıya
+   * çevrilebilenlere bakılıyor.
+   */
+  const createRestaurant = (data) => {
+    setRestaurants(prev => {
+      const enBuyuk = prev.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0);
+      const yeni = {
+        id: enBuyuk + 1,
+        name: data.name, cat: data.cat, district: data.district,
+        addr: data.addr || `${data.district}, İstanbul`,
+        phone: data.phone || '', desc: data.desc || '',
+        rating: 0, reviews: 0, price: '₺₺',
+        status: 'active', account: false, source: 'manual',
+        joined: new Date().toISOString().slice(0, 10),
+        gastro: false, claimed: false,
+        imgs: [], menu: [], popular: [], tags: [],
+      };
+      return [yeni, ...prev];
+    });
+    showToast(`${data.name} oluşturuldu ve yayınlandı.`);
+  };
+
   const nav = [
     { id: 'dashboard', label: 'Genel Bakış', icon: icons.dash },
     { id: 'restaurants', label: 'Restoranlar', icon: icons.store, count: restaurants.filter(r => r.account).length },
     { id: 'pool', label: 'Mekan Havuzu', icon: icons.inbox, count: restaurants.filter(r => !r.account).length },
+    // Moderasyon havuzun hemen ardında: ikisi de "henüz müşterimiz olmayan
+    // kayıt" işi, biri onay bekleyeni biri onaylanmışı gösteriyor.
+    { id: 'moderation', label: 'Moderasyon', icon: icons.check, count: modCount, alert: modCount > 0 },
     { id: 'applications', label: 'Başvurular', icon: icons.inbox, count: apps.length, alert: apps.length > 0 },
     { id: 'gastro', label: 'Gastro Onaylı', icon: icons.star },
     { id: 'users', label: 'Kullanıcılar', icon: icons.users },
     { id: 'campaigns', label: 'Kampanyalar', icon: icons.trend, count: 4 },
     { id: 'growth', label: 'Büyüme & Kohort', icon: icons.chart },
     { id: 'revenue', label: 'Gelir & Reklam', icon: icons.money },
+    { id: 'services', label: 'Hizmetler', icon: icons.money },
     { id: 'pricing', label: 'Fiyatlandırma', icon: icons.trend },
     { id: 'settings', label: 'Ayarlar', icon: icons.settings },
   ];
@@ -1082,7 +1142,7 @@ export default function GurAdmin() {
   const openRestaurant = openRestaurantId == null ? null : restaurants.find(r => r.id === openRestaurantId) || null;
   const pageTitle = openRestaurant ? openRestaurant.name : (nav.find(n => n.id === page)?.label || 'Genel Bakış');
 
-  const goPage = (id) => { setOpenRestaurantId(null); setPage(id); };
+  const goPage = (id) => { setOpenRestaurantId(null); setQuery(''); setPage(id); };
   // Gelir tablosundan müşteriye geçiş: aynı işletme kaydı, tek tıkla.
   const openStore = (id) => { setPage('restaurants'); setRestTab('list'); setOpenRestaurantId(id); };
 
@@ -1155,15 +1215,9 @@ export default function GurAdmin() {
         <header style={{ height: 64, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 28px', gap: 20, flexShrink: 0, background: C.panel }}>
           <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{pageTitle}</h1>
           <div style={{ flex: 1 }} />
-          <div style={{ position: 'relative', width: 280 }}>
-            <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}>
-              <Icon path={icons.search} size={16} color={C.faint} />
-            </div>
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Ara..." style={{
-              width: '100%', height: 38, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10,
-              padding: '0 12px 0 36px', color: C.text, fontFamily: FB, fontSize: 13, outline: 'none',
-            }} />
-          </div>
+          {SEARCHABLE[page] && (
+            <SearchBar value={query} onChange={setQuery} placeholder={SEARCHABLE[page]} />
+          )}
           <IconBtn
             title="Bildirimler"
             icon={<>
@@ -1183,14 +1237,22 @@ export default function GurAdmin() {
                 tab={restTab} onTab={setRestTab}
                 onSuspend={toggleSuspend} onOpen={setOpenRestaurantId}
                 hidden={hiddenReviews} onHide={toggleHideReview} />)}
-          {page === 'applications' && <ApplicationsPage apps={apps} onReview={setReviewDoc} onApprove={approveApp} onReject={rejectApp} />}
+          {page === 'applications' && <ApplicationsPage apps={apps} query={query} onReview={setReviewDoc} onApprove={approveApp} onReject={rejectApp} />}
           {page === 'gastro' && <GastroPage restaurants={restaurants} onGoRestaurants={() => goPage('restaurants')} />}
           {page === 'users' && <UsersPage query={query} />}
-          {page === 'campaigns' && <CampaignsPage />}
+          {page === 'campaigns' && <CampaignsPage query={query} />}
           {page === 'growth' && <GrowthPage />}
           {page === 'revenue' && <RevenuePage restaurants={restaurants} onOpenStore={openStore} />}
           {page === 'pool' && <VenuePoolPage restaurants={restaurants} query={query} onOpen={openStore} />}
-          {page === 'pricing' && <PricingPage restaurants={restaurants} query={query} />}
+          {page === 'moderation' && (
+            <ModerationPage restaurants={restaurants} query={query}
+              onCreate={createRestaurant} onOpen={setOpenRestaurantId} />)}
+          {page === 'services' && (
+            <ServicesPage restaurants={restaurants} query={query}
+              onOpenStream={k => { setQuery(''); setPricingStream(k); setPage('pricing'); }} />)}
+          {page === 'pricing' && (
+            <PricingPage restaurants={restaurants} query={query}
+              stream={pricingStream} onStream={setPricingStream} />)}
           {page === 'settings' && <SettingsPage />}
         </div>
       </main>
@@ -1735,6 +1797,283 @@ function DashboardPage({ restaurants = [] }) {
   );
 }
 
+/**
+ * Ortak modal kabuğu. Başvuru inceleme modalıyla aynı dil: perde
+ * soluklaşır, kart materyal gibi gelir (§12). İki yeni akış (moderasyon
+ * incelemesi ve restoran oluşturma) aynı kabuğu kullanıyor — üçüncü bir
+ * kopya çıkarmak yerine burada toplandı.
+ */
+function Modal({ title, subtitle, onClose, children, width = 560 }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(10,12,16,0.55)',
+        backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.97, y: 6 }}
+        transition={{ type: 'spring', bounce: 0, duration: 0.32 }}
+        onClick={e => e.stopPropagation()}
+        role="dialog" aria-modal="true" aria-label={title}
+        style={{ ...CARD, boxShadow: ELEV.raised, width: '100%', maxWidth: width,
+          maxHeight: '86vh', overflowY: 'auto' }}>
+        <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15.5, fontWeight: 700 }}>{title}</div>
+            {subtitle && <div style={{ fontFamily: FB, fontSize: 12, color: C.dim, marginTop: 3, lineHeight: 1.5 }}>{subtitle}</div>}
+          </div>
+          <IconBtn onClick={onClose} size={32} title="Kapat" icon={<Icon path={icons.x} size={16} color={C.dim} />} />
+        </div>
+        <div style={{ padding: 22 }}>{children}</div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/**
+ * Hangi sayfada arama var ve orada NE aranıyor. Boş bırakılan sayfada
+ * kutu hiç çizilmiyor: çalışmayan bir arama kutusu, olmayan aramadan
+ * daha kötü.
+ */
+const SEARCHABLE = {
+  restaurants: 'Restoran veya mutfak ara',
+  pool:        'Havuzda mekan ara',
+  moderation:  'Bekleyen kayıtlarda ara',
+  applications:'Başvuru sahibi veya işletme ara',
+  users:       'Kullanıcı adı veya e-posta ara',
+  campaigns:   'Kampanya, restoran veya firma ara',
+  pricing:     'Müşteri ara',
+  services:    'Hizmet veya restoran ara',
+};
+
+/**
+ * Ortak arama alanı.
+ *
+ * Tek bir bileşen ama HER SAYFA KENDİ ALANINDA arıyor: restoranda isim ve
+ * mutfak, kullanıcıda isim ve e-posta, kampanyada restoran ve organizasyon.
+ * Filtre mantığı sayfada, alan burada — tersi olsaydı her yeni sayfa için
+ * arama kutusunu yeniden çizmek gerekirdi.
+ *
+ * Yer tutucu sayfaya göre değişiyor: "Ara..." kullanıcıya NEYİ
+ * arayabileceğini söylemiyor.
+ */
+function SearchBar({ value, onChange, placeholder = 'Ara...', width = 280 }) {
+  return (
+    <div style={{ position: 'relative', width }}>
+      <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+        <Icon path={icons.search} size={16} color={C.faint} />
+      </div>
+      <input
+        value={value} onChange={e => onChange(e.target.value)}
+        placeholder={placeholder} aria-label={placeholder}
+        style={{
+          width: '100%', height: 38, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10,
+          padding: value ? '0 34px 0 36px' : '0 12px 0 36px',
+          color: C.text, fontFamily: FB, fontSize: 13, outline: 'none',
+        }} />
+      {/* Temizleme düğmesi: arama açıkken boş sonuç görüp "sayfa bozuk"
+          sanmanın önüne geçen tek şey. */}
+      {value && (
+        <button type="button" onClick={() => onChange('')} aria-label="Aramayı temizle"
+          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+            background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
+          <Icon path={icons.x} size={14} color={C.faint} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Liste boşken satır yüksekliğini koruyan tek satır. */
+function EmptyRow({ text }) {
+  return (
+    <div style={{ padding: '26px 18px', borderTop: `1px solid ${C.border}`, textAlign: 'center',
+      fontFamily: FB, fontSize: 12.5, color: C.faint }}>{text}</div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MODERASYON — yayına çıkmadan önceki son kapı
+//
+// İki ayrı iş, tek sayfada ama AYRI listelerde: yeni mekan kaydı ile
+// yayındaki bir kaydın alan değişikliği farklı kararlar; birini onaylamak
+// diğerini onaylamak değil.
+//
+// Yönetici gelen değeri DÜZENLEYEBİLİR — işletmenin yazdığını olduğu gibi
+// kabul etmek zorunda değil. Düzeltilmiş hâl yayınlanır ve kayıtta
+// "düzenlendi" izi kalır.
+// ═══════════════════════════════════════════════════════════════════════
+const MOD_ALAN = {
+  name: 'Görünen ad', desc: 'Açıklama', hours: 'Çalışma saatleri',
+  price: 'Fiyat aralığı', phone: 'Telefon', addr: 'Adres',
+};
+
+function ModerationPage({ restaurants = [], query = '', onCreate, onOpen }) {
+  const mod = useModeration();
+  const changes = pendingChanges(mod);
+  const venues = pendingVenues(restaurants, mod);
+  const [edit, setEdit] = useState(null);
+  const [draft, setDraft] = useState({});
+  const [creating, setCreating] = useState(false);
+
+  const q = query.trim().toLocaleLowerCase('tr');
+  const esles = ad => !q || String(ad || '').toLocaleLowerCase('tr').includes(q);
+  const gChanges = changes.filter(c => esles(c.restaurantName));
+  const gVenues = venues.filter(r => esles(r.name));
+
+  const ac = c => { setEdit(c); setDraft({ ...c.fields }); };
+  const onayla = () => {
+    // Yalnızca gerçekten değişen alan varsa "düzenlendi" say: yönetici
+    // hiçbir şeye dokunmadıysa kayıt "olduğu gibi onaylandı" kalmalı.
+    const degisti = Object.entries(draft).some(([k, v]) => v !== edit.fields[k]);
+    approveChange(edit.id, degisti ? draft : null);
+    setEdit(null);
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ fontFamily: FB, fontSize: 12.5, color: C.dim, maxWidth: 640, lineHeight: 1.6 }}>
+          Dış beslemeden gelen yeni mekanlar ve işletmelerin panelden girdiği bilgiler
+          önce buraya düşer. <b>Onaylanmadan tüketici uygulamasında görünmezler.</b>
+        </div>
+        <Btn label="Restoran oluştur" onClick={() => setCreating(true)} variant="filled" tone="orange"
+          icon={<Icon path={icons.plus} size={15} color={C.onBrand} />} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 18 }}>
+        <KpiCard label="Bekleyen yeni mekan" value={`${venues.length}`} icon={icons.store}
+          accent={{ color: C.orangeInk, soft: C.orangeSoft }} delta="dış besleme" deltaNeutral />
+        <KpiCard label="Bekleyen bilgi değişikliği" value={`${changes.length}`} icon={icons.inbox}
+          accent={{ color: C.blue, soft: C.blueSoft }} delta="işletmeden" deltaNeutral />
+      </div>
+
+      <section style={{ ...CARD, overflow: 'hidden', marginBottom: 18 }}>
+        <SectionHead title="Yeni mekan kayıtları" right={`${gVenues.length} kayıt`} />
+        {gVenues.length === 0
+          ? <EmptyRow text={q ? `"${query}" için bekleyen mekan yok` : 'Bekleyen yeni mekan yok'} />
+          : gVenues.map(r => (
+            <div key={r.id} style={{ padding: '14px 18px', borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{r.name}</div>
+                <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+                  {r.cat} · {r.district} · ★ {r.rating} · dış beslemeden geldi
+                </div>
+              </div>
+              <Btn label="Detay" onClick={() => onOpen?.(r.id)} variant="outline" size="sm"
+                icon={<Icon path={icons.eye} size={13} color={C.dim} />} />
+              <Btn label="Reddet" onClick={() => decideVenue(r.id, 'rejected')} variant="soft" tone="red" size="sm" />
+              <Btn label="Yayınla" onClick={() => decideVenue(r.id, 'approved')} variant="filled" tone="green" size="sm" />
+            </div>
+          ))}
+      </section>
+
+      <section style={{ ...CARD, overflow: 'hidden' }}>
+        <SectionHead title="İşletmeden gelen bilgi değişiklikleri" right={`${gChanges.length} kayıt`} />
+        {gChanges.length === 0
+          ? <EmptyRow text={q ? `"${query}" için bekleyen değişiklik yok` : 'Bekleyen değişiklik yok'} />
+          : gChanges.map(c => (
+            <div key={c.id} style={{ padding: '14px 18px', borderTop: `1px solid ${C.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{c.restaurantName}</div>
+                  <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+                    {Object.keys(c.fields).length} alan · {new Date(c.at).toLocaleString('tr')}
+                  </div>
+                </div>
+                <Btn label="İncele ve onayla" onClick={() => ac(c)} variant="filled" tone="orange" size="sm" />
+                <Btn label="Reddet" onClick={() => rejectChange(c.id)} variant="soft" tone="red" size="sm" />
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {Object.keys(c.fields).map(k => (
+                  <span key={k} style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.dim,
+                    background: C.panel2, borderRadius: R.pill, padding: '3px 9px' }}>{MOD_ALAN[k] || k}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+      </section>
+
+      <AnimatePresence>
+        {edit && (
+          <Modal onClose={() => setEdit(null)} title={edit.restaurantName}
+            subtitle="Gelen değerleri düzenleyebilirsiniz; yayınlanan hâl aşağıdakidir.">
+            {Object.entries(edit.fields).map(([k, v]) => (
+              <div key={k}>
+                <AdminField label={MOD_ALAN[k] || k} value={draft[k] ?? ''}
+                  onChange={val => setDraft(d => ({ ...d, [k]: val }))} />
+                {draft[k] !== v && (
+                  <div style={{ fontFamily: FB, fontSize: 11, color: C.yellowInk, margin: '-8px 0 12px' }}>
+                    İşletmenin girdiği: {String(v).slice(0, 90)}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <Btn label="Onayla ve yayınla" onClick={onayla} variant="filled" tone="green" size="md" fullWidth
+                icon={<Icon path={icons.check} size={15} color="#fff" />} />
+              <Btn label="Reddet" onClick={() => { rejectChange(edit.id); setEdit(null); }}
+                variant="soft" tone="red" size="md" />
+            </div>
+          </Modal>
+        )}
+        {creating && <CreateRestaurantModal onClose={() => setCreating(false)} onCreate={onCreate} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * Elle restoran oluşturma — sahiplenme akışını atlar.
+ *
+ * Yönetici zaten yetkili merci: kendi eklediği kayıt moderasyon kuyruğuna
+ * DÜŞMEZ, doğrudan yayınlanır. Kaydı kuyruğa atıp kendi kendine onaylatmak
+ * gereksiz bir tur olurdu.
+ *
+ * Sahiplenilmemiş olarak açılıyor (`account: false`): işletme sonradan
+ * kendi kaydını sahiplenebilsin. Sahipsiz kayıtta masa ayırtma kapalı
+ * kalır — söz verecek muhatap yok.
+ */
+function CreateRestaurantModal({ onClose, onCreate }) {
+  const [f, setF] = useState({ name: '', cat: '', district: '', addr: '', phone: '', desc: '' });
+  const [hata, setHata] = useState('');
+  const set = k => v => { setF(x => ({ ...x, [k]: v })); setHata(''); };
+
+  const kaydet = () => {
+    if (!f.name.trim()) return setHata('Restoran adı zorunlu.');
+    if (!f.cat.trim()) return setHata('Kategori zorunlu.');
+    if (!f.district.trim()) return setHata('İlçe zorunlu.');
+    onCreate?.({
+      name: f.name.trim(), cat: f.cat.trim(), district: f.district.trim(),
+      addr: f.addr.trim(), phone: f.phone.trim(), desc: f.desc.trim(),
+    });
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose} title="Restoran oluştur"
+      subtitle="Yönetici kaydı doğrudan yayınlanır — moderasyon kuyruğuna düşmez.">
+      <AdminField label="Restoran adı" value={f.name} onChange={set('name')} autoFocus />
+      <AdminField label="Kategori" value={f.cat} onChange={set('cat')} />
+      <AdminField label="İlçe" value={f.district} onChange={set('district')} />
+      <AdminField label="Adres" value={f.addr} onChange={set('addr')} />
+      <AdminField label="Telefon" value={f.phone} onChange={set('phone')} />
+      <AdminField label="Kısa açıklama" value={f.desc} onChange={set('desc')} />
+      {hata && (
+        <div style={{ background: C.redSoft, border: `1px solid ${C.red}44`, borderRadius: 9,
+          padding: '9px 12px', marginBottom: 14, fontSize: 12, color: C.redInk }}>{hata}</div>
+      )}
+      <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, marginBottom: 14, lineHeight: 1.55 }}>
+        Kayıt sahiplenilmemiş olarak açılır; işletme sonradan sahiplenebilir.
+        Sahiplenilene kadar masa ayırtma kapalı kalır.
+      </div>
+      <Btn label="Oluştur ve yayınla" onClick={kaydet} variant="filled" tone="orange" size="md" fullWidth />
+    </Modal>
+  );
+}
+
 function TableShell({ headers, children }) {
   return (
     <div style={{ ...CARD, overflow: 'hidden' }}>
@@ -1784,7 +2123,7 @@ const CAMPAIGN_STATUS = live({
   exhausted: () => ({ label: 'Bütçe bitti',  color: C.faint,     soft: C.panel2 }),
 });
 
-function CampaignsPage() {
+function CampaignsPage({ query = '' }) {
   const [rows, setRows] = useState(CAMPAIGN_SEED);
   const [toast, setToast] = useState(null);
   const [live, setLive] = useState(false);
@@ -1819,11 +2158,16 @@ function CampaignsPage() {
 
   const money = (minor) => `₺${(minor / 100).toLocaleString('tr', { maximumFractionDigits: 0 })}`;
   // Kalite = etkileşim oranı; skor açık artırmadaki gerçek sıralama ölçütü.
+  // Arama SIRALAMADAN ÖNCE değil sonra uygulanıyor: süzülmüş listede de
+  // kampanyalar açık artırma skoruna göre sıralı kalmalı, alfabetik değil.
+  const q = query.trim().toLocaleLowerCase('tr');
   const scored = rows.map(r => {
     const rate = r.impressions ? r.engagements / r.impressions : 0.02;
     const quality = Math.min(1.5, Math.max(0.2, rate * 20));
     return { ...r, rate, quality, score: r.bid * quality };
-  }).sort((a, b) => (b.status === 'active' ? b.score : -1) - (a.status === 'active' ? a.score : -1));
+  }).sort((a, b) => (b.status === 'active' ? b.score : -1) - (a.status === 'active' ? a.score : -1))
+    .filter(r => !q || [r.restaurant, r.org, r.badge].some(v =>
+      String(v || '').toLocaleLowerCase('tr').includes(q)));
 
   const activeRows = rows.filter(r => r.status === 'active');
   const totalSpend = rows.reduce((a, r) => a + r.spent, 0);
@@ -2051,7 +2395,7 @@ function GrowthPage() {
             ['Retention', 'Kayıt gününden N gün sonra en az bir ürün olayı üreten kullanıcı oranı. Sadece uygulamayı açmak yetmiyor.'],
             ['Etkileşim', 'Kohort başına kaydırma ve kaydetme sayısı; destenin doyup doymadığını gösterir.'],
             ['Dönüşüm', 'Sağa kaydırılan mekân için yol tarifi alınma ve konumla doğrulanmış ziyaret oranı — ürünün gerçek dünyadaki karşılığı.'],
-            ['LTV', 'Reklam + abonelik gelirinin kullanıcı başına kümülatif toplamı; ARPU bunun aylığa bölünmüşü.'],
+            ['LTV', 'Reklam ve ücretli özellik gelirinin kullanıcı başına kümülatif toplamı; ARPU bunun aylığa bölünmüşü.'],
           ].map(([k, v]) => (
             <div key={k} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{ fontSize: 11.5, fontWeight: 700, color: C.orangeInk, minWidth: 74 }}>{k}</span>
@@ -2186,8 +2530,38 @@ function ReviewFeed({ reviews, hidden, onHide, onOpenRestaurant, empty }) {
 function StoreFeatures({ restaurant }) {
   const settings = usePlatformSettings();
   const overrides = settings.storeOverrides?.[String(restaurant.id)] || {};
+  const hidden = isRestaurantHidden(restaurant.id, settings);
 
   return (
+    <>
+    {/* ─── GÖRÜNÜRLÜK ───
+        Özellik kapılarından AYRI bir kart. Kapılar "bu mekanda şu özellik
+        yok" der; bu ise "bu mekan yok" der — aynı listeye koymak ikisini
+        aynı ağırlıkta gösterirdi ve yanlış satıra basmak bir mekanı
+        sessizce uygulamadan düşürürdü. */}
+    <section style={{
+      ...CARD, overflow: 'hidden', marginBottom: 16,
+      borderColor: hidden ? C.redInk : C.border,
+    }}>
+      <div style={{ padding: '15px 18px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
+            Uygulamada görünürlük
+            {hidden && (
+              <span style={{ fontFamily: FB, fontSize: 10, fontWeight: 800, letterSpacing: 0.4,
+                color: C.redInk, background: C.redSoft, borderRadius: R.pill, padding: '2px 8px' }}>GİZLİ</span>
+            )}
+          </div>
+          <div style={{ fontFamily: FB, fontSize: 12, color: C.dim, lineHeight: 1.55 }}>
+            {hidden
+              ? 'Bu mekan tüketici uygulamasında hiç görünmüyor: destede, aramada ve listelerde yok. Kaydı silinmedi, işletme paneli çalışmaya devam ediyor.'
+              : 'Kapatırsan bu mekan tüketici uygulamasından tamamen kalkar — deste, arama ve listeler dahil. Kayıt silinmez, işletme paneli çalışmaya devam eder.'}
+          </div>
+        </div>
+        <Toggle on={!hidden} onChange={() => setRestaurantHidden(restaurant.id, !hidden)} />
+      </div>
+    </section>
+
     <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
       <SectionHead title="Bu işletmede açık özellikler"
         right={`${PER_STORE_FEATURES.filter(f => settings[f.key] && overrides[f.key] !== false).length} / ${PER_STORE_FEATURES.length} açık`} />
@@ -2212,6 +2586,7 @@ function StoreFeatures({ restaurant }) {
         );
       })}
     </section>
+    </>
   );
 }
 
@@ -2223,7 +2598,6 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
   const reviews = useMemo(() => restaurantReviews(r), [r.id]);
   const services = storeServices(r);
   const serviceRev = storeServiceRevenue(r);
-  const planFee = PLAN_PRICE[r.plan] || 0;
 
   // Yorum dağılımı — rozet kararını verirken bakılan asıl kanıt
   const dist = [5, 4, 3, 2, 1].map(star => ({ star, n: reviews.filter(v => v.stars === star).length }));
@@ -2275,7 +2649,6 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
       <div style={{ ...CARD, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', marginBottom: 16, overflow: 'hidden' }}>
         <MetaCell label="Bölge">{r.district}</MetaCell>
         <MetaCell label="Puan"><span style={{ color: C.orangeInk }}>★</span> {r.rating} <span style={{ color: C.faint, fontWeight: 500, fontSize: 12 }}>({r.reviews.toLocaleString('tr')})</span></MetaCell>
-        <MetaCell label="Plan"><span style={{ color: PLAN_COLOR[r.plan] }}>{r.plan}</span></MetaCell>
         <MetaCell label="Aylık ciro">{money(storeMonthly(r))}</MetaCell>
         <MetaCell label="Durum"><StatusBadge status={r.status} /></MetaCell>
         <MetaCell label="Katılım">{formatDate(r.joined)}</MetaCell>
@@ -2293,19 +2666,7 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
           hangi kalemin açık olduğu STORE_SERVICES'ten geliyor. */}
       <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
         <SectionHead title="Aldığı ücretli özellikler"
-          right={`${services.length} kalem · ${money(serviceRev + planFee)} / ay`} />
-        <div style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: PLAN_COLOR[r.plan], flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700 }}>{r.plan} abonelik</div>
-            <div style={{ fontSize: 11.5, color: C.faint }}>
-              {planFee ? 'İşletme paneli, analiz ve öncelikli destek' : 'Ücretsiz plan — yalnızca temel kayıt'}
-            </div>
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: planFee ? C.text : C.faint }}>
-            {planFee ? `${money(planFee)}/ay` : '—'}
-          </div>
-        </div>
+          right={`${services.length} kalem · ${money(serviceRev)} / ay`} />
         {services.map(x => (
           <div key={x.key} style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: KIND_TONE[x.kind], flexShrink: 0 }} />
@@ -2513,7 +2874,7 @@ function RestaurantsPage({ restaurants, query, onSuspend, onOpen }) {
     .filter(r => r.name.toLowerCase().includes(query.toLowerCase()) || r.cat.toLowerCase().includes(query.toLowerCase()));
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
-      <TableShell headers={['Restoran', 'Bölge', 'Puan', 'Plan', 'Ücretli Özellikler', { label: 'Aylık', right: true }, 'Durum', { label: 'İşlemler', right: true }]}>
+      <TableShell headers={['Restoran', 'Bölge', 'Puan', 'Ücretli Özellikler', { label: 'Aylık', right: true }, 'Durum', { label: 'İşlemler', right: true }]}>
         {filtered.map(r => (
           <tr key={r.id} className="row-hover" onClick={() => onOpen(r.id)} title={`${r.name} detayını aç`}
             style={{ borderBottom: `1px solid ${C.border}`, transition: 'background 0.1s', cursor: 'pointer' }}>
@@ -2533,7 +2894,6 @@ function RestaurantsPage({ restaurants, query, onSuspend, onOpen }) {
             </td>
             <td style={{ padding: '14px 18px', fontSize: 13, color: C.dim }}>{r.district}</td>
             <td style={{ padding: '14px 18px', fontSize: 13, fontWeight: 600 }}>★ {r.rating}</td>
-            <td style={{ padding: '14px 18px' }}><span style={{ fontSize: 12, fontWeight: 700, color: PLAN_COLOR[r.plan] }}>{r.plan}</span></td>
             {/* Mağaza bazlı ücretli özellikler — hangi müşterinin neyi
                 satın aldığı listede de görünsün, detaya girmeye gerek kalmasın */}
             <td style={{ padding: '14px 18px', maxWidth: 260 }}><ServiceChips services={storeServices(r)} max={3} /></td>
@@ -2680,8 +3040,14 @@ function ClaimsPanel() {
   );
 }
 
-function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
-  if (apps.length === 0) {
+function ApplicationsPage({ apps, query = '', onReview, onApprove, onReject }) {
+  // Başvuruda üç alan aranıyor: işletme adı, sahibin adı ve ilçe. Vergi
+  // numarası bilerek dışarıda — kimse onu ezberden aramıyor.
+  const q = query.trim().toLocaleLowerCase('tr');
+  const gorunen = !q ? apps : apps.filter(a =>
+    [a.name, a.owner, a.district].some(v => String(v || '').toLocaleLowerCase('tr').includes(q)));
+
+  if (gorunen.length === 0) {
     return (
       <div style={{ animation: 'fadeIn 0.2s' }}>
       <ClaimsPanel />
@@ -2689,8 +3055,10 @@ function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
         <div style={{ display: 'inline-flex', width: 64, height: 64, borderRadius: 16, background: C.greenSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
           <Icon path={icons.check} size={30} color={C.greenInk} />
         </div>
-        <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700 }}>Bekleyen başvuru yok</h3>
-        <p style={{ margin: 0, fontSize: 13.5, color: C.dim }}>Tüm restoran başvuruları değerlendirildi.</p>
+        <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700 }}>
+          {q ? 'Eşleşen başvuru yok' : 'Bekleyen başvuru yok'}</h3>
+        <p style={{ margin: 0, fontSize: 13.5, color: C.dim }}>
+          {q ? `"${query}" için başvuru bulunamadı.` : 'Tüm restoran başvuruları değerlendirildi.'}</p>
       </div>
       </div>
     );
@@ -2700,10 +3068,10 @@ function ApplicationsPage({ apps, onReview, onApprove, onReject }) {
       <ClaimsPanel />
       <div style={{ marginBottom: 16, padding: '12px 16px', background: C.yellowSoft, border: `1px solid ${C.yellow}44`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
         <Icon path={icons.inbox} size={18} color={C.yellowInk} />
-        <span style={{ fontSize: 13, color: C.text }}><b>{apps.length} başvuru</b> vergi levhası doğrulaması bekliyor.</span>
+        <span style={{ fontSize: 13, color: C.text }}><b>{gorunen.length} başvuru</b> vergi levhası doğrulaması bekliyor.</span>
       </div>
       <div style={{ display: 'grid', gap: 12 }}>
-        {apps.map(a => (
+        {gorunen.map(a => (
           <div key={a.id} style={{ ...CARD, padding: 18, display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ width: 46, height: 46, borderRadius: 12, background: 'linear-gradient(135deg,#FF7A1A33,#F04E0033)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18, color: C.orangeInk, flexShrink: 0 }}>{a.name[0]}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -3049,18 +3417,119 @@ function OfferField({ current, offer, onSend }) {
   );
 }
 
-function PricingPage({ restaurants = [], query = '' }) {
+// ═══════════════════════════════════════════════════════════════════════
+// HİZMETLER — sattığımız her şey tek listede
+//
+// Önceden bir kalemin kaç müşteride açık olduğunu görmenin tek yolu
+// restoranları tek tek gezmekti; ciro sayfası toplamları veriyordu ama
+// "banner'ı kimler almış" sorusunu cevaplamıyordu.
+//
+// Buradaki her satır bir ÜRÜN: kaç müşteride açık, aylık ne getiriyor,
+// kaç teklif havada. Satıra basınca o hizmetin fiyatlandırma sekmesine
+// gidiliyor — genel bakıştan işe tek tıkla.
+// ═══════════════════════════════════════════════════════════════════════
+function ServicesPage({ restaurants = [], query = '', onOpenStream }) {
+  const store = pricing.usePricing();
+  const q = query.trim().toLocaleLowerCase('tr');
+
+  const rows = REVENUE_STREAMS.map(sv => {
+    const musteriler = restaurants.filter(r => storeServices(r).some(x => x.key === sv.key));
+    const teklifler = store.offers.filter(o => o.streamKey === sv.key);
+    return {
+      ...sv,
+      customers: musteriler,
+      pending: teklifler.filter(o => o.status === 'pending').length,
+      accepted: teklifler.filter(o => o.status === 'accepted').length,
+      rejected: teklifler.filter(o => o.status === 'rejected').length,
+    };
+  }).filter(sv => !q
+    || sv.name.toLocaleLowerCase('tr').includes(q)
+    || sv.kind.toLocaleLowerCase('tr').includes(q)
+    || sv.customers.some(r => r.name.toLocaleLowerCase('tr').includes(q)));
+
+  const enCok = Math.max(1, ...rows.map(r => r.monthly));
+
+  return (
+    <div style={{ animation: 'fadeIn 0.2s' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 18 }}>
+        <KpiCard label="Satılan hizmet" value={`${REVENUE_STREAMS.length}`} icon={icons.money}
+          accent={{ color: C.orangeInk, soft: C.orangeSoft }} delta="katalogda" deltaNeutral />
+        <KpiCard label="Aylık toplam" value={money(STREAM_TOTAL)} icon={icons.trend}
+          accent={{ color: C.greenInk, soft: C.greenSoft }} delta="tüm kalemler" deltaNeutral />
+        <KpiCard label="Bekleyen teklif" value={`${store.offers.filter(o => o.status === 'pending').length}`}
+          icon={icons.inbox} accent={{ color: C.blue, soft: C.blueSoft }} delta="işletme kararı" deltaNeutral />
+      </div>
+
+      <section style={{ ...CARD, overflow: 'hidden' }}>
+        <SectionHead title="Hizmet kataloğu" right={`${rows.length} kalem`} />
+        {rows.length === 0 ? <EmptyRow text={`"${query}" için hizmet bulunamadı`} /> : rows.map(sv => (
+          <div key={sv.key} style={{ padding: '15px 18px', borderTop: `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{sv.name}</span>
+                  <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 700, color: C.dim,
+                    background: C.panel2, borderRadius: R.pill, padding: '2px 9px' }}>{sv.kind}</span>
+                </div>
+                <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.5 }}>{sv.note}</div>
+              </div>
+              <div style={{ textAlign: 'right', minWidth: 110 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, ...NUM }}>{money(sv.monthly)}</div>
+                <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>{sv.unit}</div>
+              </div>
+              <Btn label="Teklifler" onClick={() => onOpenStream?.(sv.key)} variant="outline" size="sm" />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 160, height: 6, borderRadius: 3, background: C.panel2, overflow: 'hidden' }}>
+                <div style={{ width: `${(sv.monthly / enCok) * 100}%`, height: '100%', background: C.orange, borderRadius: 3 }} />
+              </div>
+              {/* Renk tek başına bilgi taşımasın: sayılar da yazılı. */}
+              <span style={{ fontFamily: FB, fontSize: 11.5, color: C.dim }}>
+                {sv.customers.length} müşteride açık
+              </span>
+              {sv.pending > 0 && (
+                <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.yellowInk,
+                  background: C.yellowSoft, borderRadius: R.pill, padding: '2px 9px' }}>{sv.pending} teklif bekliyor</span>
+              )}
+              {sv.accepted > 0 && (
+                <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.greenInk,
+                  background: C.greenSoft, borderRadius: R.pill, padding: '2px 9px' }}>{sv.accepted} kabul</span>
+              )}
+              {sv.rejected > 0 && (
+                <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.redInk,
+                  background: C.redSoft, borderRadius: R.pill, padding: '2px 9px' }}>{sv.rejected} ret</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </section>
+    </div>
+  );
+}
+
+function PricingPage({ restaurants = [], query = '', stream = 'all', onStream }) {
   const store = pricing.usePricing();
   const [openId, setOpenId] = useState(null);
 
   // Yalnız hesabı olan müşteriler. Dış beslemeden gelen mekanlar burada yok.
+  //
+  // HİZMET SEKMESİ seçiliyse liste o hizmetle ilgili müşterilere daralır:
+  // "o hizmeti alanlar" + "o hizmet için teklif gönderilmiş olanlar".
+  // İkincisi şart — teklif gönderdiğin ama henüz almamış müşteriyi
+  // listeden düşürmek, takip etmen gereken tam kişiyi gizlerdi.
   const customers = useMemo(() => {
     const q = query.trim().toLocaleLowerCase('tr');
+    const teklifli = new Set(store.offers
+      .filter(o => o.streamKey === stream).map(o => String(o.restaurantId)));
     return restaurants
       .filter(r => r.account)
+      .filter(r => stream === 'all'
+        || storeServices(r).some(x => x.key === stream)
+        || teklifli.has(String(r.id)))
       .filter(r => !q || r.name.toLocaleLowerCase('tr').includes(q))
       .sort((a, b) => storeMonthly(b) - storeMonthly(a));
-  }, [restaurants, query]);
+  }, [restaurants, query, stream, store.offers]);
 
   const apiOnly = restaurants.filter(r => !r.account).length;
   const pendingFor = (id) => store.offers.filter(
@@ -3071,6 +3540,25 @@ function PricingPage({ restaurants = [], query = '' }) {
 
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
+      {/* ─── HİZMET SEKMELERİ ───
+          Her ücretli kalemin kendi sekmesi. Sekmedeki sayı o hizmet için
+          BEKLEYEN teklif sayısı: yöneticinin peşine düşmesi gereken iş.
+          Etiketin tek başına renk taşıması yetmiyor, sayı da yazılı. */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        {[{ key: 'all', short: 'Tümü' }, ...REVENUE_STREAMS].map(sv => {
+          const secili = stream === sv.key;
+          const bekleyen = sv.key === 'all'
+            ? store.offers.filter(o => o.status === 'pending').length
+            : store.offers.filter(o => o.streamKey === sv.key && o.status === 'pending').length;
+          return (
+            <Btn key={sv.key} label={sv.short} size="sm"
+              variant={secili ? 'filled' : 'outline'} tone={secili ? 'orange' : 'neutral'}
+              count={bekleyen || undefined}
+              onClick={() => onStream?.(sv.key)} />
+          );
+        })}
+      </div>
+
       <section style={{ ...CARD, padding: '15px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <Icon path={icons.store} size={17} color={C.orangeInk} />
         <span style={{ fontFamily: FB, fontSize: 12.5, color: C.dim, lineHeight: 1.5, flex: 1, minWidth: 220 }}>
@@ -3099,7 +3587,7 @@ function PricingPage({ restaurants = [], query = '' }) {
                   {pending > 0 && <Badge text={`${pending} teklif bekliyor`} color={C.yellowInk} soft={C.yellowSoft} />}
                 </div>
                 <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
-                  {r.district} · <span style={{ color: PLAN_COLOR[r.plan], fontWeight: 700 }}>{r.plan}</span> · {services.length} ücretli özellik
+                  {r.district} · {services.length} ücretli özellik
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -3112,16 +3600,6 @@ function PricingPage({ restaurants = [], query = '' }) {
             {open && (
               <div>
                 <SectionHead title="Aldığı hizmetler" right="fiyatı değiştirmek için teklif gönderin" />
-                <div style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: PLAN_COLOR[r.plan], flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{r.plan} abonelik</div>
-                    <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>Paket fiyatı — kalem bazlı teklif dışında</div>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: PLAN_PRICE[r.plan] ? C.text : C.faint }}>
-                    {PLAN_PRICE[r.plan] ? `${money(PLAN_PRICE[r.plan])}/ay` : '—'}
-                  </div>
-                </div>
                 {services.map(sv => (
                   <div key={sv.key} style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -3217,7 +3695,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
   const group = (...kinds) => streams.filter(x => kinds.includes(x.kind)).reduce((a, x) => a + x.monthly, 0);
   const adRev = group('Reklam', 'Sponsorluk');
   const txRev = group('Performans');
-  const subRev = SUBS_TOTAL + group('İçerik');   // abonelik planları + Gastro paketi
+  const subRev = group('İçerik');   // yalnızca Gastro paketi — abonelik kaldırıldı
 
   // ARPU/LTV: sunucudaki user_ltv anlık görüntüsünün panel karşılığı.
   const MAU = 41200;
@@ -3249,7 +3727,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
   const namedTotal = restaurants.reduce((a, r) => a + storeMonthly(r), 0);
   const otherCount = STATS.totalRestaurants - restaurants.length;
   const otherTotal = Math.max(0, total - namedTotal);
-  const payingCount = restaurants.filter(r => storeServices(r).length > 0 || PLAN_PRICE[r.plan] > 0).length;
+  const payingCount = restaurants.filter(r => storeServices(r).length > 0).length;
   const maxCustomer = Math.max(1, ...customers.map(c => c.monthly));
 
   const kinds = [...new Set(streams.map(x => x.kind))];
@@ -3278,7 +3756,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
             </div>
             <div style={{ fontFamily: FB, fontSize: 12.5, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
               Yıllıklandırılmış {money(total * 12)} · {STATS.totalRestaurants} işletmenin
-              abonelik ve ücretli özelliklerinden.
+              ücretli özelliklerinden.
             </div>
           </div>
 
@@ -3286,7 +3764,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
           <div style={{ flex: 1, minWidth: 320, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
             {[
               { label: 'Reklam ve sponsorluk', value: adRev, tone: C.blue, note: 'Banner, push, ödüllü video' },
-              { label: 'Abonelik ve içerik', value: subRev, tone: C.orange, note: 'İşletme planları, Gastro paketi' },
+              { label: 'İçerik', value: subRev, tone: C.orange, note: 'Gastro şef videosu paketi' },
               { label: 'Performans', value: txRev, tone: C.green, note: 'Anlık fırsat, İkinci Şans' },
             ].map(b => (
               <div key={b.label} style={{ background: C.panel2, border: `1px solid ${C.border}`, borderRadius: R.control, padding: '13px 15px' }}>
@@ -3307,7 +3785,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14, marginTop: 20, paddingTop: 18, borderTop: `1px solid ${C.border}` }}>
           {[
             ['Ücretli özellik geliri', money(STREAM_TOTAL), `${streams.length} kalem`],
-            ['Abonelik geliri', money(SUBS_TOTAL), `${PLANS[0].count + PLANS[1].count} ödeyen işletme`],
+            ['Ödeyen işletme', `${payingCount}`, 'en az bir kalem açık'],
             ['ARPU (aylık)', `₺${arpu.toFixed(2)}`, `LTV ₺${(arpu * AVG_LIFETIME_MONTHS).toFixed(0)}`],
             ['İşletme başına ort.', money(total / STATS.totalRestaurants), 'aylık katkı'],
           ].map(([k, v, n]) => (
@@ -3367,7 +3845,7 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
                 {c.gastro && <Icon path={icons.star} size={12} color={C.orangeInk} fill={C.orange} />}
               </div>
               <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>
-                {c.district} · <span style={{ color: PLAN_COLOR[c.plan], fontWeight: 700 }}>{c.plan}</span>
+                {c.district}
               </div>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>

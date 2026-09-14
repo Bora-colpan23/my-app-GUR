@@ -32,6 +32,8 @@ import { useFeature } from '../lib/platform.js';
 import * as reservations from '../lib/reservations.js';
 import * as pricing from '../lib/pricing.js';
 import * as backend from '../lib/backend.js';
+import { useModeration, pendingChangeFor } from '../lib/moderation.js';
+import * as secondChance from '../lib/second-chance.js';
 import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
 
@@ -112,15 +114,16 @@ function OwnerServices({ restaurant }) {
   if (!restaurant) return null;
   const svc = detail?.services;
   const campaigns = svc?.campaigns || [];
-  const plan = svc?.plan && svc.plan !== "free"
-    ? (svc.plan === "pro" ? "Pro" : "Premium") : "Ücretsiz";
 
   return (
     <div style={{ background: "rgba(255,102,0,0.07)", border: "1px solid rgba(255,102,0,0.2)", borderRadius: 20, padding: "14px 16px", marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: 0 }}>Aldığın hizmetler</p>
-        <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, letterSpacing: 0.3, color: plan === "Ücretsiz" ? "rgba(255,255,255,0.5)" : "var(--c-warn)", background: "rgba(255,255,255,0.07)", borderRadius: 6, padding: "3px 9px" }}>
-          {plan.toLocaleUpperCase("tr")} PLAN
+        {/* PLAN ROZETİ KALDIRILDI — işletme aboneliği yok. Ödenen tutarın
+            tamamı satın alınan ücretli özelliklerden geliyor; "hangi
+            kademedeyim" diye bir bilgi artık yok. */}
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, letterSpacing: 0.3, color: "rgba(255,255,255,0.5)", background: "rgba(255,255,255,0.07)", borderRadius: 6, padding: "3px 9px" }}>
+          {campaigns.length} KALEM
         </span>
       </div>
 
@@ -152,6 +155,7 @@ function OwnerServices({ restaurant }) {
 }
 
 function OwnerInfoTab({ restaurant }) {
+  const modState = useModeration();
   const profiles = useOwnerProfiles();
   const own = profiles[String(restaurant?.id)] || {};
   const [draft, setDraft] = useState(() =>
@@ -163,13 +167,15 @@ function OwnerInfoTab({ restaurant }) {
   }
 
   const save = async () => {
-    await backend.saveOwnerFields(restaurant.id, draft);
+    await backend.saveOwnerFields(restaurant.id, draft, { restaurantName: restaurant.name });
     haptic(12);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const filled = OVERRIDABLE.filter(f => draft[f]?.trim()).length;
+  // Bekleyen değişiklik: girilen alan yayında değil, yöneticide.
+  const bekleyen = pendingChangeFor(restaurant?.id, modState);
 
   return (
     <div>
@@ -181,6 +187,7 @@ function OwnerInfoTab({ restaurant }) {
         <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.55 }}>
           Kaydın harita servislerinden otomatik oluşturuldu. Doldurduğun alanlar bu veriyi
           ezer; boş bıraktıkların API'den gelmeye devam eder.
+          <br />Girdiğin bilgiler <b>yayına girmeden önce GUR ekibince incelenir</b>.
         </p>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "var(--c-warn)", margin: "9px 0 0" }}>
           {filled}/{OVERRIDABLE.length} alan işletmeden
@@ -188,17 +195,21 @@ function OwnerInfoTab({ restaurant }) {
       </div>
 
       {INFO_FIELDS.map(f => {
-        const fromOwner = !!draft[f.key]?.trim();
+        const incelemede = !!bekleyen && Object.prototype.hasOwnProperty.call(bekleyen.fields, f.key);
+        const fromOwner = !incelemede && !!own[f.key]?.trim();
         return (
           <div key={f.key} style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
               <label style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>{f.label}</label>
+              {/* Rozetin üçüncü hâli: İNCELEMEDE. Onaylanmamış bir değere
+                  "İŞLETMEDEN" demek yalan olurdu — o değer henüz yayında
+                  değil, yöneticinin önünde. */}
               <span style={{
                 fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4,
                 padding: "2px 8px", borderRadius: 6,
-                color: fromOwner ? "var(--c-ok-light)" : "rgba(255,255,255,0.45)",
-                background: fromOwner ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.07)",
-              }}>{fromOwner ? "İŞLETMEDEN" : "API'DEN"}</span>
+                color: incelemede ? "var(--c-warn-light)" : fromOwner ? "var(--c-ok-light)" : "rgba(255,255,255,0.45)",
+                background: incelemede ? "rgba(245,158,11,0.16)" : fromOwner ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.07)",
+              }}>{incelemede ? "İNCELEMEDE" : fromOwner ? "İŞLETMEDEN" : "API'DEN"}</span>
             </div>
             {f.multiline ? (
               <textarea
@@ -775,6 +786,63 @@ function LockedCard({ text }) {
     <div style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 18, padding: "18px", marginBottom: 12, display: "flex", alignItems: "center", gap: 11 }}>
       <Icon n="shield" size={16} color="rgba(255,255,255,0.3)" />
       <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.4)", margin: 0 }}>{text}</p>
+    </div>
+  );
+}
+
+/**
+ * İkinci Şans paketi kartı.
+ *
+ * Diğer büyüme kartları "satın alındı" bayrağı tutuyor; bu gerçek bir
+ * kota yürütüyor: 200 FARKLI kullanıcıya gösterim. İlerleme çubuğu
+ * kullanıcıya kaç kişiye ulaştığını söylüyor — "satın aldın" demek tek
+ * başına bir şey ifade etmiyordu.
+ *
+ * Aktif paket varken ikincisi alınamaz: aynı kullanıcıya iki kat gösterim
+ * satın alınmasın diye (kural shared/second-chance.js içinde, düğme
+ * yalnızca onu yansıtıyor).
+ */
+function SecondChanceCard({ restaurant }) {
+  const state = secondChance.useSecondChance();
+  if (!restaurant) return <LockedCard text="Önce bir işletme sahiplen." />;
+
+  const aktif = secondChance.activeFor(restaurant.id, state);
+  const oran = secondChance.progress(aktif);
+  const fiyat = `₺${(secondChance.PACKAGE.priceMinor / 100).toLocaleString("tr")} / hafta`;
+
+  return (
+    <div style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${aktif ? "rgba(255,102,0,0.35)" : "rgba(255,255,255,0.06)"}`, borderRadius: 18, padding: "16px 18px", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0 }}>
+          İkinci Şans Paketi
+        </p>
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: "var(--c-brand-light)", flexShrink: 0 }}>{fiyat}</span>
+      </div>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.55 }}>
+        Sizi <b>sola kaydırmış</b> {secondChance.PACKAGE.reach} farklı kullanıcının destesine geri
+        eklenirsiniz. Aynı kişiye günde bir kez gösterilir; kota dolunca paket kapanır.
+      </p>
+
+      {aktif ? (
+        <>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.55)" }}>
+              {aktif.used} / {aktif.quota} kullanıcıya ulaşıldı
+            </span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "var(--c-ok-light)" }}>
+              %{Math.round(oran * 100)}
+            </span>
+          </div>
+          <div style={{ height: 7, borderRadius: 4, background: "rgba(255,255,255,0.09)", overflow: "hidden", marginBottom: 12 }}>
+            <div style={{ width: `${oran * 100}%`, height: "100%", background: "linear-gradient(90deg,#FF7A1A,#F04E00)", borderRadius: 4 }} />
+          </div>
+          <Btn text="Paketi durdur" variant="outlineDark" size="sm"
+            onClick={() => secondChance.cancel(aktif.id)} />
+        </>
+      ) : (
+        <Btn text="Paketi başlat" variant="filled" size="md"
+          onClick={() => { secondChance.activate({ restaurantId: restaurant.id, restaurantName: restaurant.name }); haptic(14); }} />
+      )}
     </div>
   );
 }
@@ -1475,7 +1543,7 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
             <div>
               <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>
-                  Görünürlüğünüzü artıran paketler. Rezervasyon ve menü ücretsizdir — GUR bunlardan komisyon almaz.
+                  Görünürlüğünüzü artıran paketler. Hepsi tek tek satın alınır; abonelik kademesi yok. Rezervasyon ve menü ücretsizdir.
                 </p>
               </div>
 
@@ -1541,10 +1609,10 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                   <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: "16px 18px" }}>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Rezervasyon</p>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
-                      Kullanıcı uygulamadan masa ayırtır, talep panelinize düşer. Ücretsizdir — GUR rezervasyondan komisyon almaz.
+                      Kullanıcı uygulamadan masa ayırtır, talep panelinize düşer. Tamamen ücretsizdir.
                     </p>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                      {[["Bu ay", "38"], ["Ciro", "₺52.400"], ["GUR payı", "₺0"]].map(([k, v]) => (
+                      {[["Bu ay", "38"], ["Ciro", "₺52.400"], ["Onaylanan", "31"]].map(([k, v]) => (
                         <div key={k} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "11px 12px" }}>
                           <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 3px" }}>{k}</p>
                           <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "#fff", margin: 0 }}>{v}</p>
@@ -1553,6 +1621,16 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                     </div>
                   </div>
                 )}
+              </GrowthSection>
+
+              {/* ─── İKİNCİ ŞANS ───
+                  Diğer kartlardan farklı: gerçek bir kota tutuyor.
+                  Satın alınınca paket aktifleşiyor, 200 farklı kullanıcıya
+                  gösterildikçe ilerliyor ve kota bitince kendiliğinden
+                  kapanıyor. Aktifken ikinci paket alınamıyor — düğme
+                  kapanıyor ve kural depoda da var. */}
+              <GrowthSection title="İkinci Şans">
+                <SecondChanceCard restaurant={ownerRestaurant} />
               </GrowthSection>
 
               <GrowthSection title="Gastro Paketi">
