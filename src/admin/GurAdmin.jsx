@@ -1499,10 +1499,28 @@ function TrendChart({ data, height = 200, format }) {
  * sessiz bir kayma olabilirdi. Ekran okuyucu da baştan sonu görüyor;
  * ara değerleri okumak işkence olurdu.
  */
+// Ekrandan gizli ama ekran okuyucunun gördüğü metin. `clip` tek başına
+// yetmiyordu: 1x1 kutu yerleşimde kalıyor ve bazı tarayıcılarda yazı
+// sızıyordu (panoda sayının altında ikinci bir satır beliriyordu).
+// clipPath + nowrap + negatif kenar boşluğu standart tarif.
+const SR_ONLY = {
+  position: 'absolute', width: 1, height: 1, margin: -1, padding: 0,
+  border: 0, overflow: 'hidden', whiteSpace: 'nowrap',
+  clip: 'rect(0 0 0 0)', clipPath: 'inset(50%)',
+};
+
 function AnimatedNumber({ value, duration = 1.0 }) {
   const metin = String(value);
-  // Türkçe biçim: nokta binlik, virgül ondalık.
-  const m = metin.match(/^(\D*)([\d.,]+)(.*)$/);
+
+  // DİKKAT: `match` her çağrıda YENİ bir dizi döndürür. Bu diziyi
+  // doğrudan useEffect'in bağımlılık listesine koymak animasyonu
+  // öldürüyordu: effect setV yapıyor → yeniden çizim → yeni dizi →
+  // bağımlılık değişti sayılıp effect iptal edilip baştan başlıyor →
+  // t0 sıfırlanıyor → sayaç ilk karede (g≈0.016) donup kalıyor.
+  // Panoda 342 yerine 17, ₺493K yerine ₺24K görünmesinin sebebi buydu.
+  // useMemo kimliği `metin`e bağlıyor; metin değişmedikçe dizi de aynı.
+  const m = React.useMemo(() => metin.match(/^(\D*)([\d.,]+)(.*)$/), [metin]);
+
   const reduced = React.useMemo(() => {
     try { return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
   }, []);
@@ -1525,16 +1543,17 @@ function AnimatedNumber({ value, duration = 1.0 }) {
     };
     raf = requestAnimationFrame(adim);
     return () => cancelAnimationFrame(raf);
-    // Bağımlılıklar bilerek `metin` üzerinden: aynı sayı farklı biçimde
-    // gelirse (₺939K → ₺1.02M) animasyon baştan başlasın.
-  }, [metin, hedef, duration, reduced, m]);
+    // Aynı sayı farklı biçimde gelirse (₺939K → ₺1.02M) animasyon baştan
+    // başlasın diye bağımlılık `metin` üzerinden; `m` onunla birlikte
+    // değişiyor, ayrıca listelemeye gerek yok.
+  }, [metin, m, hedef, duration, reduced]);
 
   if (!m || !Number.isFinite(hedef) || bitti) return <>{metin}</>;
   const ara = v.toLocaleString('tr', { minimumFractionDigits: ondalik, maximumFractionDigits: ondalik });
   return (
     <>
       <span aria-hidden="true">{m[1]}{ara}{m[3]}</span>
-      <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{metin}</span>
+      <span style={SR_ONLY}>{metin}</span>
     </>
   );
 }

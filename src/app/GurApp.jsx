@@ -1985,7 +1985,15 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   // genişleyebilir bir sayfa olarak gelir.
   const [sheetCard, setSheetCard] = useState(null);
   const [composing, setComposing] = useState(null);
-  const inCategory = filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants;
+  // useMemo şart: filtre açıkken `filter` her render'da YENİ dizi üretiyor
+  // ve bu dizi aşağıdaki deste hesaplarının bağımlılığı. Kimliği sürekli
+  // değişince deste her çizimde yeniden kuruluyor, `topCard` yeni nesne
+  // oluyor ve ona bağlı gösterim effect'leri boşuna tekrar çalışıyor.
+  // (Aynı hata sınıfı AnimatedNumber'da sayaçları dondurmuştu.)
+  const inCategory = useMemo(
+    () => (filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants),
+    [restaurants, filterCat]
+  );
 
   // Konum: kaba doğrulukta, yalnızca sıralama için. İzin zaten verilmişse
   // sessizce alınır; verilmemişse istem açılmaz, varsayılan merkez kullanılır
