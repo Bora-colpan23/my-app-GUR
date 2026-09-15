@@ -112,6 +112,9 @@ gur/
     │   ├── invites.js         # havuz daveti: kanal seçimi + mailto taslağı
     │   ├── geo.js             # konum izni, elle ilçe seçimi, başlangıç noktası
     │   ├── moderation.js      # yayın öncesi onay kuyruğu (mekan + alan değişikliği)
+    │   ├── requests.js        # işletmenin teklif talepleri (satın alma YOK)
+    │   ├── creatives.js        # reklam materyali yükleme (banner / ödüllü video …)
+    │   ├── import-restaurants.js  # Excel/CSV ile toplu restoran yükleme
     │   ├── second-chance.js   # haftalık yeniden gösterim paketi + geçilenler
     │   └── social-auth.js     # Google / Apple ile giriş
     ├── app/GurApp.jsx         # Tüketici uygulaması
@@ -137,6 +140,8 @@ yazıyorlar. Bağ ekranlarda değil depolarda:
 | `lib/geo.js` | tüketici (izin / seçilen ilçe) | deste sıralaması, konum çipi |
 | `lib/moderation.js` | işletme + besleme → yönetici (karar) | tüketici destesi |
 | `lib/second-chance.js` | işletme (paket) + tüketici (gösterim) | deste kurulumu, işletme paneli |
+| `lib/requests.js` | işletme (teklif iste) → yönetici (fiyatla/kapat) | yönetici bildirimi, işletme paneli |
+| `lib/creatives.js` | yönetici (reklam materyali) | yönetici hizmet listesi |
 | `data/restaurants.js` | tohum/besleme | üçü de |
 
 Bir mekanın kimliği tek yerde: `account` alanı işletmenin hesabı olup
@@ -549,6 +554,11 @@ Kurallar:
   tanımlama**. Katalogda `hex`/`hexInk` de var: yönetici paneli `GurStyles`
   render etmediği için orada `var()` çözülmez.
 
+### Havuz rozeti "API" yazar
+`SOURCE_LABEL` üç değer taşır: **API** (dış besleme), **Sahiplenilmiş**,
+**Elle eklendi**. Eskiden "Dış besleme" yazıyordu; panelde bakan kişi
+Google Places / OSM beslemesini API olarak biliyor, teknik adı daha net.
+
 ### Havuz daveti: e-posta nereden geliyor
 `src/lib/invites.js`. Burada iki şeyi doğru bilmek gerekiyor:
 
@@ -695,6 +705,110 @@ zaten göreceği kart için para almıyoruz (`zatenVar` kontrolü).
 Sunucu karşılığı: `second_chance_packages` + `second_chance_impressions`
 (migration 004). Tek aktif paket kuralı kısmi tekil indeksle veritabanı
 seviyesinde zorlanıyor — uygulama katmanında kontrol yarış koşulunda yetmez.
+
+### İşletme HİÇBİR ŞEY satın alamaz — teklif ister
+
+Doyurucu panelinde "Satın al" diye bir düğme **yok** ve olmayacak. Bütün
+ücretli kalemler (banner, push, ödüllü video, anlık fırsat, İkinci Şans
+paketi, Gastro şef videosu) tek bir akıştan geçiyor:
+
+```
+işletme "Teklif iste"  →  yöneticide talep kuyruğu + bildirim
+      →  yönetici fiyatı yazıp teklif gönderir
+      →  işletme kabul/ret  →  hizmet açılır
+```
+
+Neden: fiyat müzakereye açık ve her mekan için aynı değil. Panelde sabit
+bir fiyat gösterip "satın al" demek, pazarlığı olan bir kalemi liste
+fiyatından satmak olurdu. Kartlarda yazan rakam bu yüzden **"liste:"**
+önekiyle geçiyor — teklif değil, başlangıç noktası.
+
+Depo `src/lib/requests.js`. Bilinmesi gereken üç kural:
+
+- **Bir (restoran, hizmet) çifti için aynı anda tek açık talep.** İşletme
+  düğmeye üç kez basarsa yöneticinin önüne üç iş değil bir iş çıkar.
+- **Teklif göndermek talebi KAPATMAZ**, yalnızca `quoted` yapar. İşletme
+  reddederse ikinci bir teklif gidebilmeli; talep hâlâ geçerli.
+- `unseenCount` yalnızca `open` ve `quoted` talepleri sayar. Kapatılmış ya
+  da geri çekilmiş talep bildirimde durmaz.
+
+İşletme talebini **geri çekebilir** ("Vazgeç") — istenmeden gönderilmiş bir
+talep için yöneticiyi beklemek gerekmiyor.
+
+### Yönetici paneli: bildirim çanı
+Başlıktaki çan üç kaynaktan gelen bekleyen işi tek listede topluyor: teklif
+talepleri, sahiplenme başvuruları, moderasyon kuyruğu. Satıra basınca ilgili
+sayfaya gidiyor. Eskiden çan yalnızca bir nokta çiziyordu ve tıklanınca
+hiçbir şey olmuyordu — **çalışmayan bir bildirim, olmayandan kötüdür.**
+
+Rozetteki sayı yalnızca **teklif taleplerini** sayıyor: başvuru ve
+moderasyon kuyruğunun kendi sayaçları kenar çubuğunda duruyor, aynı sayıyı
+iki yerde göstermek "iki ayrı iş var" gibi okunurdu.
+
+**"Okundu" işareti liste KAPANIRKEN düşüyor, açılırken değil.** Açılışta
+işaretlenseydi yeni satırın turuncu noktası aynı karede silinir ve hangisinin
+yeni geldiği hiç görünmezdi.
+
+### Reklam materyali: yükleme yönetici panelinde
+Ödüllü video **kullanıcı özelliği**: kaydırma hakkı biten kullanıcı reklam
+izleyip hak kazanıyor. Mekanizmanın restoranla ilgisi yok; restoranın satın
+aldığı şey o akışta **yayınlanma hakkı**. Hizmet listesinde bu ayrım
+"kullanıcı özelliği" çipiyle ve satırın altındaki açıklamayla yazılı —
+yoksa "restoranlar kaydırma hakkı mı satıyor" diye okunuyordu.
+
+Materyaller (`src/lib/creatives.js`) yönetici panelinde, Hizmetler
+sayfasında her hizmetin **kendi satırında**: "Materyaller" düğmesi o
+hizmetin yükleme alanını açıyor. Altı yuvanın her biri kendi türünü ve
+boyut sınırını taşıyor (`SLOTS`): banner 1.5 MB görsel, ödüllü video 4 MB
+dikey video, Gastro şef videosu 5 MB…
+
+Üç karar:
+- **Satır satır açılıyor**, hepsi birden değil: altı yükleme kutusu açıkken
+  katalogun kendisi kayboluyordu.
+- Dosya **data URL** olarak localStorage'a yazılıyor (sunucu tarafı yok).
+  Kota taşarsa `write()` **hata fırlatıyor**, sessizce yutmuyor: yüklediğini
+  sanıp kaybetmek en kötü sonuç.
+- Yükleme **taslak** olarak geliyor; "Yayına al" ayrı bir adım. Yanlış
+  dosya sürüklemek yayına çıkmak anlamına gelmemeli.
+
+### Excel ile toplu restoran yükleme
+Moderasyon sayfası → "Excel ile toplu yükle". Şablonu indir → doldur →
+yükle → **önizlemeyi onayla**. `src/lib/import-restaurants.js`.
+
+- **SheetJS dinamik yükleniyor** (`await import('xlsx')`): küçültülmüş hâli
+  ~430 kB, yönetici panelinin tamamından iki kat büyük. Statik import
+  olsaydı paneli açan herkes indirirdi. Tek dosyalık artifact derlemesinde
+  `inlineDynamicImports` hepsini tek parçaya katıyor, orada fark yok.
+- **Hiçbir şey yazılmadan önce doğrulanıyor.** Yarısı hatalı bir dosyayı
+  yarıya kadar işlemek, yöneticiyi hangi satırın girdiğini elle aramaya
+  zorlardı. Hatalı satırlar **atlanıyor**, dosya reddedilmiyor: doksan doğru
+  satır için on hatalıyı beklemek gereksiz.
+- Yakalananlar: zorunlu alan boş, dosyada aynı ad iki kez, havuzda zaten
+  olan ad. Her biri satır numarasıyla yazılı.
+- Başlık eşlemesi **gevşek**: büyük/küçük harf, boşluk ve zorunluluk
+  yıldızı yok sayılıyor; sıra önemli değil. Şablonu Excel'de açıp başlığa
+  dokunan kullanıcı dosyayı bozmuş olmuyor.
+- CSV aynı yoldan geçiyor — SheetJS biçimi kendi tanıyor, ikinci bir
+  ayrıştırıcı iki ayrı hata kaynağı demekti.
+- Kayıtlar **sahiplenilmemiş** ve doğrudan **yayında** açılıyor (elle
+  restoran oluşturmayla aynı kural: yönetici zaten onaylayan merci).
+- Şablon indirmesi artifact kum havuzunda engelli olabiliyor; o durumda
+  başlık satırı ekranda gösterilip kopyalatılıyor.
+
+### Gastro şef paketi: altın paket
+Katalogdaki tek "üst raf" kalem — şef çekimi yapılıyor, Gastro Onaylı
+kategorisine giriyor, en pahalısı. Diğer hizmetlerle aynı gri satırda
+durunca farkı okunmuyordu; kendi altın yüzeyi, `★` öneki ve "ALTIN PAKET"
+çipi var. Üstünden geçen parıltı `.gur-gold-sheen` (`src/ui/kit.jsx`),
+`prefers-reduced-motion`'da duruyor.
+
+Altın **yeni bir renk ailesi değil**: palete kalıcı jeton eklenmedi,
+yalnızca bu tek ürünün kimliği (`GOLD`, `GurAdmin.jsx`). Yeni bir
+yeşil/kırmızı/amber yazmama kuralı duruyor — altın bir DURUM değil.
+
+İki temada iki ayrı sorun var: koyu zeminde altın metin parlıyor ama beyaz
+kâğıtta aynı ton (`#E9C456`, beyazla 1.7:1) okunmuyor. Mürekkep bu yüzden
+açık temada koyulaşıyor (`#7A5B0B`, 6.4:1).
 
 ### Yönetici paneli: Hizmetler ve arama
 **Hizmetler** sayfası sattığımız her kalemi tek listede gösteriyor: kaç

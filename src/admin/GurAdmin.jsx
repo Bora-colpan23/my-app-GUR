@@ -8,6 +8,9 @@ import * as pricing from '../lib/pricing.js';
 import { ASSIGNABLE, badgesOf, toggleBadge, useBadgeMap } from '../lib/badges.js';
 import { channelOf, inviteOf, sendInvite, useInvites } from '../lib/invites.js';
 import { useModeration, pendingChanges, pendingVenues, approveChange, rejectChange, decideVenue } from '../lib/moderation.js';
+import { useRequests, openRequests, requestFor, markQuoted, close as closeRequest, unseenCount, markAllSeen } from '../lib/requests.js';
+import { useCreatives, SLOTS, listFor, addCreative, removeCreative, toggleLive, liveCount } from '../lib/creatives.js';
+import { TEMPLATE_COLUMNS, templateHeaderLine, downloadTemplate, parseRestaurantFile } from '../lib/import-restaurants.js';
 
 // ═══════════════════════════════════════════════════════════════
 // GUR YÖNETİCİ PANELİ — Platform kontrol merkezi
@@ -44,6 +47,7 @@ import { useModeration, pendingChanges, pendingVenues, approveChange, rejectChan
 // ═══════════════════════════════════════════════════════════════════════
 
 const LIGHT = {
+  isDark: false,
   bg: '#EEF0F3',
   panel: '#FFFFFF',
   panel2: '#F3F4F7',
@@ -93,6 +97,7 @@ const LIGHT = {
 // yükseldikçe açılıyor: koyu arayüzde yükseklik gölgeyle değil zeminin
 // açılmasıyla anlatılır — siyah bir gölge zaten siyah zeminde görünmez.
 const DARK = {
+  isDark: true,
   bg: '#0E1116',
   panel: '#171C23',
   panel2: '#212832',
@@ -675,6 +680,10 @@ const icons = {
   sun: <><circle cx="12" cy="12" r="4" /><line x1="12" y1="2" x2="12" y2="5" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="2" y1="12" x2="5" y2="12" /><line x1="19" y1="12" x2="22" y2="12" /><line x1="4.9" y1="4.9" x2="7" y2="7" /><line x1="17" y1="17" x2="19.1" y2="19.1" /><line x1="4.9" y1="19.1" x2="7" y2="17" /><line x1="17" y1="7" x2="19.1" y2="4.9" /></>,
   moon: <><path d="M20 14.5A8.5 8.5 0 019.5 4a7 7 0 108.9 10.4c.5.1 1 .1 1.6.1z" /></>,
   plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
+  play: <><polygon points="6 4 20 12 6 20 6 4" /></>,
+  upload: <><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>,
+  sheet: <><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /></>,
+  trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></>,
   eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>,
   doc: <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></>,
   trend: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></>,
@@ -1091,6 +1100,37 @@ export default function GurAdmin() {
   const modQueue = useModeration();
   const modCount = pendingChanges(modQueue).length + pendingVenues(restaurants, modQueue).length;
 
+  // ─── BİLDİRİMLER ───
+  // Üç kaynaktan gelen bekleyen iş tek listede. Rozet YALNIZCA görülmemiş
+  // teklif taleplerini sayıyor; başvuru ve moderasyon kuyruğunun kendi
+  // sayaçları kenar çubuğunda duruyor ve aynı sayıyı iki yerde göstermek
+  // "iki ayrı iş var" gibi okunurdu.
+  const [bildirimAcik, setBildirimAcik] = useState(false);
+  const talepler = useRequests();
+  // "Okundu" işareti liste KAPANIRKEN düşüyor, açılırken değil: açılışta
+  // işaretlenseydi yeni satırın turuncu noktası aynı karede silinir ve
+  // hangisinin yeni geldiği hiç görünmezdi.
+  const kapatBildirim = () => { setBildirimAcik(false); markAllSeen(); };
+  const bildirimSayisi = unseenCount(talepler);
+  const bildirimler = [
+    ...openRequests(talepler).map(t => ({
+      id: t.id, sayfa: 'pricing',
+      baslik: `${t.restaurantName} teklif istedi`,
+      alt: `${t.streamName}${t.status === 'quoted' ? ' · teklif gönderildi' : ''}`,
+      at: t.at, yeni: !t.seen,
+    })),
+    ...(apps.length ? [{
+      id: 'apps', sayfa: 'applications',
+      baslik: `${apps.length} sahiplenme başvurusu`,
+      alt: 'vergi levhası doğrulaması bekliyor', at: null, yeni: false,
+    }] : []),
+    ...(modCount ? [{
+      id: 'mod', sayfa: 'moderation',
+      baslik: `${modCount} kayıt onay bekliyor`,
+      alt: 'yeni mekan ve bilgi değişiklikleri', at: null, yeni: false,
+    }] : []),
+  ];
+
   /**
    * Yöneticinin elle eklediği restoran. Sahiplenme akışını atlar ve
    * doğrudan yayınlanır — yönetici zaten onaylayan merci, kendi kaydını
@@ -1117,6 +1157,33 @@ export default function GurAdmin() {
       return [yeni, ...prev];
     });
     showToast(`${data.name} oluşturuldu ve yayınlandı.`);
+  };
+
+  /**
+   * Excel/CSV'den gelen toplu kayıt.
+   *
+   * Tek tek `createRestaurant` çağırmak da çalışırdı (her biri fonksiyonel
+   * güncelleme), ama yüz satır için yüz toast çıkardı ve React yüz kez
+   * yeniden çizerdi. Tek `setRestaurants`, tek özet.
+   */
+  const createRestaurantsBulk = (list) => {
+    if (!list.length) return;
+    setRestaurants(prev => {
+      let enBuyuk = prev.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0);
+      const yeniler = list.map(data => ({
+        id: ++enBuyuk,
+        name: data.name, cat: data.cat, district: data.district,
+        addr: data.addr || `${data.district}, İstanbul`,
+        phone: data.phone || '', desc: data.desc || '',
+        rating: 0, reviews: 0, price: '₺₺',
+        status: 'active', account: false, source: 'manual',
+        joined: new Date().toISOString().slice(0, 10),
+        gastro: false, claimed: false,
+        imgs: [], menu: [], popular: [], tags: [],
+      }));
+      return [...yeniler, ...prev];
+    });
+    showToast(`${list.length} restoran içe aktarıldı ve yayınlandı.`);
   };
 
   const nav = [
@@ -1218,13 +1285,37 @@ export default function GurAdmin() {
           {SEARCHABLE[page] && (
             <SearchBar value={query} onChange={setQuery} placeholder={SEARCHABLE[page]} />
           )}
-          <IconBtn
-            title="Bildirimler"
-            icon={<>
-              <Icon path={icons.bell} size={17} color={C.dim} />
-              {apps.length > 0 && <span style={{ position: 'absolute', top: 8, right: 9, width: 7, height: 7, borderRadius: '50%', background: C.orange }} />}
-            </>}
-          />
+          {/* Çan artık gerçekten çalışıyor: üç kaynaktan gelen bekleyen
+              işi tek listede topluyor ve satıra basınca ilgili sayfaya
+              gidiyor. Eskiden yalnızca bir nokta çiziyordu, tıklanınca
+              hiçbir şey olmuyordu — çalışmayan bir bildirim, olmayandan
+              kötüdür. */}
+          <div style={{ position: 'relative' }}>
+            <IconBtn
+              title="Bildirimler"
+              onClick={() => (bildirimAcik ? kapatBildirim() : setBildirimAcik(true))}
+              icon={<>
+                <Icon path={icons.bell} size={17} color={C.dim} />
+                {bildirimSayisi > 0 && (
+                  <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16,
+                    padding: '0 4px', borderRadius: R.pill, background: C.orange, color: C.onBrand,
+                    border: `2px solid ${C.panel}`, fontSize: 9.5, fontWeight: 800,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {bildirimSayisi}
+                  </span>
+                )}
+              </>}
+            />
+            <AnimatePresence>
+              {bildirimAcik && (
+                <NotificationList
+                  items={bildirimler}
+                  onClose={kapatBildirim}
+                  onGo={(sayfa) => { kapatBildirim(); goPage(sayfa); }}
+                />
+              )}
+            </AnimatePresence>
+          </div>
         </header>
 
         {/* Sayfa içeriği */}
@@ -1246,7 +1337,8 @@ export default function GurAdmin() {
           {page === 'pool' && <VenuePoolPage restaurants={restaurants} query={query} onOpen={openStore} />}
           {page === 'moderation' && (
             <ModerationPage restaurants={restaurants} query={query}
-              onCreate={createRestaurant} onOpen={setOpenRestaurantId} />)}
+              onCreate={createRestaurant} onCreateMany={createRestaurantsBulk}
+              onOpen={setOpenRestaurantId} />)}
           {page === 'services' && (
             <ServicesPage restaurants={restaurants} query={query}
               onOpenStream={k => { setQuery(''); setPricingStream(k); setPage('pricing'); }} />)}
@@ -1905,6 +1997,148 @@ function SearchBar({ value, onChange, placeholder = 'Ara...', width = 280 }) {
   );
 }
 
+/**
+ * Bir hizmetin reklam materyalleri: yükleme alanı + yüklenenlerin listesi.
+ *
+ * Hizmetler sayfasında ilgili satırın altında açılıyor — envanteri
+ * yönettiğin yerin yanında. Ayrı bir "Materyaller" sayfası olsaydı
+ * "banner'ı kim aldı" ile "banner'da ne yayında" iki ayrı yere düşerdi.
+ *
+ * YÜKLEMEK YAYINLAMAK DEĞİL: dosya geldikten sonra yönetici kontrol edip
+ * "Yayına al"a basıyor. Tek adımda yayına almak, yanlış dosyayı anında
+ * canlıya çıkarmak olurdu.
+ */
+function CreativeSlot({ streamKey }) {
+  const state = useCreatives();
+  const slot = SLOTS[streamKey];
+  const liste = listFor(streamKey, state);
+  const [hata, setHata] = useState('');
+  const [yukluyor, setYukluyor] = useState(false);
+  const girdiRef = useRef(null);
+
+  if (!slot) return null;
+
+  const sec = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';                       // aynı dosya tekrar seçilebilsin
+    if (!f) return;
+    setHata(''); setYukluyor(true);
+    try { await addCreative(streamKey, f); }
+    catch (err) { setHata(err.message || 'Yükleme başarısız.'); }
+    finally { setYukluyor(false); }
+  };
+
+  return (
+    <div style={{ marginTop: 12, padding: '13px 15px', borderRadius: 12,
+      background: C.panel2, border: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+        <span style={{ fontSize: 12.5, fontWeight: 700 }}>{slot.label}</span>
+        <span style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>
+          {liste.length} dosya · {liveCount(streamKey, state)} yayında
+        </span>
+        <div style={{ flex: 1 }} />
+        <input ref={girdiRef} type="file" accept={slot.accept} onChange={sec}
+          style={{ display: 'none' }} aria-label={`${slot.label} dosyası seç`} />
+        <Btn label={yukluyor ? 'Yükleniyor…' : 'Dosya yükle'} size="sm" variant="outline"
+          loading={yukluyor} onClick={() => girdiRef.current?.click()}
+          icon={<Icon path={icons.plus} size={13} color={C.dim} />} />
+      </div>
+      <div style={{ fontFamily: FB, fontSize: 11.5, color: C.dim, lineHeight: 1.5 }}>
+        {slot.hint} · en fazla {slot.maxMB} MB
+      </div>
+      {hata && (
+        <div role="status" style={{ marginTop: 9, background: C.redSoft, border: `1px solid ${C.red}44`,
+          borderRadius: 8, padding: '7px 10px', fontSize: 11.5, color: C.redInk }}>{hata}</div>
+      )}
+      {liste.map(cr => (
+        <div key={cr.id} style={{ marginTop: 9, display: 'flex', alignItems: 'center', gap: 10,
+          background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px' }}>
+          <div style={{ width: 44, height: 34, borderRadius: 6, overflow: 'hidden', flexShrink: 0,
+            background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {cr.type?.startsWith('image/')
+              ? <img src={cr.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <Icon path={icons.play} size={15} color={C.faint} />}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cr.name}</div>
+            <div style={{ fontFamily: FB, fontSize: 10.5, color: C.faint }}>
+              {cr.sizeMB} MB{cr.restaurantName ? ` · ${cr.restaurantName}` : ''}
+            </div>
+          </div>
+          {/* Yayın durumu renkle DEĞİL yazıyla: "yayında" / "taslak". */}
+          <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 700,
+            color: cr.live ? C.greenInk : C.faint,
+            background: cr.live ? C.greenSoft : C.panel2,
+            borderRadius: R.pill, padding: '2px 8px' }}>
+            {cr.live ? 'yayında' : 'taslak'}
+          </span>
+          <Btn label={cr.live ? 'Yayından al' : 'Yayına al'} size="sm"
+            variant={cr.live ? 'soft' : 'filled'} tone={cr.live ? 'yellow' : 'green'}
+            onClick={() => toggleLive(streamKey, cr.id)} />
+          <IconBtn size={28} title="Sil" danger onClick={() => removeCreative(streamKey, cr.id)}
+            icon={<Icon path={icons.trash} size={13} color={C.redInk} />} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Bildirim listesi. Başlıktaki çanın altından açılan panel.
+ *
+ * Perde YOK ama dışarı tıklayınca kapanıyor: modal değil, hızlı bir
+ * bakış. Perde koymak "bu bir karar ekranı" der, oysa buradan yalnızca
+ * ilgili sayfaya geçiliyor.
+ */
+function NotificationList({ items = [], onClose, onGo }) {
+  return (
+    <>
+      {/* Görünmez kapatma katmanı — panelin ALTINDA (z-index) ki satırlara
+          basılabilsin. */}
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 400 }} />
+      <motion.div
+        initial={{ opacity: 0, y: -6, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -4, scale: 0.98 }}
+        transition={{ type: 'spring', bounce: 0, duration: 0.24 }}
+        role="dialog" aria-label="Bildirimler"
+        style={{
+          position: 'absolute', top: 46, right: 0, width: 340, zIndex: 401,
+          ...CARD, boxShadow: ELEV.raised, overflow: 'hidden', maxHeight: 420, overflowY: 'auto',
+        }}>
+        <div style={{ padding: '13px 16px', borderBottom: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13.5, fontWeight: 700 }}>Bildirimler</span>
+          <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>{items.length} bekleyen iş</span>
+        </div>
+        {items.length === 0 ? (
+          <div style={{ padding: '26px 16px', textAlign: 'center', fontFamily: FB, fontSize: 12.5, color: C.faint }}>
+            Bekleyen iş yok.
+          </div>
+        ) : items.map(b => (
+          <button key={b.id} type="button" onClick={() => onGo?.(b.sayfa)}
+            className="gur-admin-btn"
+            style={{
+              display: 'block', width: '100%', textAlign: 'left', border: 'none',
+              borderTop: `1px solid ${C.border}`, background: 'transparent',
+              padding: '12px 16px', cursor: 'pointer', color: C.text,
+              '--btn-bg': 'transparent', '--btn-bg-hover': C.panel2,
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Yeni olan işaretli; renk tek başına bilgi taşımasın diye
+                  nokta ayrı bir nesne, metnin rengi değişmiyor. */}
+              {b.yeni && <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.orange, flexShrink: 0 }} />}
+              <span style={{ fontSize: 13, fontWeight: 700 }}>{b.baslik}</span>
+            </div>
+            <div style={{ fontFamily: FB, fontSize: 11.5, color: C.dim, marginTop: 3 }}>
+              {b.alt}{b.at ? ` · ${new Date(b.at).toLocaleString('tr')}` : ''}
+            </div>
+          </button>
+        ))}
+      </motion.div>
+    </>
+  );
+}
+
 /** Liste boşken satır yüksekliğini koruyan tek satır. */
 function EmptyRow({ text }) {
   return (
@@ -1929,13 +2163,14 @@ const MOD_ALAN = {
   price: 'Fiyat aralığı', phone: 'Telefon', addr: 'Adres',
 };
 
-function ModerationPage({ restaurants = [], query = '', onCreate, onOpen }) {
+function ModerationPage({ restaurants = [], query = '', onCreate, onCreateMany, onOpen }) {
   const mod = useModeration();
   const changes = pendingChanges(mod);
   const venues = pendingVenues(restaurants, mod);
   const [edit, setEdit] = useState(null);
   const [draft, setDraft] = useState({});
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const q = query.trim().toLocaleLowerCase('tr');
   const esles = ad => !q || String(ad || '').toLocaleLowerCase('tr').includes(q);
@@ -1955,11 +2190,15 @@ function ModerationPage({ restaurants = [], query = '', onCreate, onOpen }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontFamily: FB, fontSize: 12.5, color: C.dim, maxWidth: 640, lineHeight: 1.6 }}>
-          Dış beslemeden gelen yeni mekanlar ve işletmelerin panelden girdiği bilgiler
+          API'den gelen yeni mekanlar ve işletmelerin panelden girdiği bilgiler
           önce buraya düşer. <b>Onaylanmadan tüketici uygulamasında görünmezler.</b>
         </div>
-        <Btn label="Restoran oluştur" onClick={() => setCreating(true)} variant="filled" tone="orange"
-          icon={<Icon path={icons.plus} size={15} color={C.onBrand} />} />
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Btn label="Excel ile toplu yükle" onClick={() => setImporting(true)} variant="outline"
+            icon={<Icon path={icons.upload} size={15} color={C.dim} />} />
+          <Btn label="Restoran oluştur" onClick={() => setCreating(true)} variant="filled" tone="orange"
+            icon={<Icon path={icons.plus} size={15} color={C.onBrand} />} />
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 18 }}>
@@ -1978,7 +2217,7 @@ function ModerationPage({ restaurants = [], query = '', onCreate, onOpen }) {
               <div style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700 }}>{r.name}</div>
                 <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
-                  {r.cat} · {r.district} · ★ {r.rating} · dış beslemeden geldi
+                  {r.cat} · {r.district} · ★ {r.rating} · API'den geldi
                 </div>
               </div>
               <Btn label="Detay" onClick={() => onOpen?.(r.id)} variant="outline" size="sm"
@@ -2039,6 +2278,8 @@ function ModerationPage({ restaurants = [], query = '', onCreate, onOpen }) {
           </Modal>
         )}
         {creating && <CreateRestaurantModal onClose={() => setCreating(false)} onCreate={onCreate} />}
+        {importing && <ImportRestaurantsModal onClose={() => setImporting(false)}
+          onCreateMany={onCreateMany} existingNames={restaurants.map(r => r.name)} />}
       </AnimatePresence>
     </div>
   );
@@ -2089,6 +2330,139 @@ function CreateRestaurantModal({ onClose, onCreate }) {
         Sahiplenilene kadar masa ayırtma kapalı kalır.
       </div>
       <Btn label="Oluştur ve yayınla" onClick={kaydet} variant="filled" tone="orange" size="md" fullWidth />
+    </Modal>
+  );
+}
+
+/**
+ * Excel / CSV ile toplu restoran yükleme.
+ *
+ * Akış üç adım: şablonu indir → dosyayı seç → ÖNİZLEMEYİ onayla. Ortadaki
+ * adımda hiçbir şey yazılmıyor; dosya okunup satır satır doğrulanıyor ve
+ * sonuç ekranda duruyor. "Yükle" düğmesine basmadan havuza tek kayıt
+ * girmiyor — yüz satırlık bir dosyanın yarısı hatalıysa yönetici bunu
+ * yazıldıktan sonra değil, önce görüyor.
+ *
+ * Hatalı satırlar ATLANIYOR, dosyayı reddetmiyoruz: doksan doğru satır
+ * için on hatalıyı düzeltmeyi beklemek gereksiz. Kaç satırın atlandığı ve
+ * hangi satır numarasında ne olduğu listede yazılı.
+ */
+function ImportRestaurantsModal({ onClose, onCreateMany, existingNames = [] }) {
+  const girdiRef = useRef(null);
+  const [satirlar, setSatirlar] = useState(null);
+  const [dosyaAdi, setDosyaAdi] = useState('');
+  const [hata, setHata] = useState('');
+  const [mesgul, setMesgul] = useState(false);
+  // İndirme engellenirse (artifact kum havuzu sayfanın kendi başlattığı
+  // indirmelere izin vermiyor) başlık satırı ekranda gösterilir.
+  const [basliklar, setBasliklar] = useState('');
+
+  const sablon = async () => {
+    const oldu = await downloadTemplate();
+    if (!oldu) setBasliklar(templateHeaderLine());
+  };
+
+  const sec = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setMesgul(true); setHata(''); setSatirlar(null); setDosyaAdi(f.name);
+    try {
+      setSatirlar(await parseRestaurantFile(f, existingNames));
+    } catch (err) {
+      setHata(err?.message || 'Dosya okunamadı.');
+    } finally {
+      setMesgul(false);
+    }
+  };
+
+  const gecerli = (satirlar || []).filter(r => !r.errors.length);
+  const hatali = (satirlar || []).filter(r => r.errors.length);
+
+  const yukle = () => {
+    onCreateMany?.(gecerli.map(r => r.data));
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose} title="Excel ile toplu restoran yükleme" width={720}
+      subtitle="Şablonu doldurup yükleyin. Kayıtlar doğrudan yayınlanır, moderasyon kuyruğuna düşmez.">
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        <Btn label="Şablonu indir (.xlsx)" onClick={sablon} variant="outline"
+          icon={<Icon path={icons.sheet} size={15} color={C.dim} />} />
+        <Btn label={mesgul ? 'Okunuyor…' : 'Dosya seç (.xlsx / .csv)'} loading={mesgul}
+          onClick={() => girdiRef.current?.click()} variant="filled" tone="orange"
+          icon={<Icon path={icons.upload} size={15} color={C.onBrand} />} />
+        <input ref={girdiRef} type="file" accept=".xlsx,.xls,.csv" onChange={sec}
+          style={{ display: 'none' }} aria-hidden="true" tabIndex={-1} />
+      </div>
+
+      {basliklar && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 9,
+          padding: '10px 12px', marginBottom: 14 }}>
+          <div style={{ fontFamily: FB, fontSize: 11.5, color: C.dim, marginBottom: 6 }}>
+            Tarayıcı indirmeyi engelledi. Aşağıdaki satırı Excel'in ilk satırına yapıştırın:
+          </div>
+          <code style={{ fontFamily: FM, fontSize: 11.5, color: C.text, wordBreak: 'break-word' }}>
+            {basliklar.replace(/\t/g, '  |  ')}
+          </code>
+        </div>
+      )}
+
+      <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.6, marginBottom: 14 }}>
+        Sütunlar: {TEMPLATE_COLUMNS.map(c => c.header + (c.required ? '*' : '')).join(' · ')}
+        {' '}— yıldızlı alanlar zorunlu. Başlık sırası önemli değil, adları eşleşiyor olmalı.
+      </div>
+
+      {hata && (
+        <div role="status" style={{ background: C.redSoft, border: `1px solid ${C.red}44`, borderRadius: 9,
+          padding: '9px 12px', marginBottom: 14, fontSize: 12, color: C.redInk }}>{hata}</div>
+      )}
+
+      {satirlar && (
+        <>
+          <div role="status" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <span style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: C.greenInk,
+              background: C.greenSoft, borderRadius: R.pill, padding: '3px 10px' }}>
+              {gecerli.length} satır yüklenecek
+            </span>
+            {hatali.length > 0 && (
+              <span style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: C.redInk,
+                background: C.redSoft, borderRadius: R.pill, padding: '3px 10px' }}>
+                {hatali.length} satır atlanacak
+              </span>
+            )}
+            <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, alignSelf: 'center' }}>{dosyaAdi}</span>
+          </div>
+
+          <div style={{ maxHeight: 280, overflowY: 'auto', border: `1px solid ${C.border}`,
+            borderRadius: 10, marginBottom: 14 }}>
+            {satirlar.map(r => (
+              <div key={r.line} style={{ padding: '9px 12px', borderBottom: `1px solid ${C.border}`,
+                display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                background: r.errors.length ? C.redSoft : 'transparent' }}>
+                <span style={{ fontFamily: FM, fontSize: 11, color: C.faint, minWidth: 34 }}>#{r.line}</span>
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700 }}>{r.data.name || '—'}</div>
+                  <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>
+                    {[r.data.cat, r.data.district].filter(Boolean).join(' · ') || 'kategori/ilçe yok'}
+                  </div>
+                </div>
+                {/* Renk tek başına bilgi taşımaz: durum yazıyla da yazılı. */}
+                <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700,
+                  color: r.errors.length ? C.redInk : C.greenInk }}>
+                  {r.errors.length ? `atlanacak — ${r.errors.join(', ')}` : 'hazır'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <Btn label={gecerli.length ? `${gecerli.length} restoranı yükle ve yayınla` : 'Yüklenecek satır yok'}
+        onClick={yukle} variant="filled" tone="orange" size="md" fullWidth
+        disabled={!gecerli.length} />
     </Modal>
   );
 }
@@ -3248,7 +3622,34 @@ function UsersPage({ query }) {
 // Uygulamada görünüyorlar (kullanıcı onları da keşfediyor) ama bize ödeme
 // yapmıyorlar — satışın başlayacağı liste burası.
 // ═══════════════════════════════════════════════════════════════════════
-const SOURCE_LABEL = { api: 'Dış besleme', owner: 'Sahiplenilmiş' };
+/**
+ * ALTIN PAKET — Gastro şef videosu.
+ *
+ * Katalogdaki tek "üst raf" kalem: şef çekimi yapılıyor, Gastro Onaylı
+ * kategorisine giriyor ve en pahalısı. Diğer hizmetlerle aynı gri satırda
+ * durunca farkı okunmuyordu, bu yüzden kendi altın yüzeyi var.
+ *
+ * Altın YENİ BİR RENK AİLESİ DEĞİL: palete kalıcı bir jeton eklenmedi,
+ * yalnızca bu tek satırın yüzeyi. Yeni bir yeşil/kırmızı/amber yazmama
+ * kuralı duruyor — altın bir DURUM değil, tek bir ürünün kimliği.
+ *
+ * İki temada iki farklı sorun var: koyu zeminde altın metin parlıyor ama
+ * beyaz kâğıtta aynı ton (#E9C456, beyazla 1.7:1) okunmuyor. Bu yüzden
+ * mürekkep açık temada koyulaşıyor (#7A5B0B, beyazla 6.4:1).
+ */
+const GOLD = live({
+  bg: () => C.isDark
+    ? 'linear-gradient(135deg, rgba(212,175,55,0.15), rgba(120,86,12,0.07))'
+    : 'linear-gradient(135deg, rgba(233,196,86,0.20), rgba(255,244,214,0.55))',
+  border: () => C.isDark ? 'rgba(233,196,86,0.40)' : 'rgba(180,140,30,0.38)',
+  ink: () => C.isDark ? '#E9C456' : '#7A5B0B',
+  soft: () => C.isDark ? 'rgba(233,196,86,0.16)' : 'rgba(233,196,86,0.30)',
+});
+
+// Rozet 'API' yazıyor: kaydın nereden geldiğini teknik adıyla söylemek
+// 'dış besleme'den daha net — panelde bakan kişi Google Places / OSM
+// beslemesini API olarak biliyor.
+const SOURCE_LABEL = { api: 'API', owner: 'Sahiplenilmiş', manual: 'Elle eklendi' };
 
 // Havuzdaki mekana sahiplenme daveti.
 //
@@ -3317,7 +3718,7 @@ function VenuePoolPage({ restaurants = [], query = '', onOpen }) {
 
       <section style={{ ...CARD, overflow: 'hidden' }}>
         <SectionHead title="Sahiplenilmemiş mekanlar"
-          right="dış beslemeden gelir · panel girişi yok" />
+          right="API'den gelir · panel girişi yok" />
 
         <div style={{ padding: '12px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>Sırala:</span>
@@ -3338,7 +3739,7 @@ function VenuePoolPage({ restaurants = [], query = '', onOpen }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 2 }}>
                 <span style={{ fontSize: 13.5, fontWeight: 600 }}>{r.name}</span>
-                <Badge text={SOURCE_LABEL[r.source] || 'Dış besleme'} color={C.blue} soft={C.blueSoft} />
+                <Badge text={SOURCE_LABEL[r.source] || 'API'} color={C.blue} soft={C.blueSoft} />
               </div>
               <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
                 {r.cat} · {r.district} · ★ {r.rating} ({r.reviews.toLocaleString('tr')} yorum) · havuza {formatDate(r.joined)} girdi
@@ -3449,6 +3850,10 @@ function OfferField({ current, offer, onSend }) {
 // ═══════════════════════════════════════════════════════════════════════
 function ServicesPage({ restaurants = [], query = '', onOpenStream }) {
   const store = pricing.usePricing();
+  // Materyal alanı satır satır açılıyor: altısı birden açık olsaydı sayfa
+  // yükleme kutularından ibaret kalır, katalogun kendisi kaybolurdu.
+  const [acik, setAcik] = useState(null);
+  useCreatives();
   const q = query.trim().toLocaleLowerCase('tr');
 
   const rows = REVENUE_STREAMS.map(sv => {
@@ -3482,20 +3887,52 @@ function ServicesPage({ restaurants = [], query = '', onOpenStream }) {
       <section style={{ ...CARD, overflow: 'hidden' }}>
         <SectionHead title="Hizmet kataloğu" right={`${rows.length} kalem`} />
         {rows.length === 0 ? <EmptyRow text={`"${query}" için hizmet bulunamadı`} /> : rows.map(sv => (
-          <div key={sv.key} style={{ padding: '15px 18px', borderTop: `1px solid ${C.border}` }}>
+          <div key={sv.key} style={{ padding: '15px 18px', borderTop: `1px solid ${C.border}`,
+            position: 'relative', overflow: 'hidden',
+            ...(sv.key === 'gastroPackage'
+              ? { background: GOLD.bg, borderTop: `1px solid ${GOLD.border}` }
+              : null) }}>
+            {sv.key === 'gastroPackage' && <span className="gur-gold-sheen" aria-hidden="true" />}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 240 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{sv.name}</span>
+                  <span style={{ fontSize: 13.5, fontWeight: 700,
+                    ...(sv.key === 'gastroPackage' ? { color: GOLD.ink } : null) }}>
+                    {sv.key === 'gastroPackage' ? '\u2605 ' : ''}{sv.name}
+                  </span>
                   <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 700, color: C.dim,
                     background: C.panel2, borderRadius: R.pill, padding: '2px 9px' }}>{sv.kind}</span>
+                  {sv.key === 'gastroPackage' && (
+                    <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 800, color: GOLD.ink,
+                      background: GOLD.soft, border: `1px solid ${GOLD.border}`,
+                      borderRadius: R.pill, padding: '2px 9px', letterSpacing: 0.3 }}>ALTIN PAKET</span>
+                  )}
+                  {/* Ödüllü video KULLANICI özelliği: reklam izleyen kaydırma
+                      hakkı kazanır. Restoranın satın aldığı şey o akışta
+                      yayınlanma hakkı — mekanizmanın kendisi değil. */}
+                  {sv.key === 'rewardedAds' && (
+                    <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 700, color: C.blue,
+                      background: C.blueSoft, borderRadius: R.pill, padding: '2px 9px' }}>kullanıcı özelliği</span>
+                  )}
                 </div>
                 <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.5 }}>{sv.note}</div>
+                {sv.key === 'rewardedAds' && (
+                  <div style={{ fontFamily: FB, fontSize: 11.5, color: C.dim, lineHeight: 1.5, marginTop: 4 }}>
+                    Kaydırma hakkı kazandıran akış kullanıcıya ait ve restorandan
+                    bağımsız çalışır; restoran yalnızca bu akışta yayınlanacak
+                    videoyu satın alır.
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: 'right', minWidth: 110 }}>
                 <div style={{ fontSize: 15, fontWeight: 800, ...NUM }}>{money(sv.monthly)}</div>
                 <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>{sv.unit}</div>
               </div>
+              <Btn label="Materyaller" size="sm"
+                variant={acik === sv.key ? 'filled' : 'outline'}
+                tone={acik === sv.key ? 'orange' : undefined}
+                count={liveCount(sv.key) || undefined}
+                onClick={() => setAcik(v => (v === sv.key ? null : sv.key))} />
               <Btn label="Teklifler" onClick={() => onOpenStream?.(sv.key)} variant="outline" size="sm" />
             </div>
 
@@ -3520,10 +3957,58 @@ function ServicesPage({ restaurants = [], query = '', onOpenStream }) {
                   background: C.redSoft, borderRadius: R.pill, padding: '2px 9px' }}>{sv.rejected} ret</span>
               )}
             </div>
+
+            {acik === sv.key && <CreativeSlot streamKey={sv.key} />}
           </div>
         ))}
       </section>
     </div>
+  );
+}
+
+/**
+ * İşletmeden gelen teklif talepleri.
+ *
+ * Fiyatlandırma sayfasının EN ÜSTÜNDE ve bu bilinçli: burası yöneticinin
+ * "bugün ne yapmam lazım" listesi. Aşağıdaki müşteri listesi tarama içindir,
+ * bu ise iş kuyruğu — kuyruk aşağıda kalsa fark edilmezdi.
+ *
+ * Talep, teklifin kendisi DEĞİL: yönetici buradan "Teklif gönder"e basınca
+ * ilgili hizmetin sekmesine gidip fiyatı yazıyor. Talebi kapatmak tek
+ * tıkla teklif göndermek olsaydı fiyat girilmemiş bir teklif çıkardı.
+ */
+function RequestQueue({ onGoStream }) {
+  const talepler = useRequests();
+  const acik = openRequests(talepler);
+  if (!acik.length) return null;
+
+  return (
+    <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16, borderColor: C.orangeInk }}>
+      <SectionHead title="İşletmeden gelen teklif talepleri"
+        right={`${acik.length} talep · fiyatlandırma bekliyor`} />
+      {acik.map(t => (
+        <div key={t.id} style={{ padding: '14px 18px', borderTop: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700 }}>{t.restaurantName}</div>
+            <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+              {t.streamName} · {new Date(t.at).toLocaleString('tr')}
+            </div>
+            {t.note && (
+              <div style={{ fontFamily: FB, fontSize: 11.5, color: C.dim, marginTop: 4 }}>“{t.note}”</div>
+            )}
+          </div>
+          {t.status === 'quoted' && (
+            <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.blue,
+              background: C.blueSoft, borderRadius: R.pill, padding: '3px 9px' }}>teklif gönderildi</span>
+          )}
+          <Btn label="Teklif gönder" size="sm" variant="filled" tone="orange"
+            onClick={() => onGoStream?.(t.streamKey)} />
+          <Btn label="Talebi kapat" size="sm" variant="soft" tone="red"
+            onClick={() => closeRequest(t.id, 'yönetici kapattı')} />
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -3559,6 +4044,8 @@ function PricingPage({ restaurants = [], query = '', stream = 'all', onStream })
 
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
+      <RequestQueue onGoStream={onStream} />
+
       {/* ─── HİZMET SEKMELERİ ───
           Her ücretli kalemin kendi sekmesi. Sekmedeki sayı o hizmet için
           BEKLEYEN teklif sayısı: yöneticinin peşine düşmesi gereken iş.
@@ -3633,11 +4120,18 @@ function PricingPage({ restaurants = [], query = '', stream = 'all', onStream })
                     <OfferField
                       current={sv.monthly}
                       offer={latestOffer(r.id, sv.key)}
-                      onSend={({ offerMonthly, note }) => pricing.sendOffer({
-                        streamKey: sv.key, streamName: sv.name,
-                        restaurantId: r.id, restaurantName: r.name,
-                        currentMonthly: sv.monthly, offerMonthly, note,
-                      })}
+                      onSend={({ offerMonthly, note }) => {
+                        pricing.sendOffer({
+                          streamKey: sv.key, streamName: sv.name,
+                          restaurantId: r.id, restaurantName: r.name,
+                          currentMonthly: sv.monthly, offerMonthly, note,
+                        });
+                        // Talep varsa "fiyatlandı" olur ama KAPANMAZ:
+                        // işletme reddederse ikinci bir teklif gidebilir
+                        // ve talebin kendisi hâlâ geçerli.
+                        const t = requestFor(r.id, sv.key);
+                        if (t) markQuoted(t.id);
+                      }}
                     />
                   </div>
                 ))}

@@ -34,6 +34,7 @@ import * as pricing from '../lib/pricing.js';
 import * as backend from '../lib/backend.js';
 import { useModeration, pendingChangeFor } from '../lib/moderation.js';
 import * as secondChance from '../lib/second-chance.js';
+import { useRequests, requestFor, requestQuote, withdraw } from '../lib/requests.js';
 import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
 
@@ -804,6 +805,8 @@ function LockedCard({ text }) {
  */
 function SecondChanceCard({ restaurant }) {
   const state = secondChance.useSecondChance();
+  const talepler = useRequests();
+  const talep = restaurant ? requestFor(restaurant.id, "secondChance", talepler) : null;
   if (!restaurant) return <LockedCard text="Önce bir işletme sahiplen." />;
 
   const aktif = secondChance.activeFor(restaurant.id, state);
@@ -840,34 +843,99 @@ function SecondChanceCard({ restaurant }) {
             onClick={() => secondChance.cancel(aktif.id)} />
         </>
       ) : (
-        <Btn text="Paketi başlat" variant="filled" size="md"
-          onClick={() => { secondChance.activate({ restaurantId: restaurant.id, restaurantName: restaurant.name }); haptic(14); }} />
+        // Paket doğrudan başlatılamıyor: teklif istenir, yönetici
+        // fiyatlandırır, kabul edilince başlar (bkz. requests.js).
+        talep ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <Icon n="clock" size={14} color="var(--c-warn-light)" />
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-warn-light)" }}>
+              {talep.status === "quoted" ? "Fiyatlandırılıyor" : "Teklif istendi"}
+            </span>
+            <Btn text="Vazgeç" onClick={() => withdraw(talep.id)} variant="plainDark" size="sm" fullWidth={false} />
+          </div>
+        ) : (
+          <Btn text="Teklif iste" variant="filled" size="md"
+            onClick={() => { requestQuote({ restaurantId: restaurant.id, restaurantName: restaurant.name, streamKey: "secondChance", streamName: "İkinci Şans paketi" }); haptic(14); }} />
+        )
       )}
     </div>
   );
 }
 
-function GrowthCard({ title, price, desc, active, locked, onBuy }) {
+/**
+ * Büyüme kartı.
+ *
+ * SATIN ALMA DÜĞMESİ YOK. İşletme kendi kendine hiçbir hizmeti açamıyor;
+ * yalnızca **teklif isteyebiliyor**. Talep yöneticiye düşer, fiyatı o
+ * belirler ve teklif gönderir; işletme kabul ederse hizmet açılır.
+ *
+ * Fiyat "liste fiyatı" olarak yazılıyor ve bunu söylüyor: gerçek tutar
+ * tekliften gelir. Eskiden yazan rakam bağlayıcıymış gibi duruyordu.
+ *
+ * `gold` Gastro paketi için: satın alınan değil, seçilerek verilen bir
+ * paket olduğu için ayrı bir görsel dil taşıyor (bkz. GoldCard).
+ */
+function GrowthCard({ title, price, desc, active, locked, streamKey, streamName, restaurant, gold }) {
+  const talepler = useRequests();
+  const talep = restaurant && streamKey
+    ? requestFor(restaurant.id, streamKey, talepler) : null;
+  const teklifler = pricing.usePricing();
+  const gelen = restaurant && streamKey
+    ? teklifler.offers.find(o => String(o.restaurantId) === String(restaurant.id)
+        && o.streamKey === streamKey && o.status === "pending")
+    : null;
+
+  const iste = () => {
+    if (!restaurant) return;
+    requestQuote({
+      restaurantId: restaurant.id, restaurantName: restaurant.name,
+      streamKey, streamName: streamName || title,
+    });
+    haptic(14);
+  };
+
   return (
     <div style={{
-      background: active ? "rgba(255,102,0,0.07)" : "rgba(255,255,255,0.04)",
-      border: `1px solid ${active ? "rgba(255,102,0,0.28)" : "rgba(255,255,255,0.06)"}`,
+      background: gold
+        ? "linear-gradient(140deg, rgba(212,175,55,0.16), rgba(120,86,12,0.10))"
+        : active ? "rgba(255,102,0,0.07)" : "rgba(255,255,255,0.04)",
+      border: `1px solid ${gold ? "rgba(233,196,86,0.42)" : active ? "rgba(255,102,0,0.28)" : "rgba(255,255,255,0.06)"}`,
       borderRadius: 18, padding: "16px 18px", marginBottom: 12, opacity: locked ? 0.5 : 1,
+      position: "relative", overflow: "hidden",
     }}>
+      {gold && <span className="gur-gold-sheen" aria-hidden="true" />}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0 }}>{title}</p>
-        <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "#FF9A4D", flexShrink: 0 }}>{price}</span>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: gold ? "#F6E6A8" : "#fff", margin: 0 }}>{title}</p>
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: gold ? "#E9C456" : "#FF9A4D", flexShrink: 0 }}>{price}</span>
       </div>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>{desc}</p>
       {locked ? (
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.35)", margin: 0 }}>Bu paket sonraki fazda açılıyor</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.35)", margin: 0 }}>Bu paket şu an kapalı</p>
       ) : active ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Icon n="check" size={14} color="var(--c-ok-light)" />
           <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-ok-light)" }}>Aktif</span>
         </div>
+      ) : gelen ? (
+        // Teklif geldi: düğme burada değil, "Teklifler" sekmesinde karar
+        // veriliyor. Aynı kararı iki yerden vermek kafa karıştırır.
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Icon n="sparkle" size={14} color="var(--c-brand-light)" />
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-brand-light)" }}>
+            Teklif geldi — Teklifler sekmesine bak
+          </span>
+        </div>
+      ) : talep ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <Icon n="clock" size={14} color="var(--c-warn-light)" />
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-warn-light)" }}>
+            {talep.status === "quoted" ? "Fiyatlandırılıyor" : "Teklif istendi"}
+          </span>
+          <Btn text="Vazgeç" onClick={() => withdraw(talep.id)} variant="plainDark" size="sm" fullWidth={false} />
+        </div>
       ) : (
-        <Btn text="Satın Al" onClick={onBuy} variant="filled" size="sm" fullWidth={false} />
+        <Btn text="Teklif iste" onClick={iste}
+          variant={gold ? "outlineDark" : "filled"} size="sm" fullWidth={false} />
       )}
     </div>
   );
@@ -1217,7 +1285,9 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
     o => String(o.restaurantId) === String(ownerRestaurant?.id) && o.status === "pending").length;
   const [bought, setBought] = useState({});
   const [notice, setNotice] = useState(null);
-  const buy = (key, label) => { setBought(p => ({ ...p, [key]: true })); setNotice(label); setTimeout(() => setNotice(null), 2200); };
+  // `buy` KALDIRILDI: işletme kendi kendine hizmet açamıyor. Paketler
+  // yalnızca yöneticinin gönderdiği teklif kabul edilince açılıyor;
+  // `bought` artık yalnızca "şu an aktif mi" göstergesi olarak okunuyor.
   const [dealPct, setDealPct] = useState(20);
   const [dealHours, setDealHours] = useState(2);
   const [dealLive, setDealLive] = useState(false);
@@ -1543,26 +1613,28 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
             <div>
               <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>
-                  Görünürlüğünüzü artıran paketler. Hepsi tek tek satın alınır; abonelik kademesi yok. Rezervasyon ve menü ücretsizdir.
+                  Görünürlüğünüzü artıran paketler. <b>Hiçbiri doğrudan satın alınmaz</b> —
+                  teklif istersiniz, GUR ekibi fiyatlandırıp size teklif gönderir, kabul
+                  ederseniz yayına girer. Rezervasyon ve menü ücretsizdir.
                 </p>
               </div>
 
               {/* Faz 1 — reklam / sponsorluk */}
               <GrowthSection title="Reklam ve Sponsorluk">
                 <GrowthCard
-                  title="Keşfet Banner'ı" price="₺2.400 / hafta" active={bought.featured}
+                  title="Keşfet Banner'ı" price="liste: ₺2.400 / hafta" active={bought.featured}
+                  streamKey="bannerAds" streamName="Dönen keşfet banner'ı" restaurant={ownerRestaurant}
                   desc="Keşfet ekranının üstündeki dönen banner'da bir slayt. Haftada ~4.000 gösterim."
-                  onBuy={() => buy("featured", "Banner slaytınız yayına alındı")}
                 />
                 <GrowthCard
-                  title="Ödüllü Video Reklam" price="₺3.100 / 1.000 izlenme" active={bought.rewarded}
+                  title="Ödüllü Video Reklam" price="liste: ₺3.100 / 1.000 izlenme" active={bought.rewarded}
+                  streamKey="rewardedAds" streamName="Ödüllü video reklam" restaurant={ownerRestaurant}
                   desc="Kullanıcı kaydırma hakkı kazanmak için videonuzu sonuna kadar izler — tamamlanma oranı ~%78."
-                  onBuy={() => buy("rewarded", "Ödüllü video kampanyası başlatıldı")}
                 />
                 <GrowthCard
-                  title="Push Bildirim Reklamı" price="₺1.800 / gönderim" active={bought.push}
+                  title="Push Bildirim Reklamı" price="liste: ₺1.800 / gönderim" active={bought.push}
+                  streamKey="pushAds" streamName="Push bildirim reklamları" restaurant={ownerRestaurant}
                   desc="Semtinizdeki kullanıcılara tek seferlik bildirim. Gönderim saatini siz seçersiniz."
-                  onBuy={() => buy("push", "Push bildirim gönderimi planlandı")}
                 />
               </GrowthSection>
 
@@ -1633,11 +1705,17 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                 <SecondChanceCard restaurant={ownerRestaurant} />
               </GrowthSection>
 
+              {/* ─── GASTRO: ALTIN PAKET ───
+                  Kataloğun en üst basamağı ve tek "seçilerek verilen"
+                  paketi — rozet bağımsız şef değerlendirmesine dayanıyor,
+                  parayla alınmıyor. Görsel dili bu yüzden diğerlerinden
+                  ayrı: altın gradyan + üstünden geçen parıltı. */}
               <GrowthSection title="Gastro Paketi">
                 <GrowthCard
-                  title="Gastro Şef Videosu Paketi" price="₺13.200 / ay" active={bought.license}
+                  gold
+                  title="Gastro Şef Videosu Paketi" price="liste: ₺13.200 / ay" active={bought.license}
                   desc="Tanınmış bir şef mekânınızda 15 sn dikey video çeker; video hem uygulamada galeride yayınlanır hem de kendi sosyal medyanızda süresiz kullanılır. Paketi alan mekan Gastro Onaylı kategorisine girer."
-                  onBuy={() => buy("license", "Gastro paketi satın alındı")}
+                  streamKey="gastroPackage" streamName="Gastro şef videosu paketi" restaurant={ownerRestaurant}
                 />
               </GrowthSection>
             </div>

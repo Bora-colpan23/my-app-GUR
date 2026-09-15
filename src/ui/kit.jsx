@@ -1050,6 +1050,31 @@ export function GurStyles() {
           opacity: 0.9; cursor: progress; filter: none;
         }
 
+        /* ── ALTIN PAKET PARILTISI ───────────────────────────────────
+           Gastro paketi kataloğun en üst basamağı. Altın gradyanın
+           üstünden geniş ve YAVAŞ bir parıltı geçiyor — hızlı bir parlama
+           dikkat çekmek yerine rahatsız ediyor.
+
+           Sürekli değil, 4.5 saniyede bir: gözün takıldığı ama takip
+           etmediği bir ritim. Parıltı transform ile geçiyor (bileşik
+           katman), background-position ile geçseydi her karede yeniden
+           boyama yapardı. */
+        @keyframes gur-gold-sheen {
+          0%   { transform: translateX(-130%) skewX(-18deg); opacity: 0; }
+          8%   { opacity: 0.55; }
+          38%  { transform: translateX(130%) skewX(-18deg); opacity: 0; }
+          100% { transform: translateX(130%) skewX(-18deg); opacity: 0; }
+        }
+        .gur-gold-sheen {
+          position: absolute; top: 0; bottom: 0; left: 0; width: 45%;
+          background: linear-gradient(90deg, transparent, rgba(255,240,190,0.5), transparent);
+          animation: gur-gold-sheen 4.5s ease-in-out infinite;
+          pointer-events: none; will-change: transform;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .gur-gold-sheen { animation: none; opacity: 0; }
+        }
+
         /* ── İSKELET PARLAMASI ────────────────────────────────────────
            Parlama transform ile geçiyor: background-position animasyonu
            bileşik katmana çıkmıyor ve uzun listede kasıyor. */
