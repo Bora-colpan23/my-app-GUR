@@ -1,82 +1,877 @@
 # GUR — Proje Rehberi (Claude Code için)
 
-Bu dosya Claude Code'un projeyi hızlıca anlaması içindir. GUR, İstanbul için **Tinder-tarzı restoran keşif platformu**dur.
+Bu dosya Claude Code'un projeyi hızlıca anlaması içindir. GUR, İstanbul için
+**Bumble mekaniğine dayalı restoran keşif platformu**dur.
 
 ## Ne inşa ediyoruz
 
-Kullanıcılar restoranları kaydırarak keşfeder (sağa = favori, sola = geç). Ana farklılaştırıcı **Gastro Onaylı** sistemidir: tanınmış şefler restoranları onaylar, onaylılar rozet + öncelikli yerleşim alır. Gelir modeli restoran abonelikleridir (Premium/Pro/Ücretsiz).
+Kullanıcılar restoranları kaydırarak keşfeder: **sağa** = kaydet, **sola** = geç,
+**yukarı** = "hemen gitmek istiyorum" (süper beğeni). Karta dokununca detay ayrı
+bir ekrana gitmez — kartın üstünde genişleyebilir bir sayfa olarak açılır.
 
-Ürün üç arayüzden oluşur:
-1. **Tüketici mobil uygulaması** — keşif, kaydırma, favoriler, detay, profil
-2. **Doyurucu (restoran) paneli** — kayıt, doğrulama, dashboard, menü/fotoğraf yükleme
-3. **Yönetici paneli** — başvuru onayı, Gastro yönetimi, moderasyon, gelir
+Ana farklılaştırıcılar:
+- **Gastro Onaylı**: tanınmış şefler restoranları onaylar, rozet + öncelikli yerleşim.
+- **Konum doğrulamalı yorum**: mekânda yeterince kalan kullanıcıya "deneyim nasıldı"
+  bildirimi gider ve yorum kilidi açılır; yorum "Konumla doğrulandı" rozeti alır.
+- **B2B ekosistem**: mekan havuzu dış API'lerden otomatik dolar, işletme kendi
+  kaydını sahiplenir (claim), doldurmadığı alanlar API'den gelmeye devam eder.
+
+Gelir modeli tek ve bütüncül bir sistemdir — **aşamalı faz yapısı kaldırıldı**:
+- Organik akışa harmanlanan sponsorlu kartlar (CPC/CPE açık artırma)
+- İşletmenin **tek tek satın aldığı** ücretli özellikler (banner, push, ödüllü
+  video, anlık fırsat, İkinci Şans paketi, Gastro şef videosu)
+- Ödüllü video reklam ve GUR Plus tüketici aboneliği
+
+**İŞLETME ABONELİĞİ YOK.** Premium / Pro / Ücretsiz kademesi kaldırıldı; bir
+işletmenin ödediği tutarın tamamı satın aldığı kalemlerden gelir. Plana bağlı
+"tam görünürlük / öncelikli yerleşim" diye bir mekanizma da yok — görünürlük
+tek yerden yönetiliyor (restoran bazlı görünürlük anahtarı).
+
+**REZERVASYON KOMİSYONU YOK.** Masa ayırtma tamamen ücretsiz ve yalnızca
+kaydını **sahiplenmiş** işletmelerde açık: sahipsiz bir mekan adına söz
+veremeyiz. Kapı hem arayüzde hem sunucuda (`POST /api/reservations`).
+
+Ürün dört arayüzden oluşur:
+1. **Tüketici mobil uygulaması** — keşif, kaydırma, detay sayfası, favoriler, profil
+2. **Doyurucu (B2B) paneli** — sahiplenme, bilgi/menü/fotoğraf yönetimi, etkileşim analizi
+3. **Yönetici paneli** — başvuru ve sahiplenme onayı, mekan havuzu, Gastro
+   yönetimi, kampanyalar, fiyatlandırma, kohort/LTV
+4. **Sunucu** — mekan beslemesi, swipe motoru, bildirim cron'ları, analitik toplama
 
 ## Çalıştırma
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run db:setup && npm run db:seed   # PostgreSQL + şema + tohum veri
+npm run dev:all                       # API (8787) + arayüz (5173)
 ```
 
-- `/`       → Tüketici + Doyurucu uygulaması (telefon çerçevesi içinde önizlenir)
-- `/admin`  → Yönetici paneli (tam ekran masaüstü)
+Yalnız arayüz: `npm run dev`. Yalnız API: `npm run dev:api`.
 
-Derleme: `npm run build` → `dist/`
+- `/`         → Tüketici uygulaması (telefon çerçevesi yalnızca masaüstünde)
+- `/isletme`  → Doyurucu: işletme uygulaması (kendi girişi, kendi oturumu)
+- `/admin`    → Yönetici paneli (tam ekran masaüstü)
+
+Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
+`demo@gur.app` / `gur1234`.
+
+Derleme: `npm run build` → `dist/`. Lint: `npm run lint` (src + server + shared).
+
+**Artifact önizlemesi:** `npm run artifact` → `dist/gur-preview.html` (tek dosya).
+Elle derlemeyin: yönetici paneli `src/main.jsx` içinde `React.lazy` ile
+yükleniyor, tek dosyalık artifact o ayrı chunk'ı bulamaz ve panel açılmaz.
+Betik `GUR_ARTIFACT=1` ile tek parça derliyor ve çıktıda birden fazla JS
+dosyası kalırsa hata veriyor.
+
+### İki mod: canlı ve yerel
+
+Uygulama açılışta `/api/health` yoklar ve sağ üstte hangi modda olduğunu
+gösterir:
+
+- **CANLI** — sunucu ayakta. Kimlik, deste, kaydırma, ziyaret, yorum ve
+  sahiplenme PostgreSQL'e yazılır; kota ve kampanya ücretlendirmesi sunucuda.
+- **YEREL** — sunucu yok (artifact önizlemesi, çevrimdışı). Aynı akışlar
+  localStorage üzerinde yürür, hiçbir ekran kilitlenmez.
+
+Dallanma tek yerde: `src/lib/backend.js`. Ekranlar "sunucu var mı" diye
+sormaz, bu cepheyi çağırır.
 
 ## Proje yapısı
 
 ```
 gur/
-├── index.html                 # Giriş; Poppins fontu burada yüklenir
-├── vite.config.js             # Vite + React eklentisi
-├── package.json
+├── index.html                 # Giriş; fontlar bloke etmeden yüklenir
+├── shared/                    # İSTEMCİ VE SUNUCUNUN ORTAK KULLANDIĞI SAF MODÜLLER
+│   ├── deck.js                # buildDeck / rankCampaigns / quotaState
+│   ├── second-chance.js       # paket kotası ve günlük tekrar engeli
+│   └── deeplink.js            # harita derin bağlantıları, Haversine
+├── server/                    # Node tarafı (bkz. server/README.md)
+│   ├── index.js               # giriş: HTTP + cron + ilk besleme
+│   ├── db/setup.sh            # rol + veritabanı + eklenti + şema
+│   ├── db/schema.sql          # tam şema (tek migration, 26 tablo)
+│   ├── db/seed.js             # tohum veri; önce gerçek beslemeyi dener
+│   ├── db/queries/cohorts.sql # retention / kohort / LTV toplama sorguları
+│   └── src/
+│       ├── http/{server,routes}.js   # çerçevesiz router + API uçları
+│       ├── auth/{session,password,social}.js
+│       └── {ingestion,swipe,visits,notifications,analytics}/, cron.js
 └── src/
-    ├── main.jsx               # React kökü + router (/ ve /admin)
-    ├── app/
-    │   └── GurApp.jsx         # TÜM tüketici + doyurucu uygulaması (tek dosya, ~2260 satır)
-    └── admin/
-        └── GurAdmin.jsx       # Yönetici paneli (tek dosya, ~730 satır)
+    ├── main.jsx               # React kökü + router; /isletme ve /admin ayrı parçada
+    ├── data/restaurants.js    # MEKAN HAVUZU — üç uygulamanın ortak verisi
+    ├── ui/
+    │   ├── kit.jsx            # ortak buton/ikon/alan/yüzey + stil bloğu
+    │   └── sheets.jsx         # aşağı sürüklenip kapanan sayfalar
+    ├── lib/
+    │   ├── api.js             # API istemcisi + mod ölçümü
+    │   ├── backend.js         # canlı/yerel cephesi — tek dallanma noktası
+    │   ├── analytics.js       # rıza kapılı GA4 + ürün olay akışı
+    │   ├── visits.js          # konum doğrulamalı ziyaret (sunucu kurallarının aynısı)
+    │   ├── b2b.js             # sahiplenme başvuruları + işletmenin girdiği alanlar
+    │   ├── campaigns.js       # demo kampanya envanteri
+    │   ├── badges.js          # rozet kataloğu + atamalar (Gastro + editoryal)
+    │   ├── invites.js         # havuz daveti: kanal seçimi + mailto taslağı
+    │   ├── geo.js             # konum izni, elle ilçe seçimi, başlangıç noktası
+    │   ├── moderation.js      # yayın öncesi onay kuyruğu (mekan + alan değişikliği)
+    │   ├── requests.js        # işletmenin teklif talepleri (satın alma YOK)
+    │   ├── creatives.js        # reklam materyali yükleme (banner / ödüllü video …)
+    │   ├── import-restaurants.js  # Excel/CSV ile toplu restoran yükleme
+    │   ├── second-chance.js   # haftalık yeniden gösterim paketi + geçilenler
+    │   └── social-auth.js     # Google / Apple ile giriş
+    ├── app/GurApp.jsx         # Tüketici uygulaması
+    ├── business/GurBusiness.jsx  # Doyurucu: işletme uygulaması
+    └── admin/GurAdmin.jsx     # Yönetici paneli
 ```
 
 ## Mimari notlar (ÖNEMLİ)
 
+### Üç uygulama, tek veri katmanı
+Tüketici, işletme ve yönetici ayrı uygulamalar ama aynı kayıtları okuyup
+yazıyorlar. Bağ ekranlarda değil depolarda:
+
+| Depo | Yazan | Okuyan |
+|---|---|---|
+| `lib/b2b.js` | işletme (bilgi, menü, foto, **logo**) | tüketici kaydı, yönetici listesi |
+| `lib/platform.js` | yönetici (özellik kapıları) | tüketici ve işletme |
+| `lib/reservations.js` | tüketici (talep) → işletme (karar) | tüketici (bildirim) |
+| `lib/pricing.js` | yönetici (teklif) → işletme (karar) | yönetici gelir tabloları |
+| `lib/ad-frequency.js` | tüketici (gösterim) | deste kurulumu |
+| `lib/badges.js` | yönetici (editoryal rozet) | tüketici kartı, kaydırma, detay |
+| `lib/invites.js` | yönetici (havuz daveti) | yönetici havuz listesi |
+| `lib/geo.js` | tüketici (izin / seçilen ilçe) | deste sıralaması, konum çipi |
+| `lib/moderation.js` | işletme + besleme → yönetici (karar) | tüketici destesi |
+| `lib/second-chance.js` | işletme (paket) + tüketici (gösterim) | deste kurulumu, işletme paneli |
+| `lib/requests.js` | işletme (teklif iste) → yönetici (fiyatla/kapat) | yönetici bildirimi, işletme paneli |
+| `lib/creatives.js` | yönetici (reklam materyali) | yönetici hizmet listesi |
+| `data/restaurants.js` | tohum/besleme | üçü de |
+
+Bir mekanın kimliği tek yerde: `account` alanı işletmenin hesabı olup
+olmadığını söyler. Hesabı olmayan (yalnız dış beslemeden gelen) mekanlar
+fiyatlandırma panelinde görünmez — teklif gönderilecek muhatap yoktur.
+
+### Telefon çerçevesi yalnızca masaüstünde
+390×844'lük maket bir **önizleme kabuğu**. Gerçek telefonda `.gur-stage` ve
+`.gur-frame` üstündeki medya kuralı devreye girer: çerçeve, gölge, köşe
+yarıçapı ve sahte çentik kalkar, uygulama `100dvh` ile ekranı kaplar. Aksi
+hâlde ekranda ikinci bir telefon çiziliyor, sahte çentik gerçeğinin altına
+düşüyor ve 844px'lik kutu kısa ekranları taşırıyordu.
+
+Kurallar `!important` — uygulama satır içi stille yazılı ve satır içi stil
+sınıf kuralını yener; tersini yapmanın tek yolu bu.
+
+### Yazı tipi: jetondan oku
+`--f-display` (Poppins) ve `--f-body` (Outfit) `GurStyles` içinde tanımlı;
+kodda `fontFamily: "var(--f-body)"` yazılır, aile adı elle yazılmaz. Yedek
+zincirde `system-ui` var: yazı tipi gelene kadar iOS'ta San Francisco,
+Android'de Roboto çizilir — genel `sans-serif` iki platformda iki ayrı
+yazı tipi seçiyordu.
+
+Her iki aile de **index.html'den** yüklenir. `GurStyles` içine `@import`
+yazmayın: `@import` bir stil sayfasında ilk sırada olmak zorundadır, oradaki
+`:root` kuralından sonra geldiği için tarayıcı sessizce atar (Outfit uzun
+süre bu yüzden hiç yüklenmedi).
+
+### Metin alanları 16px
+iOS Safari 16px'ten küçük bir alana odaklanınca sayfayı yakınlaştırır ve
+düzen bozulur. `input`/`textarea`/`select` taban ölçüsü 16px; satır içinde
+daha küçük yazmayın.
+
+### Renk paleti: uygulama açık, panel iki temalı
+Tüketici ve işletme uygulamasının tek bir açık teması var; orada koyu tema
+**bilinçli olarak yok**. **Yönetici panelinin koyu teması var** (bkz.
+"Yönetici paneli: iki tema").
+Uygulama satır içi stille yazıldığı için renkler yine CSS değişkenlerinden
+okunuyor (`src/ui/kit.jsx` → `GurStyles`): satır içi stil sınıf kuralını
+yener ama `var()` değerini okur. Böylece palet tek yerden değişir.
+
+Yeni renk yazarken **jeton kullan**: `var(--c-card)`, `var(--c-ink)`,
+`var(--c-ink-2)`, `var(--c-muted)`, `var(--c-border)`, `var(--c-subtle)`.
+Sabit `#fff` yalnızca turuncu/koyu zemin üstündeki metin ve ikonlar için.
+Yönetici paneli kendi jeton kümesini taşır (`GurAdmin.jsx` → `C`).
+
+### Turuncu zeminde yazı BEYAZ (ürün kararı)
+Tabanı turuncu olan her yüzeyde metin beyaz. Bu **bilinçli bir tercih** ve
+bedeli ölçüldü: beyaz `#FF6600` üstünde **2.94:1**, marka gradyanının açık
+ucunda (`#FF7A1A`) **2.61:1** — WCAG AA eşiği 4.5'in altında. Denetleme
+betiği bu yüzden uyarı veriyor. Tüketici ve işletme taramasında çıkan 25
+uyarının **tamamı** budur; başka kaynaklı tek bir kontrast hatası yok.
+Listeyi bu şekilde okuyun: sıfır beklemeyin, 25 bekleyin, 26 olursa yeni
+bir hata girmiş demektir. Yönetici panelinin kendi rakamları için bkz.
+"Yönetici paneli: iki tema".
+
+Geçirmenin tek yolu metin taşıyan turuncu yüzeyi koyultmaktı
+(`#C24B00`, beyazla 4.88:1) — marka turuncusu o zaman kiremite dönüyor,
+onun yerine turuncu korundu.
+
+| Jeton | Nerede |
+|---|---|
+| `--c-on-brand` | turuncu DOLGU üstünde ana metin (`#fff`) |
+| `--c-on-brand-2` | turuncu üstünde ikincil metin (`rgba(255,255,255,0.86)`) |
+| `--c-brand-ink` | kâğıt üstünde turuncu METİN — 5.02:1, AA geçer |
+| `--c-field-label` | alan etiketi; kâğıtta koyu, turuncu kabukta beyaz |
+
+**Alan etiketleri için `.gur-on-brand` kullan.** `InputField`/`SelectField`
+etiketi rengini `--c-field-label`'dan okuyor. Aynı alan hem kremsi kâğıtta
+hem turuncu kabukta kullanılıyor; turuncunun üstünde koyu mürekkep göze
+batıyordu. Turuncu kabuğa `className="gur-on-brand"` yazmak yetiyor —
+değişken kalıtımla iniyor, içindeki her alan devralıyor, tek tek bayrak
+geçmeye gerek yok. Kâğıt üstündeki formlar (tüketici kaydı, işletme kayıt
+adımları) sınıfı ALMAZ, koyu mürekkep orada doğru.
+
+Alanın **içi** beyaz kart olarak kalır: kutunun içindeki yazıyı da beyaza
+çevirmek beyaz zeminde beyaz metin demek olurdu.
+
+Kâğıt üstünde `#FF6600`'ı metin rengi olarak **kullanma** — `--c-brand-ink`
+var. Turuncu zeminde elle `#fff` **yazma** — `--c-on-brand` var; jetondan
+okumak paletin tek yerden değişmesini sağlıyor.
+
+Aynı kural durum renklerinde: parlak ton dolgu, koyu ton yazı.
+`--c-ok` / `--c-ok-ink` / `--c-ok-on`, `--c-bad` / `--c-bad-ink`; panelde
+`C.orangeInk`, `C.greenInk`, `C.redInk`, `C.yellowInk`, `C.onBrand`.
+
+**Pasif durumu `opacity` ile kurma.** `opacity: 0.4` bir etiketi ~2:1'e
+düşürüyordu ve denetimden de kaçıyordu. Aktif/pasif farkı renkle: pasif
+`--c-muted` (5.6:1), aktif marka mürekkebi.
+
+Denetleme betiği ata zincirindeki opaklığı ve fotoğraf perdesini hesaba
+katarak on ekranı tarıyor; GUR kelime markası (tek harfli G/U/R) logotype
+olduğu için kural dışı.
+
+### Renkle hiyerarşi
+Renk **yalnızca aktif ve birincil olanda** kalır; gerisi nötr. Keşfet
+ekranında dokuz ayrı turuncu vardı (konum iğnesi, arama çubuğundaki eylem,
+"Tümü", "Kaydırarak gez", kategori halkaları, ızgara simgesi, "Aç" çipi,
+alt bar, Match şeridi) — hepsi doygun olunca hiçbiri birincil olmuyordu.
+
+Turuncu kalanlar: **alt bardaki seçili sekme**, **GUR Match şeridi** (öne
+çıkarılan tek özellik) ve **marka logosu**. Süs simgeler, bölüm bağlantıları
+ve seçili olmayan kategori halkaları `--c-ink-2` / `--c-line`.
+
+Bir **durum**u marka rengiyle gösterme: "Aç" çipi marka gradyanı taşıyordu,
+şimdi yeşil ailesinde — durum bilgisi eylem gibi görünmüyor.
+
+Ölçüt: bir ekranda ekranda görünen doygun renk sayısı tek haneli kalmalı ve
+her rengin tek bir işi olmalı.
+
+### Tutarlı renk seçimi
+Her rolün **tek** bir rengi var. Aynı işi yapan dokuz ayrı yeşil
+(`#4CAF50`, `#4ADE80`, `#22C55E`, `#16A34A`, `#166534`, `#22A34D`,
+`#2F8C46`…), altı kırmızı ve dört amber arayüzü tutarsız gösteriyordu.
+Süper beğeni etiketi de paletin dışında bir gök mavisiydi (`#38BDF8`) —
+tek yabancı ton oydu, marka turuncusuna alındı.
+
+Her rol iki zemin için iki ton taşır — `-ink` açık kâğıt, `-light` koyu
+zemin ve fotoğraf için:
+
+| Rol | Dolgu | Açık zemin | Koyu zemin | Yumuşak |
+|---|---|---|---|---|
+| olumlu | `--c-ok` | `--c-ok-ink` | `--c-ok-light` | `--c-ok-soft` |
+| olumsuz | `--c-bad` | `--c-bad-ink` | `--c-bad-light` | `--c-bad-soft` |
+| uyarı / puan | `--c-warn` | `--c-warn-ink` | `--c-warn-light` | `--c-warn-soft` |
+| marka | `#FF6600` | `--c-brand-ink` | `--c-brand-light` | `--c-brand-soft` |
+
+Yeni bir yeşil/kırmızı/amber **yazma** — ailede zaten var. Marka gradyanına
+tehlike kırmızısı karıştırma: `#FF7A1A → #F04E00` turuncunun kendi iki ucu.
+
+Kural dışı olanlar: GUR kelime markasının harfleri (`#FFA500`/`#FF6600`/
+`#FF0000`), Google'ın marka renkleri ve sponsorlu reklam verisindeki
+reklamveren aksanları (`SPONSORED[].accent`).
+
+### Tonlu griler
+Nötr gri (`#ccc`, `#bbb`, `#333`, `#aaa`…) kremsi kâğıdın ve sıcak
+fotoğrafların yanında ölü duruyor. Hepsi paletin sıcak ekseninde:
+`--c-warm-1` … `--c-warm-4`, `--c-warm-ink`, `--c-warm-dark`. Panelin
+kâğıdı soğuk olduğu için oradaki griler soğuk eksende (`C.dim`, `C.faint`).
+
+Dikkat: `--c-warm-3` / `--c-warm-4` **koyu zemin için**. Açık kâğıtta
+okunmazlar — orada `--c-muted` kullan.
+
+### Tonlarla vurgu
+Sıralı bir büyüklüğü altı ayrı renkle değil, tek rengin tonlarıyla göster.
+`CAT_DIST` altı ayrı turuncu-kırmızı-amber karışımıydı; şimdi tek bir
+turuncu rampa, "Diğer" toplama kalemi olduğu için rampanın dışında nötr.
+
+### Doğal gradyanlar
+İki duraklı siyah→saydam geçişi ortada gri bir pus ve bittiği yerde görünür
+bir kesim bırakıyor: alfa doğrusal artıyor, algılanan parlaklık öyle
+artmıyor. `scrim(peak, end%, floor)` (`src/ui/kit.jsx`) durakları yumuşatma
+eğrisine oturtuyor. Fotoğraf üstüne elle `linear-gradient` yazma.
+
+### Gölge: tek katman yok
+Her gölge **üç katmandan** oluşur — dar ve yakın olan temas çizgisini,
+geniş ve soluk olan yayılan ışığı taşır. Kurallar:
+
+- Kaydırma **yalnızca dikey** (ışık tepeden). Yana kaçan gölge nesneyi
+  eğri durur gibi gösteriyor.
+- Bulanıklık kaydırmadan belirgin biçimde büyük.
+- Her katman düşük opaklıkta (0.03–0.09), toplamı yumuşak bir yükseklik
+  veriyor — sert kenarlı koyu bir leke değil.
+- Renk **zeminin tonunda**: saf siyah, kremsi kâğıdın (#FDFBF7) üstünde
+  gri duruyor. Uygulama sıcak (`--sh-tint: 45, 36, 25`), yönetici paneli
+  soğuk (`rgba(15,18,25,…)`), turuncu yüzeyler turuncu (`--sh-brand`).
+- Basılınca gölge **kısalır**, içeri dönmez: nesne kâğıda yaklaşır,
+  yüzey çukurlaşmaz.
+
+Ölçek `GurStyles` içinde: `--sh-1` … `--sh-4` (açık kâğıt), `--sh-d1` …
+`--sh-d4` (fotoğraf ve koyu zemin), `--sh-brand` / `--sh-brand-lg` /
+`--sh-brand-sm`, ve aşağıdan yükselen sayfa için `--sh-up`. Adlandırılmış
+karşılıkları `ELEV` üzerinden okunur. Yönetici paneli kendi stil bloğunu
+taşıdığı için aynı ölçeği JS'te tutar (`GurAdmin.jsx` → `SH`).
+
+**Satır içine gölge yazmayın** — ölçekten okuyun.
+
+### "One" buton dili
+Bütün haplar tek tarifte: tam yuvarlak (`999`), kalın yazı (700), rengine
+göre tonlanmış **dar** bir düşüş gölgesi, basılınca hem küçülme hem gölgenin
+kısalması. İçeriden parlayan `inset` gölgeler kaldırıldı.
+
+`src/ui/kit.jsx` → `Btn` varyantları:
+
+| Varyant | Nerede |
+|---|---|
+| `filled` | turuncu birincil eylem |
+| `ink` | siyah hap — turuncuyla yarışmadan birincil olabilen tek renk |
+| `onColor` | turuncu zemin üstünde beyaz hap |
+| `outlineDark` | beyaz zemin üstünde beyaz hap + ince kenarlık |
+| `brandSoft` / `successSoft` / `destructiveSoft` | %10 tonlu zemin, renkli kalın yazı |
+| `outline` / `plain` / `plainDark` | kenarlıklı ve düz metin hapları |
+
+İki ek yuva: `trailing` bir simgeyi yuvarlak cebe alır (referanstaki
+"Download ⬇"), `count` hapın içine küçük bir sayaç rozeti koyar ("Done ①").
+
+Devre dışı hap **soluklaştırılmaz**: uygulamada kendi rengini koruyup geri
+çekilir, yönetici panelinde gri hapa döner. `opacity: 0.42 + grayscale`
+beyaz yazıyı okunmaz bırakıyordu.
+
+### Parlak turuncu simge ve basınca dolan hap
+Kaydırma düğmelerinin simgeleri düz turuncu değil, üstten aydınlık alta
+doğru koyulaşan bir rampa (`#FFB067 → #FF7A1A → #EF4A00`, markanın kendi
+uçları) artık — cam gibi duran referans düğmelerin yaptığı iş bu.
+
+Gradyan **bir kez** tanımlanıyor (`GlossDefs`, uygulama kökünde) ve
+simgeler `GLOSS` sabitiyle (`url(#gur-gloss)`) bağlanıyor. Her düğmede
+ayrı bir `<defs>` çizerseniz aynı id çoğalır ve tarayıcı hepsini ilkine
+bağlar. Gradyan bulunamazsa simge **siyah** çizilir — ekleyip görmeden
+geçmeyin.
+
+Kaydırma düğmelerinde renk artık ayrım taşımıyor, **şekil** taşıyor:
+çarpı = geç, çift ok = detay, kalp = favori. Üçü de turuncu; ayrımı
+simgenin biçimi yapıyor.
+
+Bütün haplar basılınca **içeriden turuncu doluyor**: `.gur-btn::before`
+merkezden büyüyen bir daire. Kurallar:
+- Dolgu hapın zeminini değiştirmiyor, ÜSTÜNE biniyor — her varyantta çalışır.
+- `transform: scale()` ile büyüyor; genişlik animasyonu her karede yeniden
+  yerleşim yaptırırdı.
+- İçerik `isolation: isolate` + `z-index: -1` ile dolgunun üstünde kalıyor.
+- Hap tam yuvarlak olduğu için `overflow: hidden` dolguyu kenarda kesiyor.
+- Kendi düğmesini elle yazan yerler `.gur-fill` sınıfını doğrudan kullanır.
+
+### Yemek zili: iki an, tek nesne
+`DinnerBell` iki yerde çalıyor — kota dolduğunda ("mutfak kapandı") ve GUR
+Match'te eşleşme olduğunda ("masa hazır"). İkisi de aynı şeyi söylediği
+için tek bileşen.
+
+Zil **gövdesi** sallanıyor, tokmak değil: dönüş ekseni tepedeki topuz
+(`transform-origin: 50% 10%`), yoksa zil havada kayıyor gibi duruyor.
+İki tur sonra duruyor — sürekli dönen bir salınım 0.2 Hz civarında
+rahatsız ediyor. Çevresindeki `.gur-bell-wave` halkaları sesin görsel
+karşılığı.
+
+**Ses yok.** İzinsiz ses çalmak kaba, üstelik sessiz moddaki telefonu da
+yok sayardı. Zil görsel bir işaret.
+
+Azaltılmış hareket tercihinde salınım ve halkalar duruyor, zil görünmeye
+devam ediyor.
+
+### Yönetici panosu: One düzeni
+Panel açık gri kâğıt (`C.bg`) üzerinde beyaz kartlar. Üç imza parçası
+`GurAdmin.jsx` içinde:
+
+- `Segmented` — gri kanal, seçili seçenek beyaz hap. Dönem ve zaman aralığı
+  seçimlerinin tamamı bundan geçer ve **gerçekten veri değiştirir**
+  (`TREND_RANGES`), yalnızca etiket değiştirmez.
+- `TrendChart` — tek serili çizgi + solan alan, imleçle nişangâh ve koyu
+  ipucu kutusu. Tek seri olduğu için gösterge kutusu yok; her noktaya sayı
+  yazılmaz, yalnızca tepe noktası etiketlidir.
+- `Sparkline` — tablo satırının 24 saatlik eğilimi. Renk tek başına bilgi
+  taşımaz: yanındaki sütun yüzdeyi ↗/↘ ile de yazar.
+
+Sayı sütunları `NUM` yayılımını kullanır (sistem mono + `tabular-nums`):
+rakamlar hizalanır, ek font isteği gitmez.
+
+### Yönetici paneli: iki tema
+Panelin açık ve **koyu** teması var (uygulamanın hâlâ yok). Anahtar iki
+yerde: kenar çubuğunun altında ve giriş ekranının sağ üstünde. Seçim
+`gur.admin.theme`'de saklanıyor; hiç seçilmemişse işletim sisteminin
+tercihi (`prefers-color-scheme`) okunuyor.
+
+**Nasıl çalışıyor.** Panel kendi stil bloğunu taşıyor ve `GurStyles`
+jetonlarını görmüyor; renkler bu yüzden CSS değişkeni değil JS. Tema
+değişince `LIGHT`/`DARK` paleti `C`nin üstüne **yerinde** yazılıyor
+(`applyAdminTheme`) ve kökteki state bump'ı bütün ağacı yeniden çizdiriyor.
+Böylece 560'tan fazla `C.x` kullanımı olduğu gibi kalıyor — SVG
+öznitelikleri (`fill`, `stopColor`) ve `${C.red}44` gibi hex
+birleştirmeleri dahil, ki bunların ikisi de `var()` ile çalışmazdı.
+Ağaçta `React.memo` sınırı yok, o yüzden sayfa/filtre/arama durumu
+korunuyor (kök `key` ile remount edilseydi kaybolurdu).
+
+**Modül düzeyinde `const X = { a: C.foo }` YAZMAYIN.** O değer modül
+yüklenirken donar ve tema değişince güncellenmez — koyu temada açık tema
+renkleri sızar. Türev sabitler `live()` ile getter'a çevrildi: `CARD`,
+`SH`, `ELEV`, `TONE_COLOR`, `TONE_SOFT`, `KIND_TONE`, `PLAN_COLOR`,
+`CAMPAIGN_STATUS`. Yenisini eklerken aynısını yapın.
+
+Bölünme kuralı uygulamanınkiyle aynı: **dolgu parlak tonunu korur, YAZI
+zemine göre ton değiştirir.** Açık kâğıtta koyu mürekkep (`-Ink`), koyu
+zeminde açık tint — ve koyu zemin tintleri uygulamanın `--c-*-light`
+jetonlarıyla birebir aynı hexler (`#4ADE80`, `#FF7A70`, `#FFB454`,
+`#FF9A4D`). Yeni renk tanımlanmadı.
+
+Dolgu olarak kullanılan tonların ayrı jetonu var (`fillGreen`, `fillRed`,
+`fillNeutral`): koyu temada `greenInk` açılıyor, dolgu olarak kullanılsaydı
+üstündeki beyaz yazı okunmaz olurdu. `offBg`/`offInk`/`offBorder` devre
+dışı hap, `heroTint` gelir şeridinin sıcak yıkaması, `tooltipBg` grafik
+ipucu kutusu — hepsi iki temalı.
+
+Koyu temada **gölge yükseklik anlatmaz**: siyah zeminde soluk siyah gölge
+görünmez. Yüksekliği yüzeyin AÇILMASI anlatıyor (`bg` → `panel` →
+`panel2`), gölge yalnızca ayırıcı. `SH_DARK` opaklıkları bu yüzden belirgin
+biçimde yüksek.
+
+Buton CSS'i tek yerde (`btnCss()`): iki stil bloğu da onu kullanıyor. Ayrı
+tutulduğu dönemde giriş ekranındaki "Giriş yap" hapı hiç
+biçimlendirilmiyordu — tarayıcının gri varsayılanı üstünde beyaz yazı,
+1.15:1, düğme neredeyse görünmezdi.
+
+**Ölçüm.** Koyu temada on bir sayfa tarandığında 28 uyarı çıkıyor ve
+hepsi beyaz-turuncu kararından; başka kaynaklı sıfır. Açık temada aynı
+tarama 62 uyarı veriyor ve bunun **34'ü turuncu değil**: parlak dolgu
+tonları (`C.green`, `C.orange`, `C.yellow`, `C.red`) beyaz kâğıtta
+doğrudan YAZI rengi olarak kullanılmış — yukarıdaki iki-ton kuralının
+ihlali, koyu temadan önce de vardı. Daha önce raporlanan "hepsi turuncu"
+rakamı yalnızca panoyu tarayan dar bir taramadan geliyordu; on bir sayfanın
+tamamı ilk kez tarandı.
+
+### Erişilebilirlik kuralları (uyulacak)
+- Alan etiketleri `htmlFor` ile bağlı (`InputField`), `<label>` süs değil.
+- Bildirim ve geri bildirim yüzeyleri `role="status" aria-live="polite"`.
+- Sayfalar (sheet) `role="dialog" aria-modal`, ekranlar `<main>`.
+- Görseller anlamlı `alt` alır; süs görsel `alt=""`.
+- Gri tonlar WCAG AA'ya göre: `--c-muted` beyaz üstünde 4.6:1.
+- Renk tek başına bilgi taşımaz — ısı haritasında kutunun içinde yüzde de yazar.
+
+### Karanlık kalıp yok
+- Rıza kutusunda iki seçenek **aynı** görsel ağırlıkta; reddetmek kabul
+  etmek kadar kolay.
+- Kota teklifinde ücretsiz yol (reklam izle) ve çıkış görünür; satın alma
+  tek belirgin seçenek değil.
+- Ödüllü reklamda "Vazgeç" her zaman görünür.
+- Hesap silme tek onayla ulaşılabilir (roach motel yok).
+
+### `shared/` — tek doğruluk kaynağı
+`buildDeck` ve `directionsUrl` hem sunucu hem istemci tarafından çağrılır.
+Yerleşim hissi ve harita bağlantı formatı iki yerde ayrı tutulursa biri
+sessizce bozulur; bu yüzden saf ve ortak.
+
+### Kota istemciye sayı olarak GÖNDERİLMEZ
+`quotaState` yalnızca `pressure: "free" | "near" | "exhausted"` döndürür.
+Arayüzde "kalan hakkın: 12" gibi bir ibare **bilinçli olarak yoktur**;
+sınıra yaklaşınca sıcak bir vinyet, dolunca `PremiumOffer` açılır.
+
+### Sponsorlu kart organik kartla aynı nesnedir
+`buildDeck` yalnızca `sponsored` alanını ekler. `SwipeCard` iki durumu ayırt
+etmez, yalnızca küçük bir rozet çizer. Aralık 5-7 arasında rastgeledir —
+sabit aralık kullanıcı tarafından fark ediliyor.
+
 ### GurApp.jsx — tek dosyalık uygulama
-- Tüm ekranlar tek dosyada ayrı fonksiyon bileşenleri: `SplashScreen`, `WelcomeScreen`, `LoginScreen`, `RegisterScreen`, `DoyurucuAuthScreen`, `DoyurucuLoginScreen`, `RestReg1/2/3`, `RestaurantDashboard`, `ExploreScreen`, `SwipeScreen`, `DetailScreen`, `FavScreen`, `ProfileScreen`.
-- Ekran yönetimi: `GurApp` içinde `screen` state'i + `render()` switch'i. Navigasyon `nav(to)` / `back()` ile history stack üzerinden.
-- Ortak bileşenler: `GurLogo` (pill logo), `Screen`, `PhoneFrame`, `Img`, `InputField`, `Btn`, `UploadBox`.
-- Stil: **inline style** (CSS-in-JS yok, Tailwind yok). Renkler `GRAD = "#FF6600"` turuncu-kırmızı marka gradyanı.
-- Animasyonlar: dosya sonundaki `<style>` bloğunda `@keyframes` (fadeInUp, badgeMarquee, spin, pulse).
-- Font: **Poppins** (index.html'de yüklenir). Başka font kullanma.
+- Ekran yönetimi: `screen` state'i + `render()` switch'i; gezinme `nav()`/`back()`.
+  `nav()` bir tarayıcı kaydı iter, geri dönüş tek yoldan `popstate` ile işlenir
+  (cihazın donanım geri tuşu böylece çalışır).
+- Ortak bileşenler: `GurLogo`, `Screen`, `PhoneFrame`, `Img`, `InputField`, `Btn`,
+  `IconBtn`, `Sheet`, `DangerConfirm`, `SocialAuthRow`, `CardDetailSheet`.
+- Stil: **inline style** (CSS-in-JS yok, Tailwind yok). `GRAD = "#FF6600"`.
+- Hareket: Motion (`motion/react` + imperatif `animate`). Springler Apple HIG'e
+  göre: damping 1.0 varsayılan, momentum taşıyan hareketlerde bounce 0.2.
+- Font: **Poppins** + **Outfit**, jetondan: `var(--f-display)` / `var(--f-body)`.
+  Başka font kullanma. Sayı sütunlarında sistem mono (yönetici: `FM`).
 
-### Canlı veri (OpenStreetMap)
-- `fetchLiveRestaurants()` — Overpass API'den gerçek Kadıköy restoranlarını çeker (ücretsiz, API-key yok).
-- Başarısız olursa sessizce mock `RESTAURANTS` verisine düşer.
-- `dataSource` state'i "demo" | "live"; canlı ise Swipe ekranında yeşil rozet gösterilir.
-- `CAT_MAP` OSM mutfak etiketlerini (turkish, sushi...) 13 kategoriye eşler.
+### Konum: giriş biter bitmez sorulur
+Kimlik akışı (`login` / `register`) bittiğinde ekran **doğrudan Keşfet'e
+gitmez**: `afterAuth()` önce `geo.consentAsked()` bakar, hiç sorulmadıysa
+`location` ekranına götürür. Tarayıcının izin kutusu deste kurulurken
+habersiz açılmasın diye niyet önce yazıyla anlatılıyor.
 
-### GurAdmin.jsx — yönetici paneli
-- Koyu, veri-yoğun "operatör" arayüzü (GitHub/Linear estetiği). Renkler `C` nesnesinde.
-- Sayfalar: `DashboardPage`, `RestaurantsPage`, `ApplicationsPage`, `GastroPage`, `UsersPage`, `ReviewsPage`, `RevenuePage`, `SettingsPage`.
-- Tüm veriler mock (dosya başındaki sabitler). State'li aksiyonlar çalışır (onay, Gastro ver/al, askıya al).
+Üç yol da eşit ağırlıkta (karanlık kalıp yok): **Konumumu kullan**,
+**İlçemi seçeyim**, **Şimdi değil**.
+
+İzin reddedilirse akış tıkanmaz — `src/lib/geo.js` iki ayrı başlangıç
+noktası tanıyor:
+
+| `source` | Nereden | Ne zaman |
+|---|---|---|
+| `device` | Geolocation API | izin verildi |
+| `manual` | `DISTRICTS` listesinden seçilen ilçe | izin yok/reddedildi |
+
+`origin()` ikisini de döndürür, `hasOrigin()` ikisini de sayar; sıralama
+kodu hangisi olduğunu bilmez. Seçim `gur.geo.choice` altında saklanır ve
+açılışta `restore()` ile geri yüklenir.
+
+**Sol üstteki konum çipi bir düğmedir.** Dokununca `LocationSheet` açılır:
+izni tekrar isteyebilir ya da ilçeyi değiştirebilirsin. Reddeden kullanıcı
+tarayıcı ayarlarına gitmeden geri dönebilsin diye bu yol her ekranda
+duruyor. Çipin üst satırı durumu söyler: "Konumun" / "Seçtiğin ilçe" /
+"Konum kapalı".
+
+Ham koordinat hiçbir yere gönderilmez; ekran da bunu yazar.
+
+### Rozetler: bir mekanda birden fazla nişan
+`src/lib/badges.js` altı rozetlik bir katalog taşıyor. **Gastro Onaylı
+kaydın kendi alanı** (`r.gastro`) olarak kalıyor — bağımsız şef
+değerlendirmesine dayanıyor ve satın alınamıyor. Diğer beşi (Günün
+Restoranı, Haftanın Keşfi, Editör Seçimi, Yeni Açıldı, Semtin Favorisi)
+yönetici panelinden elle veriliyor ve **ayrı depoda** (`gur.badges`):
+besleme kaydı tazelediğinde editoryal karar silinmesin.
+
+`badgesOf(r, map)` ikisini birleştirip **katalog sırasında** döndürür —
+rozetler her ekranda aynı sırada görünür.
+
+Üç gösterim, üçü de aynı katalogdan:
+
+| Bileşen | Nerede | Ne gösterir |
+|---|---|---|
+| `BadgeChips` | Keşfet listesinde fotoğraf üstünde | doygun dolgu + beyaz kısa ad |
+| `BadgeChips onLight` | detay sayfasında adın altında | yumuşak zemin + koyu mürekkep, **tam ad** |
+| `BadgeMarks` | kaydırma kartında ismin yanında | renkli disk içinde yalnız simge |
+
+Kurallar:
+- **Aynı rozeti bir kartta iki kez çizme.** Kaydırma kartında rozet yalnız
+  ismin yanında; fotoğrafın üstündeki çip oradan kaldırıldı.
+- `BadgeMarks` **diskin içinde**. Çıplak simge çizilince Gastro'nun yıldızı,
+  hesabın doğrulandığını söyleyen `VerifiedStar` ile tek şey gibi okunuyordu.
+  Sıra: isim → rozetler → `VerifiedStar`.
+- Nişan sayısı **üçle sınırlı** (`max`); tamamı detayda adlarıyla yazılı.
+- Rozetin rengi paletin durum ailesinden; **yeni bir yeşil/amber/kırmızı
+  tanımlama**. Katalogda `hex`/`hexInk` de var: yönetici paneli `GurStyles`
+  render etmediği için orada `var()` çözülmez.
+
+### Havuz rozeti "API" yazar
+`SOURCE_LABEL` üç değer taşır: **API** (dış besleme), **Sahiplenilmiş**,
+**Elle eklendi**. Eskiden "Dış besleme" yazıyordu; panelde bakan kişi
+Google Places / OSM beslemesini API olarak biliyor, teknik adı daha net.
+
+### Havuz daveti: e-posta nereden geliyor
+`src/lib/invites.js`. Burada iki şeyi doğru bilmek gerekiyor:
+
+- **Google Places API e-posta DÖNDÜRMEZ** — böyle bir alanı yok. Havuzdaki
+  adresler mekanın kendi bildirdiği OSM `email` / `contact:email`
+  etiketinden geliyor (`osmToRestaurant` bunları okuyor) ve çoğu kayıtta yok.
+- **Projede posta taşıması yok** (SMTP/nodemailer kurulu değil). Bu yüzden
+  davet, yöneticinin kendi posta istemcisinde hazır bir taslak olarak
+  açılıyor (`mailto:`) — gönderildi numarası yapmıyoruz.
+
+`channelOf(r)` sırayla e-posta → site → telefon bakar ve düğme dört
+durumdan birini çizer: **E-posta ile davet et** / **Siteden ulaş** /
+**iletişim bilgisi yok** (pasif) / **Davet edildi**. Kim, ne zaman, hangi
+adrese — hepsi `gur.invites` altında; gerçek dağıtımda buranın yerine
+sunucuda bir kuyruk gelir, arayüz değişmeden.
+
+### Hareket kiti
+SmoothUI'nin hareket dili GUR'un kendi sistemine yazıldı. **Tailwind
+eklenmedi** — zaten aynı motoru kullanıyoruz: Motion. (SmoothUI'nin kendi
+bileşenleri bu ortamda indirilemiyor: `smoothui.dev` çıkış kapısında
+engelli. Ayrıca Tailwind v4 + TypeScript istiyor, ikisi de burada yok.)
+
+`src/ui/kit.jsx` içinde dört parça:
+
+| Parça | Ne yapar | Nerede |
+|---|---|---|
+| `SplitText` | başlık harf harf belirir | karşılama ekranı, **yalnız orada** |
+| `CountUp` | sayı sayarak artar | kit'te hazır (panelin kendi kopyası var) |
+| `Orb` | üç katmanlı dönen turuncu küre | konum izni beklenirken |
+| `Skeleton` | parlayan yer tutucu | dış yorumlar yüklenirken |
+
+Ortak kural: **yalnızca `transform` ve `opacity`**. Genişlik/yükseklik/top
+animasyonu her karede yeniden yerleşim yaptırıyor, bu ikisi yaptırmıyor.
+Hepsi `prefers-reduced-motion`'a uyuyor — hareket durur, nesne kalır.
+
+`SplitText` metni görsel olarak parçalıyor ama **ekran okuyucuya bütün
+gönderiyor**: her harf ayrı düğüm olsaydı okuyucu heceleyebilirdi. Görünür
+parçalar `aria-hidden` + `data-split`, yanlarında ekrandan gizli tam metin
+duruyor. **`data-split` denetleme betiği için de gerekli**: harfleri tek tek
+saymak bir başlıktan on bir satır uyarı üretiyordu — aynı piksel, aynı oran.
+
+Panelin `AnimatedNumber`'ı KPI değerini hazır biçimlenmiş dizgeden ayırıyor
+(`₺939K` → ek + sayı + ek) ve yalnızca sayıyı sayıyor. Animasyon bitince
+**ekranda orijinal dizge** duruyor; biçimlendirmeyi yeniden üretmek binlik
+ayıracında sessiz bir kaymaya yol açabilirdi.
+
+### Ekran geçişleri ve genişleyen kart
+Ekranlar `AnimatePresence mode="popLayout"` içinde. `popLayout` giden ekranı
+akıştan çıkarıyor; olmazsa iki ekran bir kare boyunca üst üste yığılıp
+sayfayı uzatıyor.
+
+Geçişin **yönü** alt bardaki sekme sırasından geliyor (`SEKME_SIRA`): sağdaki
+sekmeye giderken içerik sağdan, soldakine dönerken soldan. Yön rastgele
+olsaydı kullanıcı nerede olduğunu kaybederdi. Sekme olmayan geçişlerde
+(giriş, detay, yasal metin) "sağ/sol" diye bir anlam yok — orada yalnızca
+yumuşak ölçek + solma.
+
+**Genişleyen kart:** Keşfet listesindeki kartın görseli ile detay
+sayfasının kapak görseli aynı `layoutId`'yi taşıyor
+(`gur-kapak-${r.id}`), Motion ikisi arasında morph ediyor. Kimlik mekan
+id'sine bağlı olmak **zorunda** — sabit bir id verilirse listedeki bütün
+kartlar tek bir görselmiş gibi birbirine morph olur. `layoutId` karusel
+ŞERİDİNDE değil dış sarmalayıcıda: şerit zaten `translateX` ile kayıyor,
+ikisi aynı düğümde olsaydı morph ile karusel kaydırması aynı transform
+üzerinde çakışırdı.
+
+### Moderasyon: yayına çıkmadan önce yönetici görür
+Önceden iki yol da denetimsizdi — beslemenin getirdiği yeni mekan anında
+listedeydi, işletmenin girdiği alan anında karttaydı. Artık ikisi de kuyruğa
+düşüyor (`src/lib/moderation.js`, sunucuda migration 003).
+
+**İki ayrı şey, iki ayrı yer** — tek tabloda tutmak "mekan bekliyor" ile
+"mekanın telefonu bekliyor" durumlarını karıştırırdı:
+
+| Ne | Nerede | Kim karar verir |
+|---|---|---|
+| Kayıt yayında mı | `venues` / `restaurants.review_status` | Moderasyon sayfası |
+| Yayındaki kaydın nesi değişecek | `changes` / `restaurant_change_requests` | Moderasyon sayfası |
+
+**Mevcut kayıtlar ONAYLI sayılır.** Varsayılanı "bekliyor" yapmak havuzu bir
+gecede boşaltırdı; yalnızca beslemenin GETİRDİĞİ yeni kayıt beklemeye düşer
+(`markVenuePending`, tohum listesiyle karşılaştırarak).
+
+Yönetici onaylarken **düzenleyebilir**: gelen metni olduğu gibi kabul etmek
+zorunda değil, düzelttiği hâl yayınlanır ve kayıtta `edited` izi kalır.
+İşletme panelinde alan rozetinin üçüncü hâli bunu söylüyor: **İNCELEMEDE**
+(onaylanmamış bir değere "İŞLETMEDEN" demek yalan olurdu).
+
+Bir mekanın aynı anda **tek bekleyen talebi** olur — işletme formu üç kez
+kaydederse yöneticinin önüne üç iş değil son hâl çıkar. Sunucuda kısmi tekil
+indeksle zorlanıyor.
+
+**Elle restoran oluşturma** (Moderasyon sayfası → "Restoran oluştur")
+sahiplenme akışını atlar ve doğrudan yayınlanır: yönetici zaten onaylayan
+merci, kendi kaydını kendi kuyruğuna atmak boş bir tur olurdu. Kayıt
+**sahiplenilmemiş** açılır (havuza düşer, müşteri listesine değil).
+
+### Restoran bazlı görünürlük anahtarı
+Tek bir mekanı tüketici uygulamasından **tamamen** gizler
+(`platform.js` → `setRestaurantHidden`). Özellik kapılarından ayrı bir kart:
+kapılar "bu mekanda şu özellik yok" der, bu "bu mekan yok" der.
+
+Ayarlar sayfasında **değil**, restoranın kendi detay ekranında — genel bir
+listede yanlış satıra basmak bir mekanı sessizce uygulamadan düşürürdü.
+
+Süzgeç tüketici tarafında **tek yerde** (`GurApp` → `feed`): deste, arama,
+kategori sayıları, favoriler ve GUR Match hepsi oradan besleniyor. İki ayrı
+süzgeç arka arkaya ve ikisi ayrı soru soruyor:
+`publishedOnly` (moderasyondan geçti mi) → `visibleRestaurants` (gizlendi mi).
+
+### İkinci Şans: ücretsiz mekanik + satın alınan paket
+İki ayrı şey, karıştırmayın:
+
+- **Oturum içi tur (ücretsiz)** — deste bitti, geçtiklerine bir daha bak.
+  Eskiden beri var, kaldırılmadı, kimseye para kazandırmıyor.
+- **Haftalık paket (ücretli)** — restoran ödüyor ve kendisini **sola
+  kaydırmış** kullanıcıların destesine geri giriyor. Başka gün, başka
+  oturum, başka kullanıcı.
+
+Paket kuralları `shared/second-chance.js`de (istemci ve sunucu ortak; ayrı
+yazılsaydı sunucu paketi bitmiş sayarken istemci göstermeye devam ederdi):
+
+| Kural | Değer |
+|---|---|
+| Erişim | **200 farklı kullanıcı** (gösterim sayısı değil) |
+| Süre | 7 gün — ama **kotayla biter**, süreyle değil |
+| Aynı kullanıcıya | günde en fazla 1 kez |
+| Restoran başına | aynı anda **tek aktif paket** |
+
+Hedefleme: yalnızca o restoranı **sola kaydırmış** kullanıcı. Hiç görmemiş
+kişiye "ikinci şans" diye bir şey yok — o zaten organik akışta görecek.
+Kart organik havuzun **arkasına** ekleniyor: kullanıcı bir kez "hayır"
+demiş, önce hiç görmediklerini görsün.
+
+**Aday listesi oturum başında DONDURULUYOR** (`scDondurulmus` ref'i) ve bu
+şart. Canlı hesaplansaydı: kart en üste gelir → gösterim kaydedilir → depo
+değişir → `candidatesFor` "bugün gösterildi" deyip kartı düşürür → kart
+kullanıcı görmeden desteden silinir. Sayaç ilerler, restoran öder, kullanıcı
+hiçbir şey görmez. Bu hata geliştirme sırasında gerçekten oluştu.
+
+Mekan o oturumda zaten **organik** çıkıyorsa paket tüketilmiyor: kullanıcının
+zaten göreceği kart için para almıyoruz (`zatenVar` kontrolü).
+
+Sunucu karşılığı: `second_chance_packages` + `second_chance_impressions`
+(migration 004). Tek aktif paket kuralı kısmi tekil indeksle veritabanı
+seviyesinde zorlanıyor — uygulama katmanında kontrol yarış koşulunda yetmez.
+
+### İşletme HİÇBİR ŞEY satın alamaz — teklif ister
+
+Doyurucu panelinde "Satın al" diye bir düğme **yok** ve olmayacak. Bütün
+ücretli kalemler (banner, push, ödüllü video, anlık fırsat, İkinci Şans
+paketi, Gastro şef videosu) tek bir akıştan geçiyor:
+
+```
+işletme "Teklif iste"  →  yöneticide talep kuyruğu + bildirim
+      →  yönetici fiyatı yazıp teklif gönderir
+      →  işletme kabul/ret  →  hizmet açılır
+```
+
+Neden: fiyat müzakereye açık ve her mekan için aynı değil. Panelde sabit
+bir fiyat gösterip "satın al" demek, pazarlığı olan bir kalemi liste
+fiyatından satmak olurdu. Kartlarda yazan rakam bu yüzden **"liste:"**
+önekiyle geçiyor — teklif değil, başlangıç noktası.
+
+Depo `src/lib/requests.js`. Bilinmesi gereken üç kural:
+
+- **Bir (restoran, hizmet) çifti için aynı anda tek açık talep.** İşletme
+  düğmeye üç kez basarsa yöneticinin önüne üç iş değil bir iş çıkar.
+- **Teklif göndermek talebi KAPATMAZ**, yalnızca `quoted` yapar. İşletme
+  reddederse ikinci bir teklif gidebilmeli; talep hâlâ geçerli.
+- `unseenCount` yalnızca `open` ve `quoted` talepleri sayar. Kapatılmış ya
+  da geri çekilmiş talep bildirimde durmaz.
+
+İşletme talebini **geri çekebilir** ("Vazgeç") — istenmeden gönderilmiş bir
+talep için yöneticiyi beklemek gerekmiyor.
+
+### Yönetici paneli: bildirim çanı
+Başlıktaki çan üç kaynaktan gelen bekleyen işi tek listede topluyor: teklif
+talepleri, sahiplenme başvuruları, moderasyon kuyruğu. Satıra basınca ilgili
+sayfaya gidiyor. Eskiden çan yalnızca bir nokta çiziyordu ve tıklanınca
+hiçbir şey olmuyordu — **çalışmayan bir bildirim, olmayandan kötüdür.**
+
+Rozetteki sayı yalnızca **teklif taleplerini** sayıyor: başvuru ve
+moderasyon kuyruğunun kendi sayaçları kenar çubuğunda duruyor, aynı sayıyı
+iki yerde göstermek "iki ayrı iş var" gibi okunurdu.
+
+**"Okundu" işareti liste KAPANIRKEN düşüyor, açılırken değil.** Açılışta
+işaretlenseydi yeni satırın turuncu noktası aynı karede silinir ve hangisinin
+yeni geldiği hiç görünmezdi.
+
+### Reklam materyali: yükleme yönetici panelinde
+Ödüllü video **kullanıcı özelliği**: kaydırma hakkı biten kullanıcı reklam
+izleyip hak kazanıyor. Mekanizmanın restoranla ilgisi yok; restoranın satın
+aldığı şey o akışta **yayınlanma hakkı**. Hizmet listesinde bu ayrım
+"kullanıcı özelliği" çipiyle ve satırın altındaki açıklamayla yazılı —
+yoksa "restoranlar kaydırma hakkı mı satıyor" diye okunuyordu.
+
+Materyaller (`src/lib/creatives.js`) yönetici panelinde, Hizmetler
+sayfasında her hizmetin **kendi satırında**: "Materyaller" düğmesi o
+hizmetin yükleme alanını açıyor. Altı yuvanın her biri kendi türünü ve
+boyut sınırını taşıyor (`SLOTS`): banner 1.5 MB görsel, ödüllü video 4 MB
+dikey video, Gastro şef videosu 5 MB…
+
+Üç karar:
+- **Satır satır açılıyor**, hepsi birden değil: altı yükleme kutusu açıkken
+  katalogun kendisi kayboluyordu.
+- Dosya **data URL** olarak localStorage'a yazılıyor (sunucu tarafı yok).
+  Kota taşarsa `write()` **hata fırlatıyor**, sessizce yutmuyor: yüklediğini
+  sanıp kaybetmek en kötü sonuç.
+- Yükleme **taslak** olarak geliyor; "Yayına al" ayrı bir adım. Yanlış
+  dosya sürüklemek yayına çıkmak anlamına gelmemeli.
+
+### Excel ile toplu restoran yükleme
+Moderasyon sayfası → "Excel ile toplu yükle". Şablonu indir → doldur →
+yükle → **önizlemeyi onayla**. `src/lib/import-restaurants.js`.
+
+- **SheetJS dinamik yükleniyor** (`await import('xlsx')`): küçültülmüş hâli
+  ~430 kB, yönetici panelinin tamamından iki kat büyük. Statik import
+  olsaydı paneli açan herkes indirirdi. Tek dosyalık artifact derlemesinde
+  `inlineDynamicImports` hepsini tek parçaya katıyor, orada fark yok.
+- **Hiçbir şey yazılmadan önce doğrulanıyor.** Yarısı hatalı bir dosyayı
+  yarıya kadar işlemek, yöneticiyi hangi satırın girdiğini elle aramaya
+  zorlardı. Hatalı satırlar **atlanıyor**, dosya reddedilmiyor: doksan doğru
+  satır için on hatalıyı beklemek gereksiz.
+- Yakalananlar: zorunlu alan boş, dosyada aynı ad iki kez, havuzda zaten
+  olan ad. Her biri satır numarasıyla yazılı.
+- Başlık eşlemesi **gevşek**: büyük/küçük harf, boşluk ve zorunluluk
+  yıldızı yok sayılıyor; sıra önemli değil. Şablonu Excel'de açıp başlığa
+  dokunan kullanıcı dosyayı bozmuş olmuyor.
+- CSV aynı yoldan geçiyor — SheetJS biçimi kendi tanıyor, ikinci bir
+  ayrıştırıcı iki ayrı hata kaynağı demekti.
+- Kayıtlar **sahiplenilmemiş** ve doğrudan **yayında** açılıyor (elle
+  restoran oluşturmayla aynı kural: yönetici zaten onaylayan merci).
+- Şablon indirmesi artifact kum havuzunda engelli olabiliyor; o durumda
+  başlık satırı ekranda gösterilip kopyalatılıyor.
+
+### Gastro şef paketi: altın paket
+Katalogdaki tek "üst raf" kalem — şef çekimi yapılıyor, Gastro Onaylı
+kategorisine giriyor, en pahalısı. Diğer hizmetlerle aynı gri satırda
+durunca farkı okunmuyordu; kendi altın yüzeyi, `★` öneki ve "ALTIN PAKET"
+çipi var. Üstünden geçen parıltı `.gur-gold-sheen` (`src/ui/kit.jsx`),
+`prefers-reduced-motion`'da duruyor.
+
+Altın **yeni bir renk ailesi değil**: palete kalıcı jeton eklenmedi,
+yalnızca bu tek ürünün kimliği (`GOLD`, `GurAdmin.jsx`). Yeni bir
+yeşil/kırmızı/amber yazmama kuralı duruyor — altın bir DURUM değil.
+
+İki temada iki ayrı sorun var: koyu zeminde altın metin parlıyor ama beyaz
+kâğıtta aynı ton (`#E9C456`, beyazla 1.7:1) okunmuyor. Mürekkep bu yüzden
+açık temada koyulaşıyor (`#7A5B0B`, 6.4:1).
+
+### Yönetici paneli: Hizmetler ve arama
+**Hizmetler** sayfası sattığımız her kalemi tek listede gösteriyor: kaç
+müşteride açık, aylık ne getiriyor, kaç teklif havada. Önceden "banner'ı
+kimler almış" sorusunun cevabı yoktu — ciro sayfası toplam veriyordu,
+restoranları tek tek gezmek gerekiyordu. Satırdaki "Teklifler" o hizmetin
+fiyatlandırma sekmesine götürüyor.
+
+**Fiyatlandırma** sayfasında her hizmetin kendi sekmesi var. Sekmedeki sayı
+o hizmet için BEKLEYEN teklif. Sekme seçiliyken liste "o hizmeti alanlar +
+o hizmet için teklif gönderilmiş olanlar"a daralıyor — ikincisi şart, yoksa
+takip etmen gereken tam kişi (teklif gönderdiğin ama henüz almamış müşteri)
+listeden düşerdi.
+
+**Arama** tek bileşen (`SearchBar`) ama her sayfa **kendi alanında** arıyor;
+hangi sayfada ne arandığı `SEARCHABLE` tablosunda. Arama olmayan sayfada
+kutu **hiç çizilmiyor**: çalışmayan bir arama kutusu, olmayan aramadan
+kötüdür. Sayfa değişince sorgu temizleniyor — "pizza" arayıp başka sayfaya
+geçip dönünce boş liste görüp "bozuk" sanmanın önüne geçiyor.
+
+### Konum doğrulamalı ziyaret
+`src/lib/visits.js` ve `server/src/visits/tracker.js` **aynı kuralları** taşır:
+120 m yarıçap, 15 dk kalış, 100 m'den iyi hassasiyet. Ham konum hiçbir yerde
+saklanmaz — yalnızca mesafe/süre özeti. Önizlemede test edilebilmesi için
+"Demo: bu mekânda olduğumu varsay" yolu var (`accelerate` bayrağı).
+
+### İşletme verisi: API mi, işletme mi
+`src/lib/b2b.js` → `applyOwnerProfile` işletmenin girdiği alanı dış kaynağın
+üstüne yazar; girilmeyen alan API'den gelir. Panelde her alanın yanında
+"İŞLETMEDEN" / "API'DEN" rozeti bunu gösterir.
+
+### Canlı veri
+`fetchLiveRestaurants()` Overpass API'den gerçek Kadıköy restoranlarını çeker
+(ücretsiz, anahtarsız, istemci tarafı iptal zaman aşımlı). Başarısız olursa
+sessizce mock `RESTAURANTS` verisine düşer. Sunucu tarafında havuz ayrıca
+Google Places + Foursquare + Tripadvisor + OSM'den cron ile beslenir.
 
 ## Görsel kurallar (bunlara uy)
 
-- **Görseller**: `picsum.photos` kullan (Unsplash artifact'ta güvenilmez). URL formatı: `https://picsum.photos/seed/AD/600/400`.
-- **Alt bar**: TÜM ekranlarda aynı olmalı — beyaz yuvarlak pill, kenarda ikon+yazı, ortada GUR pill logo. Inline (position:absolute değil).
-- **Logo boyutları**: 42px pill (header/nav), 60-80px (giriş ekranları), 22-24px (dekoratif/alt bar), 110px (yalnızca splash).
-- **Font**: her yerde Poppins, italic yok.
-- **Menü**: görsel galeri olarak açılır (metin liste değil). Her restoranın `menu: [...]` alanı var.
-
-## Sonraki adımlar (yapılabilecekler)
-
-- Backend bağlantısı: Supabase veya Node+PostgreSQL (bkz. veri modeli, PRD'de).
-- React Native sürümü ayrı bir projede mevcut (gur-mobile).
-- GUR Match özelliği (arkadaşla birlikte kaydırma, eşleşme ekranı) — viral büyüme için.
-- Ödeme entegrasyonu (iyzico/Stripe) abonelikler için.
-- Yönetici girişi (şu an doğrudan /admin açılıyor).
+- **Görseller**: `picsum.photos`. Küçük kutularda `<Img box={46}>` ver — kaynak
+  o ölçüde istenir.
+- **Alt bar**: TÜM ekranlarda aynı — beyaz pill, kenarda ikon+yazı, ortada GUR pili.
+- **Logo boyutları**: 42px (header/nav), 60-80px (giriş), 22-24px (dekoratif), 110px (splash).
+- **Dokunma hedefi**: en az 44×44pt. Küçük ikon butonlar görsel boyutunu korur,
+  `.gur-icon-btn::after` ile hedef büyür.
+- **Menü**: görsel galeri olarak açılır (metin liste değil).
 
 ## Bilinen kısıtlar
 
-- Tüm veri mock/yerel; backend yok (kalıcılık yok, sayfa yenilenince sıfırlanır).
-- Kimlik doğrulama gerçek değil (giriş ekranları herhangi bir değerle geçer).
-- GurApp.jsx büyük tek dosya; istenirse ekranlar ayrı dosyalara bölünebilir.
+- **Push taşıması yok.** Bildirim kuyruğu, tavan, sessiz saat ve tekrar
+  engelleme çalışıyor; `server/index.js` içindeki `push` konsola yazıyor.
+  APNs/FCM sarmalayıcısı oraya verilecek.
+- **Google/Apple girişi anahtar bekliyor.** Akış ve sunucu tarafı doğrulama
+  hazır; `VITE_GOOGLE_CLIENT_ID` / `APPLE_SERVICE_ID` tanımsızken düğmeler
+  demo profiliyle tamamlanır ve bunu ekranda söyler.
+- **Besleme dış ağ ister.** Anahtarsız OSM yolu bile giden HTTPS gerektirir;
+  kapalı ağda tohum listesi devreye girer.
+- **Posta taşıması yok.** Havuz daveti `mailto:` ile yöneticinin posta
+  istemcisinde taslak açıyor; sunucudan giden posta yok. Ayrıca Google
+  Places API e-posta alanı döndürmüyor — adresler OSM etiketlerinden
+  geliyor ve çoğu kayıtta yok.
+- **Ödeme entegrasyonu yok** (iyzico/Stripe). GUR Plus ve ücretli özellikler
+  arayüzde var, tahsilat yok.
+- Yasal metinlerdeki işletme bilgileri yer tutucu; yayına çıkmadan doldurulmalı.
+- Artifact önizlemesi tanımı gereği YEREL modda çalışır: statik tek dosya,
+  arkasında sunucu yok.
