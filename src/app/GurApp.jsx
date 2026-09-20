@@ -23,6 +23,7 @@ import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
 import { usePlatformSettings, useFeature, visibleRestaurants } from '../lib/platform.js';
 import { useModeration, publishedOnly, markVenuePending } from '../lib/moderation.js';
+import { useMedia, ownerMediaFor } from '../lib/media.js';
 import * as secondChance from '../lib/second-chance.js';
 import * as reservations from '../lib/reservations.js';
 import * as pricing from '../lib/pricing.js';
@@ -3861,8 +3862,12 @@ export default function GurApp(props = {}) {
   const [filterCat, setFilterCat] = useState(null);
   const [restaurants, setRestaurants] = useState(RESTAURANTS); // mock ile başla
   const [dataSource, setDataSource] = useState("demo"); // "demo" | "live"
-  // Doyurucu panelinden yüklenen görseller — uygulama genelinde tek kaynak
-  const [ownerMedia, setOwnerMedia] = useState({ photos: [], menu: [] });
+  // Doyurucu panelinden yüklenen görseller. Eskiden burası boş bir
+  // useState'ti ve hiç doldurulmuyordu: işletmenin yüklediği menü ve
+  // fotoğraf tüketiciye HİÇ ulaşmıyordu. Artık ortak depodan geliyor ve
+  // yalnızca YÖNETİCİ ONAYINDAN GEÇMİŞ dosyalar (bkz. lib/media.js →
+  // `ownerMediaFor`, süzgeç orada: iki ekran ayrı süzseydi biri unuturdu).
+  const mediaState = useMedia();
   // GUR Match oturumu
   const [matchCode, setMatchCode] = useState("");
   const [matchResults, setMatchResults] = useState([]);
@@ -3918,6 +3923,13 @@ export default function GurApp(props = {}) {
   //   visibleRestaurants → onaylı ama elle gizlenmiş mi (görünürlük anahtarı)
   // Birleştirmek yanlış olurdu: "henüz onaylanmadı" ile "onaylandı ama
   // yayından kaldırıldı" farklı durumlar ve farklı ekranlarda yönetiliyor.
+  // Onaylı dosyalar. `useMemo` şart: `ownerMediaFor` her çağrıda yeni bir
+  // nesne üretiyor ve doğrudan `feed`in bağımlılığına konsaydı feed her
+  // render'da yeniden hesaplanırdı.
+  const ownerMedia = useMemo(
+    () => ownerMediaFor(ownerRestaurant?.id, mediaState),
+    [ownerRestaurant, mediaState]
+  );
   const feed = useMemo(
     () => visibleRestaurants(
       publishedOnly(withOwnerMedia(restaurants, ownerRestaurant?.id, ownerMedia), modState),

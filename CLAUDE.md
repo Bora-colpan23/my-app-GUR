@@ -113,7 +113,8 @@ gur/
     │   ├── geo.js             # konum izni, elle ilçe seçimi, başlangıç noktası
     │   ├── moderation.js      # yayın öncesi onay kuyruğu (mekan + alan değişikliği)
     │   ├── requests.js        # işletmenin teklif talepleri (satın alma YOK)
-    │   ├── creatives.js        # reklam materyali yükleme (banner / ödüllü video …)
+    │   ├── creatives.js       # hizmet TANITIMI (yönetici yükler, işletme görür)
+    │   ├── media.js           # işletme dosyaları: menü/foto/reklam + ONAY KUYRUĞU
     │   ├── import-restaurants.js  # Excel/CSV ile toplu restoran yükleme
     │   ├── second-chance.js   # haftalık yeniden gösterim paketi + geçilenler
     │   └── social-auth.js     # Google / Apple ile giriş
@@ -141,7 +142,8 @@ yazıyorlar. Bağ ekranlarda değil depolarda:
 | `lib/moderation.js` | işletme + besleme → yönetici (karar) | tüketici destesi |
 | `lib/second-chance.js` | işletme (paket) + tüketici (gösterim) | deste kurulumu, işletme paneli |
 | `lib/requests.js` | işletme (teklif iste) → yönetici (fiyatla/kapat) | yönetici bildirimi, işletme paneli |
-| `lib/creatives.js` | yönetici (reklam materyali) | yönetici hizmet listesi |
+| `lib/creatives.js` | yönetici (hizmet TANITIMI) | işletme Büyüme sekmesi |
+| `lib/media.js` | işletme (menü/foto/reklam) → yönetici (onay) | tüketici destesi, yönetici detayı |
 | `data/restaurants.js` | tohum/besleme | üçü de |
 
 Bir mekanın kimliği tek yerde: `account` alanı işletmenin hesabı olup
@@ -749,27 +751,81 @@ iki yerde göstermek "iki ayrı iş var" gibi okunurdu.
 işaretlenseydi yeni satırın turuncu noktası aynı karede silinir ve hangisinin
 yeni geldiği hiç görünmezdi.
 
-### Reklam materyali: yükleme yönetici panelinde
+### İki ayrı dosya yolu — KARIŞTIRMAYIN
+
+Panelde iki yükleme alanı var ve **aynı şey değiller**:
+
+| | Kim yükler | Kime görünür | Onay |
+|---|---|---|---|
+| **Hizmet tanıtımı** (`lib/creatives.js`) | yönetici | işletme, Büyüme sekmesinde | yok — yönetici zaten yetkili |
+| **İşletme dosyası** (`lib/media.js`) | işletme | onaylanırsa tüketici | **var** |
+
+**Hizmet tanıtımı** reklam içeriği DEĞİL: sattığımız hizmetin ne olduğunu
+ANLATAN örnek ("banner ekranda nasıl görünüyor", "şef videosu neye
+benziyor"). Hizmetler sayfasında satırdaki **Tanıtım** düğmesi açıyor.
+Yükleme **taslak** geliyor; "İşletmelere göster" ayrı bir adım. İşletme
+kartta bu tanıtımı görüp öyle teklif istiyor — fiyat ve iki satır açıklama
+"dönen keşfet banner'ı"nın neye benzediğini anlatmıyordu.
+
 Ödüllü video **kullanıcı özelliği**: kaydırma hakkı biten kullanıcı reklam
-izleyip hak kazanıyor. Mekanizmanın restoranla ilgisi yok; restoranın satın
-aldığı şey o akışta **yayınlanma hakkı**. Hizmet listesinde bu ayrım
-"kullanıcı özelliği" çipiyle ve satırın altındaki açıklamayla yazılı —
-yoksa "restoranlar kaydırma hakkı mı satıyor" diye okunuyordu.
+izleyip hak kazanıyor. Restoranın satın aldığı şey o akışta **yayınlanma
+hakkı**. Hizmet listesinde bu ayrım "kullanıcı özelliği" çipiyle ve
+satırın altındaki açıklamayla yazılı.
 
-Materyaller (`src/lib/creatives.js`) yönetici panelinde, Hizmetler
-sayfasında her hizmetin **kendi satırında**: "Materyaller" düğmesi o
-hizmetin yükleme alanını açıyor. Altı yuvanın her biri kendi türünü ve
-boyut sınırını taşıyor (`SLOTS`): banner 1.5 MB görsel, ödüllü video 4 MB
-dikey video, Gastro şef videosu 5 MB…
+### İşletme dosyaları: onay kuyruğu (`lib/media.js`)
+Menü, fotoğraf ve reklam materyali. İşletme yüklüyor, **yönetici
+onaylamadan tüketiciye çıkmıyor**:
 
-Üç karar:
-- **Satır satır açılıyor**, hepsi birden değil: altı yükleme kutusu açıkken
-  katalogun kendisi kayboluyordu.
-- Dosya **data URL** olarak localStorage'a yazılıyor (sunucu tarafı yok).
-  Kota taşarsa `write()` **hata fırlatıyor**, sessizce yutmuyor: yüklediğini
+```
+işletme yükler (pending) → yönetici ÖNİZLER → onay: tüketicide görünür
+                                            → ret: sebebiyle işletmede kalır
+```
+
+**Neden `moderation.js`'e koymadık.** Orası ALAN değişikliği kuyruğu: bir
+mekanın tek bekleyen talebi olur ve talep bütün olarak onaylanır. Dosya
+öyle değil — beş menü sayfasının üçü geçip ikisi kalabilmeli. Tek kayıtta
+tutmak "menü bekliyor" ile "menünün 2. sayfası bekliyor" durumlarını
+karıştırırdı.
+
+**Eskiden hiç çalışmıyordu.** Menü ve fotoğraf yüklemeleri React state'te
+(`ownerMedia`, blob URL) duruyordu: sayfa yenilenince kayboluyor, yönetici
+panelinden görünmüyor, tüketiciye HİÇ ulaşmıyordu. Yönetici panelindeki
+menü listesi de tohumlanmış sahte veriydi (`restaurantMenus`) — ad ve sayfa
+sayısı vardı, açılacak dosya yoktu. İkisi de kaldırıldı.
+
+Bilinmesi gerekenler:
+- **Süzgeç tek yerde**: `ownerMediaFor` yalnızca `approved` döndürüyor ve
+  tüketici destesi oradan besleniyor. İki ekran ayrı ayrı süzseydi biri
+  er geç unuturdu.
+- **Kayıt her zaman `pending` doğuyor** (`addMedia`). "Yükledim, yayında"
+  diye bir yol yok; kapı depoda, arayüzde değil.
+- **Görseller yazılmadan önce küçültülüyor** (`image.js` →
+  `fileToFittedDataUrl`, oran korunur, JPEG). Küçültmeden üç telefon
+  fotoğrafı tarayıcı kotasını dolduruyor ve dördüncü yükleme hata veriyordu.
+  Video küçültülemiyor (tuval sesi ve süreyi kaybeder), orada sınır gerçek
+  sınır.
+- Kota taşarsa `write()` **hata fırlatıyor**, sessizce yutmuyor: yüklediğini
   sanıp kaybetmek en kötü sonuç.
-- Yükleme **taslak** olarak geliyor; "Yayına al" ayrı bir adım. Yanlış
-  dosya sürüklemek yayına çıkmak anlamına gelmemeli.
+- **Ret sebep istiyor.** Sebepsiz ret işletmeyi aynı dosyayı ikinci kez
+  yüklemeye iter ve aynı iş yöneticiye geri gelir. Sebep işletme panelinde
+  dosyanın altında yazılı.
+
+**Yönetici tarafı üç yerde:**
+- Moderasyon → "Onayımı bekleyen dosyalar" (en üstte: burada bir MÜŞTERİ
+  bekliyor), önizle → onayla/reddet.
+- Restoran detayı → "İşletmenin yüklediği dosyalar": tür sekmeleri, tıklayınca
+  büyük açılır, karar oradan da verilebilir.
+- Kenar çubuğundaki **Moderasyon sayacı** üç kuyruğu da topluyor; çan rozeti
+  teklif talepleri + bekleyen dosyaları sayıyor.
+
+**İşletme tarafı:** sekmelerin üstünde **ONAY DURUMU** şeridi — hangi türde
+kaç dosya beklemede/yayında/reddedilmiş. Her sekmede duruyor: bekleyen bir
+menü onayını görmek için Menü sekmesine girmek gerekseydi işletme onu ancak
+arayarak bulurdu.
+
+**Kayıt akışındaki (reg3) yüklemeler depoya gitmiyor**: orada henüz
+sahiplenilmiş bir kayıt yok, dosyayı hangi restoranın altına yazacağımızı
+bilmiyoruz. Panele girildikten sonraki yüklemeler kuyruğa düşüyor.
 
 ### Excel ile toplu restoran yükleme
 Moderasyon sayfası → "Excel ile toplu yükle". Şablonu indir → doldur →
@@ -870,6 +926,10 @@ Google Places + Foursquare + Tripadvisor + OSM'den cron ile beslenir.
   istemcisinde taslak açıyor; sunucudan giden posta yok. Ayrıca Google
   Places API e-posta alanı döndürmüyor — adresler OSM etiketlerinden
   geliyor ve çoğu kayıtta yok.
+- **Dosya deposu yok.** Menü/fotoğraf/reklam ve hizmet tanıtımları data URL
+  olarak localStorage'da; tarayıcı kotası ~5 MB. Gerçek dağıtımda yerine bir
+  nesne deposu (S3/R2) + sunucuda onay tablosu gelir; arayüz `url` ve
+  `status` okuduğu için değişmesi gerekmiyor.
 - **Ödeme entegrasyonu yok** (iyzico/Stripe). GUR Plus ve ücretli özellikler
   arayüzde var, tahsilat yok.
 - Yasal metinlerdeki işletme bilgileri yer tutucu; yayına çıkmadan doldurulmalı.

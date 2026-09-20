@@ -35,6 +35,11 @@ import * as backend from '../lib/backend.js';
 import { useModeration, pendingChangeFor } from '../lib/moderation.js';
 import * as secondChance from '../lib/second-chance.js';
 import { useRequests, requestFor, requestQuote, withdraw } from '../lib/requests.js';
+import {
+  useMedia, KINDS as MEDIA_KINDS, listMedia, addMedia, removeMedia,
+  statusSummary, ownerMediaFor, isVideo as mediaIsVideo, sizeLabel as mediaSize,
+} from '../lib/media.js';
+import { useCreatives, promoFor, isVideo as promoIsVideo } from '../lib/creatives.js';
 import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
 
@@ -908,7 +913,11 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
         <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: gold ? "#F6E6A8" : "#fff", margin: 0 }}>{title}</p>
         <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: gold ? "#E9C456" : "#FF9A4D", flexShrink: 0 }}>{price}</span>
       </div>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>{desc}</p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 12px", lineHeight: 1.5 }}>{desc}</p>
+      {/* Hizmetin tanıtımı — yönetici yüklüyor (lib/creatives.js). Fiyatın
+          yanında duruyor: "banner nedir" sorusunun cevabı teklif
+          istenmeden önce, ayrı bir ekranda değil burada olmalı. */}
+      <ServicePromo streamKey={streamKey} />
       {locked ? (
         <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.35)", margin: 0 }}>Bu paket şu an kapalı</p>
       ) : active ? (
@@ -937,6 +946,211 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
         <Btn text="Teklif iste" onClick={iste}
           variant={gold ? "outlineDark" : "filled"} size="sm" fullWidth={false} />
       )}
+    </div>
+  );
+}
+
+/**
+ * DURUM ROZETİ — bir dosyanın onay hâli.
+ *
+ * Renk tek başına bilgi taşımıyor: yanında her zaman yazı var. Reddedilen
+ * dosyada sebep de yazılı — "reddedildi" deyip sebebi söylememek işletmeyi
+ * aynı dosyayı ikinci kez yüklemeye iter.
+ */
+function MediaStatus({ file }) {
+  const map = {
+    pending:  { text: "İncelemede", renk: "var(--c-warn-light)", zemin: "rgba(255,180,84,0.14)" },
+    approved: { text: "Yayında",    renk: "var(--c-ok-light)",   zemin: "rgba(74,222,128,0.14)" },
+    rejected: { text: "Reddedildi", renk: "var(--c-bad-light)",  zemin: "rgba(255,122,112,0.14)" },
+  };
+  const d = map[file.status] || map.pending;
+  return (
+    <span style={{
+      fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, color: d.renk,
+      background: d.zemin, borderRadius: 999, padding: "2px 9px", whiteSpace: "nowrap",
+    }}>{d.text}</span>
+  );
+}
+
+/**
+ * ONAY KUYRUKLU YÜKLEME — menü, fotoğraf ve reklam materyali için tek bileşen.
+ *
+ * Üç sekmede üç ayrı kopya vardı; menüde silme düğmesi, fotoğrafta grid,
+ * reklamda hiçbiri. Aynı işi yapan üç kod üç ayrı davranış demekti.
+ *
+ * Yüklenen dosya DOĞRUDAN YAYINA GİRMİYOR: `addMedia` kaydı `pending`
+ * doğuruyor ve tüketici yalnızca onaylananı görüyor. Ekran bunu saklamıyor,
+ * yükleme kutusunun altında yazıyor — "yükledim, neden görünmüyor" sorusu
+ * sorulmadan cevaplanmış oluyor.
+ */
+function MediaManager({ restaurant, kind, grid = false }) {
+  const durum = useMedia();
+  const k = MEDIA_KINDS[kind];
+  const girdi = useRef(null);
+  const [hata, setHata] = useState("");
+  const [mesgul, setMesgul] = useState(false);
+  const dosyalar = restaurant ? listMedia(restaurant.id, kind, durum) : [];
+
+  const sec = async (e) => {
+    const secilen = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!secilen.length || !restaurant) return;
+    setMesgul(true); setHata("");
+    try {
+      // Sırayla: hepsini aynı anda yazmak son yazanın kazandığı bir
+      // yarış kuruyordu (her biri aynı anlık görüntüden okuyor).
+      for (const f of secilen) await addMedia(restaurant.id, kind, f);
+    } catch (err) {
+      setHata(err?.message || "Dosya yüklenemedi.");
+    } finally { setMesgul(false); }
+  };
+
+  if (!restaurant) return null;
+
+  return (
+    <div>
+      {dosyalar.length > 0 && (grid ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+          {dosyalar.map(f => (
+            <div key={f.id} style={{ position: "relative", borderRadius: 14, overflow: "hidden", aspectRatio: "1" }}>
+              <img src={f.url} alt={f.name} loading="lazy" decoding="async"
+                style={{ width: "100%", height: "100%", objectFit: "cover",
+                  // Onaylanmamış dosya soluk DEĞİL, üstünde rozet var:
+                  // soluklaştırma hem okunmuyor hem "bozuk" gibi duruyordu.
+                  filter: f.status === "rejected" ? "grayscale(1)" : "none" }} />
+              <div style={{ position: "absolute", left: 4, bottom: 4 }}><MediaStatus file={f} /></div>
+              <div style={{ position: "absolute", top: 4, right: 4 }}>
+                <IconBtn onClick={() => removeMedia(restaurant.id, kind, f.id)}
+                  tone="glassDark" shape="rounded" size={26} title="Kaldır"
+                  icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+          {dosyalar.map(f => (
+            <div key={f.id} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+              {mediaIsVideo(f) ? (
+                <div style={{ width: 46, height: 46, borderRadius: 12, background: "rgba(255,102,0,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#FF6600" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4" /></svg>
+                </div>
+              ) : (
+                <img src={f.url} alt="" style={{ width: 46, height: 46, borderRadius: 12, objectFit: "cover", flexShrink: 0 }} />
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 600, color: "#fff", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                  <MediaStatus file={f} />
+                  <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.3)" }}>{mediaSize(f.sizeMB)}</span>
+                </div>
+                {f.status === "rejected" && f.reason && (
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-bad-light)", margin: "5px 0 0", lineHeight: 1.4 }}>{f.reason}</p>
+                )}
+              </div>
+              <IconBtn onClick={() => removeMedia(restaurant.id, kind, f.id)}
+                tone="dangerSoft" shape="rounded" size={32} title="Kaldır"
+                icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--c-bad-light)" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+            </div>
+          ))}
+        </div>
+      ))}
+
+      <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, padding: "26px 16px", borderRadius: 20, border: "2px dashed rgba(255,102,0,0.25)", background: "rgba(255,102,0,0.04)", cursor: mesgul ? "progress" : "pointer" }}>
+        <input ref={girdi} type="file" accept={k.accept} multiple disabled={mesgul}
+          style={{ display: "none" }} onChange={sec} />
+        <div style={{ width: 46, height: 46, borderRadius: 16, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+        </div>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 600, color: "var(--c-brand-ink)", margin: 0 }}>
+          {mesgul ? "Yükleniyor…" : `${k.tekil} yükle`}
+        </p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0, textAlign: "center", lineHeight: 1.45 }}>
+          {k.hint} · en fazla {k.maxMB} MB
+        </p>
+      </label>
+
+      {hata && (
+        <div role="status" style={{ background: "rgba(255,122,112,0.12)", border: "1px solid rgba(255,122,112,0.24)", borderRadius: 14, padding: "10px 14px", marginTop: 12 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-bad-light)", margin: 0 }}>{hata}</p>
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 12, padding: "11px 14px", borderRadius: 14, background: "rgba(255,255,255,0.04)" }}>
+        <Icon n="shield" size={14} color="rgba(255,255,255,0.4)" />
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.5 }}>
+          Yüklediğiniz dosya <b>GUR ekibinin onayından sonra</b> yayına girer.
+          Onaylanana kadar yalnızca siz görürsünüz.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ONAY DURUMU ŞERİDİ — "neyim onayda".
+ *
+ * Sekmelerin ÜSTÜNDE ve her sekmede görünüyor: bekleyen bir menü onayını
+ * görmek için Menü sekmesine girmek gerekseydi işletme onu ancak
+ * aramaya giderse bulurdu.
+ *
+ * Hiç dosya yoksa hiç çizilmiyor — boş bir "0 bekliyor" satırı yer
+ * kaplamaktan başka bir şey yapmaz.
+ */
+function ApprovalStatus({ restaurant, onGo }) {
+  const durum = useMedia();
+  if (!restaurant) return null;
+  const ozet = statusSummary(restaurant.id, durum);
+  if (!ozet.length) return null;
+
+  const sekme = { menu: "menu", photos: "photos", ads: "growth" };
+
+  return (
+    <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "14px 16px", marginBottom: 16 }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", margin: "0 0 10px", letterSpacing: 0.2 }}>ONAY DURUMU</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {ozet.map(x => (
+          <button key={x.kind} type="button" onClick={() => onGo?.(sekme[x.kind])}
+            style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap",
+              background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", width: "100%" }}>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "#fff", minWidth: 96 }}>{x.label}</span>
+            {/* Renk tek başına bilgi taşımasın: sayıların yanında ne olduğu da yazılı. */}
+            {x.pending > 0 && (
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-warn-light)", background: "rgba(255,180,84,0.14)", borderRadius: 999, padding: "2px 9px" }}>{x.pending} onay bekliyor</span>
+            )}
+            {x.approved > 0 && (
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-ok-light)", background: "rgba(74,222,128,0.14)", borderRadius: 999, padding: "2px 9px" }}>{x.approved} yayında</span>
+            )}
+            {x.rejected > 0 && (
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-bad-light)", background: "rgba(255,122,112,0.14)", borderRadius: 999, padding: "2px 9px" }}>{x.rejected} reddedildi</span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * HİZMET TANITIMI — yöneticinin yüklediği örnek görsel / video.
+ *
+ * Kartın içinde duruyor: "banner nedir" sorusunun cevabı fiyatın yanında
+ * olmalı, ayrı bir ekranda değil. Tanıtım yoksa hiç yer kaplamıyor.
+ *
+ * Video `controls` ile geliyor ama `autoPlay` YOK: izinsiz oynayan bir
+ * video paneli gezerken şaşırtıyor ve sessiz moddaki telefonu yok sayar.
+ */
+function ServicePromo({ streamKey }) {
+  const durum = useCreatives();
+  const promo = streamKey ? promoFor(streamKey, durum) : null;
+  if (!promo) return null;
+  return (
+    <div style={{ marginBottom: 12, borderRadius: 14, overflow: "hidden", background: "rgba(0,0,0,0.25)" }}>
+      {promoIsVideo(promo)
+        ? <video src={promo.url} controls playsInline preload="metadata"
+            style={{ width: "100%", maxHeight: 190, display: "block", background: "#000" }} />
+        : <img src={promo.url} alt={`${promo.name} — hizmet tanıtımı`} loading="lazy" decoding="async"
+            style={{ width: "100%", maxHeight: 190, objectFit: "cover", display: "block" }} />}
     </div>
   );
 }
@@ -1272,7 +1486,7 @@ function PriceOffers({ restaurant }) {
   );
 }
 
-function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaurant }) {
+function RestaurantDashboard({ onLogout, ownerRestaurant }) {
   const [activeTab, setActiveTab] = useState("stats");
   // Masa ayırtma yönetici panelinden kapatılabiliyor; kapalıysa sekme de
   // talep de yok — işletmeye cevaplayamayacağı bir kuyruk göstermeyiz.
@@ -1292,12 +1506,10 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
   const [dealHours, setDealHours] = useState(2);
   const [dealLive, setDealLive] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
-  // Yüklemeler uygulama kökünde tutulur — panelden çıkınca kaybolmaz ve
-  // tüketici tarafındaki swipe/detay ekranlarına anında yansır.
-  const menuUploads = ownerMedia.menu;
-  const photoUploads = ownerMedia.photos;
-  const setMenuUploads = (up) => setOwnerMedia(p => ({ ...p, menu: typeof up === "function" ? up(p.menu) : up }));
-  const setPhotoUploads = (up) => setOwnerMedia(p => ({ ...p, photos: typeof up === "function" ? up(p.photos) : up }));
+  // Menü ve fotoğraf yüklemeleri artık ortak depoda (src/lib/media.js) ve
+  // onay kuyruğundan geçiyor; MediaManager doğrudan oradan okuyup yazıyor.
+  // Eskiden burada kökten prop olarak inen geçici bir dizi vardı: sayfa
+  // yenilenince kayboluyor, yönetici panelinden hiç görünmüyordu.
 
   // Mock istatistik verileri
   const stats = {
@@ -1412,6 +1624,11 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
               </div>
             ))}
           </HScroll>
+
+          {/* Onay durumu her sekmede görünür: bekleyen bir menü onayını
+              görmek için Menü sekmesine girmek gerekseydi işletme onu
+              ancak arayarak bulurdu. */}
+          <ApprovalStatus restaurant={ownerRestaurant} onGo={setActiveTab} />
 
           {/* ─── TAB: Masa talepleri ───
               Kullanıcı uygulamadan masa ayırttığında talep buraya düşer.
@@ -1562,49 +1779,10 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
           {activeTab === "menu" && (
             <div>
               <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>Menü görsellerinizi buradan yükleyin. Kullanıcılar restoranınızın menüsünü bu görseller üzerinden görecektir.</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>Menü sayfalarınızı buradan yükleyin. GUR ekibi onayladıktan sonra kullanıcılar menünüzü bu görseller üzerinden görür.</p>
               </div>
 
-              {/* Yüklü menüler */}
-              {menuUploads.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-                  {menuUploads.map((file, i) => (
-                    <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", animation: `fadeInUp 0.3s ease-out ${i * 0.05}s both` }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-<Icon n="doc" color="#FF6600" size={18} />
-                        </div>
-                        <div>
-                          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 600, color: "#fff", margin: "0 0 2px" }}>{file.name}</p>
-                          <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.3)", margin: 0 }}>Menü sayfası {i + 1}</p>
-                        </div>
-                      </div>
-                      <IconBtn
-                        onClick={() => setMenuUploads(p => { if (p[i]?.url) URL.revokeObjectURL(p[i].url); return p.filter((_, idx) => idx !== i); })}
-                        tone="dangerSoft" shape="rounded" size={32} title="Menüyü kaldır"
-                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-bad-light)" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Yükleme alanı */}
-              <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px 16px", borderRadius: 20, border: "2px dashed rgba(255,102,0,0.25)", background: "rgba(255,102,0,0.04)", cursor: "pointer" }}>
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ display: "none" }} onChange={e => { const files = toMediaFiles(e.target.files); setMenuUploads(p => [...p, ...files]); e.target.value = ""; }} />
-                <div style={{ width: 48, height: 48, borderRadius: 16, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                </div>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 600, color: "var(--c-brand-ink)", margin: 0 }}>Menü Görseli Yükle</p>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>PDF veya fotoğraf (JPG, PNG)</p>
-              </label>
-
-              {menuUploads.length > 0 && (
-                <div style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.15)", borderRadius: 16, padding: "12px 16px", marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
-<Icon n="check" color="var(--c-ok-light)" size={16} />
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(76,175,80,0.8)", margin: 0 }}>{menuUploads.length} menü sayfası yüklendi</p>
-                </div>
-              )}
+              <MediaManager restaurant={ownerRestaurant} kind="menu" />
             </div>
           )}
 
@@ -1718,6 +1896,19 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                   streamKey="gastroPackage" streamName="Gastro şef videosu paketi" restaurant={ownerRestaurant}
                 />
               </GrowthSection>
+
+              {/* ─── KENDİ REKLAM DOSYANIZ ───
+                  Yukarıdaki kartlar "ne satın alıyorum"u anlatıyor; burası
+                  "yayınlanmasını istediğim dosya". İkisi ayrı: biri bizim
+                  tanıtımımız (yönetici yüklüyor), bu ise müşterinin
+                  gönderdiği içerik ve ONAYDAN GEÇİYOR. */}
+              <GrowthSection title="Reklam materyaliniz">
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.55 }}>
+                  Yayınlanmasını istediğiniz görsel veya videoyu buradan gönderin.
+                  GUR ekibi onayladıktan sonra satın aldığınız reklam alanında kullanılır.
+                </p>
+                <MediaManager restaurant={ownerRestaurant} kind="ads" />
+              </GrowthSection>
             </div>
           )}
 
@@ -1725,36 +1916,10 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
           {activeTab === "photos" && (
             <div>
               <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>Mekan ve yemek fotoğraflarınızı yükleyin. Kaliteli görseller müşteri ilgisini %70 artırır!</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>Mekan ve yemek fotoğraflarınızı yükleyin. Onaylananlar keşif kartınızda ilk sırada gösterilir.</p>
               </div>
 
-              {/* Yüklü fotoğraflar — grid */}
-              {photoUploads.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
-                  {photoUploads.map((file, i) => (
-                    <div key={i} style={{ position: "relative", borderRadius: 14, overflow: "hidden", aspectRatio: "1", animation: `fadeInUp 0.3s ease-out ${i * 0.05}s both` }}>
-                      <img src={file.url} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      <div style={{ position: "absolute", top: 4, right: 4 }}>
-                        <IconBtn
-                          onClick={() => setPhotoUploads(p => { if (p[i]?.url) URL.revokeObjectURL(p[i].url); return p.filter((_, idx) => idx !== i); })}
-                          tone="glassDark" shape="rounded" size={26} title="Fotoğrafı kaldır"
-                          icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Yükleme alanı */}
-              <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px 16px", borderRadius: 20, border: "2px dashed rgba(255,102,0,0.25)", background: "rgba(255,102,0,0.04)", cursor: "pointer" }}>
-                <input type="file" accept=".jpg,.jpeg,.png,.webp" multiple style={{ display: "none" }} onChange={e => { const files = toMediaFiles(e.target.files); setPhotoUploads(p => [...p, ...files]); e.target.value = ""; }} />
-                <div style={{ width: 48, height: 48, borderRadius: 16, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
-                </div>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 600, color: "var(--c-brand-ink)", margin: 0 }}>Fotoğraf Yükle</p>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>JPG, PNG, WEBP</p>
-              </label>
+              <MediaManager restaurant={ownerRestaurant} kind="photos" grid />
 
               {/* İpuçları */}
               <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "14px 16px", marginTop: 16 }}>
@@ -1767,12 +1932,6 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
                 ))}
               </div>
 
-              {photoUploads.length > 0 && (
-                <div style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.15)", borderRadius: 16, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
-<Icon n="check" color="var(--c-ok-light)" size={16} />
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(76,175,80,0.8)", margin: 0 }}>{photoUploads.length} fotoğraf yüklendi — keşif kartınızda ilk sırada gösteriliyor</p>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -1854,23 +2013,40 @@ function RestaurantDashboard({ onLogout, ownerMedia, setOwnerMedia, ownerRestaur
 export default function GurBusiness() {
   const [screen, setScreen] = useState("auth");   // auth | login | claim | reg1..3 | dashboard
   const [history, setHistory] = useState([]);
-  // Yüklenen menü ve fotoğraflar: panelde girilen medya tüketici tarafına
-  // da gidiyor (withOwnerMedia), o yüzden kökte duruyor.
+  // Kayıt akışındaki (reg3) geçici yüklemeler. Orada henüz sahiplenilmiş
+  // bir kayıt YOK — dosyayı hangi restoranın altına yazacağımızı
+  // bilmiyoruz — o yüzden depoya değil ekrana bağlı duruyorlar. Panele
+  // girildikten sonraki yüklemeler ortak depoya ve onay kuyruğuna gider.
   const [ownerMedia, setOwnerMedia] = useState({ photos: [], menu: [] });
   const [claimedRestaurant, setClaimedRestaurant] = useState(null);
 
   const ownerProfiles = useOwnerProfiles();
+  const mediaState = useMedia();
+
   // Yönetilen mekan: sahiplenilen kayıt, yoksa demo işletmesi. Liste
   // tüketici uygulamasıyla ortak (src/data/restaurants.js).
+  //
+  // İki adım şart: hangi mekanı yönettiğimizi bilmeden onun medyasını
+  // ekleyemeyiz, ama medyayı eklemeden de kaydın son hâli çıkmaz. Önce
+  // kimliği buluyoruz, sonra o kimliğin ONAYLI dosyalarını bindiriyoruz —
+  // işletme kendi panelinde tüketicinin gördüğü kaydın aynısını görsün.
+  const basePool = useMemo(
+    () => RESTAURANTS.map(r => applyOwnerProfile(r, ownerProfiles)),
+    [ownerProfiles]
+  );
+  const baseOwner = useMemo(
+    () => (claimedRestaurant
+      ? basePool.find(r => String(r.id) === String(claimedRestaurant.id)) || claimedRestaurant
+      : findOwnerRestaurant(basePool)),
+    [basePool, claimedRestaurant]
+  );
   const pool = useMemo(
-    () => withOwnerMedia(RESTAURANTS, null, ownerMedia).map(r => applyOwnerProfile(r, ownerProfiles)),
-    [ownerMedia, ownerProfiles]
+    () => withOwnerMedia(basePool, baseOwner?.id, ownerMediaFor(baseOwner?.id, mediaState)),
+    [basePool, baseOwner, mediaState]
   );
   const ownerRestaurant = useMemo(
-    () => (claimedRestaurant
-      ? pool.find(r => String(r.id) === String(claimedRestaurant.id)) || claimedRestaurant
-      : findOwnerRestaurant(pool)),
-    [pool, claimedRestaurant]
+    () => pool.find(r => String(r.id) === String(baseOwner?.id)) || baseOwner,
+    [pool, baseOwner]
   );
 
   const nav = (next) => { setHistory(h => [...h, screen]); setScreen(next); };
@@ -1892,7 +2068,7 @@ export default function GurBusiness() {
       case "reg1": return <RestRegStep1 onBack={back} onNext={() => nav("reg2")} />;
       case "reg2": return <RestRegStep2 onBack={back} onNext={() => nav("reg3")} />;
       case "reg3": return <RestRegStep3 onBack={back} onDone={() => nav("dashboard")} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} />;
-      case "dashboard": return <RestaurantDashboard onLogout={logout} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} ownerRestaurant={ownerRestaurant} />;
+      case "dashboard": return <RestaurantDashboard onLogout={logout} ownerRestaurant={ownerRestaurant} />;
       default: return <DoyurucuAuthScreen
         onLogin={() => nav("login")} onRegister={() => nav("reg1")} onClaim={() => nav("claim")} />;
     }

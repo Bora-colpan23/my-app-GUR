@@ -1,10 +1,19 @@
 // ═══════════════════════════════════════════════════════════════════════
-// REKLAM MATERYALLERİ — yöneticinin yüklediği görsel ve videolar
+// HİZMET TANITIMLARI — yöneticinin yüklediği tanıtım görseli / videosu
 //
-// Reklam envanterinin İÇERİĞİ platformda duruyor, işletmede değil:
-// banner slaytı, ödüllü video dosyası, push bildirim görseli. İşletme
-// materyali gönderiyor ama yayına giren dosyayı yönetici yüklüyor —
-// böylece ölçü, süre ve içerik denetimi tek elde kalıyor.
+// Burası REKLAM İÇERİĞİ DEĞİL. Sattığımız her hizmetin (banner, push,
+// ödüllü video, Gastro paketi…) ne olduğunu ANLATAN tanıtım dosyası:
+// "banner nasıl görünüyor", "şef videosu neye benziyor". Yönetici
+// yüklüyor, işletme kendi panelinde Büyüme sekmesinde görüyor.
+//
+// Neden bu ayrım: bir işletmenin teklif istemeden önce ne satın aldığını
+// görmesi gerekiyordu. Fiyat ve iki satır açıklama yetmiyordu — "dönen
+// keşfet banner'ı" okuyan kişi ekranda neye benzediğini bilmiyordu.
+//
+// İşletmenin KENDİ yüklediği reklam dosyası burada DEĞİL: o onay
+// kuyruğundan geçiyor (src/lib/media.js → `ads`). İkisini tek depoda
+// tutmak "bizim tanıtımımız" ile "müşterinin bize gönderdiği dosya"yı
+// karıştırırdı; birinin onaya ihtiyacı var, diğerinin yok.
 //
 // ÖDÜLLÜ VİDEO HAKKINDA: bu bir KULLANICI özelliği. Kullanıcı videoyu
 // izleyip kaydırma hakkı kazanıyor; restoranla zorunlu bir ilişkisi yok.
@@ -45,33 +54,37 @@ export function useCreatives() {
 }
 
 /**
- * Her yuvanın ne kabul ettiği tek yerde. Boyut sınırı gerçek: data URL
- * olarak localStorage'a yazılıyor ve 5 MB'lık kota bir videoyla dolar.
+ * Her hizmetin tanıtım yuvası. Hepsi görsel VE video kabul ediyor: bir
+ * hizmeti kimi zaman tek kare anlatıyor, kimi zaman on saniyelik bir
+ * ekran kaydı gerekiyor — hangisinin doğru olduğuna yükleyen karar verir.
+ *
+ * Boyut sınırı gerçek: data URL olarak localStorage'a yazılıyor ve
+ * 5 MB'lık tarayıcı kotası tek bir videoyla dolar.
  */
 export const SLOTS = {
   bannerAds: {
-    label: "Keşfet banner'ı", accept: "image/*", maxMB: 1.5,
-    hint: "1200×600 px yatay görsel. Keşfet ekranının üstündeki karusele girer.",
+    label: "Keşfet banner'ı tanıtımı", accept: "image/*,video/*", maxMB: 4,
+    hint: "Banner'ın Keşfet ekranında nasıl göründüğünü gösteren örnek kare ya da kısa ekran kaydı.",
   },
   rewardedAds: {
-    label: "Ödüllü video", accept: "video/*,image/*", maxMB: 4,
-    hint: "Dikey 9:16, en fazla 30 sn. Kullanıcı izleyip kaydırma hakkı kazanır.",
+    label: "Ödüllü video tanıtımı", accept: "image/*,video/*", maxMB: 4,
+    hint: "Ödüllü video akışının örneği. Kullanıcı izleyip kaydırma hakkı kazanıyor — işletme burada ne satın aldığını görür.",
   },
   pushAds: {
-    label: "Push bildirim görseli", accept: "image/*", maxMB: 0.8,
-    hint: "Kare görsel (1:1). Bildirimin yanında küçük gösterilir.",
+    label: "Push bildirimi tanıtımı", accept: "image/*,video/*", maxMB: 4,
+    hint: "Bildirimin telefonda nasıl göründüğünü gösteren örnek.",
   },
   instantDeals: {
-    label: "Anlık fırsat görseli", accept: "image/*", maxMB: 1,
-    hint: "Yatay görsel. Fırsat kartının arkasında kullanılır.",
+    label: "Anlık fırsat tanıtımı", accept: "image/*,video/*", maxMB: 4,
+    hint: "Fırsat kartının kullanıcı ekranındaki hâli.",
   },
   gastroPackage: {
-    label: "Gastro şef videosu", accept: "video/*", maxMB: 5,
-    hint: "Dikey 15 sn şef videosu. Mekânın galerisinde ayrı bir kare olarak çıkar.",
+    label: "Gastro şef videosu tanıtımı", accept: "image/*,video/*", maxMB: 5,
+    hint: "Örnek şef çekimi. İşletme çekimin kalitesini görmeden bu pakete teklif istemiyor.",
   },
   secondChance: {
-    label: "İkinci Şans görseli", accept: "image/*", maxMB: 1,
-    hint: "İsteğe bağlı. Boş bırakılırsa mekânın kendi fotoğrafı kullanılır.",
+    label: "İkinci Şans tanıtımı", accept: "image/*,video/*", maxMB: 4,
+    hint: "Paketin nasıl çalıştığını anlatan örnek kare ya da kısa video.",
   },
 };
 
@@ -98,7 +111,7 @@ export async function addCreative(streamKey, file, { restaurantId = null, restau
     id: `cr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     name: file.name, type: file.type, sizeMB: +mb.toFixed(2),
     url, restaurantId, restaurantName,
-    live: false,                       // yayında mı — yönetici açar
+    live: false,                       // işletmelere görünür mü — yönetici açar
     at: new Date().toISOString(),
   };
   const state = read();
@@ -114,8 +127,8 @@ export function removeCreative(streamKey, id) {
   write(next);
 }
 
-/** Yayına al / yayından kaldır. Yüklemek yayınlamak değil — yönetici
- *  materyali önce yükleyip sonra kontrol edip açabilsin. */
+/** İşletmelere göster / gizle. Yüklemek göstermek değil — yönetici
+ *  dosyayı önce yükleyip sonra kontrol edip açabilsin. */
 export function toggleLive(streamKey, id) {
   const state = read();
   write({
@@ -127,4 +140,19 @@ export function toggleLive(streamKey, id) {
 
 export function liveCount(streamKey, state = read()) {
   return listFor(streamKey, state).filter(x => x.live).length;
+}
+
+/**
+ * İşletme panelinin göreceği tanıtım — yalnızca `live` olan ve EN YENİ
+ * olan. Bir hizmetin birden fazla tanıtımı açık bırakılırsa panelde
+ * hepsini dizmek yerine sonuncusu gösteriliyor: kart bir tanıtım için
+ * yer ayırıyor, galeri için değil.
+ */
+export function promoFor(streamKey, state = read()) {
+  return listFor(streamKey, state).find(x => x.live) || null;
+}
+
+/** Önizlemede `<video>` mi `<img>` mi — tek yerden sorulsun. */
+export function isVideo(f) {
+  return !!f && String(f.type || "").startsWith("video/");
 }

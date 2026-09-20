@@ -11,6 +11,11 @@ import { useModeration, pendingChanges, pendingVenues, approveChange, rejectChan
 import { useRequests, openRequests, requestFor, markQuoted, close as closeRequest, unseenCount, markAllSeen } from '../lib/requests.js';
 import { useCreatives, SLOTS, listFor, addCreative, removeCreative, toggleLive, liveCount } from '../lib/creatives.js';
 import { TEMPLATE_COLUMNS, templateHeaderLine, downloadTemplate, parseRestaurantFile } from '../lib/import-restaurants.js';
+import {
+  useMedia, KINDS as MEDIA_KINDS, listMedia, pendingAll as pendingMedia,
+  pendingCount as mediaPendingCount, decideMedia, removeMedia,
+  isVideo as mediaIsVideo, sizeLabel as mediaSize,
+} from '../lib/media.js';
 
 // ═══════════════════════════════════════════════════════════════
 // GUR YÖNETİCİ PANELİ — Platform kontrol merkezi
@@ -496,14 +501,9 @@ function seeded(id) {
   };
 }
 
-const MENU_KINDS = [
-  { name: 'Ana Menü', pages: [8, 16] },
-  { name: 'İçecek Menüsü', pages: [2, 6] },
-  { name: 'Tatlı Menüsü', pages: [1, 4] },
-  { name: 'Kahvaltı Menüsü', pages: [2, 5] },
-  { name: 'Şarap Listesi', pages: [3, 9] },
-  { name: 'Set Menü', pages: [1, 3] },
-];
+// MENU_KINDS ve restaurantMenus() KALDIRILDI: yönetici panelindeki menü
+// listesini tohumlanmış sahte veriyle dolduruyorlardı. Menüler artık
+// işletmenin gerçekten yüklediği dosyalar (src/lib/media.js).
 
 const REVIEW_POOL = [
   { stars: 5, text: 'Sunum ve lezzet beklentimin üzerindeydi. Personel ilgili, servis hızlıydı. Kesinlikle tekrar geleceğim.' },
@@ -546,24 +546,6 @@ function daysAgoLabel(days) {
 const TODAY = new Date('2026-09-02T00:00:00Z');
 function isoDaysAgo(days) {
   return new Date(TODAY.getTime() - days * 86400000).toISOString().slice(0, 10);
-}
-
-function restaurantMenus(r) {
-  const rand = seeded(r.id * 7 + 3);
-  const count = 2 + Math.floor(rand() * 3);           // 2-4 menü
-  const picked = [];
-  const pool = [...MENU_KINDS];
-  for (let i = 0; i < count && pool.length; i++) {
-    const k = pool.splice(Math.floor(rand() * pool.length), 1)[0];
-    const [lo, hi] = k.pages;
-    picked.push({
-      name: k.name,
-      pages: lo + Math.floor(rand() * (hi - lo + 1)),
-      uploaded: isoDaysAgo(4 + Math.floor(rand() * 300)),
-      sizeMb: (0.6 + rand() * 5.4).toFixed(1),
-    });
-  }
-  return picked.sort((a, b) => (a.uploaded < b.uploaded ? 1 : -1));
 }
 
 function restaurantReviews(r) {
@@ -1098,7 +1080,14 @@ export default function GurAdmin() {
 
   // Moderasyon kuyruğundaki toplam iş — kenar çubuğu rozetinde.
   const modQueue = useModeration();
-  const modCount = pendingChanges(modQueue).length + pendingVenues(restaurants, modQueue).length;
+  const medyaDurum = useMedia();
+  const medyaBekleyen = mediaPendingCount(medyaDurum);
+  // Kenar çubuğundaki Moderasyon sayacı ÜÇ kuyruğu da topluyor: yeni
+  // mekan, alan değişikliği ve işletmenin yüklediği dosya. Üçü de aynı
+  // sayfada karara bağlanıyor — sayaç birini saymazsa o iş görünmez olur.
+  const modCount = pendingChanges(modQueue).length
+    + pendingVenues(restaurants, modQueue).length
+    + medyaBekleyen;
 
   // ─── BİLDİRİMLER ───
   // Üç kaynaktan gelen bekleyen iş tek listede. Rozet YALNIZCA görülmemiş
@@ -1111,7 +1100,10 @@ export default function GurAdmin() {
   // işaretlenseydi yeni satırın turuncu noktası aynı karede silinir ve
   // hangisinin yeni geldiği hiç görünmezdi.
   const kapatBildirim = () => { setBildirimAcik(false); markAllSeen(); };
-  const bildirimSayisi = unseenCount(talepler);
+  // Rozet iki kaynağı topluyor: teklif talepleri ve onay bekleyen dosyalar.
+  // İkisi de "bir müşteri bekliyor" demek. Başvuru ve moderasyon
+  // sayaçları kenar çubuğunda zaten duruyor, onlar rozete girmiyor.
+  const bildirimSayisi = unseenCount(talepler) + medyaBekleyen;
   const bildirimler = [
     ...openRequests(talepler).map(t => ({
       id: t.id, sayfa: 'pricing',
@@ -1119,6 +1111,12 @@ export default function GurAdmin() {
       alt: `${t.streamName}${t.status === 'quoted' ? ' · teklif gönderildi' : ''}`,
       at: t.at, yeni: !t.seen,
     })),
+    ...(medyaBekleyen ? [{
+      id: 'media', sayfa: 'moderation',
+      baslik: `${medyaBekleyen} dosya onayınızı bekliyor`,
+      alt: 'işletmelerin yüklediği menü, fotoğraf ve reklam materyali',
+      at: null, yeni: true,
+    }] : []),
     ...(apps.length ? [{
       id: 'apps', sayfa: 'applications',
       baslik: `${apps.length} sahiplenme başvurusu`,
@@ -1998,15 +1996,20 @@ function SearchBar({ value, onChange, placeholder = 'Ara...', width = 280 }) {
 }
 
 /**
- * Bir hizmetin reklam materyalleri: yükleme alanı + yüklenenlerin listesi.
+ * Bir hizmetin TANITIMI: örnek görsel veya video.
  *
- * Hizmetler sayfasında ilgili satırın altında açılıyor — envanteri
- * yönettiğin yerin yanında. Ayrı bir "Materyaller" sayfası olsaydı
- * "banner'ı kim aldı" ile "banner'da ne yayında" iki ayrı yere düşerdi.
+ * Bu alan reklam içeriği için DEĞİL. Buradaki dosya hizmetin ne olduğunu
+ * ANLATAN örnek: "banner ekranda nasıl görünüyor", "şef videosu neye
+ * benziyor". Gösterildiği yer işletmenin Büyüme sekmesi — teklif istemeden
+ * önce ne satın aldığını görsün diye.
  *
- * YÜKLEMEK YAYINLAMAK DEĞİL: dosya geldikten sonra yönetici kontrol edip
- * "Yayına al"a basıyor. Tek adımda yayına almak, yanlış dosyayı anında
- * canlıya çıkarmak olurdu.
+ * İşletmenin KENDİ reklam dosyası burada değil: o onay kuyruğundan
+ * geçiyor (Moderasyon → Onayımı bekleyen dosyalar). İkisini tek yerde
+ * toplamak "bizim tanıtımımız" ile "müşterinin gönderdiği içerik"i
+ * karıştırırdı; birinin onaya ihtiyacı var, diğerinin yok.
+ *
+ * YÜKLEMEK GÖSTERMEK DEĞİL: dosya geldikten sonra yönetici kontrol edip
+ * "İşletmelere göster"e basıyor.
  */
 function CreativeSlot({ streamKey }) {
   const state = useCreatives();
@@ -2014,6 +2017,7 @@ function CreativeSlot({ streamKey }) {
   const liste = listFor(streamKey, state);
   const [hata, setHata] = useState('');
   const [yukluyor, setYukluyor] = useState(false);
+  const [onizle, setOnizle] = useState(null);
   const girdiRef = useRef(null);
 
   if (!slot) return null;
@@ -2034,7 +2038,7 @@ function CreativeSlot({ streamKey }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
         <span style={{ fontSize: 12.5, fontWeight: 700 }}>{slot.label}</span>
         <span style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>
-          {liste.length} dosya · {liveCount(streamKey, state)} yayında
+          {liste.length} dosya · {liveCount(streamKey, state)} işletmelere açık
         </span>
         <div style={{ flex: 1 }} />
         <input ref={girdiRef} type="file" accept={slot.accept} onChange={sec}
@@ -2065,21 +2069,252 @@ function CreativeSlot({ streamKey }) {
               {cr.sizeMB} MB{cr.restaurantName ? ` · ${cr.restaurantName}` : ''}
             </div>
           </div>
-          {/* Yayın durumu renkle DEĞİL yazıyla: "yayında" / "taslak". */}
+          {/* Durum renkle DEĞİL yazıyla. */}
           <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 700,
             color: cr.live ? C.greenInk : C.faint,
             background: cr.live ? C.greenSoft : C.panel2,
             borderRadius: R.pill, padding: '2px 8px' }}>
-            {cr.live ? 'yayında' : 'taslak'}
+            {cr.live ? 'işletmelere açık' : 'taslak'}
           </span>
-          <Btn label={cr.live ? 'Yayından al' : 'Yayına al'} size="sm"
+          <Btn label="Görüntüle" size="sm" variant="outline" onClick={() => setOnizle(cr)} />
+          <Btn label={cr.live ? 'Gizle' : 'İşletmelere göster'} size="sm"
             variant={cr.live ? 'soft' : 'filled'} tone={cr.live ? 'yellow' : 'green'}
             onClick={() => toggleLive(streamKey, cr.id)} />
           <IconBtn size={28} title="Sil" danger onClick={() => removeCreative(streamKey, cr.id)}
             icon={<Icon path={icons.trash} size={13} color={C.redInk} />} />
         </div>
       ))}
+      {onizle && (
+        <MediaPreview file={onizle} onClose={() => setOnizle(null)}
+          title={`${slot.label} — önizleme`}
+          footer={
+            <div style={{ fontFamily: FB, fontSize: 12, color: C.dim, lineHeight: 1.55 }}>
+              İşletme bu dosyayı Büyüme sekmesinde, ilgili hizmetin kartında görür.
+              {onizle.live ? '' : ' Şu an taslak — “İşletmelere göster” demeden görünmez.'}
+            </div>
+          } />
+      )}
     </div>
+  );
+}
+
+/**
+ * DOSYA ÖNİZLEME — tıklanan menü sayfası / fotoğraf / video tam boy.
+ *
+ * Yöneticinin bir dosyayı onaylamadan önce GÖRMESİ gerekiyor. Eskiden
+ * menü listesi tohumlanmış sahte veriydi: ad ve sayfa sayısı vardı,
+ * açılacak bir dosya yoktu. Karara esas olan şey dosyanın kendisi.
+ *
+ * Video `controls` ile ve `autoPlay` OLMADAN geliyor: onay için açılan
+ * bir pencerede kendiliğinden başlayan ses kaba, üstelik sessiz moddaki
+ * cihazı da yok sayardı.
+ */
+function MediaPreview({ file, title, onClose, footer }) {
+  if (!file) return null;
+  return (
+    <Modal onClose={onClose} width={720}
+      title={title || file.name}
+      subtitle={`${mediaSize(file.sizeMB)} · ${formatDate(file.at)}${file.note ? ` · ${file.note}` : ''}`}>
+      <div style={{ background: C.bg, borderRadius: 12, overflow: 'hidden', marginBottom: 14,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+        {mediaIsVideo(file)
+          ? <video src={file.url} controls playsInline preload="metadata"
+              style={{ width: '100%', maxHeight: '62vh', display: 'block', background: '#000' }} />
+          : <img src={file.url} alt={file.name}
+              style={{ maxWidth: '100%', maxHeight: '62vh', objectFit: 'contain', display: 'block' }} />}
+      </div>
+      {footer}
+    </Modal>
+  );
+}
+
+/** Dosya durumu tek bir yerden çiziliyor — renk yalnız değil, yazı da var. */
+function MediaStatusChip({ status }) {
+  const map = {
+    pending: { t: 'onay bekliyor', c: () => C.yellowInk, s: () => C.yellowSoft },
+    approved: { t: 'onaylandı', c: () => C.greenInk, s: () => C.greenSoft },
+    rejected: { t: 'reddedildi', c: () => C.redInk, s: () => C.redSoft },
+  };
+  const d = map[status] || map.pending;
+  return (
+    <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 700, color: d.c(),
+      background: d.s(), borderRadius: R.pill, padding: '2px 9px', whiteSpace: 'nowrap' }}>{d.t}</span>
+  );
+}
+
+/**
+ * ONAYIMI BEKLEYEN DOSYALAR — işletmelerin yüklediği menü, fotoğraf ve
+ * reklam materyali.
+ *
+ * Moderasyon sayfasında ve EN ÜSTTE: mekan kaydı ile alan değişikliğinin
+ * yanında üçüncü bir iş kuyruğu. Ayrı bir sayfaya konsaydı "onay bekleyen
+ * var mı" sorusu iki yere bakmayı gerektirirdi.
+ *
+ * Reddetme sebep İSTİYOR: sebepsiz bir ret işletmeyi aynı dosyayı ikinci
+ * kez yüklemeye iter ve aynı iş yöneticiye geri gelir.
+ */
+function MediaQueue({ restaurants = [] }) {
+  const durum = useMedia();
+  const bekleyen = pendingMedia(durum);
+  const [acik, setAcik] = useState(null);      // önizlenen dosya
+  const [redId, setRedId] = useState(null);    // sebep yazılan dosya
+  const [sebep, setSebep] = useState('');
+
+  if (!bekleyen.length) return null;
+
+  const adOf = (rid) => restaurants.find(r => String(r.id) === String(rid))?.name || `#${rid}`;
+
+  const onayla = (f) => { decideMedia(f.restaurantId, f.kind, f.id, 'approved'); setAcik(null); };
+  const reddet = (f) => {
+    decideMedia(f.restaurantId, f.kind, f.id, 'rejected', sebep.trim() || 'Sebep belirtilmedi.');
+    setRedId(null); setSebep(''); setAcik(null);
+  };
+
+  return (
+    <section style={{ ...CARD, overflow: 'hidden', marginBottom: 18, borderColor: C.orangeInk }}>
+      <SectionHead title="Onayımı bekleyen dosyalar"
+        right={`${bekleyen.length} dosya · işletmelerden`} />
+      {bekleyen.map(f => (
+        <div key={f.id} style={{ padding: '13px 18px', borderTop: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* Küçük görsel de TIKLANABİLİR: karara esas olan dosyanın
+              kendisi, adı değil. */}
+          <button type="button" onClick={() => setAcik(f)}
+            title="Büyük görüntüle" aria-label={`${f.name} dosyasını aç`}
+            style={{ width: 54, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
+              background: C.bg, border: `1px solid ${C.border}`, padding: 0, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {mediaIsVideo(f)
+              ? <Icon path={icons.play} size={16} color={C.faint} />
+              : <img src={f.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+          </button>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700 }}>{adOf(f.restaurantId)}</div>
+            <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+              {MEDIA_KINDS[f.kind]?.tekil || f.kind} · {f.name} · {mediaSize(f.sizeMB)} · {formatDate(f.at)}
+            </div>
+          </div>
+          <Btn label="Görüntüle" size="sm" variant="outline" onClick={() => setAcik(f)} />
+          <Btn label="Onayla" size="sm" variant="filled" tone="green" onClick={() => onayla(f)} />
+          <Btn label="Reddet" size="sm" variant="soft" tone="red"
+            onClick={() => { setRedId(f.id); setSebep(''); }} />
+        </div>
+      ))}
+
+      {/* Ret sebebi — işletme panelinde dosyanın altında yazılı çıkıyor. */}
+      {redId && (() => {
+        const f = bekleyen.find(x => x.id === redId);
+        if (!f) return null;
+        return (
+          <Modal onClose={() => setRedId(null)} title="Dosyayı reddet"
+            subtitle={`${adOf(f.restaurantId)} · ${f.name}`}>
+            <AdminField label="Sebep (işletme bunu görecek)" value={sebep} onChange={setSebep} autoFocus />
+            <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, marginBottom: 14, lineHeight: 1.55 }}>
+              Sebep yazmak zorunlu değil ama yazılmazsa işletme aynı dosyayı
+              yeniden yükler ve aynı iş size geri gelir.
+            </div>
+            <Btn label="Reddet ve bildir" variant="filled" tone="red" fullWidth onClick={() => reddet(f)} />
+          </Modal>
+        );
+      })()}
+
+      {acik && (
+        <MediaPreview file={acik} onClose={() => setAcik(null)}
+          title={`${adOf(acik.restaurantId)} · ${MEDIA_KINDS[acik.kind]?.tekil || acik.kind}`}
+          footer={
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Btn label="Onayla ve yayınla" variant="filled" tone="green" onClick={() => onayla(acik)} />
+              <Btn label="Reddet" variant="soft" tone="red"
+                onClick={() => { setRedId(acik.id); setSebep(''); }} />
+            </div>
+          } />
+      )}
+    </section>
+  );
+}
+
+/**
+ * RESTORANIN DOSYALARI — yönetici panelindeki mekan detayında.
+ *
+ * "İnsanların yüklediği menüleri tıklayıp izleyebilmek" buranın işi.
+ * Eskiden bu bölüm `restaurantMenus()` ile TOHUMLANMIŞ sahte veriydi:
+ * ad, sayfa sayısı ve tarih üretiliyordu ama açılacak dosya yoktu.
+ * Artık işletmenin gerçekten yüklediği dosyalar, durumlarıyla.
+ *
+ * Karar burada da verilebiliyor: bir mekanın kaydına bakarken bekleyen
+ * dosyasını görüp Moderasyon sayfasına gitmek gereksiz bir tur olurdu.
+ */
+function RestaurantMedia({ restaurant }) {
+  const durum = useMedia();
+  const [kind, setKind] = useState('menu');
+  const [acik, setAcik] = useState(null);
+  const dosyalar = listMedia(restaurant.id, kind, durum);
+
+  const sayi = (k) => listMedia(restaurant.id, k, durum).length;
+
+  return (
+    <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
+      <SectionHead title="İşletmenin yüklediği dosyalar"
+        right={`${sayi('menu')} menü · ${sayi('photos')} fotoğraf · ${sayi('ads')} reklam`} />
+      <div style={{ padding: '12px 18px 0' }}>
+        <Segmented
+          value={kind} onChange={setKind}
+          label="Dosya türü"
+          options={Object.keys(MEDIA_KINDS).map(k => ({
+            id: k, label: `${MEDIA_KINDS[k].label} (${sayi(k)})`,
+          }))} />
+      </div>
+
+      {dosyalar.length === 0 ? (
+        <EmptyRow text={`Bu mekan henüz ${MEDIA_KINDS[kind].label.toLocaleLowerCase('tr')} yüklemedi`} />
+      ) : (
+        <div style={{ padding: 18, display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 12 }}>
+          {dosyalar.map(f => (
+            <div key={f.id}>
+              <button type="button" onClick={() => setAcik(f)}
+                title={`${f.name} — büyük görüntüle`} aria-label={`${f.name} dosyasını aç`}
+                style={{ display: 'block', width: '100%', aspectRatio: '4 / 3', padding: 0,
+                  borderRadius: 10, overflow: 'hidden', cursor: 'pointer', position: 'relative',
+                  background: C.bg, border: `1px solid ${C.border}` }}>
+                {mediaIsVideo(f)
+                  ? <span style={{ display: 'flex', width: '100%', height: '100%',
+                      alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon path={icons.play} size={22} color={C.faint} />
+                    </span>
+                  : <img src={f.url} alt={f.name} loading="lazy" decoding="async"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+              </button>
+              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <MediaStatusChip status={f.status} />
+                <span style={{ fontFamily: FB, fontSize: 10.5, color: C.faint }}>{mediaSize(f.sizeMB)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {acik && (
+        <MediaPreview file={acik} onClose={() => setAcik(null)}
+          title={`${restaurant.name} · ${MEDIA_KINDS[kind].tekil}`}
+          footer={
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <MediaStatusChip status={acik.status} />
+              {acik.status !== 'approved' && (
+                <Btn label="Onayla" variant="filled" tone="green"
+                  onClick={() => { decideMedia(restaurant.id, kind, acik.id, 'approved'); setAcik(null); }} />
+              )}
+              {acik.status !== 'rejected' && (
+                <Btn label="Reddet" variant="soft" tone="red"
+                  onClick={() => { decideMedia(restaurant.id, kind, acik.id, 'rejected', 'Yönetici reddetti.'); setAcik(null); }} />
+              )}
+              <div style={{ flex: 1 }} />
+              <Btn label="Sil" variant="outline" tone="red"
+                onClick={() => { removeMedia(restaurant.id, kind, acik.id); setAcik(null); }} />
+            </div>
+          } />
+      )}
+    </section>
   );
 }
 
@@ -2200,6 +2435,10 @@ function ModerationPage({ restaurants = [], query = '', onCreate, onCreateMany, 
             icon={<Icon path={icons.plus} size={15} color={C.onBrand} />} />
         </div>
       </div>
+
+      {/* İşletmelerin yüklediği dosyalar — üçüncü iş kuyruğu. En üstte
+          çünkü mekan kaydından farklı olarak burada bir MÜŞTERİ bekliyor. */}
+      <MediaQueue restaurants={restaurants} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 18 }}>
         <KpiCard label="Bekleyen yeni mekan" value={`${venues.length}`} icon={icons.store}
@@ -2987,7 +3226,6 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
   // Depo canlı dinleniyor: rozet takılınca hem burası hem tüketici
   // uygulaması aynı anda tazeleniyor.
   const takili = badgesOf(r, useBadgeMap());
-  const menus = useMemo(() => restaurantMenus(r), [r.id]);
   const reviews = useMemo(() => restaurantReviews(r), [r.id]);
   const services = storeServices(r);
   const serviceRev = storeServiceRevenue(r);
@@ -3053,6 +3291,9 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
           anlamı yok, o yüzden genel kapalıysa satır da kilitli görünür. */}
       <StoreFeatures restaurant={r} />
 
+      {/* İşletmenin yüklediği menü / fotoğraf / reklam — tıklanıp açılır. */}
+      <RestaurantMedia restaurant={r} />
+
       {/* ─── MÜŞTERİNİN SATIN ALDIĞI ÜCRETLİ ÖZELLİKLER ───
           Bir işletmeyle konuşmadan önce bakılan ilk yer: neyi almış, ne
           zamandır ödüyor, aylık ne ediyor. Katalog REVENUE_STREAMS'ten,
@@ -3109,36 +3350,12 @@ function RestaurantDetailPage({ r, onBack, onGastro, onSuspend }) {
         </div>
       </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: 16, alignItems: 'start' }}>
-
-        {/* ─── MENÜLER ─── */}
-        <section style={{ ...CARD, overflow: 'hidden' }}>
-          <header style={{ padding: '13px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5 }}>Menüler</span>
-            <span style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{menus.length}</span>
-          </header>
-          <div>
-            {menus.map((m, i) => (
-              <div key={m.name} style={{ padding: '12px 16px', borderTop: i ? `1px solid ${C.border}` : 'none', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: C.orangeSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon path={icons.doc} size={15} color={C.orangeInk} />
-                </div>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>{m.name}</div>
-                  <div style={{ fontSize: 11.5, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
-                    {m.pages} sayfa • {m.sizeMb} MB
-                  </div>
-                  <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
-                    Yüklendi: {formatDate(m.uploaded)}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {menus.length === 0 && (
-              <div style={{ padding: '22px 16px', fontSize: 12.5, color: C.faint, textAlign: 'center' }}>Henüz menü yüklenmemiş</div>
-            )}
-          </div>
-        </section>
+      {/* Buradaki "Menüler" bölümü KALDIRILDI. Tohumlanmış sahte veriydi:
+          ad, sayfa sayısı ve tarih üretiyordu ama açılacak bir dosya yoktu
+          — üstteki gerçek dosya bölümünün hemen altında duran, tıklanınca
+          hiçbir şey olmayan bir liste. Gerçek menüler yukarıda
+          (`RestaurantMedia`), tıklanıp büyütülebiliyor. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, alignItems: 'start' }}>
 
         {/* ─── YORUMLAR (rozet ataması bu bölümün başında) ─── */}
         <section style={{ ...CARD, overflow: 'hidden' }}>
@@ -3928,7 +4145,7 @@ function ServicesPage({ restaurants = [], query = '', onOpenStream }) {
                 <div style={{ fontSize: 15, fontWeight: 800, ...NUM }}>{money(sv.monthly)}</div>
                 <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>{sv.unit}</div>
               </div>
-              <Btn label="Materyaller" size="sm"
+              <Btn label="Tanıtım" size="sm"
                 variant={acik === sv.key ? 'filled' : 'outline'}
                 tone={acik === sv.key ? 'orange' : undefined}
                 count={liveCount(sv.key) || undefined}
