@@ -40,6 +40,32 @@ export const FEATURES = [
 
 export const PER_STORE_FEATURES = FEATURES.filter(f => f.perStore);
 
+// ═══════════════════════════════════════════════════════════════════════
+// SATIŞ KAPILARI — bir hizmet şu an satın alınabilir mi
+//
+// Yukarıdaki FEATURES ile KARIŞTIRMAYIN, ikisi ayrı soru soruyor:
+//   FEATURES        → özellik TÜKETİCİDE çalışıyor mu ("menü görüntüleme açık mı")
+//   SERVICE_GATES   → işletme bu hizmeti ALABİLİR mi ("banner satışta mı")
+//
+// Bir hizmet kapatıldığında işletme panelinde kart kayboLMUYOR: yerinde
+// "Pek yakında" yazıyor. Kaldırmak, işletmeye ürünün hiç var olmadığını
+// söylemek olurdu; oysa yakında açılacak.
+//
+// `needs` — o hizmetin dayandığı özellik kapısı. Platformda KAPALI bir
+// özelliği satmak olmaz: teslim edemeyeceğimiz şeyin parasını alamayız.
+// Bu yüzden özellik kapalıysa hizmet de otomatik kapalı sayılıyor ve
+// yönetici ayrı ayrı iki yeri kapatmak zorunda kalmıyor.
+export const SERVICE_GATES = [
+  { key: 'bannerAds',    label: "Keşfet Banner'ı" },
+  { key: 'pushAds',      label: 'Push Bildirim Reklamı' },
+  { key: 'rewardedAds',  label: 'Ödüllü Video Reklam' },
+  { key: 'secondChance', label: 'İkinci Şans paketi' },
+  { key: 'instantDeals', label: 'Anlık fırsat', needs: 'instantDealsEnabled' },
+  { key: 'gastroPackage', label: 'Gastro şef videosu paketi', needs: 'gastroVideoEnabled' },
+];
+
+const GATE_BY_KEY = Object.fromEntries(SERVICE_GATES.map(g => [g.key, g]));
+
 export const DEFAULTS = {
   matchEnabled: true,          // GUR Match: arkadaşla yan yana kaydırma
   reservationsEnabled: true,   // masa ayırtma ve işletmeye giden bildirim
@@ -52,6 +78,11 @@ export const DEFAULTS = {
   maintenance: false,          // bakım modu
   // Restoran bazlı kapatmalar: { "<restoranId>": { reservationsEnabled: false } }
   storeOverrides: {},
+  // Satışa KAPALI hizmetler: { bannerAds: true } → banner satılmıyor.
+  // Yalnızca kapalı olanlar yazılıyor; listede olmayan hizmet AÇIK sayılır.
+  // Tersi olsaydı katalogda yeni bir hizmet açıldığında eski kurulumlarda
+  // kapalı doğar ve kimse fark etmezdi.
+  servicesOff: {},
 };
 
 const listeners = new Set();
@@ -162,6 +193,36 @@ export function setStoreFeature(storeId, key, enabled) {
  * hesaba katılır. Genel anahtar her zaman üstün gelir: platformda kapalı
  * bir özelliği tek bir restoran için açmanın anlamı yok.
  */
+// ─── Satış kapıları ───────────────────────────────────────────────────
+
+/** Bu hizmet şu an satın alınabilir mi. */
+export function isServiceOpen(streamKey, settings = getSettings()) {
+  const g = GATE_BY_KEY[streamKey];
+  if (!g) return true;                       // katalog dışı: kapı yok
+  if (g.needs && settings[g.needs] === false) return false;   // özellik kapalı
+  return !(settings.servicesOff || {})[streamKey];
+}
+
+export function setServiceOpen(streamKey, open) {
+  const off = { ...(getSettings().servicesOff || {}) };
+  if (open) delete off[streamKey]; else off[streamKey] = true;
+  setSettings({ servicesOff: off });
+}
+
+/** Kapının kendisi mi kapalı, yoksa dayandığı özellik mi — arayüz ayırsın. */
+export function serviceGateReason(streamKey, settings = getSettings()) {
+  const g = GATE_BY_KEY[streamKey];
+  if (!g) return null;
+  if (g.needs && settings[g.needs] === false) return 'feature';
+  if ((settings.servicesOff || {})[streamKey]) return 'manual';
+  return null;
+}
+
+export function useServiceOpen(streamKey) {
+  const settings = usePlatformSettings();
+  return isServiceOpen(streamKey, settings);
+}
+
 export function featureOn(key, storeId = null) {
   if (!isEnabled(key)) return false;
   if (storeId == null) return true;

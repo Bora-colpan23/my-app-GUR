@@ -134,7 +134,7 @@ yazıyorlar. Bağ ekranlarda değil depolarda:
 | Depo | Yazan | Okuyan |
 |---|---|---|
 | `lib/b2b.js` | işletme (bilgi, menü, foto, **logo**) | tüketici kaydı, yönetici listesi |
-| `lib/platform.js` | yönetici (özellik kapıları) | tüketici ve işletme |
+| `lib/platform.js` | yönetici (özellik kapıları + **satış kapıları**) | tüketici ve işletme |
 | `lib/reservations.js` | tüketici (talep) → işletme (karar) | tüketici (bildirim) |
 | `lib/pricing.js` | yönetici (teklif) → işletme (karar) | yönetici gelir tabloları |
 | `lib/ad-frequency.js` | tüketici (gösterim) | deste kurulumu |
@@ -449,14 +449,15 @@ tutulduğu dönemde giriş ekranındaki "Giriş yap" hapı hiç
 biçimlendirilmiyordu — tarayıcının gri varsayılanı üstünde beyaz yazı,
 1.15:1, düğme neredeyse görünmezdi.
 
-**Ölçüm.** Koyu temada on bir sayfa tarandığında 28 uyarı çıkıyor ve
+**Ölçüm.** Koyu temada on dört sayfa tarandığında 36 uyarı çıkıyor ve
 hepsi beyaz-turuncu kararından; başka kaynaklı sıfır. Açık temada aynı
-tarama 62 uyarı veriyor ve bunun **34'ü turuncu değil**: parlak dolgu
+tarama 69 uyarı veriyor ve bunun **33'ü turuncu değil**: parlak dolgu
 tonları (`C.green`, `C.orange`, `C.yellow`, `C.red`) beyaz kâğıtta
 doğrudan YAZI rengi olarak kullanılmış — yukarıdaki iki-ton kuralının
 ihlali, koyu temadan önce de vardı. Daha önce raporlanan "hepsi turuncu"
-rakamı yalnızca panoyu tarayan dar bir taramadan geliyordu; on bir sayfanın
-tamamı ilk kez tarandı.
+rakamı yalnızca panoyu tarayan dar bir taramadan geliyordu; sonradan eklenen
+Reklam Takvimi, Hizmetler ve Moderasyon sayfaları da taramaya girdi — rakamların
+28/62'den 36/69'a çıkması bu üç sayfadan, yeni bir ihlalden değil.
 
 ### Erişilebilirlik kuralları (uyulacak)
 - Alan etiketleri `htmlFor` ile bağlı (`InputField`), `<label>` süs değil.
@@ -727,6 +728,36 @@ zaten göreceği kart için para almıyoruz (`zatenVar` kontrolü).
 Sunucu karşılığı: `second_chance_packages` + `second_chance_impressions`
 (migration 004). Tek aktif paket kuralı kısmi tekil indeksle veritabanı
 seviyesinde zorlanıyor — uygulama katmanında kontrol yarış koşulunda yetmez.
+
+### Satış kapıları: bir hizmet satın alınabilir mi (`lib/platform.js`)
+
+Yönetici **Hizmetler** sayfasındaki satır anahtarıyla her kalemi satışa
+açıp kapatıyor. Kapalıyken işletme panelinde **kart kaybolmuyor**, yerinde
+**"Pek yakında"** yazıyor: kaldırmak işletmeye ürünün hiç var olmadığını
+söylemek olurdu, oysa yakında açılacak. Fiyat da yazılmıyor —
+alınamayan bir şeyin fiyatı bilgi değil.
+
+**İki kapı var ve ayrı soru soruyorlar:**
+
+| | Soru | Nerede |
+|---|---|---|
+| `FEATURES` | özellik TÜKETİCİDE çalışıyor mu | Ayarlar |
+| `SERVICE_GATES` | işletme bu hizmeti ALABİLİR mi | Hizmetler |
+
+İkisi bağımsız değil: `needs` alanı olan hizmet, dayandığı özellik
+kapalıyken **otomatik kapalı** sayılıyor ve satır anahtarı devre dışı
+kalıyor (`anlık fırsat → instantDealsEnabled`, `Gastro paketi →
+gastroVideoEnabled`). Teslim edemeyeceğimiz şeyin parasını alamayız; ayrıca
+iki yerden aynı şeyi açmak, birini kapatıp diğerinin açık kaldığını sanmak
+demekti. Satırda hangisi olduğu yazılı: **SATIŞA KAPALI** / **ÖZELLİK KAPALI**.
+
+**Yalnızca KAPALI olanlar saklanıyor** (`servicesOff: { bannerAds: true }`).
+Tersi olsaydı katalogda yeni bir hizmet açıldığında eski kurulumlarda
+kapalı doğar ve kimse fark etmezdi.
+
+Kapalı kart `opacity` ile soluklaştırılmıyor — projenin kendi kuralı.
+`GrowthCard` ve `GrowthSection` eskiden `opacity: 0.5` kullanıyordu,
+kaldırıldı; fark artık renkle ve "Pek yakında" rozetiyle.
 
 ### İki fiyat modeli — hangisi nerede
 

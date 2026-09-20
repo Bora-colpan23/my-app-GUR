@@ -3,7 +3,7 @@ import { useClaims, decideClaim, useOwnerProfiles, ownerLogo } from '../lib/b2b.
 
 import * as api from '../lib/api.js';
 import { motion, AnimatePresence } from 'motion/react';
-import { usePlatformSettings, toggleSetting, setStoreFeature, setRestaurantHidden, isRestaurantHidden, FEATURES, PER_STORE_FEATURES } from '../lib/platform.js';
+import { isServiceOpen, setServiceOpen, serviceGateReason, usePlatformSettings, toggleSetting, setStoreFeature, setRestaurantHidden, isRestaurantHidden, FEATURES, PER_STORE_FEATURES } from '../lib/platform.js';
 import * as pricing from '../lib/pricing.js';
 import { ASSIGNABLE, badgesOf, toggleBadge, useBadgeMap } from '../lib/badges.js';
 import { channelOf, inviteOf, sendInvite, useInvites } from '../lib/invites.js';
@@ -4319,6 +4319,9 @@ function OfferField({ current, offer, onSend }) {
 // ═══════════════════════════════════════════════════════════════════════
 function ServicesPage({ restaurants = [], query = '', onOpenStream }) {
   const store = pricing.usePricing();
+  // Satış kapıları: bir hizmet kapatıldığında işletme panelinde kart
+  // kaybolmuyor, "Pek yakında" yazıyor (bkz. lib/platform.js).
+  const platform = usePlatformSettings();
   // Materyal alanı satır satır açılıyor: altısı birden açık olsaydı sayfa
   // yükleme kutularından ibaret kalır, katalogun kendisi kaybolurdu.
   const [acik, setAcik] = useState(null);
@@ -4383,6 +4386,14 @@ function ServicesPage({ restaurants = [], query = '', onOpenStream }) {
                     <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 700, color: C.blue,
                       background: C.blueSoft, borderRadius: R.pill, padding: '2px 9px' }}>kullanıcı özelliği</span>
                   )}
+                  {/* Durum renkle DEĞİL yazıyla; sebebi de yazılı çünkü
+                      "özellik kapalı" ile "satışı durdurdum" farklı işler. */}
+                  {!isServiceOpen(sv.key, platform) && (
+                    <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 800, color: C.redInk,
+                      background: C.redSoft, borderRadius: R.pill, padding: '2px 9px' }}>
+                      {serviceGateReason(sv.key, platform) === 'feature' ? 'ÖZELLİK KAPALI' : 'SATIŞA KAPALI'}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.5 }}>{sv.note}</div>
                 {sv.key === 'rewardedAds' && (
@@ -4397,6 +4408,14 @@ function ServicesPage({ restaurants = [], query = '', onOpenStream }) {
                 <div style={{ fontSize: 15, fontWeight: 800, ...NUM }}>{money(sv.monthly)}</div>
                 <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>{sv.unit}</div>
               </div>
+              {/* Satışı aç/kapa. Özellik kapısından kapalıysa buradan
+                  açılamıyor — iki yerden aynı şeyi açmak, birini kapatıp
+                  diğerinin açık kaldığını sanmak demekti. */}
+              <Toggle
+                on={isServiceOpen(sv.key, platform)}
+                disabled={serviceGateReason(sv.key, platform) === 'feature'}
+                label={`${sv.name} satışta mı`}
+                onChange={() => setServiceOpen(sv.key, !isServiceOpen(sv.key, platform))} />
               <Btn label="Tanıtım" size="sm"
                 variant={acik === sv.key ? 'filled' : 'outline'}
                 tone={acik === sv.key ? 'orange' : undefined}

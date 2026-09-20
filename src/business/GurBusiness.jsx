@@ -28,7 +28,7 @@ import {
   saveOwnerProfile, saveOwnerLogo, clearOwnerLogo, ownerLogo, OVERRIDABLE,
 } from '../lib/b2b.js';
 import { fileToSquareDataUrl } from '../lib/image.js';
-import { useFeature } from '../lib/platform.js';
+import { useFeature, useServiceOpen } from '../lib/platform.js';
 import * as reservations from '../lib/reservations.js';
 import * as pricing from '../lib/pricing.js';
 import * as backend from '../lib/backend.js';
@@ -781,9 +781,30 @@ function DarkChip({ label, active, onClick }) {
   );
 }
 
-function GrowthSection({ title, locked, children }) {
+/**
+ * PEK YAKINDA — satışa kapatılmış bir hizmetin yerinde duran şey.
+ *
+ * Kart KALDIRILMIYOR: işletmeye ürünün hiç var olmadığını söylemek yanlış
+ * olurdu, yakında açılacak. Kapalı kart `opacity` ile de soluklaştırılmıyor
+ * (projenin kendi kuralı) — fark renkle ve yazıyla.
+ */
+function ComingSoon({ compact = false }) {
   return (
-    <div style={{ marginBottom: 22, opacity: locked ? 0.55 : 1 }}>
+    <div role="status" style={{
+      display: "inline-flex", alignItems: "center", gap: 7,
+      background: "rgba(255,180,84,0.12)", border: "1px solid rgba(255,180,84,0.26)",
+      borderRadius: 999, padding: compact ? "5px 11px" : "7px 14px",
+    }}>
+      <Icon n="clock" size={compact ? 12 : 13} color="var(--c-warn-light)" />
+      <span style={{ fontFamily: "var(--f-body)", fontSize: compact ? 11.5 : 12.5,
+        fontWeight: 800, color: "var(--c-warn-light)" }}>Pek yakında</span>
+    </div>
+  );
+}
+
+function GrowthSection({ title, children }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", margin: 0, textTransform: "uppercase", letterSpacing: 0.6 }}>{title}</p>
       </div>
@@ -816,8 +837,21 @@ function LockedCard({ text }) {
 function SecondChanceCard({ restaurant }) {
   const state = secondChance.useSecondChance();
   const talepler = useRequests();
+  const satista = useServiceOpen("secondChance");
   const talep = restaurant ? requestFor(restaurant.id, "secondChance", talepler) : null;
   if (!restaurant) return <LockedCard text="Önce bir işletme sahiplen." />;
+  if (!satista) {
+    return (
+      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 18, padding: "16px 18px", marginBottom: 12 }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>İkinci Şans paketi</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
+          Sizi sola kaydırmış kullanıcıların destesine geri girersiniz.
+        </p>
+        <ComingSoon />
+      </div>
+    );
+  }
 
   const aktif = secondChance.activeFor(restaurant.id, state);
   const oran = secondChance.progress(aktif);
@@ -1071,6 +1105,8 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
   // akışından çıktı: fiyat listede yazıyor, takvimden tarih seçiliyor.
   // Geri kalanlar (Gastro, İkinci Şans, anlık fırsat) hâlâ pazarlıklı.
   const sabit = isFixedPrice(streamKey);
+  // Satışa kapalıysa kart duruyor ama yerinde "Pek yakında" yazıyor.
+  const satista = useServiceOpen(streamKey);
   const slotDurum = useAdSlots();
   const talepler = useRequests();
   const talep = restaurant && streamKey
@@ -1096,14 +1132,14 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
         ? "linear-gradient(140deg, rgba(212,175,55,0.16), rgba(120,86,12,0.10))"
         : active ? "rgba(255,102,0,0.07)" : "rgba(255,255,255,0.04)",
       border: `1px solid ${gold ? "rgba(233,196,86,0.42)" : active ? "rgba(255,102,0,0.28)" : "rgba(255,255,255,0.06)"}`,
-      borderRadius: 18, padding: "16px 18px", marginBottom: 12, opacity: locked ? 0.5 : 1,
+      borderRadius: 18, padding: "16px 18px", marginBottom: 12,
       position: "relative", overflow: "hidden",
     }}>
       {gold && <span className="gur-gold-sheen" aria-hidden="true" />}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: gold ? "#F6E6A8" : "#fff", margin: 0 }}>{title}</p>
         <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: gold ? "#E9C456" : "#FF9A4D", flexShrink: 0 }}>
-          {sabit
+          {!satista ? "" : sabit
             ? `₺${priceOf(streamKey, slotDurum).toLocaleString("tr")} / gün`
             : price}
         </span>
@@ -1113,8 +1149,8 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
           yanında duruyor: "banner nedir" sorusunun cevabı teklif
           istenmeden önce, ayrı bir ekranda değil burada olmalı. */}
       <ServicePromo streamKey={streamKey} />
-      {locked ? (
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.35)", margin: 0 }}>Bu paket şu an kapalı</p>
+      {locked || !satista ? (
+        <ComingSoon />
       ) : sabit ? (
         <SlotBooking streamKey={streamKey} restaurant={restaurant} />
       ) : active ? (
@@ -1703,6 +1739,8 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
   const [dealHours, setDealHours] = useState(2);
   const [dealLive, setDealLive] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
+  // Anlık fırsat satışa kapalıysa kart yerinde duruyor ama "Pek yakında".
+  const anlikSatista = useServiceOpen("instantDeals");
   // Menü ve fotoğraf yüklemeleri artık ortak depoda (src/lib/media.js) ve
   // onay kuyruğundan geçiyor; MediaManager doğrudan oradan okuyup yazıyor.
   // Eskiden burada kökten prop olarak inen geçici bir dizi vardı: sayfa
@@ -2016,7 +2054,15 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
               </GrowthSection>
 
               <GrowthSection title="Anlık Fırsat ve Rezervasyon">
-                {(
+                {!anlikSatista ? (
+                  <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: "16px 18px", marginBottom: 12 }}>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Anlık İndirim Yayınla</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
+                      Ölü saatlerinizi doldurun: yakındaki kullanıcılara süreli indirim bildirimi gider.
+                    </p>
+                    <ComingSoon />
+                  </div>
+                ) : (
                   <div style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)", borderRadius: 18, padding: "16px 18px", marginBottom: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                       <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0 }}>Anlık İndirim Yayınla</p>
