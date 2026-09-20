@@ -23,7 +23,9 @@ import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
 import { usePlatformSettings, useFeature, visibleRestaurants } from '../lib/platform.js';
 import { useModeration, publishedOnly, markVenuePending } from '../lib/moderation.js';
-import { useMedia, ownerMediaFor } from '../lib/media.js';
+import { useMedia, ownerMediaFor, approvedMedia } from '../lib/media.js';
+import { useAdSlots, activeBookings } from '../lib/adslots.js';
+import { pickRewardedAd, markWatched, useRewardedSeen } from '../lib/rewarded.js';
 import * as secondChance from '../lib/second-chance.js';
 import * as reservations from '../lib/reservations.js';
 import * as pricing from '../lib/pricing.js';
@@ -657,14 +659,38 @@ function HeroCarousel({ slides, intervalMs = 4500 }) {
 }
 
 function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, matchEnabled = true, restaurants = [], onDetail }) {
-  // Marka slaytı her zaman ilk sırada, sponsor slaytları onu izler
-  const slides = useMemo(() => [
-    { id: "brand", img: I.hero, title: "İstanbul'un Lezzetleri", sub: "En popüler restoranları keşfet" },
-    ...BANNER_ADS.map(a => ({
-      id: a.id, img: a.img, accent: a.accent, ad: true,
-      eyebrow: a.brand, title: a.text, sub: a.cta,
-    })),
-  ], []);
+  // ── Banner slaytları ──
+  // Marka slaytı her zaman ilk sırada. Onu SATIN ALINMIŞ slaytlar izliyor:
+  // takvimde bugüne denk gelen, onaylanmış banner rezervasyonları
+  // (lib/adslots.js). Satın alınmış slayt yoksa GUR'un kendi demo
+  // reklamları dönüyor — karusel hiçbir zaman boş kalmıyor.
+  const slotDurum = useAdSlots();
+  const medyaDurum = useMedia();
+  const slides = useMemo(() => {
+    const satilan = activeBookings("bannerAds", undefined, slotDurum)
+      .map(b => {
+        const r = restaurants.find(x => String(x.id) === String(b.restaurantId));
+        if (!r) return null;                 // gizlenmiş ya da yayında değil
+        // Görsel: işletmenin ONAYLANMIŞ reklam materyali, yoksa kendi
+        // fotoğrafı. Onaysız dosya hiçbir koşulda ekrana çıkmıyor.
+        const materyal = approvedMedia(r.id, "ads", medyaDurum)
+          .find(f => !String(f.type || "").startsWith("video/"));
+        return {
+          id: `bk-${b.id}`, img: materyal?.url || r.imgs?.[0], accent: "#FF6600", ad: true,
+          eyebrow: r.name, title: r.desc || `${r.cat} · ${r.district || ""}`.trim(),
+          sub: "Mekânı gör",
+        };
+      })
+      .filter(Boolean);
+
+    return [
+      { id: "brand", img: I.hero, title: "İstanbul'un Lezzetleri", sub: "En popüler restoranları keşfet" },
+      ...(satilan.length ? satilan : BANNER_ADS.map(a => ({
+        id: a.id, img: a.img, accent: a.accent, ad: true,
+        eyebrow: a.brand, title: a.text, sub: a.cta,
+      }))),
+    ];
+  }, [slotDurum, medyaDurum, restaurants]);
   // Yalnızca destede gerçekten bulunan restoranların fırsatları gösterilir
   const liveDeals = DEALS
     .map(d => ({ ...d, r: restaurants.find(x => x.id === d.restaurantId) }))
@@ -1076,7 +1102,15 @@ function RewardedAdOverlay({ ad, onComplete, onAbort }) {
       {/* Video alanı */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg, ${ad.accent}, #0a0500)` }} />
-        <Img src={ad.img} style={{ position: "absolute", inset: 0, opacity: 0.45 }} bg="transparent" />
+        {/* Restoranın gerçek videosu varsa O oynuyor. `muted` şart:
+            tarayıcı sesli otomatik oynatmayı engelliyor ve video hiç
+            başlamıyordu — geri sayım dolarken ekran boş kalıyordu. */}
+        {ad.video ? (
+          <video src={ad.video} autoPlay muted loop playsInline
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.85 }} />
+        ) : (
+          <Img src={ad.img} style={{ position: "absolute", inset: 0, opacity: 0.45 }} bg="transparent" />
+        )}
         <div style={{ position: "absolute", inset: 0, background: scrim(0.9, 55, 0.2) }} />
 
         {/* Üst şerit: reklam etiketi + geri sayım */}
@@ -1090,12 +1124,27 @@ function RewardedAdOverlay({ ad, onComplete, onAbort }) {
           )}
         </div>
 
-        {/* Oynatma göstergesi */}
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
-          <div style={{ width: 62, height: 62, borderRadius: "50%", background: "rgba(255,255,255,0.14)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)"><polygon points="6 3 20 12 6 21" /></svg>
+        {/* Oynatma göstergesi — gerçek video oynuyorsa çizilmiyor. */}
+        {!ad.video && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
+            {ad.source === "google" ? (
+              // Google yedeği: AdSense/AdMob birimi bağlanana kadar yer
+              // tutucu. Akış tıkanmıyor, kullanıcı hakkını yine kazanıyor.
+              <div style={{ textAlign: "center", padding: 20 }}>
+                <div style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.8)", letterSpacing: 1.2, marginBottom: 6 }}>
+                  GOOGLE REKLAMI
+                </div>
+                <div style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, maxWidth: 230 }}>
+                  Yakınındaki mekanların hepsini izledin. Bu alan reklam ağından dolduruluyor.
+                </div>
+              </div>
+            ) : (
+              <div style={{ width: 62, height: 62, borderRadius: "50%", background: "rgba(255,255,255,0.14)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)"><polygon points="6 3 20 12 6 21" /></svg>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Marka bilgisi */}
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 20px 22px", zIndex: 5 }}>
@@ -2094,12 +2143,27 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   const [gate, setGate] = useState(false);
   const [playingAd, setPlayingAd] = useState(null);
   const [adIdx, setAdIdx] = useState(0);
+  // Ödüllü videonun üç girdisi: kim yayında (rezervasyon), video onaylı mı
+  // (medya) ve bu kullanıcı neyi izlemiş.
+  const slotState = useAdSlots();
+  const mediaState = useMedia();
+  const rewardedSeen = useRewardedSeen();
 
   const quota = quotaState({ plan: "free", used, bonus });
   const outOfSwipes = !quota.allowed;
 
-  const watchAd = () => { setPlayingAd(REWARD_ADS[adIdx % REWARD_ADS.length]); setGate(false); };
+  // Hangi reklam oynayacak: yakındaki, izlenmemiş restoran videosu →
+  // GUR'un demo havuzu → Google yedeği. Kural lib/rewarded.js'te tek yerde.
+  const watchAd = () => {
+    setPlayingAd(pickRewardedAd({
+      restaurants, origin: geo.origin(), houseAds: REWARD_ADS, houseIndex: adIdx,
+      seen: rewardedSeen, slots: slotState, media: mediaState,
+    }));
+    setGate(false);
+  };
   const finishAd = () => {
+    // İzlendi işareti: aynı video bu kullanıcıya bir daha açılmaz.
+    if (playingAd?.id) markWatched(playingAd.id);
     setPlayingAd(null);
     setAdIdx(i => i + 1);
     setBonus(b => b + REWARD_SWIPES);

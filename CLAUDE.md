@@ -113,6 +113,8 @@ gur/
     │   ├── geo.js             # konum izni, elle ilçe seçimi, başlangıç noktası
     │   ├── moderation.js      # yayın öncesi onay kuyruğu (mekan + alan değişikliği)
     │   ├── requests.js        # işletmenin teklif talepleri (satın alma YOK)
+    │   ├── adslots.js        # SABİT FİYAT + takvim rezervasyonu (banner/video/push)
+    │   ├── rewarded.js       # ödüllü video seçimi: yakınlık, tekrar yok, Google yedeği
     │   ├── creatives.js       # hizmet TANITIMI (yönetici yükler, işletme görür)
     │   ├── media.js           # işletme dosyaları: menü/foto/reklam + ONAY KUYRUĞU
     │   ├── import-restaurants.js  # Excel/CSV ile toplu restoran yükleme
@@ -142,6 +144,8 @@ yazıyorlar. Bağ ekranlarda değil depolarda:
 | `lib/moderation.js` | işletme + besleme → yönetici (karar) | tüketici destesi |
 | `lib/second-chance.js` | işletme (paket) + tüketici (gösterim) | deste kurulumu, işletme paneli |
 | `lib/requests.js` | işletme (teklif iste) → yönetici (fiyatla/kapat) | yönetici bildirimi, işletme paneli |
+| `lib/adslots.js` | yönetici (fiyat) + işletme (tarih talebi) → yönetici (onay) | tüketici banner'ı, ödüllü video, işletme takvimi |
+| `lib/rewarded.js` | tüketici (izledim) | ödüllü video seçimi |
 | `lib/creatives.js` | yönetici (hizmet TANITIMI) | işletme Büyüme sekmesi |
 | `lib/media.js` | işletme (menü/foto/reklam) → yönetici (onay) | tüketici destesi, yönetici detayı |
 | `data/restaurants.js` | tohum/besleme | üçü de |
@@ -708,11 +712,26 @@ Sunucu karşılığı: `second_chance_packages` + `second_chance_impressions`
 (migration 004). Tek aktif paket kuralı kısmi tekil indeksle veritabanı
 seviyesinde zorlanıyor — uygulama katmanında kontrol yarış koşulunda yetmez.
 
-### İşletme HİÇBİR ŞEY satın alamaz — teklif ister
+### İki fiyat modeli — hangisi nerede
 
-Doyurucu panelinde "Satın al" diye bir düğme **yok** ve olmayacak. Bütün
-ücretli kalemler (banner, push, ödüllü video, anlık fırsat, İkinci Şans
-paketi, Gastro şef videosu) tek bir akıştan geçiyor:
+| | Kalemler | Fiyat | İşletme ne yapıyor |
+|---|---|---|---|
+| **Sabit** | banner, ödüllü video, push | listede yazar, yönetici günceller | takvimden tarih seçer |
+| **Pazarlıklı** | Gastro paketi, İkinci Şans, anlık fırsat | müşteriye özel | teklif ister |
+
+Reklam envanterinin fiyatı müşteriye göre değişmiyor: bir haftalık banner
+herkese aynı. Gastro çekimi ya da İkinci Şans paketi ise mekâna göre
+konuşuluyor. Aynı akışa sokmak ikisinden birini yanlış yere koyardı.
+
+**İKİSİNDE DE SATIN ALMA SERBEST DEĞİL.** Sabit fiyatta kalkan şey
+pazarlık, onay değil: işletme tarihi seçiyor, talep yöneticiye düşüyor,
+onaylanınca slot kilitleniyor.
+
+### İşletme HİÇBİR ŞEY satın alamaz — teklif ister (pazarlıklı kalemler)
+
+Doyurucu panelinde "Satın al" diye bir düğme **yok** ve olmayacak.
+Pazarlıklı kalemler (anlık fırsat, İkinci Şans paketi, Gastro şef videosu)
+tek bir akıştan geçiyor:
 
 ```
 işletme "Teklif iste"  →  yöneticide talep kuyruğu + bildirim
@@ -827,6 +846,74 @@ arayarak bulurdu.
 sahiplenilmiş bir kayıt yok, dosyayı hangi restoranın altına yazacağımızı
 bilmiyoruz. Panele girildikten sonraki yüklemeler kuyruğa düşüyor.
 
+### Reklam slotları: sabit fiyat + takvim (`lib/adslots.js`)
+
+```
+işletme takvimden tarih seçer (pending — slot geçici tutulur)
+     → yönetici onaylar (approved — slot kilitlenir, yayına girer)
+     → yönetici reddeder (rejected — slot serbest kalır)
+```
+
+Yönetici takvime **kendisi de yerleştirebiliyor** (doğrudan `approved`):
+telefonda anlaşılan bir yayın için işletmeye talep açtırmak boş bir tur
+olurdu. Kota ve doluluk kuralları yöneticiye de uygulanıyor — kendi koyduğu
+kuralı delebilmesi, kuralı kural olmaktan çıkarırdı.
+
+| Kalem | Fiyat | Süre | Restoran başına | Envanter |
+|---|---|---|---|---|
+| Keşfet banner'ı | ₺2.400 / hafta | 7 gün | ayda 1 | **tek yerleşim** |
+| Ödüllü video | ₺3.100 / ay | 30 gün | ayda 1 | havuz |
+| Push bildirimi | ₺1.800 / gönderim | 1 gün | günde 1, **haftada 3** | havuz |
+
+**Yalnızca banner exclusive.** Keşfet karuselindeki slayt tek bir yerleşim;
+aynı haftayı iki restorana satmak satılan şeyi ikiye bölerdi ve takvimin
+doluluk göstermesi de buradan anlam kazanıyor. Ödüllü video ve push HAVUZ:
+ödüllü videoda aynı anda birden çok restoranın videosu yayında olabilir,
+hangisinin oynayacağına yakınlık ve "bu kullanıcı izledi mi" karar veriyor.
+Exclusive yapılsaydı 30 günlük süre yüzünden ayda PLATFORMDA tek restoran
+yayınlayabilirdi ve uygulanacak ikinci bir aday hiç olmazdı.
+
+**Kota ve doluluk tek karar noktasında**: `canBook`. İşletme paneli,
+yönetici paneli ve yazma yolu üçü de oradan geçiyor. Arayüzde
+tekrarlansaydı panel "alabilirsin" derken yönetici tarafı reddederdi.
+
+**Fiyat rezervasyon anında donuyor** (`priceMinor`). Liste fiyatını
+yükseltmek, aylar önce onaylanmış bir yayının bedelini geriye dönük
+değiştirmemeli.
+
+**Bekleyen talep de slot tutuyor.** Yoksa iki işletme aynı slotu aynı anda
+talep eder ve biri boşuna bekler.
+
+Yönetici tarafı: **Reklam Takvimi** sayfası — fiyatlar, onay bekleyen
+talepler ve aylık doluluk ızgarası tek yerde. Fiyatı Fiyatlandırma
+sayfasına koymak yanlış olurdu: orası pazarlıklı kalemlerin yeri.
+
+Takvimde geçmiş gün **`opacity` ile soluklaştırılmıyor** — projenin kendi
+kuralı (bkz. "Pasif durumu opacity ile kurma"). İlk yazılışta öyleydi ve
+koyu temada 19 yeni kontrast uyarısı üretti; fark artık renkle.
+
+### Ödüllü video: kim ne izliyor (`lib/rewarded.js`)
+Üç kural, sırayla:
+
+1. **Yakınlık** — restoranın videosu yalnızca 15 km içindeki kullanıcıya.
+   Kadıköy'deki bir mekânın videosunu Beylikdüzü'ndekine izletmek iki
+   tarafa da bir şey kazandırmıyor. Sınır 15 km çünkü daha darı (5 km) demo
+   havuzunda çoğu oturumda hiç aday bırakmıyordu.
+2. **Tekrar yok** — bir kullanıcı bir videoyu bir kez izler. İkinci kez
+   açmak hem sıkıcı hem de erişimi şişiriyordu: aynı kişi "iki kişi" gibi
+   sayılırdı. İzlenenler `gur.rewardedSeen` altında.
+3. **Google yedeği** — gösterilecek restoran videosu kalmadıysa Google
+   reklamı oynar, kullanıcı hakkını yine kazanır, akış hiç tıkanmaz.
+
+Oynatılacak dosya **onay kuyruğundan** geliyor (`media.js` → `ads`,
+onaylı): rezervasyon yayını satın alır, hangi dosyanın oynayacağını onay
+belirler. Onaysız video hiçbir koşulda oynamıyor.
+
+Banner da aynı mantıkta: Keşfet karuselinde bugüne denk gelen ONAYLI
+rezervasyonun slaytı çıkıyor, görseli işletmenin onaylanmış reklam
+materyali. Satın alınmış slayt yoksa GUR'un demo reklamları dönüyor —
+karusel boş kalmıyor.
+
 ### Excel ile toplu restoran yükleme
 Moderasyon sayfası → "Excel ile toplu yükle". Şablonu indir → doldur →
 yükle → **önizlemeyi onayla**. `src/lib/import-restaurants.js`.
@@ -930,6 +1017,10 @@ Google Places + Foursquare + Tripadvisor + OSM'den cron ile beslenir.
   olarak localStorage'da; tarayıcı kotası ~5 MB. Gerçek dağıtımda yerine bir
   nesne deposu (S3/R2) + sunucuda onay tablosu gelir; arayüz `url` ve
   `status` okuduğu için değişmesi gerekmiyor.
+- **Google reklam entegrasyonu yok.** Ödüllü videoda restoran videosu
+  kalmadığında oynayan Google yedeği yer tutucu; AdSense/AdMob birimi
+  `src/lib/rewarded.js` → `GOOGLE_FALLBACK` yanındaki TODO'ya bağlanacak.
+  Akış tam çalışıyor, yalnızca reklamın kendisi gelmiyor.
 - **Ödeme entegrasyonu yok** (iyzico/Stripe). GUR Plus ve ücretli özellikler
   arayüzde var, tahsilat yok.
 - Yasal metinlerdeki işletme bilgileri yer tutucu; yayına çıkmadan doldurulmalı.

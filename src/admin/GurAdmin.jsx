@@ -12,6 +12,11 @@ import { useRequests, openRequests, requestFor, markQuoted, close as closeReques
 import { useCreatives, SLOTS, listFor, addCreative, removeCreative, toggleLive, liveCount } from '../lib/creatives.js';
 import { TEMPLATE_COLUMNS, templateHeaderLine, downloadTemplate, parseRestaurantFile } from '../lib/import-restaurants.js';
 import {
+  AD_PRODUCTS, AD_KEYS, useAdSlots, priceOf, setPrice, adminBook, decideBooking,
+  pendingBookings, pendingBookingCount, dayState, monthGrid, endOf, prettyDay,
+  today as adToday, WEEKDAYS_TR as AD_WEEKDAYS, MONTHS_TR as AD_MONTHS,
+} from '../lib/adslots.js';
+import {
   useMedia, KINDS as MEDIA_KINDS, listMedia, pendingAll as pendingMedia,
   pendingCount as mediaPendingCount, decideMedia, removeMedia,
   isVideo as mediaIsVideo, sizeLabel as mediaSize,
@@ -1082,6 +1087,8 @@ export default function GurAdmin() {
   const modQueue = useModeration();
   const medyaDurum = useMedia();
   const medyaBekleyen = mediaPendingCount(medyaDurum);
+  const slotDurum = useAdSlots();
+  const slotBekleyen = pendingBookingCount(slotDurum);
   // Kenar çubuğundaki Moderasyon sayacı ÜÇ kuyruğu da topluyor: yeni
   // mekan, alan değişikliği ve işletmenin yüklediği dosya. Üçü de aynı
   // sayfada karara bağlanıyor — sayaç birini saymazsa o iş görünmez olur.
@@ -1103,7 +1110,7 @@ export default function GurAdmin() {
   // Rozet iki kaynağı topluyor: teklif talepleri ve onay bekleyen dosyalar.
   // İkisi de "bir müşteri bekliyor" demek. Başvuru ve moderasyon
   // sayaçları kenar çubuğunda zaten duruyor, onlar rozete girmiyor.
-  const bildirimSayisi = unseenCount(talepler) + medyaBekleyen;
+  const bildirimSayisi = unseenCount(talepler) + medyaBekleyen + slotBekleyen;
   const bildirimler = [
     ...openRequests(talepler).map(t => ({
       id: t.id, sayfa: 'pricing',
@@ -1111,6 +1118,12 @@ export default function GurAdmin() {
       alt: `${t.streamName}${t.status === 'quoted' ? ' · teklif gönderildi' : ''}`,
       at: t.at, yeni: !t.seen,
     })),
+    ...(slotBekleyen ? [{
+      id: 'slots', sayfa: 'adcal',
+      baslik: `${slotBekleyen} yayın talebi onayınızı bekliyor`,
+      alt: 'banner, ödüllü video ve push takvim rezervasyonları',
+      at: null, yeni: true,
+    }] : []),
     ...(medyaBekleyen ? [{
       id: 'media', sayfa: 'moderation',
       baslik: `${medyaBekleyen} dosya onayınızı bekliyor`,
@@ -1198,6 +1211,7 @@ export default function GurAdmin() {
     { id: 'growth', label: 'Büyüme & Kohort', icon: icons.chart },
     { id: 'revenue', label: 'Gelir & Reklam', icon: icons.money },
     { id: 'services', label: 'Hizmetler', icon: icons.money },
+    { id: 'adcal', label: 'Reklam Takvimi', icon: icons.trend, count: slotBekleyen, alert: slotBekleyen > 0 },
     { id: 'pricing', label: 'Fiyatlandırma', icon: icons.trend },
     { id: 'settings', label: 'Ayarlar', icon: icons.settings },
   ];
@@ -1343,6 +1357,7 @@ export default function GurAdmin() {
           {page === 'pricing' && (
             <PricingPage restaurants={restaurants} query={query}
               stream={pricingStream} onStream={setPricingStream} />)}
+          {page === 'adcal' && <AdCalendarPage restaurants={restaurants} query={query} />}
           {page === 'settings' && <SettingsPage />}
         </div>
       </main>
@@ -1946,6 +1961,227 @@ function Modal({ title, subtitle, onClose, children, width = 560 }) {
  * kutu hiç çizilmiyor: çalışmayan bir arama kutusu, olmayan aramadan
  * daha kötü.
  */
+/**
+ * REKLAM TAKVİMİ — sabit fiyatlı üç kalem: fiyat, doluluk, onay.
+ *
+ * Üç iş tek sayfada çünkü üçü de aynı soruyu soruyor: "bu reklam ne zaman,
+ * kimde, kaça." Fiyatı Fiyatlandırma sayfasına koymak yanlış olurdu — orası
+ * PAZARLIKLI kalemlerin yeri ve bu üçünde pazarlık yok.
+ *
+ * Kota ve doluluk kuralı burada HESAPLANMIYOR: `canBook` tek karar noktası
+ * (lib/adslots.js). Yönetici yerleştirmesi de aynı kapıdan geçiyor — kendi
+ * koyduğu kuralı yöneticinin delebilmesi, kuralı kural olmaktan çıkarırdı.
+ */
+function AdCalendarPage({ restaurants = [], query = '' }) {
+  const durum = useAdSlots();
+  const [urun, setUrun] = useState('bannerAds');
+  const [ay, setAy] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const [fiyatDuzenle, setFiyatDuzenle] = useState(null);
+  const [fiyatTaslak, setFiyatTaslak] = useState('');
+  const [yerlestir, setYerlestir] = useState(null);   // { start }
+  const [secilenRest, setSecilenRest] = useState('');
+  const [hata, setHata] = useState('');
+
+  const p = AD_PRODUCTS[urun];
+  const q = query.trim().toLocaleLowerCase('tr');
+  const bekleyen = pendingBookings(durum)
+    .filter(b => !q || String(b.restaurantName || '').toLocaleLowerCase('tr').includes(q));
+  const hucreler = monthGrid(ay.y, ay.m);
+  const bugun = adToday();
+
+  const adOf = (rid) => restaurants.find(r => String(r.id) === String(rid))?.name || `#${rid}`;
+  const musteriler = restaurants.filter(r => r.account);
+
+  const kaydetFiyat = () => {
+    setPrice(fiyatDuzenle, fiyatTaslak);
+    setFiyatDuzenle(null);
+  };
+
+  const yerlestirOnayla = () => {
+    try {
+      const r = musteriler.find(x => String(x.id) === String(secilenRest));
+      if (!r) { setHata('Restoran seçilmedi.'); return; }
+      adminBook({ streamKey: urun, restaurantId: r.id, restaurantName: r.name, start: yerlestir.start });
+      setYerlestir(null); setSecilenRest(''); setHata('');
+    } catch (e) { setHata(e.message || 'Yerleştirilemedi.'); }
+  };
+
+  return (
+    <div style={{ animation: 'fadeIn 0.2s' }}>
+      {/* ─── FİYATLAR ─── */}
+      <section style={{ ...CARD, overflow: 'hidden', marginBottom: 18 }}>
+        <SectionHead title="Sabit fiyatlar" right="pazarlık yok — liste fiyatı" />
+        {AD_KEYS.map(k => {
+          const pr = AD_PRODUCTS[k];
+          return (
+            <div key={k} style={{ padding: '13px 18px', borderTop: `1px solid ${C.border}`,
+              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{pr.name}</div>
+                <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.5 }}>{pr.rule}</div>
+              </div>
+              <div style={{ textAlign: 'right', minWidth: 110 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, ...NUM }}>
+                  {money(priceOf(k, durum))}
+                </div>
+                <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>/ {pr.unit}</div>
+              </div>
+              <Btn label="Fiyatı değiştir" size="sm" variant="outline"
+                onClick={() => { setFiyatDuzenle(k); setFiyatTaslak(String(priceOf(k, durum))); }} />
+            </div>
+          );
+        })}
+        <div style={{ padding: '11px 18px', borderTop: `1px solid ${C.border}`,
+          fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.55 }}>
+          Fiyat değişikliği <b>geçmişe işlemez</b>: her rezervasyon kendi bedelini
+          talep anında donduruyor.
+        </div>
+      </section>
+
+      {/* ─── ONAY BEKLEYEN TALEPLER ─── */}
+      {bekleyen.length > 0 && (
+        <section style={{ ...CARD, overflow: 'hidden', marginBottom: 18, borderColor: C.orangeInk }}>
+          <SectionHead title="Onay bekleyen yayın talepleri" right={`${bekleyen.length} talep`} />
+          {bekleyen.map(b => (
+            <div key={b.id} style={{ padding: '13px 18px', borderTop: `1px solid ${C.border}`,
+              display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 230 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{b.restaurantName || adOf(b.restaurantId)}</div>
+                <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+                  {AD_PRODUCTS[b.streamKey]?.name || b.streamKey} · {prettyDay(b.start)}
+                  {b.start !== b.end ? ` – ${prettyDay(b.end)}` : ''} · {money(b.priceMinor)}
+                </div>
+              </div>
+              <Btn label="Onayla" size="sm" variant="filled" tone="green"
+                onClick={() => decideBooking(b.id, 'approved')} />
+              <Btn label="Reddet" size="sm" variant="soft" tone="red"
+                onClick={() => decideBooking(b.id, 'rejected', 'Yönetici reddetti.')} />
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* ─── TAKVİM ─── */}
+      <section style={{ ...CARD, overflow: 'hidden' }}>
+        <SectionHead title="Yayın takvimi" right={p.rule} />
+        <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center',
+          gap: 12, flexWrap: 'wrap', borderTop: `1px solid ${C.border}` }}>
+          <Segmented value={urun} onChange={setUrun} label="Reklam kalemi"
+            options={AD_KEYS.map(k => ({ id: k, label: AD_PRODUCTS[k].name }))} />
+          <div style={{ flex: 1 }} />
+          <Btn label="◀" size="sm" variant="outline" title="Önceki ay"
+            onClick={() => setAy(a => a.m === 0 ? { y: a.y - 1, m: 11 } : { y: a.y, m: a.m - 1 })} />
+          <span style={{ fontSize: 13, fontWeight: 700, minWidth: 108, textAlign: 'center' }}>
+            {AD_MONTHS[ay.m]} {ay.y}
+          </span>
+          <Btn label="▶" size="sm" variant="outline" title="Sonraki ay"
+            onClick={() => setAy(a => a.m === 11 ? { y: a.y + 1, m: 0 } : { y: a.y, m: a.m + 1 })} />
+        </div>
+
+        <div style={{ padding: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 6 }}>
+            {AD_WEEKDAYS.map(g => (
+              <div key={g} style={{ textAlign: 'center', fontFamily: FB, fontSize: 11,
+                fontWeight: 700, color: C.faint }}>{g}</div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+            {hucreler.map((gun, i) => {
+              if (!gun) return <div key={`b${i}`} />;
+              const d = dayState(urun, gun, durum);
+              const gecmis = gun < bugun;
+              const dolu = d.status !== 'free';
+              return (
+                <button key={gun} type="button"
+                  onClick={() => { if (!gecmis) { setYerlestir({ start: gun }); setHata(''); } }}
+                  disabled={gecmis}
+                  title={dolu ? d.bookings.map(b => `${b.restaurantName} (${b.status === 'approved' ? 'onaylı' : 'bekliyor'})`).join(', ') : gun}
+                  style={{
+                    minHeight: 62, borderRadius: 9, padding: '6px 7px', textAlign: 'left',
+                    border: `1px solid ${dolu ? (d.status === 'approved' ? C.green : C.yellow) + '66' : C.border}`,
+                    background: gecmis ? C.bg
+                      : d.status === 'approved' ? C.greenSoft
+                      : d.status === 'pending' ? C.yellowSoft : C.panel,
+                    cursor: gecmis ? 'default' : 'pointer', outline: 'none',
+                  }}>
+                  {/* Geçmiş gün OPACITY ile soluklaştırılmıyor: bu kural
+                      projede yasak (etiketi ~2:1'e düşürüyor ve denetimden
+                      de kaçıyor). Fark RENKLE: geçmişte nötr mürekkep,
+                      bugünde marka mürekkebi. */}
+                  <div style={{ fontFamily: FM, fontSize: 11.5, fontWeight: 700,
+                    color: gecmis ? C.faint : gun === bugun ? C.orangeInk : C.dim }}>{Number(gun.slice(-2))}</div>
+                  {d.bookings.slice(0, 2).map(b => (
+                    <div key={b.id} style={{ fontFamily: FB, fontSize: 9.5, fontWeight: 700,
+                      color: b.status === 'approved' ? C.greenInk : C.yellowInk,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {b.restaurantName}
+                    </div>
+                  ))}
+                  {d.bookings.length > 2 && (
+                    <div style={{ fontFamily: FB, fontSize: 9.5, color: C.faint }}>+{d.bookings.length - 2}</div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Renk tek başına bilgi taşımasın. */}
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 12 }}>
+            {[[C.panel, C.border, 'müsait'], [C.yellowSoft, C.yellow, 'onay bekliyor'], [C.greenSoft, C.green, 'yayında']]
+              .map(([bg, bd, t]) => (
+                <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: 4, background: bg, border: `1px solid ${bd}66` }} />
+                  <span style={{ fontFamily: FB, fontSize: 11.5, color: C.dim }}>{t}</span>
+                </span>
+              ))}
+            <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, marginLeft: 'auto' }}>
+              Boş bir güne tıklayarak kendiniz yerleştirebilirsiniz.
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Fiyat düzenleme */}
+      {fiyatDuzenle && (
+        <Modal onClose={() => setFiyatDuzenle(null)}
+          title={`${AD_PRODUCTS[fiyatDuzenle].name} — fiyat`}
+          subtitle={`Birim: ${AD_PRODUCTS[fiyatDuzenle].unit}. Yeni fiyat yalnızca bundan sonraki taleplere uygulanır.`}>
+          <AdminField label="Fiyat (₺)" value={fiyatTaslak} onChange={setFiyatTaslak} autoFocus onEnter={kaydetFiyat} />
+          <Btn label="Kaydet" variant="filled" tone="orange" fullWidth onClick={kaydetFiyat} />
+        </Modal>
+      )}
+
+      {/* Yönetici yerleştirmesi */}
+      {yerlestir && (
+        <Modal onClose={() => { setYerlestir(null); setHata(''); }}
+          title="Takvime yerleştir"
+          subtitle={`${p.name} · ${prettyDay(yerlestir.start)}${p.days > 1 ? ` – ${prettyDay(endOf(urun, yerlestir.start))}` : ''} · ${money(priceOf(urun, durum))}`}>
+          <div style={{ marginBottom: 14 }}>
+            <label htmlFor="ad-rest" style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: C.dim, marginBottom: 6 }}>Restoran</label>
+            <select id="ad-rest" value={secilenRest} onChange={e => { setSecilenRest(e.target.value); setHata(''); }}
+              style={{ width: '100%', height: 40, background: C.bg, border: `1px solid ${C.border}`,
+                borderRadius: 10, padding: '0 10px', color: C.text, fontFamily: FB, fontSize: 16, outline: 'none' }}>
+              <option value="">Seçin…</option>
+              {musteriler.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </div>
+          <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, marginBottom: 14, lineHeight: 1.55 }}>
+            Yönetici yerleştirmesi <b>doğrudan onaylı</b> açılır — telefonda anlaşılan
+            bir yayın için işletmeye talep açtırmak boş bir tur olurdu. Kota ve doluluk
+            kuralları yine de geçerli.
+          </div>
+          {hata && (
+            <div role="status" style={{ background: C.redSoft, border: `1px solid ${C.red}44`, borderRadius: 9,
+              padding: '9px 12px', marginBottom: 14, fontSize: 12, color: C.redInk }}>{hata}</div>
+          )}
+          <Btn label="Yerleştir ve yayınla" variant="filled" tone="orange" fullWidth
+            onClick={yerlestirOnayla} disabled={!secilenRest} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 const SEARCHABLE = {
   restaurants: 'Restoran veya mutfak ara',
   pool:        'Havuzda mekan ara',
@@ -1955,6 +2191,7 @@ const SEARCHABLE = {
   campaigns:   'Kampanya, restoran veya firma ara',
   pricing:     'Müşteri ara',
   services:    'Hizmet veya restoran ara',
+  adcal:       'Talep eden restoranı ara',
 };
 
 /**

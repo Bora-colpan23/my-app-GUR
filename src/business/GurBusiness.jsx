@@ -40,6 +40,11 @@ import {
   statusSummary, ownerMediaFor, isVideo as mediaIsVideo, sizeLabel as mediaSize,
 } from '../lib/media.js';
 import { useCreatives, promoFor, isVideo as promoIsVideo } from '../lib/creatives.js';
+import {
+  AD_PRODUCTS, isFixedPrice, useAdSlots, priceOf, canBook, requestBooking,
+  cancelBooking, bookingsOfRestaurant, dayState, monthGrid, today, endOf,
+  prettyDay, WEEKDAYS_TR, MONTHS_TR as AY_ADLARI,
+} from '../lib/adslots.js';
 import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
 
@@ -880,7 +885,169 @@ function SecondChanceCard({ restaurant }) {
  * `gold` Gastro paketi için: satın alınan değil, seçilerek verilen bir
  * paket olduğu için ayrı bir görsel dil taşıyor (bkz. GoldCard).
  */
+/**
+ * SABİT FİYATLI REKLAM — takvimden tarih seçip talep gönderme.
+ *
+ * Banner, ödüllü video ve push pazarlığa açık değil: fiyat listede yazıyor.
+ * Ama satın alma serbest DEĞİL — işletme müsait tarihi seçiyor, talep
+ * yöneticiye düşüyor, onaylanınca slot kilitleniyor.
+ *
+ * Takvim doluluğu ve kota kuralı ARAYÜZDE hesaplanmıyor: `canBook` tek
+ * karar noktası (lib/adslots.js). Burada tekrarlansaydı panel "alabilirsin"
+ * derken yönetici tarafı reddedebilirdi.
+ */
+function SlotBooking({ streamKey, restaurant }) {
+  const durum = useAdSlots();
+  const p = AD_PRODUCTS[streamKey];
+  const [acik, setAcik] = useState(false);
+  const [ay, setAy] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const [secili, setSecili] = useState(null);
+  const [hata, setHata] = useState("");
+
+  if (!p || !restaurant) return null;
+
+  const fiyat = priceOf(streamKey, durum);
+  const kendi = bookingsOfRestaurant(restaurant.id, durum)
+    .filter(b => b.streamKey === streamKey && b.status !== "cancelled" && b.status !== "rejected");
+  const bekleyen = kendi.find(b => b.status === "pending");
+  const onayli = kendi.filter(b => b.status === "approved");
+
+  const hucreler = monthGrid(ay.y, ay.m);
+  const bugun = today();
+
+  const gonder = () => {
+    try {
+      requestBooking({
+        streamKey, restaurantId: restaurant.id, restaurantName: restaurant.name, start: secili,
+      });
+      setSecili(null); setAcik(false); setHata("");
+      haptic(14);
+    } catch (e) { setHata(e.message || "Talep gönderilemedi."); }
+  };
+
+  const kontrol = secili ? canBook(streamKey, restaurant.id, secili, durum) : null;
+
+  return (
+    <div>
+      {/* Kural her zaman görünür: "neden alamıyorum" sorusu sorulmadan cevaplanır. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
+        <Icon n="clock" size={13} color="rgba(255,255,255,0.35)" />
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.45 }}>{p.rule}</p>
+      </div>
+
+      {onayli.map(b => (
+        <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+          <Icon n="check" size={14} color="var(--c-ok-light)" />
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-ok-light)" }}>
+            {prettyDay(b.start)}{p.days > 1 ? ` – ${prettyDay(b.end)}` : ""} · yayında
+          </span>
+        </div>
+      ))}
+
+      {bekleyen ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <Icon n="clock" size={14} color="var(--c-warn-light)" />
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-warn-light)" }}>
+            {prettyDay(bekleyen.start)}{p.days > 1 ? ` – ${prettyDay(bekleyen.end)}` : ""} · onay bekliyor
+          </span>
+          <Btn text="Vazgeç" onClick={() => cancelBooking(bekleyen.id)} variant="plainDark" size="sm" fullWidth={false} />
+        </div>
+      ) : !acik ? (
+        <Btn text="Tarih seç" onClick={() => { setAcik(true); setHata(""); }}
+          variant="filled" size="sm" fullWidth={false} />
+      ) : (
+        <div style={{ background: "rgba(0,0,0,0.22)", borderRadius: 14, padding: 12 }}>
+          {/* Ay gezinmesi */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <IconBtn size={28} shape="rounded" tone="glassLight" title="Önceki ay"
+              onClick={() => setAy(a => a.m === 0 ? { y: a.y - 1, m: 11 } : { y: a.y, m: a.m - 1 })}
+              icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>} />
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 800, color: "#fff" }}>
+              {AY_ADLARI[ay.m]} {ay.y}
+            </span>
+            <IconBtn size={28} shape="rounded" tone="glassLight" title="Sonraki ay"
+              onClick={() => setAy(a => a.m === 11 ? { y: a.y + 1, m: 0 } : { y: a.y, m: a.m + 1 })}
+              icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>} />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 4 }}>
+            {WEEKDAYS_TR.map(g => (
+              <div key={g} style={{ textAlign: "center", fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.3)" }}>{g}</div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+            {hucreler.map((gun, i) => {
+              if (!gun) return <div key={`b${i}`} />;
+              const d = dayState(streamKey, gun, durum);
+              const gecmis = gun < bugun;
+              const secim = gun === secili;
+              // Seçilen aralığın tamamı vurgulanıyor: kullanıcı yalnız
+              // başlangıcı seçiyor ama kaç gün tutacağını görmeli.
+              const aralikta = secili && gun >= secili && gun <= endOf(streamKey, secili);
+              const kapali = gecmis || (p.exclusive && d.status !== "free");
+              return (
+                <button key={gun} type="button" disabled={kapali}
+                  onClick={() => { setSecili(gun); setHata(""); }}
+                  title={kapali ? (gecmis ? "Geçmiş tarih" : "Dolu") : gun}
+                  style={{
+                    aspectRatio: "1", borderRadius: 8, border: secim ? "2px solid #FF6600" : "1px solid rgba(255,255,255,0.08)",
+                    background: aralikta ? "rgba(255,102,0,0.35)"
+                      : d.status === "approved" ? "rgba(255,122,112,0.22)"
+                      : d.status === "pending" ? "rgba(255,180,84,0.18)"
+                      : "rgba(255,255,255,0.04)",
+                    color: kapali ? "rgba(255,255,255,0.25)" : "#fff",
+                    fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700,
+                    cursor: kapali ? "not-allowed" : "pointer", padding: 0, outline: "none",
+                  }}>{Number(gun.slice(-2))}</button>
+              );
+            })}
+          </div>
+
+          {/* Renk tek başına bilgi taşımasın: gösterge yazılı. */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 9 }}>
+            {[["rgba(255,255,255,0.04)", "müsait"], ["rgba(255,180,84,0.18)", "tutuluyor"], ["rgba(255,122,112,0.22)", "dolu"]].map(([c, t]) => (
+              <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 9, height: 9, borderRadius: 3, background: c, border: "1px solid rgba(255,255,255,0.1)" }} />
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.4)" }}>{t}</span>
+              </span>
+            ))}
+          </div>
+
+          {secili && (
+            <div style={{ marginTop: 11, paddingTop: 11, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.65)", margin: "0 0 4px" }}>
+                {prettyDay(secili)}{p.days > 1 ? ` – ${prettyDay(endOf(streamKey, secili))}` : ""}
+              </p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#FF9A4D", margin: "0 0 10px" }}>
+                ₺{fiyat.toLocaleString("tr")} / {p.unit}
+              </p>
+              {kontrol && !kontrol.ok && (
+                <p role="status" style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-bad-light)", margin: "0 0 10px", lineHeight: 1.45 }}>{kontrol.reason}</p>
+              )}
+              <Btn text="Talep gönder" onClick={gonder} variant="filled" size="sm" fullWidth={false}
+                disabled={!kontrol?.ok} />
+            </div>
+          )}
+
+          {hata && (
+            <p role="status" style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-bad-light)", margin: "9px 0 0" }}>{hata}</p>
+          )}
+
+          <div style={{ marginTop: 10 }}>
+            <Btn text="Kapat" onClick={() => { setAcik(false); setSecili(null); }} variant="plainDark" size="sm" fullWidth={false} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GrowthCard({ title, price, desc, active, locked, streamKey, streamName, restaurant, gold }) {
+  // Sabit fiyatlı üç reklam kalemi (banner / ödüllü video / push) teklif
+  // akışından çıktı: fiyat listede yazıyor, takvimden tarih seçiliyor.
+  // Geri kalanlar (Gastro, İkinci Şans, anlık fırsat) hâlâ pazarlıklı.
+  const sabit = isFixedPrice(streamKey);
+  const slotDurum = useAdSlots();
   const talepler = useRequests();
   const talep = restaurant && streamKey
     ? requestFor(restaurant.id, streamKey, talepler) : null;
@@ -911,7 +1078,11 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
       {gold && <span className="gur-gold-sheen" aria-hidden="true" />}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: gold ? "#F6E6A8" : "#fff", margin: 0 }}>{title}</p>
-        <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: gold ? "#E9C456" : "#FF9A4D", flexShrink: 0 }}>{price}</span>
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: gold ? "#E9C456" : "#FF9A4D", flexShrink: 0 }}>
+          {sabit
+            ? `₺${priceOf(streamKey, slotDurum).toLocaleString("tr")} / ${AD_PRODUCTS[streamKey].unit}`
+            : price}
+        </span>
       </div>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 12px", lineHeight: 1.5 }}>{desc}</p>
       {/* Hizmetin tanıtımı — yönetici yüklüyor (lib/creatives.js). Fiyatın
@@ -920,6 +1091,8 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
       <ServicePromo streamKey={streamKey} />
       {locked ? (
         <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.35)", margin: 0 }}>Bu paket şu an kapalı</p>
+      ) : sabit ? (
+        <SlotBooking streamKey={streamKey} restaurant={restaurant} />
       ) : active ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Icon n="check" size={14} color="var(--c-ok-light)" />
@@ -1792,25 +1965,27 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
               <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>
                   Görünürlüğünüzü artıran paketler. <b>Hiçbiri doğrudan satın alınmaz</b> —
-                  teklif istersiniz, GUR ekibi fiyatlandırıp size teklif gönderir, kabul
-                  ederseniz yayına girer. Rezervasyon ve menü ücretsizdir.
+                  GUR ekibi onaylamadan hiçbiri yayına girmez. Reklam kalemlerinin
+                  (banner, ödüllü video, push) <b>fiyatı sabittir</b>: takvimden müsait
+                  tarihi seçip talep gönderirsiniz. Diğer paketlerde fiyat size özel
+                  belirlenir, teklif istersiniz. Rezervasyon ve menü ücretsizdir.
                 </p>
               </div>
 
               {/* Faz 1 — reklam / sponsorluk */}
               <GrowthSection title="Reklam ve Sponsorluk">
                 <GrowthCard
-                  title="Keşfet Banner'ı" price="liste: ₺2.400 / hafta" active={bought.featured}
+                  title="Keşfet Banner'ı" price="" active={bought.featured}
                   streamKey="bannerAds" streamName="Dönen keşfet banner'ı" restaurant={ownerRestaurant}
                   desc="Keşfet ekranının üstündeki dönen banner'da bir slayt. Haftada ~4.000 gösterim."
                 />
                 <GrowthCard
-                  title="Ödüllü Video Reklam" price="liste: ₺3.100 / 1.000 izlenme" active={bought.rewarded}
+                  title="Ödüllü Video Reklam" price="" active={bought.rewarded}
                   streamKey="rewardedAds" streamName="Ödüllü video reklam" restaurant={ownerRestaurant}
                   desc="Kullanıcı kaydırma hakkı kazanmak için videonuzu sonuna kadar izler — tamamlanma oranı ~%78."
                 />
                 <GrowthCard
-                  title="Push Bildirim Reklamı" price="liste: ₺1.800 / gönderim" active={bought.push}
+                  title="Push Bildirim Reklamı" price="" active={bought.push}
                   streamKey="pushAds" streamName="Push bildirim reklamları" restaurant={ownerRestaurant}
                   desc="Semtinizdeki kullanıcılara tek seferlik bildirim. Gönderim saatini siz seçersiniz."
                 />
