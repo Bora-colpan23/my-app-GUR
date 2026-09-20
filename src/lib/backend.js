@@ -113,14 +113,22 @@ const SAMPLE_EXTERNAL = [
 
 /**
  * Restoran detayının kart verisinde olmayan kısmı: işletmenin aldığı
- * hizmetler ve dış kaynak yorumları. Canlı modda sunucudan, yerel modda
- * demo kampanya envanterinden türetilir.
+ * hizmetler, dış kaynak yorumları ve DIŞ KAYNAK GÖRSELLERİ.
+ *
+ * `externalPhotos` eskiden burada DÜŞÜYORDU: sunucu `photos` alanını
+ * döndürüyordu ama bu cephe yalnızca `services` ve `externalReviews`
+ * alıyordu, dolayısıyla Google Places'ten gelen mekan fotoğrafları
+ * arayüze hiç ulaşmıyordu. Artık geçiyor.
  */
 export async function loadRestaurantDetail(restaurant) {
   if (isLive()) {
     try {
       const d = await api.getRestaurant(restaurant.id);
-      return { services: d.services, externalReviews: d.externalReviews || [] };
+      return {
+        services: d.services,
+        externalReviews: d.externalReviews || [],
+        externalPhotos: normalizePhotos(d.photos),
+      };
     } catch { /* yerele düş */ }
   }
   const claimed = !!(restaurant.claimed || restaurant.ownerClaimed);
@@ -130,7 +138,35 @@ export async function loadRestaurantDetail(restaurant) {
   return {
     services: { claimed, plan: claimed ? (campaigns.length ? "pro" : "premium") : null, campaigns },
     externalReviews: claimed || restaurant.gastro ? SAMPLE_EXTERNAL : [],
+    // YEREL modda sunucu yok: mekânın kendi görselleri dış kaynak
+    // karşılığı olarak gösteriliyor ki galeri boş kalmasın.
+    externalPhotos: normalizePhotos((restaurant.imgs || []).map(url => ({ url, provider: "seed" }))),
   };
+}
+
+/**
+ * Dış kaynak görselleri tek biçime indirger.
+ *
+ * Sunucu sağlayıcıya göre farklı anahtar döndürebiliyor (`url`, `src`,
+ * `photo_url`) ve video da gelebiliyor. Arayüzün bunu bilmesi gerekmesin
+ * diye normalleştirme burada, tek yerde.
+ */
+function normalizePhotos(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map(p => {
+      const url = typeof p === "string" ? p : (p?.url || p?.src || p?.photo_url || null);
+      if (!url) return null;
+      const type = typeof p === "object" ? (p.type || p.mime || "") : "";
+      return {
+        url,
+        video: String(type).startsWith("video/") || /\.(mp4|webm|mov)(\?|$)/i.test(url),
+        provider: (typeof p === "object" && p.provider) || "google",
+        attribution: (typeof p === "object" && (p.attribution || p.html_attribution)) || null,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 12);
 }
 
 export async function recordSwipe({ restaurantId, direction, campaignId, deckPosition, dwellMs }) {

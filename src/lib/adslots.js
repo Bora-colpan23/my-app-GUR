@@ -29,52 +29,64 @@ const listeners = new Set();
 let cache = null;
 
 /**
- * Üç ürün, üç ayrı kural.
+ * Üç ürün, tek fiyat birimi: GÜN.
  *
- * `days`  — onaylanınca takvimde kaç gün dolduğu.
- * `limit` — AYNI RESTORANIN ne sıklıkla alabileceği.
- * `exclusive` — o gün aralığında yalnızca tek restoran olabilir mi.
+ * Fiyat günlük, süreyi işletme seçiyor (1–`maxDays`). Önceden her ürünün
+ * süresi sabitti (banner 7 gün / hafta fiyatı, video 30 gün / ay fiyatı,
+ * push tek gönderim) ve üç ayrı birim üç ayrı kafa karışıklığı demekti:
+ * "ayda 1 kez alınır ama 30 gün kalır" cümlesi kotayla süreyi aynı yere
+ * yazıyordu. Tek birim, tek çarpma: `günlük fiyat × seçilen gün`.
+ *
+ * `dailyPrice` — bir günün listedeki bedeli (yönetici günceller).
+ * `maxDays`    — en fazla kaç gün seçilebilir. Üçünde de 7.
+ * `limit`      — AYNI RESTORANIN ne sıklıkla alabileceği.
+ * `exclusive`  — o gün aralığında yalnızca tek restoran olabilir mi.
  *
  * YALNIZCA BANNER exclusive. Keşfet karuselindeki slayt tek bir yerleşim;
- * aynı haftayı iki restorana satmak satılan şeyi ikiye bölerdi. Takvimin
+ * aynı günü iki restorana satmak satılan şeyi ikiye bölerdi. Takvimin
  * doluluk göstermesi de buradan anlam kazanıyor.
  *
  * Ödüllü video ve push exclusive DEĞİL — ikisi de HAVUZ:
  *   • Ödüllü videoda aynı anda birden çok restoranın videosu yayında
  *     olabilir; hangisinin oynayacağına yakınlık ve "bu kullanıcı izledi mi"
- *     karar veriyor (bkz. lib/rewarded.js). Exclusive yapılsaydı 30 günlük
- *     süre yüzünden ayda PLATFORMDA tek restoran yayınlayabilirdi ve
- *     yakınlık/tekrar kuralları uygulanacak ikinci bir aday hiç olmazdı.
+ *     karar veriyor (bkz. lib/rewarded.js). Exclusive yapılsaydı uygulanacak
+ *     ikinci bir aday hiç olmazdı.
  *   • Push bildirimi kişiye gidiyor, bir ekran yerleşimi değil.
- * İkisinde de sınır restoran başına: ayda 1 / günde 1 ve haftada 3.
+ *
+ * PUSH'TA BİR GÜN = BİR GÖNDERİM. Üç günlük bir push rezervasyonu üç
+ * gönderim demek, o yüzden haftalık sınır GÜN sayısı üzerinden işliyor
+ * (`weekDays: 3`): 7 gün seçilebilir ama haftada en fazla 3 gün dolar.
  */
 export const AD_PRODUCTS = {
   bannerAds: {
     name: "Keşfet Banner'ı",
-    unit: "hafta",
-    defaultPrice: 2400,
-    days: 7,
+    unit: "gün",
+    // ₺2.400/hafta idi → 2400/7 ≈ 343, yuvarlandı.
+    dailyPrice: 350,
+    maxDays: 7,
     exclusive: true,
     limit: { month: 1 },
-    rule: "Ayda 1 kez alınır, 7 gün yayında kalır.",
+    rule: "Ayda 1 kez, en fazla 7 gün.",
   },
   rewardedAds: {
     name: "Ödüllü Video Reklam",
-    unit: "ay",
-    defaultPrice: 3100,
-    days: 30,
+    unit: "gün",
+    // ₺3.100/ay idi → 3100/30 ≈ 103, yuvarlandı.
+    dailyPrice: 105,
+    maxDays: 7,
     exclusive: false,
     limit: { month: 1 },
-    rule: "Ayda 1 kez alınır, 30 gün yayında kalır. Yakındaki kullanıcılara gösterilir; videoyu izleyen aynı videoyu bir daha görmez.",
+    rule: "Ayda 1 kez, en fazla 7 gün. Yakındaki kullanıcılara gösterilir; videoyu izleyen aynı videoyu bir daha görmez.",
   },
   pushAds: {
     name: "Push Bildirim Reklamı",
-    unit: "gönderim",
-    defaultPrice: 1800,
-    days: 1,
+    unit: "gün",
+    // ₺1.800/gönderim idi; bir gün = bir gönderim, yani aynı rakam.
+    dailyPrice: 1800,
+    maxDays: 7,
     exclusive: false,
-    limit: { day: 1, week: 3 },
-    rule: "Günde en fazla 1, haftada en fazla 3 gönderim.",
+    limit: { weekDays: 3 },
+    rule: "Bir gün = bir gönderim. Haftada en fazla 3 gün.",
   },
 };
 
@@ -104,17 +116,28 @@ export function addDays(dayISO, n) {
   return toDay(x);
 }
 
-/** Başlangıçtan itibaren ürünün kapladığı gün listesi. */
-export function rangeOf(streamKey, startISO) {
+/** Seçilen gün sayısını ürünün sınırına kelepçeler. */
+export function clampDays(streamKey, days) {
   const p = AD_PRODUCTS[streamKey];
-  if (!p) return [];
-  return Array.from({ length: p.days }, (_, i) => addDays(startISO, i));
+  const n = Math.round(Number(days) || 1);
+  if (!p) return Math.max(1, n);
+  return Math.min(p.maxDays, Math.max(1, n));
+}
+
+/** Başlangıçtan itibaren kaplanan gün listesi. */
+export function rangeOf(streamKey, startISO, days) {
+  const n = clampDays(streamKey, days);
+  return Array.from({ length: n }, (_, i) => addDays(startISO, i));
 }
 
 /** Kapanış günü (dahil) — arayüzde "3 Eki – 9 Eki" yazmak için. */
-export function endOf(streamKey, startISO) {
-  const p = AD_PRODUCTS[streamKey];
-  return p ? addDays(startISO, p.days - 1) : startISO;
+export function endOf(streamKey, startISO, days) {
+  return addDays(startISO, clampDays(streamKey, days) - 1);
+}
+
+/** Toplam bedel: günlük fiyat × gün. Tek çarpma, tek yerde. */
+export function totalPrice(streamKey, days, state) {
+  return priceOf(streamKey, state) * clampDays(streamKey, days);
 }
 
 export function monthKey(dayISO) { return dayISO.slice(0, 7); }
@@ -129,6 +152,13 @@ export function weekKey(dayISO) {
   return toDay(x);
 }
 
+/** İki gün arasındaki fark (gün). Eski kayıtların süresini türetmek için. */
+export function gunFarki(aISO, bISO) {
+  const [y1, m1, d1] = aISO.split("-").map(Number);
+  const [y2, m2, d2] = bISO.split("-").map(Number);
+  return Math.round((new Date(y2, m2 - 1, d2) - new Date(y1, m1 - 1, d1)) / 86400000);
+}
+
 /** İki aralık kesişiyor mu (ikisi de kapanış günü DAHİL). */
 function overlaps(aStart, aEnd, bStart, bEnd) {
   return aStart <= bEnd && bStart <= aEnd;
@@ -136,19 +166,29 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
 
 // ─── Depo ────────────────────────────────────────────────────────────────
 
-const bos = () => ({ prices: {}, bookings: [] });
+// Depo sürümü. Fiyat birimi HAFTA/AY/GÖNDERİM iken GÜN'e çevrildi; eski
+// `prices` kaydındaki 2400 artık "günlük 2400" diye okunurdu ve haftalık
+// bir banner yedi katına çıkardı. Sürüm uyuşmazsa kaydedilmiş fiyatlar
+// atılıyor, rezervasyonlar korunuyor (bedelleri zaten donmuş durumda).
+const SURUM = 2;
+
+const bos = () => ({ v: SURUM, prices: {}, bookings: [] });
 
 function read() {
   if (cache) return cache;
   try {
     const v = JSON.parse(localStorage.getItem(KEY) || "null");
-    cache = v && typeof v === "object" ? { ...bos(), ...v } : bos();
+    if (v && typeof v === "object") {
+      cache = v.v === SURUM
+        ? { ...bos(), ...v }
+        : { ...bos(), bookings: Array.isArray(v.bookings) ? v.bookings : [] };
+    } else cache = bos();
   } catch { cache = bos(); }
   return cache;
 }
 function write(next) {
-  cache = next;
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* yoksay */ }
+  cache = { ...next, v: SURUM };
+  try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* yoksay */ }
   for (const l of listeners) l();
 }
 function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
@@ -159,10 +199,10 @@ export function useAdSlots() {
 
 // ─── Fiyat ───────────────────────────────────────────────────────────────
 
-/** Yürürlükteki fiyat: yönetici değiştirdiyse o, yoksa katalog varsayılanı. */
+/** Yürürlükteki GÜNLÜK fiyat: yönetici değiştirdiyse o, yoksa katalog. */
 export function priceOf(streamKey, state = read()) {
   const ozel = state.prices?.[streamKey];
-  return Number.isFinite(ozel) ? ozel : (AD_PRODUCTS[streamKey]?.defaultPrice ?? 0);
+  return Number.isFinite(ozel) ? ozel : (AD_PRODUCTS[streamKey]?.dailyPrice ?? 0);
 }
 
 /**
@@ -233,36 +273,57 @@ export function activeBookings(streamKey, dayISO = today(), state = read()) {
  * yolu (`requestBooking`) buradan geçiyor. Kural arayüzde tekrarlansaydı
  * işletmeye "alabilirsin" deyip yönetici tarafında reddedilirdi.
  */
-export function canBook(streamKey, restaurantId, startISO, state = read()) {
+export function canBook(streamKey, restaurantId, startISO, days = 1, state = read()) {
   const p = AD_PRODUCTS[streamKey];
   if (!p) return { ok: false, reason: "Bilinmeyen reklam kalemi." };
   if (!startISO) return { ok: false, reason: "Başlangıç tarihi seçilmedi." };
   if (startISO < today()) return { ok: false, reason: "Geçmiş bir tarih seçilemez." };
 
+  const n = clampDays(streamKey, days);
+  if (Number(days) > p.maxDays) {
+    return { ok: false, reason: `En fazla ${p.maxDays} gün seçilebilir.` };
+  }
+
   const start = startISO;
-  const end = endOf(streamKey, startISO);
+  const end = endOf(streamKey, startISO, n);
+  const gunler = rangeOf(streamKey, startISO, n);
   const kendi = bookingsFor(streamKey, state)
     .filter(b => TUTAN.has(b.status) && String(b.restaurantId) === String(restaurantId));
 
-  // ── Restoran başına sıklık ──
+  // ── Aynı restoran kendi aralığıyla çakışamaz ──
+  // Ürün havuz olsa bile bir restoranın aynı günü iki kez alması anlamsız:
+  // ikinci kayıt aynı yayını ikinci kez faturalardı.
+  const kendiCakisan = kendi.find(b => overlaps(start, end, b.start, b.end));
+  if (kendiCakisan) {
+    return { ok: false, reason: `${prettyDay(kendiCakisan.start)} – ${prettyDay(kendiCakisan.end)} aralığında zaten kaydınız var.` };
+  }
+
+  // ── Aylık sıklık (banner, ödüllü video) ──
   if (p.limit.month != null) {
     const ay = monthKey(startISO);
-    const n = kendi.filter(b => monthKey(b.start) === ay).length;
-    if (n >= p.limit.month) {
+    const adet = kendi.filter(b => monthKey(b.start) === ay).length;
+    if (adet >= p.limit.month) {
       return { ok: false, reason: `Bu kalem ayda ${p.limit.month} kez alınabilir. ${ay} için zaten bir kaydınız var.` };
     }
   }
-  if (p.limit.day != null) {
-    const n = kendi.filter(b => b.start === startISO).length;
-    if (n >= p.limit.day) {
-      return { ok: false, reason: `Aynı gün en fazla ${p.limit.day} gönderim alınabilir.` };
+
+  // ── Haftalık GÜN sınırı (push) ──
+  // Gün sayısı üzerinden çünkü push'ta bir gün bir gönderim: üç günlük bir
+  // rezervasyon üç gönderim demek. Rezervasyon SAYISINI saymak, tek kayıtla
+  // yedi gönderim almanın önünü açardı.
+  if (p.limit.weekDays != null) {
+    const haftaya = {};
+    for (const g of gunler) haftaya[weekKey(g)] = (haftaya[weekKey(g)] || 0) + 1;
+    for (const b of kendi) {
+      for (const g of rangeOf(streamKey, b.start, gunFarki(b.start, b.end) + 1)) {
+        const h = weekKey(g);
+        if (h in haftaya) haftaya[h] += 1;
+      }
     }
-  }
-  if (p.limit.week != null) {
-    const h = weekKey(startISO);
-    const n = kendi.filter(b => weekKey(b.start) === h).length;
-    if (n >= p.limit.week) {
-      return { ok: false, reason: `Haftada en fazla ${p.limit.week} gönderim alınabilir. Bu hafta doldu.` };
+    for (const [h, adet] of Object.entries(haftaya)) {
+      if (adet > p.limit.weekDays) {
+        return { ok: false, reason: `Haftada en fazla ${p.limit.weekDays} gün alınabilir (${prettyDay(h)} haftası doldu).` };
+      }
     }
   }
 
@@ -274,27 +335,30 @@ export function canBook(streamKey, restaurantId, startISO, state = read()) {
       return {
         ok: false,
         reason: cakisan.status === "approved"
-          ? `${cakisan.start} – ${cakisan.end} aralığı dolu.`
-          : `${cakisan.start} – ${cakisan.end} aralığı başka bir talep için tutuluyor.`,
+          ? `${prettyDay(cakisan.start)} – ${prettyDay(cakisan.end)} aralığı dolu.`
+          : `${prettyDay(cakisan.start)} – ${prettyDay(cakisan.end)} aralığı başka bir talep için tutuluyor.`,
       };
     }
   }
 
-  return { ok: true, start, end };
+  return { ok: true, start, end, days: n };
 }
 
 /** İşletmenin talebi. Her zaman `pending` doğar — onay kapısı burada. */
-export function requestBooking({ streamKey, restaurantId, restaurantName, start, note = "" }) {
+export function requestBooking({ streamKey, restaurantId, restaurantName, start, days = 1, note = "" }) {
   const state = read();
-  const kontrol = canBook(streamKey, restaurantId, start, state);
+  const kontrol = canBook(streamKey, restaurantId, start, days, state);
   if (!kontrol.ok) throw new Error(kontrol.reason);
+  const gunluk = priceOf(streamKey, state);
   const kayit = {
     id: `bk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     streamKey, restaurantId, restaurantName,
-    start: kontrol.start, end: kontrol.end,
+    start: kontrol.start, end: kontrol.end, days: kontrol.days,
     // Fiyat REZERVASYON ANINDA donuyor; sonradan liste fiyatı değişse de
-    // bu yayının bedeli değişmez.
-    priceMinor: priceOf(streamKey, state),
+    // bu yayının bedeli değişmez. Günlüğü de saklıyoruz ki "kaç günden
+    // kaça" sorusu sonradan cevaplanabilsin.
+    dailyMinor: gunluk,
+    priceMinor: gunluk * kontrol.days,
     status: "pending", reason: null, note,
     by: "owner",
     at: new Date().toISOString(), decidedAt: null,
@@ -304,15 +368,17 @@ export function requestBooking({ streamKey, restaurantId, restaurantName, start,
 }
 
 /** Yöneticinin doğrudan yerleştirmesi — talep turu olmadan onaylı doğar. */
-export function adminBook({ streamKey, restaurantId, restaurantName, start, note = "" }) {
+export function adminBook({ streamKey, restaurantId, restaurantName, start, days = 1, note = "" }) {
   const state = read();
-  const kontrol = canBook(streamKey, restaurantId, start, state);
+  const kontrol = canBook(streamKey, restaurantId, start, days, state);
   if (!kontrol.ok) throw new Error(kontrol.reason);
+  const gunluk = priceOf(streamKey, state);
   const kayit = {
     id: `bk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     streamKey, restaurantId, restaurantName,
-    start: kontrol.start, end: kontrol.end,
-    priceMinor: priceOf(streamKey, state),
+    start: kontrol.start, end: kontrol.end, days: kontrol.days,
+    dailyMinor: gunluk,
+    priceMinor: gunluk * kontrol.days,
     status: "approved", reason: null, note,
     by: "admin",
     at: new Date().toISOString(), decidedAt: new Date().toISOString(),

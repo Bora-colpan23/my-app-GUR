@@ -13,7 +13,7 @@ import { useCreatives, SLOTS, listFor, addCreative, removeCreative, toggleLive, 
 import { TEMPLATE_COLUMNS, templateHeaderLine, downloadTemplate, parseRestaurantFile } from '../lib/import-restaurants.js';
 import {
   AD_PRODUCTS, AD_KEYS, useAdSlots, priceOf, setPrice, adminBook, decideBooking,
-  pendingBookings, pendingBookingCount, dayState, monthGrid, endOf, prettyDay,
+  pendingBookings, pendingBookingCount, dayState, monthGrid, endOf, prettyDay, gunFarki,
   today as adToday, WEEKDAYS_TR as AD_WEEKDAYS, MONTHS_TR as AD_MONTHS,
 } from '../lib/adslots.js';
 import {
@@ -1979,6 +1979,7 @@ function AdCalendarPage({ restaurants = [], query = '' }) {
   const [fiyatDuzenle, setFiyatDuzenle] = useState(null);
   const [fiyatTaslak, setFiyatTaslak] = useState('');
   const [yerlestir, setYerlestir] = useState(null);   // { start }
+  const [yerGun, setYerGun] = useState(1);
   const [secilenRest, setSecilenRest] = useState('');
   const [hata, setHata] = useState('');
 
@@ -2001,8 +2002,9 @@ function AdCalendarPage({ restaurants = [], query = '' }) {
     try {
       const r = musteriler.find(x => String(x.id) === String(secilenRest));
       if (!r) { setHata('Restoran seçilmedi.'); return; }
-      adminBook({ streamKey: urun, restaurantId: r.id, restaurantName: r.name, start: yerlestir.start });
-      setYerlestir(null); setSecilenRest(''); setHata('');
+      adminBook({ streamKey: urun, restaurantId: r.id, restaurantName: r.name,
+        start: yerlestir.start, days: yerGun });
+      setYerlestir(null); setYerGun(1); setSecilenRest(''); setHata('');
     } catch (e) { setHata(e.message || 'Yerleştirilemedi.'); }
   };
 
@@ -2024,7 +2026,7 @@ function AdCalendarPage({ restaurants = [], query = '' }) {
                 <div style={{ fontSize: 15, fontWeight: 800, ...NUM }}>
                   {money(priceOf(k, durum))}
                 </div>
-                <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>/ {pr.unit}</div>
+                <div style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>/ gün · en fazla {pr.maxDays} gün</div>
               </div>
               <Btn label="Fiyatı değiştir" size="sm" variant="outline"
                 onClick={() => { setFiyatDuzenle(k); setFiyatTaslak(String(priceOf(k, durum))); }} />
@@ -2033,8 +2035,9 @@ function AdCalendarPage({ restaurants = [], query = '' }) {
         })}
         <div style={{ padding: '11px 18px', borderTop: `1px solid ${C.border}`,
           fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.55 }}>
-          Fiyat değişikliği <b>geçmişe işlemez</b>: her rezervasyon kendi bedelini
-          talep anında donduruyor.
+          Fiyatlar <b>günlük</b>. Bedel = günlük fiyat × seçilen gün. Fiyat
+          değişikliği <b>geçmişe işlemez</b>: her rezervasyon kendi günlük
+          bedelini talep anında donduruyor.
         </div>
       </section>
 
@@ -2049,7 +2052,7 @@ function AdCalendarPage({ restaurants = [], query = '' }) {
                 <div style={{ fontSize: 13.5, fontWeight: 700 }}>{b.restaurantName || adOf(b.restaurantId)}</div>
                 <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
                   {AD_PRODUCTS[b.streamKey]?.name || b.streamKey} · {prettyDay(b.start)}
-                  {b.start !== b.end ? ` – ${prettyDay(b.end)}` : ''} · {money(b.priceMinor)}
+                  {b.start !== b.end ? ` – ${prettyDay(b.end)}` : ''} · {(b.days ?? gunFarki(b.start, b.end) + 1)} gün · {money(b.priceMinor)}
                 </div>
               </div>
               <Btn label="Onayla" size="sm" variant="filled" tone="green"
@@ -2145,17 +2148,29 @@ function AdCalendarPage({ restaurants = [], query = '' }) {
       {fiyatDuzenle && (
         <Modal onClose={() => setFiyatDuzenle(null)}
           title={`${AD_PRODUCTS[fiyatDuzenle].name} — fiyat`}
-          subtitle={`Birim: ${AD_PRODUCTS[fiyatDuzenle].unit}. Yeni fiyat yalnızca bundan sonraki taleplere uygulanır.`}>
-          <AdminField label="Fiyat (₺)" value={fiyatTaslak} onChange={setFiyatTaslak} autoFocus onEnter={kaydetFiyat} />
+          subtitle={`GÜNLÜK fiyat. ${AD_PRODUCTS[fiyatDuzenle].maxDays} güne kadar seçilebiliyor, bedel gün sayısıyla çarpılıyor. Yeni fiyat yalnızca bundan sonraki taleplere uygulanır.`}>
+          <AdminField label="Günlük fiyat (₺)" value={fiyatTaslak} onChange={setFiyatTaslak} autoFocus onEnter={kaydetFiyat} />
           <Btn label="Kaydet" variant="filled" tone="orange" fullWidth onClick={kaydetFiyat} />
         </Modal>
       )}
 
       {/* Yönetici yerleştirmesi */}
       {yerlestir && (
-        <Modal onClose={() => { setYerlestir(null); setHata(''); }}
+        <Modal onClose={() => { setYerlestir(null); setYerGun(1); setHata(''); }}
           title="Takvime yerleştir"
-          subtitle={`${p.name} · ${prettyDay(yerlestir.start)}${p.days > 1 ? ` – ${prettyDay(endOf(urun, yerlestir.start))}` : ''} · ${money(priceOf(urun, durum))}`}>
+          subtitle={`${p.name} · ${prettyDay(yerlestir.start)}${yerGun > 1 ? ` – ${prettyDay(endOf(urun, yerlestir.start, yerGun))}` : ''} · ${money(priceOf(urun, durum))} × ${yerGun} = ${money(priceOf(urun, durum) * yerGun)}`}>
+          <div style={{ marginBottom: 14 }}>
+            <label htmlFor="ad-gun" style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: C.dim, marginBottom: 6 }}>
+              Gün sayısı (en fazla {p.maxDays})
+            </label>
+            <select id="ad-gun" value={yerGun} onChange={e => { setYerGun(Number(e.target.value)); setHata(''); }}
+              style={{ width: '100%', height: 40, background: C.bg, border: `1px solid ${C.border}`,
+                borderRadius: 10, padding: '0 10px', color: C.text, fontFamily: FB, fontSize: 16, outline: 'none' }}>
+              {Array.from({ length: p.maxDays }, (_, k) => k + 1).map(n => (
+                <option key={n} value={n}>{n} gün</option>
+              ))}
+            </select>
+          </div>
           <div style={{ marginBottom: 14 }}>
             <label htmlFor="ad-rest" style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: C.dim, marginBottom: 6 }}>Restoran</label>
             <select id="ad-rest" value={secilenRest} onChange={e => { setSecilenRest(e.target.value); setHata(''); }}

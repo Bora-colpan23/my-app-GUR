@@ -1634,6 +1634,11 @@ function ReviewGate({ restaurant, onReview, onVerifyLocation, compact = false })
   const [tick, setTick] = useState(0);
   useEffect(() => visits.subscribeVisits(() => setTick(t => t + 1)), []);
   const unlocked = tick >= 0 && visits.reviewPermission(restaurant.id).allowed;
+  // Takip durumu doğrudan geo'dan okunuyor, prop olarak inmiyor: iki ayrı
+  // ekran (kart sayfası ve tam detay) aynı bileşeni çiziyor ve prop
+  // zincirinde birini güncellemeyi unutmak iki ekranın farklı şey
+  // söylemesi demekti. Cihaz izni varsa ziyaret takibi zaten çalışıyor.
+  const tracking = geo.useUserLocation().source === "device";
 
   return (
     <div style={{
@@ -1650,11 +1655,29 @@ function ReviewGate({ restaurant, onReview, onVerifyLocation, compact = false })
       <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-muted)", lineHeight: 1.5, margin: "0 0 10px" }}>
         {unlocked
           ? "Bu mekânda geçirdiğin zaman doğrulandı; yorumun “Konumla doğrulandı” rozetiyle yayınlanır."
-          : "Mekânda en az 15 dakika kaldığında yorum alanı kendiliğinden açılır ve yorumun doğrulanmış sayılır."}
+          : tracking
+            ? "Konum iznin açık. Bu mekânda 15 dakika dolunca yorum alanı kendiliğinden açılır — bir şey yapmana gerek yok."
+            : "Mekânda en az 15 dakika kaldığında yorum alanı kendiliğinden açılır ve yorumun doğrulanmış sayılır."}
       </p>
-      {unlocked
-        ? <Btn text="Deneyimini yaz" onClick={onReview} variant="filled" size="md" />
-        : <Btn text="Buradayım, konumumu doğrula" onClick={() => onVerifyLocation?.(restaurant)} variant="outlineDark" size="md" />}
+      {unlocked ? (
+        <Btn text="Deneyimini yaz" onClick={onReview} variant="filled" size="md" />
+      ) : tracking ? (
+        // İzin zaten verilmiş: "konumumu doğrula" demek kullanıcıya
+        // vermiş olduğu izni tekrar istemek olurdu. Onun yerine durum
+        // yazılıyor; önizlemede test edilebilsin diye demo yolu düz bir
+        // bağlantı olarak duruyor.
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Icon n="check" size={13} color="var(--c-ok-ink)" />
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-ok-ink)" }}>
+            Konumun izleniyor
+          </span>
+          <div style={{ flex: 1 }} />
+          <Btn text="Demo: buradayım" onClick={() => onVerifyLocation?.(restaurant)}
+            variant="plainDark" size="sm" fullWidth={false} />
+        </div>
+      ) : (
+        <Btn text="Buradayım, konumumu doğrula" onClick={() => onVerifyLocation?.(restaurant)} variant="outlineDark" size="md" />
+      )}
     </div>
   );
 }
@@ -1666,8 +1689,12 @@ function ReviewGate({ restaurant, onReview, onVerifyLocation, compact = false })
 // zorunda. Sağlayıcı anahtarı tanımlı değilken örnek satırlar gösteriliyor
 // ve "örnek" etiketiyle işaretleniyor — Google yorumu gibi sunulmuyor.
 // ═══════════════════════════════════════════════
-function ExternalReviews({ reviews = [], restaurant, loading }) {
+function ExternalReviews({ reviews = [], photos = [], restaurant, loading }) {
   const [open, setOpen] = useState(false);
+  const [buyut, setBuyut] = useState(null);
+  // Açıkken HEPSİ çiziliyor ve liste KENDİ İÇİNDE kayıyor: eskiden
+  // "2 yorum daha" sayfayı uzatıyordu ve sekiz yorumda detay sayfası
+  // yorumlardan ibaret kalıyordu. Kapalıyken ilk iki yorum görünür.
   const shown = open ? reviews : reviews.slice(0, 2);
   const sample = reviews.length > 0 && reviews.every(r => r.provider !== "google_places");
   const mapsUrl = placeUrl({ name: restaurant.name, address: restaurant.addr, lat: restaurant.lat, lng: restaurant.lng }, "google");
@@ -1710,6 +1737,10 @@ function ExternalReviews({ reviews = [], restaurant, loading }) {
         </p>
       ) : (
         <>
+        <div data-yorum-kutusu={open ? "acik" : "kapali"} style={open ? {
+          maxHeight: 260, overflowY: "auto", overscrollBehavior: "contain",
+          borderTop: "1px solid rgba(0,0,0,0.05)", borderBottom: "1px solid rgba(0,0,0,0.05)",
+        } : undefined}>
           {shown.map((rv, i) => (
             <div key={i} style={{ padding: "10px 0", borderBottom: i < shown.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -1725,6 +1756,7 @@ function ExternalReviews({ reviews = [], restaurant, loading }) {
               <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "var(--c-muted)" }}>{rv.relative_time || ""}</span>
             </div>
           ))}
+        </div>
           {reviews.length > 2 && (
             <button type="button" className="gur-btn" onClick={() => setOpen(o => !o)}
               style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-brand-ink)" }}>
@@ -1733,6 +1765,60 @@ function ExternalReviews({ reviews = [], restaurant, loading }) {
           )}
         </>
       )}
+
+      {/* ─── DIŞ KAYNAK GÖRSELLERİ ───
+          Google Places'ten gelen mekan fotoğrafları (ve varsa videolar).
+          Sunucu bunları zaten döndürüyordu ama istemci cephesi alanı
+          DÜŞÜRÜYORDU — arayüze hiç ulaşmıyorlardı (bkz. lib/backend.js →
+          loadRestaurantDetail). Yatay şerit: dikey listeye koymak
+          yorumları aşağı itiyordu. */}
+      {photos.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "var(--c-muted)", margin: "0 0 7px" }}>
+            Google Haritalar görselleri
+          </p>
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", overscrollBehavior: "contain", paddingBottom: 4 }}>
+            {photos.map((f, i) => (
+              <button key={i} type="button" onClick={() => setBuyut(f)}
+                aria-label={`${restaurant.name} görseli ${i + 1} — büyüt`}
+                style={{ flexShrink: 0, width: 108, height: 80, borderRadius: 12, overflow: "hidden",
+                  border: "1px solid var(--c-border)", padding: 0, cursor: "pointer", background: "#EFE9E2",
+                  position: "relative", outline: "none" }}>
+                {f.video ? (
+                  <>
+                    <video src={f.url} muted playsInline preload="metadata"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <span aria-hidden style={{ position: "absolute", inset: 0, display: "flex",
+                      alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.28)" }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><polygon points="6 3 20 12 6 21" /></svg>
+                    </span>
+                  </>
+                ) : (
+                  <img src={f.url} alt="" loading="lazy" decoding="async"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Büyütme — görsel de video da tam boy. */}
+      <AnimatePresence>
+        {buyut && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setBuyut(null)}
+            role="dialog" aria-modal="true" aria-label="Görsel önizleme"
+            style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(8,6,4,0.88)",
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+            {buyut.video
+              ? <video src={buyut.url} controls autoPlay playsInline
+                  style={{ maxWidth: "100%", maxHeight: "80vh", borderRadius: 14, background: "#000" }} />
+              : <img src={buyut.url} alt="" style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderRadius: 14 }} />}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <button type="button" className="gur-btn"
         onClick={() => window.open(mapsUrl, "_blank", "noopener,noreferrer")}
@@ -1991,7 +2077,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
             ))}
           </div>
 
-          <ExternalReviews reviews={detail?.externalReviews || []} restaurant={r} loading={!detail} />
+          <ExternalReviews reviews={detail?.externalReviews || []} photos={detail?.externalPhotos || []} restaurant={r} loading={!detail} />
 
           {/* Yorum kapısı — uygulamanın her yerinde aynı bileşen */}
           <div style={{ marginBottom: 16 }}>
@@ -3075,7 +3161,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           {/* Google Haritalar yorumları ve yorum kapısı — kart detayıyla
               birebir aynı bileşenler, aynı kural. */}
           <div style={{ padding: "0 16px", marginBottom: 18 }}>
-            <ExternalReviews reviews={detail?.externalReviews || []} restaurant={r} loading={!detail} />
+            <ExternalReviews reviews={detail?.externalReviews || []} photos={detail?.externalPhotos || []} restaurant={r} loading={!detail} />
             <ReviewGate restaurant={r} onReview={() => setComposing(true)} onVerifyLocation={onVerifyLocation} />
           </div>
 
@@ -3950,7 +4036,20 @@ export default function GurApp(props = {}) {
   };
 
   // Konum doğrulamalı ziyaret. İzin alınana kadar hiçbir konum okunmaz.
-  const [locationOn, setLocationOn] = useState(false);
+  //
+  // İKİ KAPI VARDI, BİRLEŞTİRİLDİ. Girişten sonraki konum ekranında
+  // "Konumumu kullan" diyen kullanıcı tarayıcı iznini zaten veriyordu ama
+  // o izin yalnızca `geo`ya (deste sıralaması, konum çipi) gidiyordu;
+  // ziyaret takibini açan bayrak ayrıydı ve yalnızca "Buradayım, konumumu
+  // doğrula" düğmesinden açılıyordu. Sonuç: izin verilmiş olmasına rağmen
+  // takip hiç başlamıyor, düğme her mekânda çıkmaya devam ediyordu.
+  //
+  // Artık CİHAZ izni varsa (`source === "device"`) takip kendiliğinden
+  // başlıyor. Elle açma yolu duruyor: ilçesini elle seçmiş ya da izni
+  // reddetmiş kullanıcı oradan izin verebilmeli.
+  const [locationManual, setLocationManual] = useState(false);
+  const userLoc = geo.useUserLocation();
+  const locationOn = locationManual || userLoc.source === "device";
   const [rationale, setRationale] = useState(null);   // doğrulanacak restoran
   const [visitPrompt, setVisitPrompt] = useState(null);
   const [reservationNotice, setReservationNotice] = useState(null);
@@ -4059,7 +4158,7 @@ export default function GurApp(props = {}) {
     if (!locationOn) return;
     return visits.watchLocation(
       sample => backend.pushLocationSample(feed, sample),
-      () => setLocationOn(false)          // izin geri alındıysa sessizce dur
+      () => setLocationManual(false)      // izin geri alındıysa sessizce dur
     );
   }, [locationOn, feed]);
 
@@ -4115,7 +4214,10 @@ export default function GurApp(props = {}) {
   // Gerçek konum yoksa (önizleme, izin reddi) demo doğrulaması akışı kurtarır.
   const verifyLocation = (restaurant) => setRationale(restaurant || true);
   const allowLocation = () => {
-    setLocationOn(true);
+    setLocationManual(true);
+    // Cihaz iznini de iste: elle açan kullanıcı konum çipini ve deste
+    // sıralamasını da kazansın — aynı izin, iki ayrı fayda.
+    geo.requestLocation();
     setRationale(null);
   };
   const demoVerify = () => {

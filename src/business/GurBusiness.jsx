@@ -43,7 +43,7 @@ import { useCreatives, promoFor, isVideo as promoIsVideo } from '../lib/creative
 import {
   AD_PRODUCTS, isFixedPrice, useAdSlots, priceOf, canBook, requestBooking,
   cancelBooking, bookingsOfRestaurant, dayState, monthGrid, today, endOf,
-  prettyDay, WEEKDAYS_TR, MONTHS_TR as AY_ADLARI,
+  prettyDay, gunFarki, WEEKDAYS_TR, MONTHS_TR as AY_ADLARI,
 } from '../lib/adslots.js';
 import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
@@ -902,6 +902,7 @@ function SlotBooking({ streamKey, restaurant }) {
   const [acik, setAcik] = useState(false);
   const [ay, setAy] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [secili, setSecili] = useState(null);
+  const [gun, setGun] = useState(1);          // kaç gün — 1..maxDays
   const [hata, setHata] = useState("");
 
   if (!p || !restaurant) return null;
@@ -918,14 +919,16 @@ function SlotBooking({ streamKey, restaurant }) {
   const gonder = () => {
     try {
       requestBooking({
-        streamKey, restaurantId: restaurant.id, restaurantName: restaurant.name, start: secili,
+        streamKey, restaurantId: restaurant.id, restaurantName: restaurant.name,
+        start: secili, days: gun,
       });
-      setSecili(null); setAcik(false); setHata("");
+      setSecili(null); setGun(1); setAcik(false); setHata("");
       haptic(14);
     } catch (e) { setHata(e.message || "Talep gönderilemedi."); }
   };
 
-  const kontrol = secili ? canBook(streamKey, restaurant.id, secili, durum) : null;
+  const kontrol = secili ? canBook(streamKey, restaurant.id, secili, gun, durum) : null;
+  const toplam = fiyat * gun;
 
   return (
     <div>
@@ -939,7 +942,7 @@ function SlotBooking({ streamKey, restaurant }) {
         <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
           <Icon n="check" size={14} color="var(--c-ok-light)" />
           <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-ok-light)" }}>
-            {prettyDay(b.start)}{p.days > 1 ? ` – ${prettyDay(b.end)}` : ""} · yayında
+            {prettyDay(b.start)}{b.end !== b.start ? ` – ${prettyDay(b.end)}` : ""} · {(b.days ?? gunFarki(b.start, b.end) + 1)} gün · yayında
           </span>
         </div>
       ))}
@@ -948,7 +951,7 @@ function SlotBooking({ streamKey, restaurant }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <Icon n="clock" size={14} color="var(--c-warn-light)" />
           <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-warn-light)" }}>
-            {prettyDay(bekleyen.start)}{p.days > 1 ? ` – ${prettyDay(bekleyen.end)}` : ""} · onay bekliyor
+            {prettyDay(bekleyen.start)}{bekleyen.end !== bekleyen.start ? ` – ${prettyDay(bekleyen.end)}` : ""} · {(bekleyen.days ?? gunFarki(bekleyen.start, bekleyen.end) + 1)} gün · onay bekliyor
           </span>
           <Btn text="Vazgeç" onClick={() => cancelBooking(bekleyen.id)} variant="plainDark" size="sm" fullWidth={false} />
         </div>
@@ -976,19 +979,19 @@ function SlotBooking({ streamKey, restaurant }) {
             ))}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
-            {hucreler.map((gun, i) => {
-              if (!gun) return <div key={`b${i}`} />;
-              const d = dayState(streamKey, gun, durum);
-              const gecmis = gun < bugun;
-              const secim = gun === secili;
+            {hucreler.map((gunISO, i) => {
+              if (!gunISO) return <div key={`b${i}`} />;
+              const d = dayState(streamKey, gunISO, durum);
+              const gecmis = gunISO < bugun;
+              const secim = gunISO === secili;
               // Seçilen aralığın tamamı vurgulanıyor: kullanıcı yalnız
               // başlangıcı seçiyor ama kaç gün tutacağını görmeli.
-              const aralikta = secili && gun >= secili && gun <= endOf(streamKey, secili);
+              const aralikta = secili && gunISO >= secili && gunISO <= endOf(streamKey, secili, gun);
               const kapali = gecmis || (p.exclusive && d.status !== "free");
               return (
-                <button key={gun} type="button" disabled={kapali}
-                  onClick={() => { setSecili(gun); setHata(""); }}
-                  title={kapali ? (gecmis ? "Geçmiş tarih" : "Dolu") : gun}
+                <button key={gunISO} type="button" disabled={kapali}
+                  onClick={() => { setSecili(gunISO); setHata(""); }}
+                  title={kapali ? (gecmis ? "Geçmiş tarih" : "Dolu") : gunISO}
                   style={{
                     aspectRatio: "1", borderRadius: 8, border: secim ? "2px solid #FF6600" : "1px solid rgba(255,255,255,0.08)",
                     background: aralikta ? "rgba(255,102,0,0.35)"
@@ -998,7 +1001,7 @@ function SlotBooking({ streamKey, restaurant }) {
                     color: kapali ? "rgba(255,255,255,0.25)" : "#fff",
                     fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700,
                     cursor: kapali ? "not-allowed" : "pointer", padding: 0, outline: "none",
-                  }}>{Number(gun.slice(-2))}</button>
+                  }}>{Number(gunISO.slice(-2))}</button>
               );
             })}
           </div>
@@ -1015,11 +1018,32 @@ function SlotBooking({ streamKey, restaurant }) {
 
           {secili && (
             <div style={{ marginTop: 11, paddingTop: 11, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+              {/* Gün sayısı: fiyat günlük, süreyi işletme seçiyor. Kurala
+                  takılan gün sayısı pasif çizilmiyor — basılınca SEBEBİ
+                  yazılıyor. Sessizce tıklanamayan bir düğme "bozuk" diye
+                  okunuyordu. */}
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.5)", margin: "0 0 7px" }}>
+                Kaç gün? (en fazla {p.maxDays})
+              </p>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
+                {Array.from({ length: p.maxDays }, (_, k) => k + 1).map(n => {
+                  const secimi = n === gun;
+                  return (
+                    <button key={n} type="button" onClick={() => { setGun(n); setHata(""); }}
+                      style={{
+                        minWidth: 34, height: 32, borderRadius: 9, cursor: "pointer", outline: "none",
+                        border: secimi ? "2px solid #FF6600" : "1px solid rgba(255,255,255,0.12)",
+                        background: secimi ? "rgba(255,102,0,0.22)" : "rgba(255,255,255,0.04)",
+                        color: "#fff", fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700,
+                      }}>{n}</button>
+                  );
+                })}
+              </div>
               <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.65)", margin: "0 0 4px" }}>
-                {prettyDay(secili)}{p.days > 1 ? ` – ${prettyDay(endOf(streamKey, secili))}` : ""}
+                {prettyDay(secili)}{gun > 1 ? ` – ${prettyDay(endOf(streamKey, secili, gun))}` : ""}
               </p>
               <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#FF9A4D", margin: "0 0 10px" }}>
-                ₺{fiyat.toLocaleString("tr")} / {p.unit}
+                ₺{fiyat.toLocaleString("tr")} × {gun} gün = ₺{toplam.toLocaleString("tr")}
               </p>
               {kontrol && !kontrol.ok && (
                 <p role="status" style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-bad-light)", margin: "0 0 10px", lineHeight: 1.45 }}>{kontrol.reason}</p>
@@ -1034,7 +1058,7 @@ function SlotBooking({ streamKey, restaurant }) {
           )}
 
           <div style={{ marginTop: 10 }}>
-            <Btn text="Kapat" onClick={() => { setAcik(false); setSecili(null); }} variant="plainDark" size="sm" fullWidth={false} />
+            <Btn text="Kapat" onClick={() => { setAcik(false); setSecili(null); setGun(1); }} variant="plainDark" size="sm" fullWidth={false} />
           </div>
         </div>
       )}
@@ -1080,7 +1104,7 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
         <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: gold ? "#F6E6A8" : "#fff", margin: 0 }}>{title}</p>
         <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: gold ? "#E9C456" : "#FF9A4D", flexShrink: 0 }}>
           {sabit
-            ? `₺${priceOf(streamKey, slotDurum).toLocaleString("tr")} / ${AD_PRODUCTS[streamKey].unit}`
+            ? `₺${priceOf(streamKey, slotDurum).toLocaleString("tr")} / gün`
             : price}
         </span>
       </div>

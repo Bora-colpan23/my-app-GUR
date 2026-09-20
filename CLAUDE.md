@@ -530,6 +530,22 @@ duruyor. Çipin üst satırı durumu söyler: "Konumun" / "Seçtiğin ilçe" /
 
 Ham koordinat hiçbir yere gönderilmez; ekran da bunu yazar.
 
+**Konum izni TEK KAPI — ziyaret takibi kendiliğinden başlar.** Önceden iki
+ayrı bayrak vardı: girişten sonraki konum ekranında "Konumumu kullan" diyen
+kullanıcı tarayıcı iznini zaten veriyordu ama o izin yalnızca `geo`ya
+(deste sıralaması, konum çipi) gidiyordu; ziyaret takibini açan bayrak
+ayrıydı ve yalnızca detay sayfasındaki "Buradayım, konumumu doğrula"
+düğmesinden açılıyordu. Sonuç: izin verilmiş olmasına rağmen takip hiç
+başlamıyor, düğme her mekânda çıkmaya devam ediyordu.
+
+Artık cihaz izni varsa (`source === "device"`) `watchLocation` kendiliğinden
+çalışıyor ve `ReviewGate` düğme yerine **"Konumun izleniyor"** yazıyor.
+Elle açma yolu duruyor: ilçesini elle seçmiş ya da izni reddetmiş kullanıcı
+oradan izin verebilmeli. `ReviewGate` takip durumunu prop olarak DEĞİL
+doğrudan `geo`dan okuyor — iki ekran (kart sayfası ve tam detay) aynı
+bileşeni çiziyor ve prop zincirinde birini güncellemeyi unutmak ikisinin
+farklı şey söylemesi demekti.
+
 ### Rozetler: bir mekanda birden fazla nişan
 `src/lib/badges.js` altı rozetlik bir katalog taşıyor. **Gastro Onaylı
 kaydın kendi alanı** (`r.gastro`) olarak kalıyor — bağımsız şef
@@ -716,7 +732,7 @@ seviyesinde zorlanıyor — uygulama katmanında kontrol yarış koşulunda yetm
 
 | | Kalemler | Fiyat | İşletme ne yapıyor |
 |---|---|---|---|
-| **Sabit** | banner, ödüllü video, push | listede yazar, yönetici günceller | takvimden tarih seçer |
+| **Sabit** | banner, ödüllü video, push | **günlük**, listede yazar, yönetici günceller | takvimden tarih + 1–7 gün seçer |
 | **Pazarlıklı** | Gastro paketi, İkinci Şans, anlık fırsat | müşteriye özel | teklif ister |
 
 Reklam envanterinin fiyatı müşteriye göre değişmiyor: bir haftalık banner
@@ -859,27 +875,45 @@ telefonda anlaşılan bir yayın için işletmeye talep açtırmak boş bir tur
 olurdu. Kota ve doluluk kuralları yöneticiye de uygulanıyor — kendi koyduğu
 kuralı delebilmesi, kuralı kural olmaktan çıkarırdı.
 
-| Kalem | Fiyat | Süre | Restoran başına | Envanter |
+**FİYAT BİRİMİ GÜN.** Üçünde de bedel `günlük fiyat × seçilen gün`.
+Önceden her ürünün süresi sabitti ve birimi ayrıydı (hafta / ay / gönderim);
+"ayda 1 kez alınır ama 30 gün kalır" cümlesi kotayla süreyi aynı yere
+yazıyordu. Tek birim, tek çarpma.
+
+| Kalem | Günlük | Süre | Restoran başına | Envanter |
 |---|---|---|---|---|
-| Keşfet banner'ı | ₺2.400 / hafta | 7 gün | ayda 1 | **tek yerleşim** |
-| Ödüllü video | ₺3.100 / ay | 30 gün | ayda 1 | havuz |
-| Push bildirimi | ₺1.800 / gönderim | 1 gün | günde 1, **haftada 3** | havuz |
+| Keşfet banner'ı | ₺350 | 1–7 gün | ayda 1 | **tek yerleşim** |
+| Ödüllü video | ₺105 | 1–7 gün | ayda 1 | havuz |
+| Push bildirimi | ₺1.800 | 1–7 gün | **haftada 3 gün** | havuz |
+
+Günlükler eski fiyatlardan türetildi: 2400/hafta ≈ 343→350, 3100/ay ≈ 103→105,
+1800/gönderim = 1800 (bir gün bir gönderim). Hepsi panelden değişebilir.
+
+**PUSH'TA BİR GÜN = BİR GÖNDERİM.** Üç günlük rezervasyon üç gönderim
+demek, o yüzden haftalık sınır GÜN sayısı üzerinden işliyor (`weekDays: 3`):
+7 gün seçilebilir ama haftada en fazla 3 gün dolar. Rezervasyon SAYISINI
+saymak tek kayıtla yedi gönderim almanın önünü açardı.
 
 **Yalnızca banner exclusive.** Keşfet karuselindeki slayt tek bir yerleşim;
-aynı haftayı iki restorana satmak satılan şeyi ikiye bölerdi ve takvimin
+aynı günü iki restorana satmak satılan şeyi ikiye bölerdi ve takvimin
 doluluk göstermesi de buradan anlam kazanıyor. Ödüllü video ve push HAVUZ:
 ödüllü videoda aynı anda birden çok restoranın videosu yayında olabilir,
 hangisinin oynayacağına yakınlık ve "bu kullanıcı izledi mi" karar veriyor.
-Exclusive yapılsaydı 30 günlük süre yüzünden ayda PLATFORMDA tek restoran
-yayınlayabilirdi ve uygulanacak ikinci bir aday hiç olmazdı.
+Exclusive yapılsaydı uygulanacak ikinci bir aday hiç olmazdı.
+
+**Depo sürümlü** (`v: 2`). Fiyat birimi hafta/ay/gönderimden güne çevrildi;
+kaydedilmiş eski `prices` değeri (2400) günlük sanılsaydı haftalık banner
+yedi katına çıkardı. Sürüm uyuşmazsa fiyatlar atılıyor, rezervasyonlar
+korunuyor — bedelleri zaten donmuş.
 
 **Kota ve doluluk tek karar noktasında**: `canBook`. İşletme paneli,
 yönetici paneli ve yazma yolu üçü de oradan geçiyor. Arayüzde
 tekrarlansaydı panel "alabilirsin" derken yönetici tarafı reddederdi.
 
-**Fiyat rezervasyon anında donuyor** (`priceMinor`). Liste fiyatını
-yükseltmek, aylar önce onaylanmış bir yayının bedelini geriye dönük
-değiştirmemeli.
+**Fiyat rezervasyon anında donuyor** — hem günlüğü (`dailyMinor`) hem
+toplamı (`priceMinor`). Liste fiyatını yükseltmek, aylar önce onaylanmış
+bir yayının bedelini geriye dönük değiştirmemeli; günlüğü de saklıyoruz ki
+"kaç günden kaça" sorusu sonradan cevaplanabilsin.
 
 **Bekleyen talep de slot tutuyor.** Yoksa iki işletme aynı slotu aynı anda
 talep eder ve biri boşuna bekler.
@@ -908,6 +942,20 @@ koyu temada 19 yeni kontrast uyarısı üretti; fark artık renkle.
 Oynatılacak dosya **onay kuyruğundan** geliyor (`media.js` → `ads`,
 onaylı): rezervasyon yayını satın alır, hangi dosyanın oynayacağını onay
 belirler. Onaysız video hiçbir koşulda oynamıyor.
+
+### Dış kaynak yorumları ve görselleri
+Detay sayfasındaki Google bloğunda iki şey var:
+
+- **Yorumlar** açıldığında liste KENDİ İÇİNDE kayıyor (`max-height: 260`).
+  Eskiden "2 yorum daha" sayfayı uzatıyordu ve sekiz yorumda detay sayfası
+  yorumlardan ibaret kalıyordu. Kapalıyken ilk iki yorum görünür.
+- **Görseller** yatay şeritte, tıklanınca tam boy açılıyor; video da
+  destekleniyor. Bunlar sunucudan zaten geliyordu ama istemci cephesi
+  (`lib/backend.js` → `loadRestaurantDetail`) yalnızca `services` ve
+  `externalReviews` alıp `photos` alanını DÜŞÜRÜYORDU — Google Places
+  fotoğrafları arayüze hiç ulaşmıyordu. Artık geçiyor ve
+  `normalizePhotos` sağlayıcı farklarını (`url`/`src`/`photo_url`, video
+  mü değil mi) tek yerde düzleştiriyor.
 
 Banner da aynı mantıkta: Keşfet karuselinde bugüne denk gelen ONAYLI
 rezervasyonun slaytı çıkıyor, görseli işletmenin onaylanmış reklam
