@@ -247,7 +247,12 @@ export function Btn({
   text, onClick, disabled, loading, variant = "onColor", size = "lg",
   fullWidth = true, icon, trailing, count,
 }) {
-  const paddings = { lg: "16px 0", md: "13px 22px", sm: "9px 16px" };
+  // lg'nin yatay dolgusu ESKİDEN 0'dı. Tam genişlikte fark etmiyordu
+  // (hap zaten satırı kaplıyor, yazı ortalı) ama `fullWidth={false}` bir
+  // lg hapta genişlik yazıya göre hesaplanıyor ve hap metnin harflerine
+  // yapışıyordu — "Keşfetmeye Başla" kutunun içinde sıkışık duruyordu.
+  // Üç boyut da artık yatay dolgu taşıyor.
+  const paddings = { lg: "16px 30px", md: "13px 22px", sm: "9px 16px" };
   const fontSizes = { lg: 16, md: 14, sm: 12.5 };
   const chipSizes = { lg: 26, md: 22, sm: 19 };
 
