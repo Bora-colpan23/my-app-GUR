@@ -3,7 +3,7 @@ import { useClaims, decideClaim, useOwnerProfiles, ownerLogo } from '../lib/b2b.
 
 import * as api from '../lib/api.js';
 import { motion, AnimatePresence } from 'motion/react';
-import { isServiceOpen, setServiceOpen, serviceGateReason, usePlatformSettings, toggleSetting, setStoreFeature, setRestaurantHidden, isRestaurantHidden, FEATURES, PER_STORE_FEATURES } from '../lib/platform.js';
+import { isServiceOpen, setServiceOpen, setServiceOpenFor, serviceGateReason, closedServiceCount, usePlatformSettings, toggleSetting, setStoreFeature, setRestaurantHidden, isRestaurantHidden, FEATURES, PER_STORE_FEATURES, SERVICE_GATES } from '../lib/platform.js';
 import * as pricing from '../lib/pricing.js';
 import { ASSIGNABLE, badgesOf, toggleBadge, useBadgeMap } from '../lib/badges.js';
 import { channelOf, inviteOf, sendInvite, useInvites } from '../lib/invites.js';
@@ -97,7 +97,12 @@ const LIGHT = {
   fillNeutralInk: '#ffffff',
 
   // Devre dışı hap: soluklaştırma değil, kendi rengi olan gri hap.
-  offBg: '#E7E9EE', offInk: '#98A0AE', offBorder: '#E0E3E9',
+  // `offInk` #98A0AE iken zemininde 2.17:1 idi ve denetimden
+  // de kaçıyordu: taranan açık tema sayfalarında devre dışı hap yoktu.
+  // Koyu paletin yanında oranı yazılıydı, açık paletin hiç ölçülmemişti.
+  // Soluklaştırma DEĞİL koyultma: "devre dışı" bilgisini gri DOLGU taşıyor
+  // (bkz. "Pasif durumu opacity ile kurma"), yazının okunur olması gerek.
+  offBg: '#E7E9EE', offInk: '#5F6875', offBorder: '#E0E3E9',   /* 4.6:1 */
   // Gelir şeridinin sıcak yıkaması ve grafik ipucu kutusu.
   heroTint: '#FFF6EE',
   tooltipBg: '#17130F',
@@ -726,6 +731,20 @@ function money(n) {
   if (n >= 1000000) return `₺${(n / 1000000).toFixed(2)}M`;
   if (n >= 10000) return `₺${Math.round(n / 1000)}K`;
   return `₺${Math.round(n).toLocaleString('tr')}`;
+}
+
+/**
+ * TAM tutar — kısaltma yok.
+ *
+ * `money()` büyük sayıları kısaltıyor (₺13.200 → "₺13K") ve bu KPI
+ * toplamlarında doğru: oradaki soru "ne mertebede". Ama yöneticinin ELLE
+ * yazdığı bir fiyatta yanlış: ₺13.200 ile ₺13.400 ikisi de "₺13K" okunur,
+ * yazdığın sayıyı ekrandan doğrulayamazsın. Liste fiyatı, teklif tutarı ve
+ * işletmeye görünen rakamlar bu yüzden tam yazılıyor — işletme panelinde de
+ * tam yazıyor, iki taraf aynı sayıyı görmek zorunda.
+ */
+function tamPara(n) {
+  return `₺${Math.round(Number(n) || 0).toLocaleString('tr')}`;
 }
 
 // ─── Mağazanın satın aldığı ücretli özellikler, rozet dizisi ──────────
@@ -3470,6 +3489,10 @@ function StoreFeatures({ restaurant }) {
         );
       })}
     </section>
+
+    {/* Özellik kapılarının hemen altında ama AYRI kart: yukarısı
+        "bu mekanda ne çalışıyor", burası "bu mekana ne satıyoruz". */}
+    <StoreServiceGates restaurant={restaurant} />
     </>
   );
 }
@@ -4255,8 +4278,147 @@ function VenuePoolPage({ restaurants = [], query = '', onOpen }) {
 // Dış beslemeden (Google Places / OSM) gelen mekanların kullanıcı adı da
 // muhatabı da yok; onlara teklif göndermek boşa yazmak olurdu.
 // ═══════════════════════════════════════════════════════════════════════
-function OfferField({ current, offer, onSend }) {
-  const [value, setValue] = useState(String(current || ''));
+/**
+ * PAZARLIKLI KALEMLERİN LİSTE FİYATI.
+ *
+ * Reklam envanterinin sabit fiyatı Reklam Takvimi sayfasında; burası
+ * pazarlıklı üçlünün BAŞLANGIÇ fiyatı. İkisi ayrı sayfada çünkü ayrı
+ * işler: orada takvim ve doluluk var, burada pazarlık.
+ *
+ * Fiyat değişikliği GÖNDERİLMİŞ TEKLİFLERİ bozmuyor (bkz. pricing.js →
+ * setListPrice). Satırda "katalog: ₺X" yazıyor: yöneticinin kendi
+ * değiştirdiği değerle varsayılanı ayırt edebilmesi gerekiyor, yoksa
+ * "bunu ben mi yazdım" sorusunun cevabı yok.
+ */
+function ListPriceCard() {
+  const store = pricing.usePricing();
+  const [taslak, setTaslak] = useState({});     // yazarken tutulan ham metin
+
+  const kaydet = (key) => {
+    const raw = taslak[key];
+    if (raw !== undefined) pricing.setListPrice(key, Number(String(raw).replace(/[^\d]/g, '')));
+    setTaslak(t => { const n = { ...t }; delete n[key]; return n; });
+  };
+
+  return (
+    <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
+      <SectionHead title="Liste fiyatları — pazarlıklı kalemler"
+        right={`${pricing.customListCount(store)} kalem elle belirlendi`} />
+      <div style={{ padding: '11px 18px', fontFamily: FB, fontSize: 12, color: C.dim, lineHeight: 1.55, borderTop: `1px solid ${C.border}` }}>
+        Teklif alanı bu fiyattan başlıyor ve işletme panelinde
+        &ldquo;liste:&rdquo; önekiyle görünüyor — taahhüt değil, pazarlığın
+        başlangıç noktası. Değiştirmek, gönderilmiş tekliflerin tutarını
+        etkilemez.
+      </div>
+      {pricing.NEGOTIATED.map(sv => {
+        const guncel = pricing.listPriceOf(sv.key, store);
+        const ozel = guncel !== sv.price;
+        const deger = taslak[sv.key] !== undefined ? taslak[sv.key] : String(guncel);
+        return (
+          <div key={sv.key} style={{ padding: '13px 18px', borderTop: `1px solid ${C.border}`,
+            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 190 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>{sv.name}</div>
+              <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
+                {ozel ? `katalog: ${tamPara(sv.price)} ${sv.unit}` : 'katalog fiyatında'}
+              </div>
+            </div>
+            {ozel && <Badge text="elle belirlendi" color={C.orangeInk} soft={C.orangeSoft} />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.bg,
+              border: `1px solid ${C.border}`, borderRadius: R.control, padding: '0 12px', height: 38 }}>
+              <span style={{ fontFamily: FB, fontSize: 13, color: C.faint }}>₺</span>
+              <input
+                value={deger}
+                onChange={e => setTaslak(t => ({ ...t, [sv.key]: e.target.value }))}
+                onBlur={() => kaydet(sv.key)}
+                onKeyDown={e => { if (e.key === 'Enter') { kaydet(sv.key); e.currentTarget.blur(); } }}
+                inputMode="numeric" aria-label={`${sv.name} liste fiyatı`}
+                style={{ width: 84, background: 'transparent', border: 'none', outline: 'none',
+                  color: C.text, fontFamily: FB, fontSize: 13.5, fontWeight: 700 }} />
+              <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>{sv.unit}</span>
+            </div>
+            {/* Katalog değerine dönüş: elle yazılan sayıyı silmek için
+                kutuyu boşaltıp beklemek gerekmesin. */}
+            <Btn label="Katalog" size="sm" variant="outline" disabled={!ozel}
+              onClick={() => pricing.setListPrice(sv.key, sv.price)} />
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+/**
+ * MÜŞTERİ BAZLI SATIŞ KAPILARI — "bu müşteriye satıyor muyuz".
+ *
+ * Platform kapısıyla (Hizmetler sayfası) karıştırmayın: orası "bu kalemi
+ * hiç satmıyoruz" der, burası "bu müşteriye satmıyoruz". Sıra tek yönlü —
+ * platformda kapalıysa buradan açılamıyor; anahtar devre dışı kalıyor ve
+ * sebebi satırda yazıyor.
+ *
+ * İki yerden çiziliyor (restoran detayı + Fiyatlandırma satırı) ama tek
+ * bileşen ve tek depo: ikisi ayrı yazılsaydı biri eklenen bir kalemi
+ * göstermeyi unuturdu. İkisi de tek bir müşteriye girilmiş olmayı
+ * gerektiriyor, o yüzden "yanlış satıra basma" riski yok.
+ */
+function StoreServiceGates({ restaurant }) {
+  const settings = usePlatformSettings();
+  const kapali = closedServiceCount(restaurant.id, settings);
+
+  return (
+    <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
+      <SectionHead title="Bu müşteriye satışta olan hizmetler"
+        right={kapali ? `${kapali} kalem kapalı` : 'hepsi açık'} />
+      {SERVICE_GATES.map(g => {
+        const sebep = serviceGateReason(g.key, settings, restaurant.id);
+        const acik = isServiceOpen(g.key, settings, restaurant.id);
+        // Üstteki iki kapıdan kapalıysa müşteri anahtarı bir şey
+        // değiştirmez; çalışmayan anahtar sunmuyoruz.
+        const genelKapali = sebep === 'feature' || sebep === 'manual';
+        return (
+          <div key={g.key} style={{ padding: '13px 18px', borderTop: `1px solid ${C.border}`,
+            display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {g.label}
+                {sebep === 'feature' && <Badge text="özellik kapalı" color={C.yellowInk} soft={C.yellowSoft} />}
+                {sebep === 'manual' && <Badge text="platformda kapalı" color={C.yellowInk} soft={C.yellowSoft} />}
+                {sebep === 'store' && <Badge text="bu müşteriye kapalı" color={C.redInk} soft={C.redSoft} />}
+              </div>
+              {pricing.isNegotiated(g.key) && (
+                <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, marginTop: 2 }}>
+                  liste: {tamPara(pricing.listPriceOf(g.key))} {pricing.listUnitOf(g.key)}
+                </div>
+              )}
+            </div>
+            {/* Devre dışı sebebi doğru yazılsın: özellik kapısı Ayarlar'da,
+                satış kapısı Hizmetler sayfasında — ikisini aynı cümleyle
+                anlatmak yöneticiyi yanlış sayfaya yollardı. */}
+            <Toggle on={acik} disabled={genelKapali}
+              disabledTitle={sebep === 'feature'
+                ? 'Dayandığı özellik kapalı — önce Ayarlar’dan açın'
+                : 'Platform genelinde satışa kapalı — önce Hizmetler sayfasından açın'}
+              label={`${restaurant.name} · ${g.label}`}
+              onChange={() => setServiceOpenFor(restaurant.id, g.key, !acik)} />
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function OfferField({ current, offer, onSend, listPrice = 0, listUnit = '' }) {
+  // BİRİM UYUŞMASI ŞART. Teklifin tutarı AYLIK (`offerMonthly`) ve gelir
+  // tabloları onu aylık olarak topluyor. Liste fiyatı ise kalemin kendi
+  // biriminde: Gastro "/ ay", İkinci Şans "/ paket", anlık fırsat
+  // "/ yayın". Yayın başına ₺450'yi aylık alana yazmak, ₺2.400 ödeyen
+  // müşteride "-%81" gibi anlamsız bir sapma üretiyordu.
+  //
+  // Bu yüzden alan yalnızca AYLIK kalemlerde liste fiyatından doluyor;
+  // diğerlerinde liste fiyatı alanın yanında BİLGİ olarak duruyor ve
+  // tutarı yönetici kendi çeviriyor — çevirmeyi biz uydurmuyoruz.
+  const aylikListe = listUnit === '/ ay' ? listPrice : 0;
+  const [value, setValue] = useState(String(aylikListe || current || ''));
   const [note, setNote] = useState('');
   const [sent, setSent] = useState(false);
   const n = Number(value.replace(/[^\d]/g, ''));
@@ -4291,6 +4453,17 @@ function OfferField({ current, offer, onSend }) {
           {delta > 0 ? '+' : ''}{delta}%
         </span>
       )}
+      {/* Aylık kalemde listeye dönüş düğmesi; farklı birimli kalemde
+          yalnızca bilgi — tek tıkla yazılamaz, çünkü aynı sayı değil. */}
+      {aylikListe > 0 && n !== aylikListe && (
+        <Btn label={`Liste ${tamPara(aylikListe)}`} size="sm" variant="outline"
+          onClick={() => setValue(String(aylikListe))} />
+      )}
+      {listPrice > 0 && !aylikListe && (
+        <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, whiteSpace: 'nowrap' }}>
+          liste: {tamPara(listPrice)} {listUnit}
+        </span>
+      )}
       <input
         value={note} onChange={e => setNote(e.target.value)}
         placeholder="Not (işletme görür)"
@@ -4299,7 +4472,7 @@ function OfferField({ current, offer, onSend }) {
         variant="filled" tone={sent ? 'green' : 'orange'} size="md" />
       {offer && (
         <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: tone, background: `${tone}1F`, border: `1px solid ${tone}33`, borderRadius: R.pill, padding: '4px 11px' }}>
-          {label} · {money(offer.offerMonthly)}
+          {label} · {tamPara(offer.offerMonthly)}
         </span>
       )}
     </div>
@@ -4502,6 +4675,8 @@ function RequestQueue({ onGoStream }) {
 
 function PricingPage({ restaurants = [], query = '', stream = 'all', onStream }) {
   const store = pricing.usePricing();
+  // Müşteri bazlı satış kapıları satır başlığında rozet olarak yazılıyor.
+  const platform = usePlatformSettings();
   const [openId, setOpenId] = useState(null);
 
   // Yalnız hesabı olan müşteriler. Dış beslemeden gelen mekanlar burada yok.
@@ -4533,6 +4708,10 @@ function PricingPage({ restaurants = [], query = '', stream = 'all', onStream })
   return (
     <div style={{ animation: 'fadeIn 0.2s' }}>
       <RequestQueue onGoStream={onStream} />
+
+      {/* Teklif alanı bu fiyattan başlıyor; en üstte çünkü teklif
+          göndermeden önce bakılacak yer burası. */}
+      <ListPriceCard />
 
       {/* ─── HİZMET SEKMELERİ ───
           Her ücretli kalemin kendi sekmesi. Sekmedeki sayı o hizmet için
@@ -4579,6 +4758,12 @@ function PricingPage({ restaurants = [], query = '', stream = 'all', onStream })
                   <span style={{ fontSize: 14, fontWeight: 700 }}>{r.name}</span>
                   {r.gastro && <Icon path={icons.star} size={12} color={C.orangeInk} fill={C.orange} />}
                   {pending > 0 && <Badge text={`${pending} teklif bekliyor`} color={C.yellowInk} soft={C.yellowSoft} />}
+                  {/* Kapalı kalem varsa satırı açmadan görünsün: kapatıp
+                      unutmak, sonra "neden teklif istemiyor" diye
+                      aramak demekti. */}
+                  {closedServiceCount(r.id, platform) > 0 && (
+                    <Badge text={`${closedServiceCount(r.id, platform)} kalem kapalı`} color={C.redInk} soft={C.redSoft} />
+                  )}
                 </div>
                 <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
                   {r.district} · {services.length} ücretli özellik
@@ -4593,6 +4778,11 @@ function PricingPage({ restaurants = [], query = '', stream = 'all', onStream })
 
             {open && (
               <div>
+                {/* Müşteri bazlı satış kapıları — restoranın detay
+                    ekranındakiyle AYNI bileşen ve aynı depo. */}
+                <div style={{ padding: '14px 18px 0' }}>
+                  <StoreServiceGates restaurant={r} />
+                </div>
                 <SectionHead title="Aldığı hizmetler" right="fiyatı değiştirmek için teklif gönderin" />
                 {services.map(sv => (
                   <div key={sv.key} style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}` }}>
@@ -4601,12 +4791,14 @@ function PricingPage({ restaurants = [], query = '', stream = 'all', onStream })
                       <span style={{ fontSize: 13.5, fontWeight: 600 }}>{sv.name}</span>
                       <Badge text={sv.kind} color={KIND_TONE[sv.kind]} soft={C.panel2} />
                       <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
-                        Yürürlükteki fiyat {money(sv.monthly)} / ay
+                        Yürürlükteki fiyat {tamPara(sv.monthly)} / ay
                         {sv.repriced && ' · kabul edilen teklif'}
                       </span>
                     </div>
                     <OfferField
                       current={sv.monthly}
+                      listPrice={pricing.isNegotiated(sv.key) ? pricing.listPriceOf(sv.key, store) : 0}
+                      listUnit={pricing.listUnitOf(sv.key)}
                       offer={latestOffer(r.id, sv.key)}
                       onSend={({ offerMonthly, note }) => {
                         pricing.sendOffer({
@@ -4661,7 +4853,7 @@ function PricingPage({ restaurants = [], query = '', stream = 'all', onStream })
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>{o.restaurantName} · {o.streamName}</div>
                 <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
-                  {money(o.currentMonthly)} → {money(o.offerMonthly)}
+                  {tamPara(o.currentMonthly)} → {tamPara(o.offerMonthly)}
                   {diff !== null && diff !== 0 && ` (${diff > 0 ? '+' : ''}${diff}%)`}
                   {o.note ? ` · "${o.note}"` : ''}
                 </div>
@@ -4935,12 +5127,12 @@ function RevenuePage({ restaurants = [], onOpenStore }) {
 // (Gerçek dağıtımda bu bayrak sunucuda tutulur; istemcinin girişi
 // gizlemesi yetmez, uç de reddetmelidir.)
 // ═══════════════════════════════════════════════════════════════════════
-function Toggle({ on, onChange, label, disabled }) {
+function Toggle({ on, onChange, label, disabled, disabledTitle }) {
   return (
     <motion.button
       onClick={disabled ? undefined : onChange} disabled={disabled}
       role="switch" aria-checked={on} aria-label={label}
-      title={disabled ? 'Platform genelinde kapalı — önce Ayarlar’dan açın' : undefined}
+      title={disabled ? (disabledTitle || 'Platform genelinde kapalı — önce Ayarlar’dan açın') : undefined}
       whileTap={disabled ? undefined : { scale: 0.94 }}
       transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
       className="gur-admin-btn"

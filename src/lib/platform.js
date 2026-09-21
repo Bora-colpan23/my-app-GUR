@@ -83,6 +83,12 @@ export const DEFAULTS = {
   // Tersi olsaydı katalogda yeni bir hizmet açıldığında eski kurulumlarda
   // kapalı doğar ve kimse fark etmezdi.
   servicesOff: {},
+  // MÜŞTERİ bazlı kapatmalar: { "<restoranId>": { gastroPackage: true } }.
+  // Aynı mantık, tek fark kapsam: burası "bu müşteriye satmıyoruz" der.
+  // `storeOverrides`a koymadık — orası FEATURES kuyruğu ve ayrı bir soru
+  // soruyor ("bu mekanda menü çalışıyor mu"); ikisini tek haritada tutmak
+  // "özellik yok" ile "satmıyoruz" durumlarını karıştırırdı.
+  servicesOffFor: {},
 };
 
 const listeners = new Set();
@@ -195,12 +201,22 @@ export function setStoreFeature(storeId, key, enabled) {
  */
 // ─── Satış kapıları ───────────────────────────────────────────────────
 
-/** Bu hizmet şu an satın alınabilir mi. */
-export function isServiceOpen(streamKey, settings = getSettings()) {
+/**
+ * Bu hizmet şu an satın alınabilir mi.
+ *
+ * `restaurantId` verilirse o müşterinin kapısı da hesaba katılır. Sıra
+ * ÖNEMLİ ve tek yönlü: özellik → platform → müşteri. Üsttekinden kapalı
+ * bir şeyi alttan açmak bir işe yaramaz, o yüzden genel kapı her zaman
+ * üstün geliyor — "platformda satmıyoruz" ile "bu müşteriye satmıyoruz"
+ * aynı cümle değil, ama ilki ikincisini kapsıyor.
+ */
+export function isServiceOpen(streamKey, settings = getSettings(), restaurantId = null) {
   const g = GATE_BY_KEY[streamKey];
   if (!g) return true;                       // katalog dışı: kapı yok
   if (g.needs && settings[g.needs] === false) return false;   // özellik kapalı
-  return !(settings.servicesOff || {})[streamKey];
+  if ((settings.servicesOff || {})[streamKey]) return false;  // platformda kapalı
+  if (restaurantId == null) return true;
+  return !(settings.servicesOffFor?.[String(restaurantId)] || {})[streamKey];
 }
 
 export function setServiceOpen(streamKey, open) {
@@ -209,18 +225,45 @@ export function setServiceOpen(streamKey, open) {
   setSettings({ servicesOff: off });
 }
 
-/** Kapının kendisi mi kapalı, yoksa dayandığı özellik mi — arayüz ayırsın. */
-export function serviceGateReason(streamKey, settings = getSettings()) {
+/** Tek bir müşteriye satışı aç/kapat. */
+export function setServiceOpenFor(restaurantId, streamKey, open) {
+  if (!GATE_BY_KEY[streamKey]) return;
+  const all = { ...(getSettings().servicesOffFor || {}) };
+  const forStore = { ...(all[String(restaurantId)] || {}) };
+  if (open) delete forStore[streamKey]; else forStore[streamKey] = true;
+  // Boş kalan kaydı silelim: müşteri başına boş bir nesne bırakmak depoyu
+  // "kapalı bir şeyi var" gibi gösterirdi.
+  if (Object.keys(forStore).length) all[String(restaurantId)] = forStore;
+  else delete all[String(restaurantId)];
+  setSettings({ servicesOffFor: all });
+}
+
+/**
+ * Kapı neden kapalı — arayüz üçünü ayrı yazsın, sebebi bilmeden
+ * yönetici yanlış anahtarı arar.
+ *   'feature' → dayandığı özellik kapalı (Ayarlar)
+ *   'manual'  → platformda satışa kapalı (Hizmetler)
+ *   'store'   → bu müşteriye kapalı (müşterinin kendi kartı)
+ */
+export function serviceGateReason(streamKey, settings = getSettings(), restaurantId = null) {
   const g = GATE_BY_KEY[streamKey];
   if (!g) return null;
   if (g.needs && settings[g.needs] === false) return 'feature';
   if ((settings.servicesOff || {})[streamKey]) return 'manual';
+  if (restaurantId != null
+      && (settings.servicesOffFor?.[String(restaurantId)] || {})[streamKey]) return 'store';
   return null;
 }
 
-export function useServiceOpen(streamKey) {
+/** Bir müşteriye kapatılmış hizmet sayısı — panelde rozet olarak yazıyor. */
+export function closedServiceCount(restaurantId, settings = getSettings()) {
+  const forStore = settings.servicesOffFor?.[String(restaurantId)] || {};
+  return SERVICE_GATES.filter(g => forStore[g.key]).length;
+}
+
+export function useServiceOpen(streamKey, restaurantId = null) {
   const settings = usePlatformSettings();
-  return isServiceOpen(streamKey, settings);
+  return isServiceOpen(streamKey, settings, restaurantId);
 }
 
 export function featureOn(key, storeId = null) {

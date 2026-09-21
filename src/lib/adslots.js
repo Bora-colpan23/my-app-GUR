@@ -23,6 +23,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { useSyncExternalStore } from "react";
+import { isServiceOpen } from "./platform.js";
 
 const KEY = "gur.adslots";
 const listeners = new Set();
@@ -276,6 +277,12 @@ export function activeBookings(streamKey, dayISO = today(), state = read()) {
 export function canBook(streamKey, restaurantId, startISO, days = 1, state = read()) {
   const p = AD_PRODUCTS[streamKey];
   if (!p) return { ok: false, reason: "Bilinmeyen reklam kalemi." };
+  // Satış kapısı en başta: kapalı bir kalemde tarih, kota ve doluluk
+  // kontrolü yapmanın anlamı yok. Kapı arayüzde de var ama tek karar
+  // noktası burası (bkz. "Kota ve doluluk tek karar noktasında").
+  if (!isServiceOpen(streamKey, undefined, restaurantId)) {
+    return { ok: false, reason: "Bu kalem şu an satışa kapalı." };
+  }
   if (!startISO) return { ok: false, reason: "Başlangıç tarihi seçilmedi." };
   if (startISO < today()) return { ok: false, reason: "Geçmiş bir tarih seçilemez." };
 

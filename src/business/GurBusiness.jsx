@@ -837,7 +837,9 @@ function LockedCard({ text }) {
 function SecondChanceCard({ restaurant }) {
   const state = secondChance.useSecondChance();
   const talepler = useRequests();
-  const satista = useServiceOpen("secondChance");
+  // Kapı müşteri bazlı: aynı kalem platformda açık olup bu restorana
+  // kapatılmış olabilir (bkz. lib/platform.js → servicesOffFor).
+  const satista = useServiceOpen("secondChance", restaurant?.id);
   const talep = restaurant ? requestFor(restaurant.id, "secondChance", talepler) : null;
   if (!restaurant) return <LockedCard text="Önce bir işletme sahiplen." />;
   if (!satista) {
@@ -855,7 +857,12 @@ function SecondChanceCard({ restaurant }) {
 
   const aktif = secondChance.activeFor(restaurant.id, state);
   const oran = secondChance.progress(aktif);
-  const fiyat = `₺${(secondChance.PACKAGE.priceMinor / 100).toLocaleString("tr")} / hafta`;
+  // Fiyat yöneticinin belirlediği LİSTE fiyatından; `PACKAGE.priceMinor`
+  // paketin kota/süre kurallarıyla birlikte duran varsayılanı, pazarlığın
+  // kendisi değil. İkisi ayrı yerdeydi ve panelde eski sayı yazıyordu.
+  // Birim "/ paket": paket süreyle değil KOTAYLA bittiği için "/ hafta"
+  // demek yanlıştı (bkz. shared/second-chance.js).
+  const fiyat = `liste: ₺${pricing.listPriceOf("secondChance").toLocaleString("tr")} ${pricing.listUnitOf("secondChance")}`;
 
   return (
     <div style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${aktif ? "rgba(255,102,0,0.35)" : "rgba(255,255,255,0.06)"}`, borderRadius: 18, padding: "16px 18px", marginBottom: 12 }}>
@@ -1106,7 +1113,9 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
   // Geri kalanlar (Gastro, İkinci Şans, anlık fırsat) hâlâ pazarlıklı.
   const sabit = isFixedPrice(streamKey);
   // Satışa kapalıysa kart duruyor ama yerinde "Pek yakında" yazıyor.
-  const satista = useServiceOpen(streamKey);
+  // Kapı hem platform hem MÜŞTERİ bazlı: yönetici tek bir restorana da
+  // kapatabiliyor ve o zaman yalnızca onun panelinde "Pek yakında" çıkıyor.
+  const satista = useServiceOpen(streamKey, restaurant?.id);
   const slotDurum = useAdSlots();
   const talepler = useRequests();
   const talep = restaurant && streamKey
@@ -1141,7 +1150,9 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
         <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: gold ? "#E9C456" : "#FF9A4D", flexShrink: 0 }}>
           {!satista ? "" : sabit
             ? `₺${priceOf(streamKey, slotDurum).toLocaleString("tr")} / gün`
-            : price}
+            : pricing.isNegotiated(streamKey)
+              ? `liste: ₺${pricing.listPriceOf(streamKey, teklifler).toLocaleString("tr")} ${pricing.listUnitOf(streamKey)}`
+              : price}
         </span>
       </div>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 12px", lineHeight: 1.5 }}>{desc}</p>
@@ -1740,7 +1751,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
   const [dealLive, setDealLive] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
   // Anlık fırsat satışa kapalıysa kart yerinde duruyor ama "Pek yakında".
-  const anlikSatista = useServiceOpen("instantDeals");
+  const anlikSatista = useServiceOpen("instantDeals", ownerRestaurant?.id);
   // Menü ve fotoğraf yüklemeleri artık ortak depoda (src/lib/media.js) ve
   // onay kuyruğundan geçiyor; MediaManager doğrudan oradan okuyup yazıyor.
   // Eskiden burada kökten prop olarak inen geçici bir dizi vardı: sayfa
@@ -2066,7 +2077,11 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
                   <div style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)", borderRadius: 18, padding: "16px 18px", marginBottom: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                       <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0 }}>Anlık İndirim Yayınla</p>
-                      <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-ok-light)" }}>₺450 / yayın</span>
+                      {/* Fiyat depodan: yönetici Fiyatlandırma sayfasından
+                          değiştirdiğinde burası da değişiyor. */}
+                      <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-ok-light)" }}>
+                        liste: ₺{pricing.listPriceOf("instantDeals").toLocaleString("tr")} / yayın
+                      </span>
                     </div>
                     <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.5 }}>
                       Ölü saatlerinizi doldurun: yakındaki kullanıcılara süreli indirim bildirimi gider.
@@ -2136,7 +2151,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
               <GrowthSection title="Gastro Paketi">
                 <GrowthCard
                   gold
-                  title="Gastro Şef Videosu Paketi" price="liste: ₺13.200 / ay" active={bought.license}
+                  title="Gastro Şef Videosu Paketi" price="" active={bought.license}
                   desc="Tanınmış bir şef mekânınızda 15 sn dikey video çeker; video hem uygulamada galeride yayınlanır hem de kendi sosyal medyanızda süresiz kullanılır. Paketi alan mekan Gastro Onaylı kategorisine girer."
                   streamKey="gastroPackage" streamName="Gastro şef videosu paketi" restaurant={ownerRestaurant}
                 />

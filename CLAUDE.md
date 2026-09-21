@@ -136,7 +136,7 @@ yazıyorlar. Bağ ekranlarda değil depolarda:
 | `lib/b2b.js` | işletme (bilgi, menü, foto, **logo**) | tüketici kaydı, yönetici listesi |
 | `lib/platform.js` | yönetici (özellik kapıları + **satış kapıları**) | tüketici ve işletme |
 | `lib/reservations.js` | tüketici (talep) → işletme (karar) | tüketici (bildirim) |
-| `lib/pricing.js` | yönetici (teklif) → işletme (karar) | yönetici gelir tabloları |
+| `lib/pricing.js` | yönetici (**liste fiyatı** + teklif) → işletme (karar) | işletme Büyüme kartları, yönetici gelir tabloları |
 | `lib/ad-frequency.js` | tüketici (gösterim) | deste kurulumu |
 | `lib/badges.js` | yönetici (editoryal rozet) | tüketici kartı, kaydırma, detay |
 | `lib/invites.js` | yönetici (havuz daveti) | yönetici havuz listesi |
@@ -451,13 +451,14 @@ biçimlendirilmiyordu — tarayıcının gri varsayılanı üstünde beyaz yazı
 
 **Ölçüm.** Koyu temada on dört sayfa tarandığında 36 uyarı çıkıyor ve
 hepsi beyaz-turuncu kararından; başka kaynaklı sıfır. Açık temada aynı
-tarama 69 uyarı veriyor ve bunun **33'ü turuncu değil**: parlak dolgu
+tarama 68 uyarı veriyor ve bunun **32'si turuncu değil**: parlak dolgu
 tonları (`C.green`, `C.orange`, `C.yellow`, `C.red`) beyaz kâğıtta
 doğrudan YAZI rengi olarak kullanılmış — yukarıdaki iki-ton kuralının
 ihlali, koyu temadan önce de vardı. Daha önce raporlanan "hepsi turuncu"
 rakamı yalnızca panoyu tarayan dar bir taramadan geliyordu; sonradan eklenen
 Reklam Takvimi, Hizmetler ve Moderasyon sayfaları da taramaya girdi — rakamların
-28/62'den 36/69'a çıkması bu üç sayfadan, yeni bir ihlalden değil.
+28/62'den 36/69'a çıkması bu üç sayfadan, yeni bir ihlalden değil. Açık tema
+69'dan 68'e düştü: devre dışı hap jetonu (`offInk`) 2.17:1'den 4.6:1'e çekildi.
 
 ### Erişilebilirlik kuralları (uyulacak)
 - Alan etiketleri `htmlFor` ile bağlı (`InputField`), `<label>` süs değil.
@@ -737,27 +738,94 @@ açıp kapatıyor. Kapalıyken işletme panelinde **kart kaybolmuyor**, yerinde
 söylemek olurdu, oysa yakında açılacak. Fiyat da yazılmıyor —
 alınamayan bir şeyin fiyatı bilgi değil.
 
-**İki kapı var ve ayrı soru soruyorlar:**
+**ÜÇ kapı var ve üçü ayrı soru soruyor:**
 
-| | Soru | Nerede |
-|---|---|---|
-| `FEATURES` | özellik TÜKETİCİDE çalışıyor mu | Ayarlar |
-| `SERVICE_GATES` | işletme bu hizmeti ALABİLİR mi | Hizmetler |
+| Kapı | Soru | Nerede | Depo |
+|---|---|---|---|
+| `FEATURES` | özellik TÜKETİCİDE çalışıyor mu | Ayarlar | `storeOverrides` |
+| `SERVICE_GATES` | bu hizmeti HİÇ satıyor muyuz | Hizmetler | `servicesOff` |
+| müşteri kapısı | bu MÜŞTERİYE satıyor muyuz | müşterinin kendi kartı | `servicesOffFor` |
 
-İkisi bağımsız değil: `needs` alanı olan hizmet, dayandığı özellik
-kapalıyken **otomatik kapalı** sayılıyor ve satır anahtarı devre dışı
-kalıyor (`anlık fırsat → instantDealsEnabled`, `Gastro paketi →
-gastroVideoEnabled`). Teslim edemeyeceğimiz şeyin parasını alamayız; ayrıca
-iki yerden aynı şeyi açmak, birini kapatıp diğerinin açık kaldığını sanmak
-demekti. Satırda hangisi olduğu yazılı: **SATIŞA KAPALI** / **ÖZELLİK KAPALI**.
+**Sıra tek yönlü ve üsttekiler alttakini kapsıyor**: özellik → platform →
+müşteri. Üstten kapalı bir şeyi alttan açmak bir işe yaramaz, o yüzden
+anahtar devre dışı kalıyor. `isServiceOpen(key, settings, restaurantId)`
+üçünü bu sırayla soruyor; `restaurantId` verilmezse yalnızca ilk ikisi.
+`serviceGateReason` hangisi olduğunu döndürüyor (`feature` / `manual` /
+`store`) ve arayüz üçünü ayrı yazıyor — sebebi bilmeyen yönetici yanlış
+sayfada anahtar arar. Devre dışı anahtarın `title`'ı da doğru sayfayı
+söylüyor (özellik → Ayarlar, satış → Hizmetler).
 
-**Yalnızca KAPALI olanlar saklanıyor** (`servicesOff: { bannerAds: true }`).
-Tersi olsaydı katalogda yeni bir hizmet açıldığında eski kurulumlarda
-kapalı doğar ve kimse fark etmezdi.
+`needs` alanı olan hizmet, dayandığı özellik kapalıyken **otomatik kapalı**
+sayılıyor (`anlık fırsat → instantDealsEnabled`, `Gastro paketi →
+gastroVideoEnabled`): teslim edemeyeceğimiz şeyin parasını alamayız.
+
+**Müşteri kapısı `storeOverrides`a KONMADI.** Orası `FEATURES` kuyruğu ve
+ayrı bir soru soruyor ("bu mekanda menü çalışıyor mu"); ikisini tek
+haritada tutmak "özellik yok" ile "satmıyoruz" durumlarını karıştırırdı.
+
+**Müşteri anahtarı iki yerden çiziliyor** — restoranın detay ekranı ve
+Fiyatlandırma sayfasındaki müşteri satırı — ama **tek bileşen**
+(`StoreServiceGates`) ve tek depo. İkisi ayrı yazılsaydı biri katalogda
+açılan yeni kalemi göstermeyi unuturdu. "Yanlış satıra basma" riski yok:
+ikisi de tek bir müşteriye girilmiş olmayı gerektiriyor. Müşteri satırında
+kapalı kalem varsa satır **açılmadan** rozetle yazıyor — kapatıp unutmak,
+sonra "neden teklif istemiyor" diye aramak demekti.
+
+**Yalnızca KAPALI olanlar saklanıyor** (`servicesOff: { bannerAds: true }`,
+`servicesOffFor: { "3": { gastroPackage: true } }`). Tersi olsaydı
+katalogda yeni bir hizmet açıldığında eski kurulumlarda kapalı doğar ve
+kimse fark etmezdi. Açılan kayıt siliniyor, boş kalan müşteri kaydı da.
+
+**Kapı arayüzde DEĞİL depoda**: `requestQuote` (teklif talebi) ve `canBook`
+(reklam rezervasyonu) kapalı kalemi reddediyor. Kart "Pek yakında" yazıyor
+ama kapatıldıktan sonra açık kalmış bir sekmeden gelen istek de
+reddedilmeli.
 
 Kapalı kart `opacity` ile soluklaştırılmıyor — projenin kendi kuralı.
 `GrowthCard` ve `GrowthSection` eskiden `opacity: 0.5` kullanıyordu,
 kaldırıldı; fark artık renkle ve "Pek yakında" rozetiyle.
+
+### Pazarlıklı kalemlerin liste fiyatı (`lib/pricing.js`)
+
+Pazarlık artık boş sayfadan başlamıyor: üç pazarlıklı kalemin yöneticinin
+belirlediği bir **liste fiyatı** var (`NEGOTIATED`), Fiyatlandırma
+sayfasının en üstündeki kartta değiştiriliyor.
+
+| Kalem | Katalog | Birim |
+|---|---|---|
+| Gastro şef videosu paketi | ₺13.200 | / ay |
+| İkinci Şans paketi | ₺1.450 | / paket |
+| Anlık fırsat | ₺450 | / yayın |
+
+- **Yalnızca DEĞİŞTİRİLENLER saklanıyor** (`list: {}`); gerisi katalogdan
+  geliyor. Tersi olsaydı katalog fiyatını güncellemek hiçbir kurulumu
+  etkilemezdi. Katalog değerine dönülürse kayıt siliniyor — "değiştirilmedi"
+  ile "aynı sayı yazıldı" aynı şey.
+- **Liste fiyatı değişimi GÖNDERİLMİŞ teklifi bozmuyor.** Teklifteki tutar
+  o an donmuş: listeyi yükseltmek, işletmenin önünde duran teklifi habersiz
+  değiştirmek olurdu ve kabul edeceği tutarla kabul ettiği tutar farklı
+  çıkardı. Yeni liste yalnızca bundan sonraki tekliflerin başlangıcı.
+- **BİRİM UYUŞMASI ŞART.** Teklifin tutarı AYLIK (`offerMonthly`) ve gelir
+  tabloları onu aylık topluyor. Teklif alanı bu yüzden yalnızca **"/ ay"**
+  birimli kalemde liste fiyatından doluyor; "/ paket" ve "/ yayın"
+  kalemlerde liste fiyatı alanın yanında BİLGİ olarak duruyor. Yayın başına
+  ₺450'yi aylık alana yazmak, ₺2.400 ödeyen müşteride "−%81" gibi anlamsız
+  bir sapma üretiyordu — çevirmeyi biz uydurmuyoruz.
+- Birim katalogda **sabit**: fiyatı değiştirmek pazarlık, birimi
+  değiştirmek satılan şeyi değiştirmek olurdu.
+- İşletme panelindeki `liste: ₺X` rakamları **hepsi buradan** okunuyor.
+  Önceden üçü de elle yazılıydı (`liste: ₺13.200 / ay`, `₺450 / yayın`,
+  İkinci Şans'ta `PACKAGE.priceMinor` üzerinden `₺1.450 / hafta`) —
+  yöneticinin değiştirdiği fiyat panele hiç ulaşmıyordu. İkinci Şans'ın
+  birimi de düzeltildi: paket süreyle değil **kotayla** bittiği için
+  "/ hafta" yanlıştı.
+
+**Panelde fiyat `tamPara()` ile yazılıyor, `money()` ile değil.** `money()`
+binleri kısaltıyor (₺13.200 → "₺13K") ve KPI toplamlarında doğru: oradaki
+soru "ne mertebede". Elle yazılan bir fiyatta yanlış — ₺13.200 ile ₺13.400
+ikisi de "₺13K" okunur, yazdığın sayıyı ekrandan doğrulayamazsın. Liste
+fiyatı, teklif tutarı ve işletmeye görünen rakamlar tam yazılıyor: iki
+taraf aynı sayıyı görmek zorunda.
 
 ### İki fiyat modeli — hangisi nerede
 

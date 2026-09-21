@@ -2,10 +2,14 @@
 // FİYATLANDIRMA VE TEKLİFLER
 //
 // Yönetici, hesabı olan bir müşteriye aldığı hizmetler için tek tek fiyat
-// teklifi gönderir. Liste fiyatı yoktur: her işletmenin fiyatı kendi
-// pazarlığının sonucudur. Teklif işletmenin panelinde görünür; kabul
-// ederse o kalemin aylık bedeli teklif edilen tutara döner ve gelir
-// tabloları bunu okur.
+// teklifi gönderir. Her işletmenin ÖDEDİĞİ tutar kendi pazarlığının
+// sonucudur; ama pazarlık artık boş sayfadan başlamıyor — her pazarlıklı
+// kalemin yöneticinin belirlediği bir LİSTE FİYATI var (aşağıda) ve teklif
+// alanı oradan doluyor. Liste fiyatı bir taahhüt değil, başlangıç noktası:
+// işletme panelinde de "liste:" önekiyle geçiyor.
+//
+// Teklif işletmenin panelinde görünür; kabul ederse o kalemin aylık bedeli
+// teklif edilen tutara döner ve gelir tabloları bunu okur.
 //
 // Teklif "uygulanmış fiyat" değildir: karşı taraf kabul edene kadar hiçbir
 // tutar değişmez. Kabul etmeden fiyatı düşürmek/yükseltmek, işletmeye
@@ -19,7 +23,29 @@ import { useSyncExternalStore } from "react";
 
 const KEY = "gur.pricing";
 
-const EMPTY = { offers: [] };
+// ─── PAZARLIKLI KALEMLERİN LİSTE FİYATI ──────────────────────────────
+//
+// Sabit fiyatlı reklam envanteri `lib/adslots.js`de ve birimi GÜN. Burası
+// onun karşılığı: pazarlığa açık üç kalemin başlangıç fiyatı. İkisi ayrı
+// dosyada çünkü ayrı şeyler — sabit fiyatta işletme tarihi seçip talep
+// açıyor, burada fiyatın kendisi konuşuluyor.
+//
+// `unit` yalnızca etiket: bedelin neyin karşılığı olduğunu söylüyor
+// ("/ ay" ile "/ yayın" aynı sayı değil). Yönetici fiyatı panelden
+// değiştiriyor; birim katalogda sabit, çünkü birimi değiştirmek satılan
+// şeyi değiştirmek olurdu.
+export const NEGOTIATED = [
+  { key: 'gastroPackage', name: 'Gastro şef videosu paketi', unit: '/ ay',     price: 13200 },
+  { key: 'secondChance',  name: 'İkinci Şans paketi',        unit: '/ paket',  price: 1450 },
+  { key: 'instantDeals',  name: 'Anlık fırsat',              unit: '/ yayın',  price: 450 },
+];
+
+const NEG_BY_KEY = Object.fromEntries(NEGOTIATED.map(x => [x.key, x]));
+
+/** Katalog varsayılanları; depoda yalnızca DEĞİŞTİRİLENLER duruyor. */
+const DEFAULT_LIST = Object.fromEntries(NEGOTIATED.map(x => [x.key, x.price]));
+
+const EMPTY = { offers: [], list: {} };
 
 const listeners = new Set();
 function emit() {
@@ -46,13 +72,63 @@ export function getPricing() {
   if (snap.raw === raw) return snap.value;
   let stored = null;
   try { stored = JSON.parse(raw || "null"); } catch { stored = null; }
-  snap = { raw, value: { offers: Array.isArray(stored?.offers) ? stored.offers : [] } };
+  snap = { raw, value: {
+    offers: Array.isArray(stored?.offers) ? stored.offers : [],
+    // Yalnızca yöneticinin elle değiştirdiği kalemler yazılıyor; gerisi
+    // katalogdan geliyor. Tersi olsaydı katalog fiyatını güncellemek
+    // hiçbir kurulumu etkilemezdi.
+    list: (stored && typeof stored.list === 'object' && stored.list) ? stored.list : {},
+  } };
   return snap.value;
 }
 
 function write(next) {
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* depolama kapalı */ }
   emit();
+}
+
+// ─── Liste fiyatları ─────────────────────────────────────────────────
+
+/** Pazarlıklı bir kalemin yürürlükteki liste fiyatı. */
+export function listPriceOf(streamKey, state = getPricing()) {
+  const ozel = Number((state.list || {})[streamKey]);
+  return Number.isFinite(ozel) && ozel > 0 ? ozel : (DEFAULT_LIST[streamKey] ?? 0);
+}
+
+/** Kalemin birim etiketi ("/ ay", "/ paket", "/ yayın"). */
+export function listUnitOf(streamKey) {
+  return NEG_BY_KEY[streamKey]?.unit || '';
+}
+
+/** Bu kalem pazarlıklı mı (liste fiyatı olan üçlüden mi). */
+export function isNegotiated(streamKey) {
+  return !!NEG_BY_KEY[streamKey];
+}
+
+/**
+ * Liste fiyatını günceller.
+ *
+ * GÖNDERİLMİŞ TEKLİFLERE DOKUNMUYOR. Teklifteki tutar o an donmuş bir
+ * sayı: liste fiyatını yükseltmek, işletmenin önünde duran teklifi
+ * habersiz değiştirmek olurdu — kabul edeceği tutarla kabul ettiği tutar
+ * farklı çıkardı. Yeni liste yalnızca bundan sonraki tekliflerin
+ * başlangıç değeri.
+ */
+export function setListPrice(streamKey, value) {
+  if (!NEG_BY_KEY[streamKey]) return;
+  const n = Math.round(Number(value));
+  const cur = getPricing();
+  const list = { ...(cur.list || {}) };
+  // Katalog değerine dönüldüyse kaydı silelim: "değiştirilmedi" ile
+  // "aynı sayı yazıldı" aynı şey, iki hâl tutmaya gerek yok.
+  if (!Number.isFinite(n) || n <= 0 || n === DEFAULT_LIST[streamKey]) delete list[streamKey];
+  else list[streamKey] = n;
+  write({ ...cur, list });
+}
+
+/** Liste fiyatı katalogdan sapmış kalem sayısı — panelde yazıyor. */
+export function customListCount(state = getPricing()) {
+  return Object.keys(state.list || {}).length;
 }
 
 // ─── Teklifler ───────────────────────────────────────────────────────

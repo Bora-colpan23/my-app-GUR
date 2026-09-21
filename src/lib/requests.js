@@ -19,6 +19,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { useSyncExternalStore } from "react";
+import { isServiceOpen } from "./platform.js";
 
 const KEY = "gur.serviceRequests";
 const listeners = new Set();
@@ -61,6 +62,10 @@ export function requestFor(restaurantId, streamKey, state = read()) {
 export function requestQuote({ restaurantId, restaurantName, streamKey, streamName, note = "" }) {
   const state = read();
   if (requestFor(restaurantId, streamKey, state)) return null;
+  // Satışa kapalı bir kalem için talep açılmıyor. Arayüzde kart zaten
+  // "Pek yakında" yazıyor ama kapı BURADA: kapatıldıktan sonra açık kalmış
+  // bir sekmeden gelen istek de reddedilmeli.
+  if (!isServiceOpen(streamKey, undefined, restaurantId)) return null;
   const kayit = {
     id: `req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     restaurantId, restaurantName, streamKey, streamName,
