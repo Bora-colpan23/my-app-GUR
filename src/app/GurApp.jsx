@@ -4148,7 +4148,18 @@ export default function GurApp(props = {}) {
   // Sunucu ayakta mı? Ölçüm bir kez yapılır; sonuç her ekranın davranışını
   // değil, yalnızca kalıcılığı belirler (bkz. src/lib/backend.js).
   const [session, setSession] = useState({ mode: "unknown", user: null, info: null });
-  useEffect(() => { backend.boot().then(setSession); }, []);
+  useEffect(() => {
+    backend.boot().then(setSession);
+    // MOD DEĞİŞİMİNE ABONE. `boot()` tek seferlik: sunucu geç açılırsa
+    // (dağıtımın ilk boot'u, yeniden başlatma) api.js arkadan yeniden
+    // yokluyor ama ekran bunu görmezse rozet YEREL kalır ve kullanıcı
+    // sayfayı yenilemeden bağlandığını anlamaz. `subscribeApi` bu iş için
+    // zaten vardı — kimse abone olmamıştı.
+    return backend.subscribeApi(() => {
+      if (backend.apiMode() !== "live") return;
+      backend.boot().then(setSession);
+    });
+  }, []);
 
   const addReview = (restaurantId, review) =>
     setUserReviews(prev => ({ ...prev, [restaurantId]: [review, ...(prev[restaurantId] || [])] }));

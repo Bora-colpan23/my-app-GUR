@@ -47,9 +47,26 @@ services:
       - ADMIN_USER=admin
       - ADMIN_PASSWORD=gur2026
       - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+    # SAĞLIK KONTROLÜ ŞART. `web` yalnızca `depends_on: api` diyordu ve bu
+    # konteynerin BAŞLAMASINI bekler, HAZIR olmasını beklemez. İki konteyner
+    # de açılışta `npm install` çalıştırdığı için api dakikalarca cevap
+    # vermiyor olabiliyor; o aralıkta sayfayı açan kullanıcı YEREL moda
+    # düşüyor ve üç panel birbirinden kopuk çalışıyordu.
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:8787/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 4s
+      retries: 40
+      start_period: 20s
     env_file:
       - ./.env.base44-defaults
-      - /run/base44/app.env
+      # Gizli anahtarları Base44 çalışma anında buraya enjekte ediyor.
+      # required: false OLMADAN bu compose YALNIZCA Base44'te çalışır:
+      # dosya yoksa `docker compose up` hiç başlamıyor ve hata mesajı
+      # ("env file not found") sebebini de söylemiyor. Yerelde aynı yığını
+      # ayağa kaldırıp hata ayıklayamamak demekti.
+      - path: /run/base44/app.env
+        required: false
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,7 +86,8 @@ services:
       - VITE_API_TARGET=http://api:8787
       - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     command: sh -c "npm install && npx vite --host 0.0.0.0 --port 5173"
 
 volumes:

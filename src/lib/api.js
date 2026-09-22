@@ -17,6 +17,7 @@ const TOKEN_KEY = "gur.token";
 
 let mode = "unknown";           // "unknown" | "live" | "local"
 let probe = null;
+let probeInfo = null;
 const listeners = new Set();
 
 function emit() { for (const l of listeners) l(); }
@@ -35,14 +36,59 @@ function setToken(t) {
  * Sunucu var mı? Sonuç önbelleklenir; her çağrı yeni istek atmaz.
  * Zaman aşımı kısa: sunucu yoksa açılış gecikmesin.
  */
+function yokla() {
+  return fetch(`${BASE}/health`, { signal: AbortSignal.timeout(2500) })
+    .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
+}
+
+// Sunucu geç açılırsa arkadan tekrar yokluyoruz. Sınırlı ve artan aralık:
+// gerçekten sunucusuz bir ortamda (artifact önizlemesi) üç denemeden sonra
+// susuyor, boşuna istek atmıyor.
+const TEKRAR_MS = [3000, 8000, 20000];
+
+function arkadanTekrarla(i = 0) {
+  if (i >= TEKRAR_MS.length) return;
+  setTimeout(() => {
+    if (mode === "live") return;             // arada bağlandıysa iş bitti
+    yokla()
+      .then(info => {
+        mode = "live"; probeInfo = info;
+        // ÖNBELLEĞİ DE TAZELE. Yalnızca `mode`u güncellemek yetmiyordu:
+        // `ensureMode()` hâlâ başarısızlığa çözülmüş ESKİ sözü döndürüyor
+        // ve onu çağıran `boot()` yine "yerel" diyordu. Ölçüldü — rozet
+        // YEREL'de kaldı. Söz de yerine konmalı.
+        probe = Promise.resolve({ mode, info });
+        emit();
+      })
+      .catch(() => arkadanTekrarla(i + 1));
+  }, TEKRAR_MS[i]);
+}
+
+/**
+ * Mod ölçümü. BAŞARI önbelleğe alınır, BAŞARISIZLIK alınmaz.
+ *
+ * Önceden tek `probe` sözü hem başarıyı hem başarısızlığı önbelleğe
+ * alıyordu (`if (probe) return probe`) ve `boot()` tek bir `useEffect`ten
+ * bir kez çağrılıyordu. Sonuç: sunucu o 2.5 saniyede henüz cevap
+ * vermiyorsa (dağıtımın ilk açılışı, yeniden başlatma, konteynerin
+ * `npm install`i) uygulama OTURUM BOYUNCA yerel modda kalıyordu —
+ * üç panel açılıyor, çalışıyor gibi görünüyor ama veriyi paylaşmıyordu.
+ * Sayfa yenilenmeden düzelmiyordu ve kullanıcı sebebini göremiyordu.
+ */
 export function ensureMode() {
   if (probe) return probe;
-  probe = fetch(`${BASE}/health`, { signal: AbortSignal.timeout(2500) })
-    .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-    .then(info => { mode = "live"; emit(); return { mode, info }; })
-    .catch(() => { mode = "local"; emit(); return { mode, info: null }; });
+  probe = yokla()
+    .then(info => { mode = "live"; probeInfo = info; emit(); return { mode, info }; })
+    .catch(() => {
+      mode = "local"; emit();
+      arkadanTekrarla();                     // sunucu sonradan gelirse yakala
+      return { mode, info: null };
+    });
   return probe;
 }
+
+/** Son sağlık yanıtı — arkadan bağlanınca ekranın güncelleyebilmesi için. */
+export function modeInfo() { return probeInfo; }
 
 class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }

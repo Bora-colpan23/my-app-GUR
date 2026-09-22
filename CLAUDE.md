@@ -63,6 +63,67 @@ yükleniyor, tek dosyalık artifact o ayrı chunk'ı bulamaz ve panel açılmaz.
 Betik `GUR_ARTIFACT=1` ile tek parça derliyor ve çıktıda birden fazla JS
 dosyası kalırsa hata veriyor.
 
+### Base44'te çalıştırma — dört parça tek origin
+
+Depoda Base44 için hazır bir yığın var (`docker-compose.base44.yml`,
+`.base44/environment.json`, `AGENTS.md`). Başlatma komutu
+`.base44/environment.json` içinde yazılı ve yalnızca **3000** portu dışa
+açık:
+
+```
+postgres ─ şema (schema.sql) ilk boot'ta uygulanır
+   ↓
+db-setup ─ tek seferlik: npm install + server/db/seed.js, biter
+   ↓
+api ─ node server/index.js  :8787
+   ↓
+web ─ vite :5173 → host 3000 ; /api'yi VITE_API_TARGET ile api'ye proxy'ler
+```
+
+**"Birbirine bağlı" olan şey tek origin.** Üç arayüz (`/`, `/isletme`,
+`/admin`) aynı origin'den servis ediliyor, aynı `/api` yoluna gidiyor ve
+aynı PostgreSQL'i okuyup yazıyor — yani mod **CANLI** olur ve veri
+kullanıcılar arası paylaşılır. Bunu kaybederseniz uygulama kilitlenmez,
+sessizce **YEREL**'e düşer: üç panel açılır, çalışır görünür, ama her
+tarayıcı kendi localStorage'ında yaşar. Aradaki fark rozet dışında
+görünmediği için "bağlı çalışmıyor" şikâyeti hep buradan çıkıyor.
+
+Ölçüldü (docker olmadan, aynı topoloji): API + Postgres ayaktayken üç
+arayüzün üçü de CANLI, `/api/health` `{"ok":true,"restaurants":15}`
+döndürüyor ve istekler proxy üzerinden gidiyor (`canli.mjs`).
+
+**Üç tuzak ve çözümleri:**
+
+1. **`env_file: /run/base44/app.env` ZORUNLU olmamalı.** O dosyayı Base44
+   çalışma anında enjekte ediyor; yerelde yok ve `docker compose up` hiç
+   başlamıyor ("env file not found"), hata sebebi de söylemiyor. Yani aynı
+   yığını yerelde ayağa kaldırıp hata ayıklayamıyorsunuz. Çözüm compose
+   spec'inin `required: false` biçimi.
+2. **`web`, `api`'nin HAZIR olmasını beklemeli.** Yalnızca
+   `depends_on: - api` konteynerin BAŞLAMASINI bekler. İki konteyner de
+   açılışta `npm install` çalıştırdığı için api dakikalarca cevap
+   vermeyebiliyor; o aralıkta sayfayı açan herkes YEREL'e düşüyordu.
+   `api`ye healthcheck + `condition: service_healthy` eklendi.
+3. **Başarısız mod yoklaması artık kalıcı değil** (`lib/api.js`). Tek
+   `probe` sözü hem başarıyı hem başarısızlığı önbelleğe alıyordu ve
+   `boot()` bir kez çağrılıyordu: sunucu o 2.5 saniyede cevap vermezse
+   uygulama OTURUM BOYUNCA yerel kalıyordu, sayfa yenilenmeden
+   düzelmiyordu. Artık başarı önbelleklenir, başarısızlık arkadan
+   3s/8s/20s aralıklarla üç kez yeniden yoklanır. **Yoklama başarınca
+   `probe` de yerine konuyor** — yalnızca `mode`u güncellemek yetmiyordu,
+   `ensureMode()` eski sözü döndürdüğü için rozet YEREL'de kalıyordu
+   (ölçüldü). `GurApp` de `subscribeApi`ye abone: mekanizma zaten vardı,
+   kimse abone olmamıştı.
+
+Ölçüldü: API kapalıyken açılan sayfa YEREL'e düşüyor, API sonradan
+başlatıldığında **sayfa yenilenmeden ~6 saniyede** CANLI'ya geçiyor
+(`gecikmeli.mjs`).
+
+**Yerelde docker olmadan aynısı:** `pg_ctlcluster 16 main start` →
+`psql -f server/db/schema.sql` → `node server/db/seed.js` →
+`DATABASE_URL=… node server/index.js` → `VITE_API_TARGET=http://127.0.0.1:8787
+npx vite`. Tek origin yine Vite proxy'sinden gelir.
+
 ### İki mod: canlı ve yerel
 
 Uygulama açılışta `/api/health` yoklar ve sağ üstte hangi modda olduğunu
