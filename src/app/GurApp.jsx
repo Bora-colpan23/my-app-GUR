@@ -477,7 +477,7 @@ function WelcomeScreen({ onStart }) {
               yazar; sabit "/isletme" önizlemede olmayan bir yola giderdi. */}
           <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-on-brand-2)", textAlign: "center", margin: "16px 0 0", lineHeight: 1.55 }}>
             Restoran sahibi misin?{" "}
-            <Link to="/isletme" style={{ color: "var(--c-on-brand)", fontWeight: 700, textDecoration: "underline" }}>Doyurucu uygulamasına geç</Link>
+            <Link to="/isletme" className="gur-tap" style={{ display: "inline-block", color: "var(--c-on-brand)", fontWeight: 700, textDecoration: "underline" }}>Doyurucu uygulamasına geç</Link>
           </p>
         </div>
       </div>
@@ -588,7 +588,7 @@ function LoginScreen({ onBack, onLogin, onRegister, live }) {
     catch (err) { setError(err.message || "Giriş yapılamadı"); }
     finally { setBusy(false); }
   };
-  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--c-warm-1)" }}><GurLogo size={60} pill /></div><div className="gur-on-brand" style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "var(--c-on-brand)", margin: "0 0 6px", textAlign: "center" }}>Giriş yap</h2><div style={{ marginBottom: 32, display: "flex", justifyContent: "center" }}><Btn variant="plainBrand" size="sm" fullWidth={false} onClick={onRegister} text="Üyeliğiniz yoksa lütfen kayıt için dokununuz" /></div><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR'u kullanmaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="brand" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
+  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--c-warm-1)" }}><GurLogo size={60} pill /></div><div className="gur-on-brand" style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "var(--c-on-brand)", margin: "0 0 6px", textAlign: "center" }}>Giriş yap</h2><div style={{ marginBottom: 32, display: "flex", justifyContent: "center" }}><Btn variant="plainBrand" size="md" fullWidth={false} onClick={onRegister} text="Üyeliğiniz yoksa lütfen kayıt için dokununuz" /></div><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR'u kullanmaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="brand" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
 }
 
 function RegisterScreen({ onBack, onDone, onLegal, live }) {
@@ -802,8 +802,10 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             Konum satırı yeni: "yakınında" diyen bir uygulamanın nereye göre
             konuştuğunu söylemesi gerekir. Dokununca hassas konum istenir. */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, animation: "fadeInUp 0.6s ease-out" }}>
+          {/* 114×40 idi: dört piksel eksik bir hedef de eksik hedeftir.
+              Yükseklik 44'e sabitlendi, içerik dikeyde ortalı kalıyor. */}
           <button type="button" className="gur-btn" onClick={() => setLocSheet(true)}
-            style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, border: "none", background: "transparent", padding: 0, cursor: precise ? "default" : "pointer", outline: "none", textAlign: "left" }}>
+            style={{ flex: 1, minWidth: 0, minHeight: 44, display: "flex", alignItems: "center", gap: 8, border: "none", background: "transparent", padding: 0, cursor: precise ? "default" : "pointer", outline: "none", textAlign: "left" }}>
             <div style={{ width: 34, height: 34, borderRadius: 12, background: "var(--c-subtle)", border: "1px solid var(--c-line)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Icon n="pin" size={16} color="var(--c-ink-2)" />
             </div>
@@ -832,7 +834,7 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           }}>
             <Icon n="search" size={17} color="rgba(45,36,25,0.35)" />
             <input
-              value={query} onChange={e => setQuery(e.target.value)}
+              value={query} onChange={e => setQuery(e.target.value)} onFocus={keepVisible}
               placeholder="Restoran ara"
               style={{
                 flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent",
@@ -953,7 +955,8 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             aynı işlev, daha az yer, tek bakışta daha çok seçenek. */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, flexShrink: 0 }}>
           <h3 style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "var(--c-ink)", margin: 0 }}>Ne canın çekti?</h3>
-          <button type="button" className="gur-btn" onClick={() => setShowAll(true)}
+          {/* 37×14 idi; görsel ölçü aynı, hedef `.gur-tap` ile 44. */}
+          <button type="button" className="gur-btn gur-tap" onClick={() => setShowAll(true)}
             style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-ink-2)" }}>
             Tümü
           </button>
@@ -979,7 +982,9 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
           <div style={{ marginBottom: 16, flexShrink: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
               <h3 style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "var(--c-ink)", margin: 0 }}>Yakınında popüler</h3>
-              <button type="button" className="gur-btn" onClick={onSwipe}
+              {/* Görsel boyut korunuyor, dokunma hedefi `.gur-tap` ile
+                  44'e çıkıyor: 101×14 idi. */}
+              <button type="button" className="gur-btn gur-tap" onClick={onSwipe}
                 style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-ink-2)" }}>
                 Kaydırarak gez
               </button>
@@ -1404,8 +1409,14 @@ function LocationSetupScreen({ onDone }) {
 
         <div style={{ marginTop: "auto", paddingTop: 22 }}>
           {/* "Şimdi değil" de bir karar: reddetmek kabul etmek kadar kolay
-              olmalı ve her açılışta tekrar sorulmamalı. */}
-          <Btn text="Şimdi değil" onClick={() => { geo.markConsentSkipped(); onDone(); }} variant="plainDark" size="sm" />
+              olmalı ve her açılışta tekrar sorulmamalı.
+
+              EŞİT AĞIRLIK ÖLÇÜLDÜ. Üstteki iki yol 341×53 / 16px iken bu
+              341×35 / 12.5px idi: "eşit ağırlık" yazılıydı ama doğru
+              değildi, üstelik 35px dokunma hedefi de 44'ün altındaydı.
+              Aynı boy, aynı punto; ayrım yalnızca varyantta (dolgusuz
+              hap), çünkü birincil eylem bu değil — ama küçük de değil. */}
+          <Btn text="Şimdi değil" onClick={() => { geo.markConsentSkipped(); onDone(); }} variant="plainDark" size="lg" />
           <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", textAlign: "center", margin: "10px 0 0", lineHeight: 1.5 }}>
             Ham koordinatın sunucuya gönderilmez; yalnızca sıralama için bellekte tutulur.
           </p>
@@ -1873,7 +1884,13 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
   const [detail, setDetail] = useState(null);
   useEffect(() => {
     let off = false;
-    backend.loadRestaurantDetail(r).then(d => { if (!off) setDetail(d); });
+    // .catch() ŞART: `detail` null kaldığı sürece iskelet dönmeye devam
+    // eder. Cephe kendi içinde yerele düşüyor ama bu yoldan sonra atılan
+    // bir hata (ya da reddedilen bir söz) sonsuz iskelet demekti — ekranda
+    // dönen ama asla bitmeyen bir yükleme, hatanın en kötü hâli.
+    backend.loadRestaurantDetail(r)
+      .then(d => { if (!off) setDetail(d); })
+      .catch(() => { if (!off) setDetail({ services: null, externalReviews: [], externalPhotos: [] }); });
     return () => { off = true; };
   }, [r]);
   const claimed = !!(detail?.services?.claimed ?? (r.claimed || r.ownerClaimed));
@@ -3009,7 +3026,9 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
   const [detail, setDetail] = useState(null);
   useEffect(() => {
     let off = false;
-    backend.loadRestaurantDetail(r).then(d => { if (!off) setDetail(d); });
+    backend.loadRestaurantDetail(r)
+      .then(d => { if (!off) setDetail(d); })
+      .catch(() => { if (!off) setDetail({ services: null, externalReviews: [], externalPhotos: [] }); });
     return () => { off = true; };
   }, [r]);
   const claimed = !!(detail?.services?.claimed ?? (r.claimed || r.ownerClaimed));
@@ -3918,13 +3937,26 @@ const LEGAL_DOCS = [
 // yüklenmez; reddedilirse bir daha sorulmaz.
 function ConsentBanner({ onDecide, onLegal }) {
   return (
-    <div style={{
+    <>
+    {/* PERDE — kutu zaten arkadaki ekranı ÇALIŞMAZ kılıyordu ama bunu
+        söylemiyordu: karşılama ekranındaki "GUR'u kullanmaya başla" hapı
+        kutunun altında kalıyor, görünüyor, basılabilir duruyor ve hiçbir
+        şey yapmıyordu (393×852'de ölçüldü: hap 714–767, kutunun metni
+        onun üstünde). Karar verilmeden devam edilemiyorsa bu bir modal;
+        perde onu görünür kılıyor. Perdeye dokunmak KAPATMIYOR: rıza
+        sorusunun sessizce geçiştirilecek bir cevabı yok. */}
+    <div aria-hidden="true" style={{
+      position: "absolute", inset: 0, zIndex: 890,
+      background: "rgba(18,12,6,0.55)", backdropFilter: "blur(1.5px)",
+      animation: "fadeIn 0.3s ease-out",
+    }} />
+    <div role="dialog" aria-modal="true" aria-labelledby="gur-riza-baslik" style={{
       position: "absolute", left: 12, right: 12, bottom: 12, zIndex: 900,
       background: "rgba(20,14,8,0.92)", backdropFilter: "blur(12px)",
       border: "1px solid rgba(255,255,255,0.1)", borderRadius: 22, padding: "16px 16px 14px",
       boxShadow: "var(--sh-d3)", animation: "fadeInUp 0.4s ease-out",
     }}>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#fff", margin: "0 0 5px" }}>Ölçümleme çerezleri</p>
+      <p id="gur-riza-baslik" style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#fff", margin: "0 0 5px" }}>Ölçümleme çerezleri</p>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.5, margin: "0 0 13px" }}>
         Uygulamayı geliştirmek için anonim kullanım istatistikleri toplayabiliriz. Zorunlu olanlar dışında hiçbir şey izniniz olmadan çalışmaz.{" "}
         <span onClick={onLegal} style={{ color: "var(--c-warn)", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>Ayrıntılar</span>
@@ -3936,6 +3968,7 @@ function ConsentBanner({ onDecide, onLegal }) {
         <Btn text="Kabul et" onClick={() => onDecide("granted")} variant="outline" size="md" />
       </div>
     </div>
+    </>
   );
 }
 
@@ -4384,7 +4417,14 @@ export default function GurApp(props = {}) {
             yalnızca bu tarayıcıda kalıyor, bunu söylemek dürüstlük. */}
         {session.mode !== "unknown" && screen !== "splash" && (
           <div style={{
-            position: "absolute", top: 8, right: 10, zIndex: 700,
+            // ÇENTİK PAYINI KENDİ ALIYOR. `.gur-frame` üstündeki
+            // safe-area dolgusu buraya işlemiyor: mutlak konumlanmış
+            // öğenin sarmalayıcısı ata öğenin DOLGU KUTUSU, yani dolgu
+            // onu aşağı itmiyor (ölçüldü: çerçeveye 59px dolgu verildi,
+            // rozet 8px'te kaldı). Çentikli telefonda durum çubuğunun
+            // altında kalıyordu.
+            position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 8px)",
+            right: "calc(env(safe-area-inset-right, 0px) + 10px)", zIndex: 700,
             display: "inline-flex", alignItems: "center", gap: 5,
             // %42 cam açık zeminin üstünde griye dönüyor, beyaz yazı 2.5:1
             // kalıyordu. Sıcak ve daha opak: hem kâğıtta hem fotoğrafta okunur.

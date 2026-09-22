@@ -460,6 +460,48 @@ Reklam Takvimi, Hizmetler ve Moderasyon sayfaları da taramaya girdi — rakamla
 28/62'den 36/69'a çıkması bu üç sayfadan, yeni bir ihlalden değil. Açık tema
 69'dan 68'e düştü: devre dışı hap jetonu (`offInk`) 2.17:1'den 4.6:1'e çekildi.
 
+### Dokunma hedefi, çentik ve rıza — ölçülmüş kurallar
+
+Bu üç başlık "yapıldı" sanılıyordu; 393×852 (iPhone 14 Pro) ölçüsünde
+ölçülünce üçünde de açık kalmış yerler çıktı. Ölçüm betiği:
+`y20d.mjs` — her ekranda 44'ün altındaki hedefleri, çentik bandına düşen
+metni ve rıza kutusunun altında kalan düğmeyi tarıyor.
+
+**Rıza kutusu bir MODAL.** Karar verilmeden devam edilemiyor — ama bunu
+söylemiyordu: karşılama ekranındaki "GUR'u kullanmaya başla" hapı kutunun
+altında kalıyor, görünüyor, basılabilir duruyor ve hiçbir şey yapmıyordu
+(hap 714–767, kutunun metni onun üstünde). Artık `role="dialog"
+aria-modal="true"` ve arkasında bir **perde** var: engel görünür.
+Perdeye dokunmak kapatmıyor — rıza sorusunun sessizce geçiştirilecek bir
+cevabı yok.
+
+**Mutlak konumlanmış öğe çerçevenin çentik payını ALMAZ.** `.gur-frame`
+üstündeki `padding-top: max(0, inset-top - 44)` yalnızca akıştaki içeriği
+itiyor; `position: absolute` bir öğenin sarmalayıcısı ata öğenin DOLGU
+KUTUSU olduğu için dolgu onu aşağı itmiyor. Ölçüldü: çerçeveye 59px dolgu
+verildi, CANLI/YEREL rozeti 8px'te kaldı — çentikli telefonda durum
+çubuğunun altında kalıyordu. Çentik payını **kendi** okuyor artık:
+`top: calc(env(safe-area-inset-top, 0px) + 8px)`. Üst kenara mutlak
+konumlanan yeni bir öğe eklerken aynısını yapın.
+
+**`.gur-tap` — metin hedefini büyütür.** `.gur-icon-btn::after` ikon
+butonlar için; metin bağlantılarında eksik olan yalnızca YÜKSEKLİK
+("Tümü" 37×14, "Kaydırarak gez" 101×14, "Doyurucu uygulamasına geç"
+191×14). Yazıyı büyütmek düzeni bozardı, görünmez hedefi büyütmek
+bozmuyor. `GurStyles` bir şablon dizgisi: oradaki yorumlara **ters tırnak
+yazmayın**, dizgiyi orada bitirir.
+
+**"Üç yol da eşit ağırlıkta" artık gerçekten öyle.** Konum ekranında
+yazılıydı ama değildi: üstteki iki yol 341×53 / 16px iken "Şimdi değil"
+341×35 / 12.5px idi — hem karanlık kalıp hem 44'ün altında hedef. Üçü de
+aynı boy ve punto; ayrım yalnızca varyantta.
+
+**Sonsuz iskelet.** `loadRestaurantDetail` cephesi kendi içinde yerele
+düşüyor ama çağrı yerinde `.catch()` yoktu: bu yoldan sonra atılan bir
+hata `detail`i null bırakır ve yorum iskeleti sonsuza kadar döner. Dönen
+ama asla bitmeyen bir yükleme, hatanın en kötü hâli — iki çağrı yerinde de
+`.catch()` var.
+
 ### Erişilebilirlik kuralları (uyulacak)
 - Alan etiketleri `htmlFor` ile bağlı (`InputField`), `<label>` süs değil.
 - Bildirim ve geri bildirim yüzeyleri `role="status" aria-live="polite"`.

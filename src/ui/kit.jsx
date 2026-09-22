@@ -1175,12 +1175,19 @@ export function GurStyles() {
 
         /* Apple HIG: her dokunma hedefi en az 44×44pt. Küçük ikon butonların
            görsel boyutu korunur, tıklama alanı görünmez bir katmanla büyür. */
-        .gur-icon-btn, .gur-dot { position: relative; }
-        .gur-icon-btn::after, .gur-dot::after {
+        .gur-icon-btn, .gur-dot, .gur-tap { position: relative; }
+        .gur-icon-btn::after, .gur-dot::after, .gur-tap::after {
           content: ""; position: absolute; top: 50%; left: 50%;
           transform: translate(-50%, -50%);
           width: max(100%, 44px); height: max(100%, 44px);
         }
+        /* .gur-tap metin bağlantıları ve ince çipler için: ikon butonun
+           aksine GENİŞLİK zaten yeterli, eksik olan yükseklik. Ölçülenler
+           hep metindi ("Tümü" 37×14, "Kaydırarak gez" 101×14, "Doyurucu
+           uygulamasına geç" 191×14) — yazıyı büyütmek düzeni bozardı,
+           hedefi büyütmek bozmuyor.
+           NOT: bu blok bir şablon dizgisinin içinde; yorumlara TERS TIRNAK
+           yazmayın, dizgiyi orada bitirir. */
 
         /* Çentik / ev çubuğu payı. Önizleme çerçevesinde env() 0 döner, tam
            ekran cihazda ekranın kenarlarına taşan içerik olmaz. Ekranların
