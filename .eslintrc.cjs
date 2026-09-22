@@ -5,9 +5,20 @@ module.exports = {
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module', ecmaFeatures: { jsx: true } },
   settings: { react: { version: '18.3' } },
   plugins: ['react'],
+  // Vite `define` ile derleme anında yerine konan sabitler. Kaynakta bir
+  // bildirim yok, o yüzden ESLint'e burada tanıtılıyor.
+  globals: { __GUR_ARTIFACT__: 'readonly' },
   rules: {
     'react/prop-types': 'off',
     'react/no-unescaped-entities': 'off',
     'no-unused-vars': 'warn',
   },
+  overrides: [
+    {
+      // Sunucu tarafı Node'da çalışıyor: process, Buffer, console tanımlı.
+      // shared/ her iki ortamda da çalıştığı için ikisinin kesişimi geçerli.
+      files: ['server/**/*.js', 'shared/**/*.js', '*.cjs'],
+      env: { node: true, browser: false },
+    },
+  ],
 };

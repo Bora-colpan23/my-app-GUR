@@ -1,0 +1,38 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    {
+      "name": "SESSION_SECRET",
+      "description": "HMAC key for signing session tokens. Generated for development; set your own for stable sessions across restarts.",
+      "requiredAtBoot": false,
+      "generatedForDevelopment": true
+    },
+    {
+      "name": "GOOGLE_PLACES_API_KEY",
+      "description": "Optional: Google Places API key for restaurant ingestion. App falls back to OpenStreetMap without it.",
+      "requiredAtBoot": false
+    },
+    {
+      "name": "FOURSQUARE_API_KEY",
+      "description": "Optional: Foursquare API key for restaurant ingestion.",
+      "requiredAtBoot": false
+    },
+    {
+      "name": "TRIPADVISOR_API_KEY",
+      "description": "Optional: TripAdvisor API key for restaurant ingestion.",
+      "requiredAtBoot": false
+    },
+    {
+      "name": "GOOGLE_OAUTH_CLIENT_ID",
+      "description": "Optional: Google OAuth client ID for social login. Falls back to demo profile without it.",
+      "requiredAtBoot": false
+    },
+    {
+      "name": "APPLE_SERVICE_ID",
+      "description": "Optional: Apple Sign In service ID for social login.",
+      "requiredAtBoot": false
+    }
+  ]
+}
