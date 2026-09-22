@@ -1106,6 +1106,30 @@ ikisini de hedef olmaktan çıkarırdı. Yönetici kuyruğunda da yerleşim adı
 yazıyor: "Banner görseli" dosyanın TÜRÜNÜ söylüyor, ekranını değil — dikey
 bir video banner'a uymaz ve onaylayanın kararı buna bağlı.
 
+#### Görsel yükleme alanı TARİH ONAYINA bağlı
+
+Akış tek yönlü ve her adımı işletme panelinde yazılı
+(`AdCreativeSlot`, dört noktalı gösterge):
+
+```
+takvimden tarih seç   → yayın talebi (pending)
+yönetici onaylar      → slot kilitlenir, YÜKLEME ALANI AÇILIR
+görseli yükle         → dosya onay kuyruğuna düşer (pending)
+yönetici onaylar      → yayına girer
+```
+
+Yükleme alanı önceden HER ZAMAN açıktı: tarihi olmayan bir işletme dosya
+yükleyebiliyor, dosya onay kuyruğuna düşüyor ve yönetici yayınlanacak yeri
+olmayan bir görseli onaylıyordu. Kapı `hasApprovedSlot` ile depoda.
+
+**Geçmiş yayınlar kapıyı açmıyor** (`slotsOf` → `end >= bugün`): geçen ayki
+bir rezervasyon yükleme alanını sonsuza kadar açık tutar ve işletme hiçbir
+yere gitmeyecek dosyalar yüklerdi.
+
+Kapalıyken kutu **çizilip devre dışı bırakılmıyor**, yerine ne yapılması
+gerektiği yazılıyor ("önce şu karttan takvimi açıp tarih seçin") —
+tıklanamayan bir yükleme kutusu, sebebini söylemeyen bir engeldir.
+
 **Eski kayıtlar OKUMA ANINDA taşınıyor** (`tasi()`), depoyu yeniden
 yazmadan: taşıma betiği bir "ilk açılış" kancası gerektirirdi ve o kanca
 çalışmadan okuyan ekran boş liste görürdü. Dosya videoysa ödüllü video,
@@ -1113,13 +1137,23 @@ değilse banner — eski ayrımın aynısı, ama bir kez ve tek yerde.
 `pendingAll` de bu taşımadan geçiyor, yoksa dosya yönetici kuyruğunda
 görünmez ama işletmede "beklemede" yazardı.
 
-**`media.js` deposu artık `storage` olayını dinliyor.** Önbellek yalnızca
+**`media.js` VE `adslots.js` depoları artık `storage` olayını dinliyor.** Önbellek yalnızca
 kendi `write()`iyle tazeleniyordu (`if (cache) return cache`): yönetici
 BAŞKA BİR SEKMEDE dosyayı onayladığında işletme sekmesi bunu hiç görmüyor,
 sayfa yenilenene kadar "İncelemede" yazmaya devam ediyordu. Projedeki diğer
 depolar bunu zaten doğru yapıyordu; burası tek istisnaydı. Anlık görüntü
 ham metne göre önbellekleniyor — referans sabit kalmazsa
 `useSyncExternalStore` sonsuz döner.
+
+`adslots.js` aynı hatayı taşıyordu ve orada sonucu daha ağırdı: görsel
+yükleme alanı tarih onayına bakıyor, yani yönetici başka sekmede onay
+verdiğinde akışın kapısı hiç açılmıyordu.
+
+**Testler bu hataya DAYANMIŞTI.** `gunluk-test.mjs` depoyu ortada doğrudan
+eziyor (sürüm göçü denemesi) ve sonra aynı modülü hiçbir şey olmamış gibi
+kullanmaya devam ediyordu; yalnızca bayat önbellek sayesinde geçiyordu.
+Depo düzelince test kırıldı ve kendi kaydını taze oluşturacak şekilde
+düzeltildi.
 
 ### Reklam slotları: sabit fiyat + takvim (`lib/adslots.js`)
 

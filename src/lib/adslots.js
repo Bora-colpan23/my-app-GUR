@@ -28,6 +28,7 @@ import { isServiceOpen } from "./platform.js";
 const KEY = "gur.adslots";
 const listeners = new Set();
 let cache = null;
+let cacheRaw = null;
 
 /**
  * Üç ürün, tek fiyat birimi: GÜN.
@@ -175,24 +176,48 @@ const SURUM = 2;
 
 const bos = () => ({ v: SURUM, prices: {}, bookings: [] });
 
+// Anlık görüntü HAM METNE göre önbellekleniyor. Önceden `if (cache) return
+// cache` vardı ve önbellek yalnızca kendi write()'imizle tazeleniyordu:
+// yönetici BAŞKA BİR SEKMEDE tarihi onayladığında işletme sekmesi bunu hiç
+// görmüyordu. Görsel yükleme alanı tam da bu onaya bakıyor — bayat önbellek
+// akışın kapısını kapalı bırakıyordu.
+//
+// Referans ham metin değişmediği sürece SABİT kalmalı, yoksa
+// useSyncExternalStore sonsuz döner.
 function read() {
-  if (cache) return cache;
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) || "null");
-    if (v && typeof v === "object") {
-      cache = v.v === SURUM
-        ? { ...bos(), ...v }
-        : { ...bos(), bookings: Array.isArray(v.bookings) ? v.bookings : [] };
-    } else cache = bos();
-  } catch { cache = bos(); }
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch { return cache || (cache = bos()); }
+  if (cache && cacheRaw === raw) return cache;
+  let v = null;
+  try { v = JSON.parse(raw || "null"); } catch { v = null; }
+  if (v && typeof v === "object") {
+    cache = v.v === SURUM
+      ? { ...bos(), ...v }
+      : { ...bos(), bookings: Array.isArray(v.bookings) ? v.bookings : [] };
+  } else cache = bos();
+  cacheRaw = raw;
   return cache;
 }
 function write(next) {
-  cache = { ...next, v: SURUM };
-  try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* yoksay */ }
+  const sonraki = { ...next, v: SURUM };
+  let metin = null;
+  try { metin = JSON.stringify(sonraki); } catch { metin = null; }
+  try { localStorage.setItem(KEY, metin); } catch { /* yoksay */ }
+  cache = sonraki; cacheRaw = metin;
   for (const l of listeners) l();
+  try { window.dispatchEvent(new Event("gur:adslots")); } catch { /* SSR */ }
 }
-function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+function subscribe(fn) {
+  listeners.add(fn);
+  const disaridan = () => fn();
+  window.addEventListener("storage", disaridan);      // başka sekme
+  window.addEventListener("gur:adslots", disaridan);  // aynı sekme, diğer rota
+  return () => {
+    listeners.delete(fn);
+    window.removeEventListener("storage", disaridan);
+    window.removeEventListener("gur:adslots", disaridan);
+  };
+}
 
 export function useAdSlots() {
   return useSyncExternalStore(subscribe, read, read);
@@ -242,6 +267,36 @@ export function bookingsOfRestaurant(restaurantId, state = read()) {
   return allBookings(state)
     .filter(b => String(b.restaurantId) === String(restaurantId))
     .sort((a, b) => (a.start < b.start ? 1 : -1));
+}
+
+/**
+ * Bir restoranın bu yerleşimdeki YAYINLARI, duruma göre.
+ *
+ * Reklam materyali yükleme alanı buna bakıyor: tarih onaylanmadan görsel
+ * istemek, teslim edilecek bir yeri olmayan dosyayı onay kuyruğuna
+ * sokmak olurdu. Akış tek yönlü — tarih seç → yönetici onaylasın →
+ * görseli yükle → görsel onaylansın → yayına gir.
+ *
+ * GEÇMİŞ YAYINLAR SAYILMIYOR (`end >= bugün`): geçen ayki bir rezervasyon
+ * yükleme alanını sonsuza kadar açık tutardı ve işletme hiçbir yere
+ * gitmeyecek dosya yüklerdi.
+ */
+export function slotsOf(restaurantId, streamKey, state = read()) {
+  const bugun = today();
+  const hepsi = allBookings(state).filter(b =>
+    String(b.restaurantId) === String(restaurantId) &&
+    b.streamKey === streamKey &&
+    b.end >= bugun);
+  const sirala = (a, b) => (a.start < b.start ? -1 : 1);
+  return {
+    approved: hepsi.filter(b => b.status === "approved").sort(sirala),
+    pending: hepsi.filter(b => b.status === "pending").sort(sirala),
+  };
+}
+
+/** Görsel yükleme kapısı: onaylanmış, süresi geçmemiş bir yayın var mı. */
+export function hasApprovedSlot(restaurantId, streamKey, state = read()) {
+  return slotsOf(restaurantId, streamKey, state).approved.length > 0;
 }
 
 export function pendingBookings(state = read()) {

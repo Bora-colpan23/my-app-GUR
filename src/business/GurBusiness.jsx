@@ -43,7 +43,7 @@ import { useCreatives, promoFor, isVideo as promoIsVideo } from '../lib/creative
 import {
   AD_PRODUCTS, isFixedPrice, useAdSlots, priceOf, canBook, requestBooking,
   cancelBooking, bookingsOfRestaurant, dayState, monthGrid, today, endOf,
-  prettyDay, gunFarki, WEEKDAYS_TR, MONTHS_TR as AY_ADLARI,
+  prettyDay, gunFarki, slotsOf, WEEKDAYS_TR, MONTHS_TR as AY_ADLARI,
 } from '../lib/adslots.js';
 import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
@@ -937,6 +937,109 @@ function SecondChanceCard({ restaurant }) {
  * karar noktası (lib/adslots.js). Burada tekrarlansaydı panel "alabilirsin"
  * derken yönetici tarafı reddedebilirdi.
  */
+/**
+ * REKLAM GÖRSELİ — tarih onayına BAĞLI yükleme alanı.
+ *
+ * Akış tek yönlü ve her adımı ekranda yazılı:
+ *
+ *   1. takvimden tarih seç        → yayın talebi (pending)
+ *   2. yönetici tarihi onaylar    → slot kilitlenir, YÜKLEME ALANI AÇILIR
+ *   3. görseli yükle              → dosya onay kuyruğuna düşer (pending)
+ *   4. yönetici görseli onaylar   → yayına girer
+ *
+ * Yükleme alanı önceden HER ZAMAN açıktı. Tarihi olmayan bir işletme
+ * dosya yükleyebiliyor, dosya onay kuyruğuna düşüyor ve yönetici
+ * yayınlanacak yeri olmayan bir görseli onaylıyordu. Kapı burada: teslim
+ * edilecek bir yer yoksa dosya istemiyoruz.
+ *
+ * Geçmiş rezervasyonlar kapıyı açmıyor (`slotsOf` → `end >= bugün`):
+ * geçen ayki bir yayın, hiçbir yere gitmeyecek dosyalar toplardı.
+ */
+function AdCreativeSlot({ kind, restaurant }) {
+  const slotDurum = useAdSlots();
+  const medyaDurum = useMedia();
+  const tanim = MEDIA_KINDS[kind];
+  const { approved, pending } = restaurant
+    ? slotsOf(restaurant.id, kind, slotDurum)
+    : { approved: [], pending: [] };
+  const acik = approved.length > 0;
+  const dosyalar = restaurant ? listMedia(restaurant.id, kind, medyaDurum) : [];
+  const yayinda = dosyalar.some(f => f.status === "approved");
+  const incelemede = dosyalar.some(f => f.status === "pending");
+
+  // Adım göstergesi: hangi aşamada olduğun tek bakışta görünsün.
+  const adim = !acik ? (pending.length ? 1 : 0) : yayinda ? 3 : incelemede ? 2 : 2;
+  const durumMetni = !acik
+    ? (pending.length
+        ? `Tarih onayı bekleniyor · ${prettyDay(pending[0].start)} – ${prettyDay(pending[0].end)}`
+        : "Henüz yayın tarihi yok")
+    : yayinda
+      ? `Yayında · ${prettyDay(approved[0].start)} – ${prettyDay(approved[0].end)}`
+      : incelemede
+        ? "Görsel onayda — GUR ekibi inceliyor"
+        : `${prettyDay(approved[0].start)} – ${prettyDay(approved[0].end)} için dosyanızı yükleyin`;
+  const durumRenk = yayinda ? "var(--c-ok-light)" : acik ? "var(--c-brand-light)" : "var(--c-warn-light)";
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff" }}>
+          {tanim.label}
+        </span>
+        {/* Nereye çıkacağı ve hangi tür dosya istendiği başlığın yanında:
+            "reklam materyali" tek başına hangi ekranı kastettiğini
+            söylemiyordu. */}
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700,
+          color: "var(--c-brand-light)", background: "rgba(255,102,0,0.14)",
+          border: "1px solid rgba(255,102,0,0.26)", borderRadius: 999, padding: "2px 9px" }}>
+          {tanim.accept.startsWith("video") ? "video" : "görsel"}
+        </span>
+      </div>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: "0 0 10px", lineHeight: 1.5 }}>
+        {tanim.slot}
+      </p>
+
+      {/* Dört adım, hangisinde olduğun dolu noktayla. Renk tek başına bilgi
+          taşımıyor: altında cümlesi yazılı. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        {["Tarih", "Onay", "Görsel", "Yayın"].map((etiket, i) => (
+          <div key={etiket} style={{ display: "flex", alignItems: "center", gap: 6, flex: i < 3 ? 1 : "0 0 auto" }}>
+            <span style={{
+              width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+              background: i <= adim ? durumRenk : "rgba(255,255,255,0.18)",
+            }} />
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700,
+              color: i <= adim ? durumRenk : "rgba(255,255,255,0.32)" }}>{etiket}</span>
+            {i < 3 && <span style={{ flex: 1, height: 1, background: i < adim ? durumRenk : "rgba(255,255,255,0.12)" }} />}
+          </div>
+        ))}
+      </div>
+      <p role="status" style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700,
+        color: durumRenk, margin: "0 0 10px" }}>{durumMetni}</p>
+
+      {acik ? (
+        <MediaManager restaurant={restaurant} kind={kind} />
+      ) : (
+        /* KAPALI. Kutuyu çizip devre dışı bırakmak yerine ne yapılması
+           gerektiğini yazıyoruz: tıklanamayan bir yükleme kutusu, sebebini
+           söylemeyen bir engeldir. */
+        <div style={{
+          background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.14)",
+          borderRadius: 18, padding: "16px 18px", display: "flex", alignItems: "flex-start", gap: 11,
+        }}>
+          <Icon n="clock" size={15} color="var(--c-warn-light)" />
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.55)", margin: 0, lineHeight: 1.55 }}>
+            {pending.length
+              ? "Tarih talebiniz yöneticide. Onaylandığı anda yükleme alanı burada açılacak."
+              : <>Önce yukarıdaki <b style={{ color: "#fff" }}>{AD_PRODUCTS[kind]?.name || tanim.label}</b> kartından
+                takvimi açıp tarih seçin. Tarih onaylandıktan sonra dosyanızı buradan gönderirsiniz.</>}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SlotBooking({ streamKey, restaurant }) {
   const durum = useAdSlots();
   const p = AD_PRODUCTS[streamKey];
@@ -2177,25 +2280,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
                   sonra satın aldığınız alanda yayınlanır.
                 </p>
                 {AD_KINDS.map(k => (
-                  <div key={k} style={{ marginBottom: 18 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                      <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff" }}>
-                        {MEDIA_KINDS[k].label}
-                      </span>
-                      {/* Nereye çıkacağı dosyanın yanında yazıyor: "reklam
-                          materyali" başlığı tek başına hangi ekranı
-                          kastettiğini söylemiyordu. */}
-                      <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700,
-                        color: "var(--c-brand-light)", background: "rgba(255,102,0,0.14)",
-                        border: "1px solid rgba(255,102,0,0.26)", borderRadius: 999, padding: "2px 9px" }}>
-                        {MEDIA_KINDS[k].accept.startsWith("video") ? "video" : "görsel"}
-                      </span>
-                    </div>
-                    <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: "0 0 10px", lineHeight: 1.5 }}>
-                      {MEDIA_KINDS[k].slot}
-                    </p>
-                    <MediaManager restaurant={ownerRestaurant} kind={k} />
-                  </div>
+                  <AdCreativeSlot key={k} kind={k} restaurant={ownerRestaurant} />
                 ))}
               </GrowthSection>
             </div>
