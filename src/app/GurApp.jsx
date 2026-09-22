@@ -712,10 +712,12 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
       .map(b => {
         const r = restaurants.find(x => String(x.id) === String(b.restaurantId));
         if (!r) return null;                 // gizlenmiş ya da yayında değil
-        // Görsel: işletmenin ONAYLANMIŞ reklam materyali, yoksa kendi
+        // Görsel: işletmenin BANNER için onaylanmış materyali, yoksa kendi
         // fotoğrafı. Onaysız dosya hiçbir koşulda ekrana çıkmıyor.
-        const materyal = approvedMedia(r.id, "ads", medyaDurum)
-          .find(f => !String(f.type || "").startsWith("video/"));
+        // Yerleşime göre ayrı kova (bkz. lib/media.js → KINDS): önceden tek
+        // havuzdan ilk GÖRSEL alınıyordu ve ödüllü video için yüklenmiş bir
+        // kare banner'a düşebiliyordu.
+        const materyal = approvedMedia(r.id, "bannerAds", medyaDurum)[0];
         return {
           id: `bk-${b.id}`, img: materyal?.url || r.imgs?.[0], accent: "#FF6600", ad: true,
           eyebrow: r.name, title: r.desc || `${r.cat} · ${r.district || ""}`.trim(),

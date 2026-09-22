@@ -1027,8 +1027,8 @@ hakkı**. Hizmet listesinde bu ayrım "kullanıcı özelliği" çipiyle ve
 satırın altındaki açıklamayla yazılı.
 
 ### İşletme dosyaları: onay kuyruğu (`lib/media.js`)
-Menü, fotoğraf ve reklam materyali. İşletme yüklüyor, **yönetici
-onaylamadan tüketiciye çıkmıyor**:
+Menü, fotoğraf ve **yerleşim başına** reklam materyali. İşletme yüklüyor,
+**yönetici onaylamadan tüketiciye çıkmıyor**:
 
 ```
 işletme yükler (pending) → yönetici ÖNİZLER → onay: tüketicide görünür
@@ -1080,6 +1080,46 @@ arayarak bulurdu.
 **Kayıt akışındaki (reg3) yüklemeler depoya gitmiyor**: orada henüz
 sahiplenilmiş bir kayıt yok, dosyayı hangi restoranın altına yazacağımızı
 bilmiyoruz. Panele girildikten sonraki yüklemeler kuyruğa düşüyor.
+
+#### Reklam materyali YERLEŞİME GÖRE ayrı (`bannerAds` / `rewardedAds`)
+
+Tek bir `ads` havuzu vardı ve iki tüketici de oradan besleniyordu; ayrımı
+yalnızca MIME tipi yapıyordu — banner ilk GÖRSEL'i, ödüllü video ilk
+VİDEO'yu alıyordu. İki sorun:
+
+1. **Ödüllü videoda `|| liste[0]` yedeği vardı.** Restoran yalnızca banner
+   görseli yüklediyse ödüllü video yuvasında hareketsiz bir JPEG
+   "oynuyordu": kullanıcı süresi olmayan bir reklamı izlemiş sayılıp
+   kaydırma hakkı kazanıyordu. Yedek kaldırıldı — video yoksa o restoran
+   aday değil, akış Google yedeğine düşüyor.
+2. **İşletme hangi dosyanın nereye gittiğini göremiyordu.** Tek kutuya bir
+   dosya bırakıp ikisini birden doldurduğunu sanıyordu.
+
+| Kova | Kabul | Nerede çıkar |
+|---|---|---|
+| `bannerAds` | `image/*` | Keşfet ekranının üstündeki dönen banner |
+| `rewardedAds` | `video/*` | Kaydırma hakkı kazandıran ödüllü reklam |
+
+Kutular işletme panelinde **alt alta**, her birinde yerleşim adı, tür çipi
+(görsel/video) ve o türe kilitli dosya seçici var. Yan yana koymak telefonda
+ikisini de hedef olmaktan çıkarırdı. Yönetici kuyruğunda da yerleşim adı
+yazıyor: "Banner görseli" dosyanın TÜRÜNÜ söylüyor, ekranını değil — dikey
+bir video banner'a uymaz ve onaylayanın kararı buna bağlı.
+
+**Eski kayıtlar OKUMA ANINDA taşınıyor** (`tasi()`), depoyu yeniden
+yazmadan: taşıma betiği bir "ilk açılış" kancası gerektirirdi ve o kanca
+çalışmadan okuyan ekran boş liste görürdü. Dosya videoysa ödüllü video,
+değilse banner — eski ayrımın aynısı, ama bir kez ve tek yerde.
+`pendingAll` de bu taşımadan geçiyor, yoksa dosya yönetici kuyruğunda
+görünmez ama işletmede "beklemede" yazardı.
+
+**`media.js` deposu artık `storage` olayını dinliyor.** Önbellek yalnızca
+kendi `write()`iyle tazeleniyordu (`if (cache) return cache`): yönetici
+BAŞKA BİR SEKMEDE dosyayı onayladığında işletme sekmesi bunu hiç görmüyor,
+sayfa yenilenene kadar "İncelemede" yazmaya devam ediyordu. Projedeki diğer
+depolar bunu zaten doğru yapıyordu; burası tek istisnaydı. Anlık görüntü
+ham metne göre önbellekleniyor — referans sabit kalmazsa
+`useSyncExternalStore` sonsuz döner.
 
 ### Reklam slotları: sabit fiyat + takvim (`lib/adslots.js`)
 
@@ -1158,9 +1198,10 @@ koyu temada 19 yeni kontrast uyarısı üretti; fark artık renkle.
 3. **Google yedeği** — gösterilecek restoran videosu kalmadıysa Google
    reklamı oynar, kullanıcı hakkını yine kazanır, akış hiç tıkanmaz.
 
-Oynatılacak dosya **onay kuyruğundan** geliyor (`media.js` → `ads`,
-onaylı): rezervasyon yayını satın alır, hangi dosyanın oynayacağını onay
-belirler. Onaysız video hiçbir koşulda oynamıyor.
+Oynatılacak dosya **onay kuyruğundan** geliyor (`media.js` →
+`rewardedAds`, onaylı): rezervasyon yayını satın alır, hangi dosyanın
+oynayacağını onay belirler. Onaysız video hiçbir koşulda oynamıyor.
+Görsele düşen bir yedek de YOK (bkz. "Reklam materyali yerleşime göre").
 
 ### Dış kaynak yorumları ve görselleri
 Detay sayfasındaki Google bloğunda iki şey var:

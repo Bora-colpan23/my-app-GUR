@@ -2460,9 +2460,20 @@ function MediaQueue({ restaurants = [] }) {
               : <img src={f.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
           </button>
           <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700 }}>{adOf(f.restaurantId)}</div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {adOf(f.restaurantId)}
+              {/* NEREDE YAYINLANACAĞI. "Banner görseli" dosyanın türünü
+                  söylüyor, ekranını değil; onaylayan kişinin kararı tam da
+                  buna bağlı — dikey bir video banner'a uymaz. */}
+              {MEDIA_KINDS[f.kind]?.slot && (
+                <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 700, color: C.orangeInk,
+                  background: C.orangeSoft, borderRadius: R.pill, padding: '2px 9px' }}>
+                  {MEDIA_KINDS[f.kind].label}
+                </span>
+              )}
+            </div>
             <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint }}>
-              {MEDIA_KINDS[f.kind]?.tekil || f.kind} · {f.name} · {mediaSize(f.sizeMB)} · {formatDate(f.at)}
+              {MEDIA_KINDS[f.kind]?.slot || MEDIA_KINDS[f.kind]?.tekil || f.kind} · {f.name} · {mediaSize(f.sizeMB)} · {formatDate(f.at)}
             </div>
           </div>
           <Btn label="Görüntüle" size="sm" variant="outline" onClick={() => setAcik(f)} />
@@ -2526,7 +2537,7 @@ function RestaurantMedia({ restaurant }) {
   return (
     <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
       <SectionHead title="İşletmenin yüklediği dosyalar"
-        right={`${sayi('menu')} menü · ${sayi('photos')} fotoğraf · ${sayi('ads')} reklam`} />
+        right={`${sayi('menu')} menü · ${sayi('photos')} fotoğraf · ${sayi('bannerAds')} banner · ${sayi('rewardedAds')} video`} />
       <div style={{ padding: '12px 18px 0' }}>
         <Segmented
           value={kind} onChange={setKind}

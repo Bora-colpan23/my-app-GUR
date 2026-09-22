@@ -35,33 +35,76 @@ import { fileToFittedDataUrl } from "./image.js";
 
 const KEY = "gur.media";
 const listeners = new Set();
-let cache = null;
+
+// Anlık görüntü HAM METNE göre önbellekleniyor (b2b.js / pricing.js ile
+// aynı kalıp). Önceden `if (cache) return cache` vardı ve önbellek yalnızca
+// kendi `write()`imizle tazeleniyordu: yönetici BAŞKA BİR SEKMEDE dosyayı
+// onayladığında işletme sekmesi bunu hiç görmüyor, sayfa yenilenene kadar
+// "İncelemede" yazmaya devam ediyordu. Projedeki diğer depolar bunu zaten
+// doğru yapıyordu; burası tek istisnaydı.
+//
+// Referansın ham metin değişmediği sürece SABİT kalması şart:
+// useSyncExternalStore her çağrıda yeni nesne görürse sonsuz döner.
+let snap = { raw: null, value: {} };
 
 function read() {
-  if (cache) return cache;
-  try { cache = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; }
-  catch { cache = {}; }
-  return cache;
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch { return snap.value; }
+  if (snap.raw === raw) return snap.value;
+  let stored = null;
+  try { stored = JSON.parse(raw || "{}"); } catch { stored = null; }
+  snap = { raw, value: stored && typeof stored === "object" ? stored : {} };
+  return snap.value;
 }
 function write(next) {
-  cache = next;
-  try { localStorage.setItem(KEY, JSON.stringify(next)); }
+  let metin;
+  try { metin = JSON.stringify(next); } catch { metin = null; }
+  try { localStorage.setItem(KEY, metin); }
   catch {
     // Kota taştı. SESSİZCE YUTMUYORUZ: çağıran yer kullanıcıya
     // söyleyebilsin. Yüklediğini sanıp kaybetmek en kötü sonuç.
+    // Önbelleği GÜNCELLEMEDEN atıyoruz: yazılamayan veriyi yazılmış
+    // göstermek, kaybı bir de gizlemek olurdu.
     throw new Error("Dosya tarayıcı deposuna sığmadı. Daha küçük bir dosya deneyin ya da eski dosyaları silin.");
   }
+  snap = { raw: metin, value: next };
   for (const l of listeners) l();
+  try { window.dispatchEvent(new Event("gur:media")); } catch { /* SSR */ }
 }
-function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+function subscribe(fn) {
+  listeners.add(fn);
+  const disaridan = () => fn();
+  window.addEventListener("storage", disaridan);     // başka sekme
+  window.addEventListener("gur:media", disaridan);   // aynı sekme, diğer rota
+  return () => {
+    listeners.delete(fn);
+    window.removeEventListener("storage", disaridan);
+    window.removeEventListener("gur:media", disaridan);
+  };
+}
 
 export function useMedia() {
   return useSyncExternalStore(subscribe, read, read);
 }
 
 /**
- * Üç tür, üç ayrı kural. `shrink` görselin uzun kenarı: menü sayfası
+ * Dört tür, dört ayrı kural. `shrink` görselin uzun kenarı: menü sayfası
  * okunabilir kalmalı (1600), mekan fotoğrafı kart boyunda yeter (1280).
+ *
+ * REKLAM MATERYALİ YERLEŞİME GÖRE AYRI. Önceden tek bir `ads` havuzu vardı
+ * ve iki tüketici de oradan besleniyordu; ayrımı yalnızca MIME tipi
+ * yapıyordu — banner ilk GÖRSEL'i, ödüllü video ilk VİDEO'yu alıyordu.
+ * İki sorun doğuruyordu:
+ *
+ *   1. Ödüllü videoda `|| liste[0]` yedeği vardı: restoran yalnızca banner
+ *      görseli yüklediyse ödüllü video yuvasında hareketsiz bir JPEG
+ *      "oynuyordu". Kullanıcı süresi olmayan bir reklamı izlemiş sayılıp
+ *      hak kazanıyordu.
+ *   2. İşletme hangi dosyanın nereye gittiğini göremiyordu: tek kutuya bir
+ *      dosya bırakıp ikisini birden doldurduğunu sanıyordu.
+ *
+ * Artık her yerleşimin kendi kutusu, kendi `accept`i ve kendi ölçü tarifi
+ * var. Yanlış türü yüklemek dosya seçicide zaten mümkün değil.
  */
 export const KINDS = {
   menu: {
@@ -72,18 +115,48 @@ export const KINDS = {
     label: "Fotoğraflar", tekil: "Mekan fotoğrafı", accept: "image/*", maxMB: 8, shrink: 1280,
     hint: "Mekan ve yemek fotoğrafları. Keşif kartınızda ilk sırada gösterilir.",
   },
-  ads: {
-    label: "Reklam materyali", tekil: "Reklam dosyası", accept: "image/*,video/*", maxMB: 4, shrink: 1600,
-    hint: "Yayınlanmasını istediğiniz görsel veya video. Onaylanınca satın aldığınız reklam alanında kullanılır.",
+  bannerAds: {
+    label: "Keşfet banner'ı", tekil: "Banner görseli", accept: "image/*", maxMB: 4, shrink: 1600,
+    slot: "Keşfet ekranının üstündeki dönen banner",
+    hint: "Keşfet ekranının üstündeki dönen banner'da çıkacak görsel. Yatay kullanılır; yazıyı ortaya yakın tutun, kenarlar kırpılabilir.",
+  },
+  rewardedAds: {
+    label: "Ödüllü video", tekil: "Ödüllü video dosyası", accept: "video/*", maxMB: 4,
+    slot: "Kaydırma hakkı kazandıran ödüllü reklam",
+    hint: "Kullanıcının kaydırma hakkı kazanmak için sonuna kadar izlediği video. Dikey ve kısa tutun; ses olmadan da anlaşılmalı.",
   },
 };
 
 export const KIND_LIST = Object.keys(KINDS);
 
-const bosMekan = () => ({ menu: [], photos: [], ads: [] });
+/** Reklam yerleşimleri — işletme paneli ve yönetici bu listeden geçiyor. */
+export const AD_KINDS = ["bannerAds", "rewardedAds"];
+
+const bosMekan = () => ({ menu: [], photos: [], bannerAds: [], rewardedAds: [] });
+
+/**
+ * Eski tek havuzlu kayıtları yerleşimlere dağıtır.
+ *
+ * OKUMA ANINDA yapılıyor, depoyu yeniden yazmadan: taşıma betiği yazmak
+ * için tarayıcıda bir "ilk açılış" kancası gerekirdi ve o kanca
+ * çalışmadan okuyan bir ekran boş liste görürdü. Dosya videoysa ödüllü
+ * video, değilse banner — eski ayrımın aynısı, ama bir kez ve tek yerde.
+ */
+function tasi(kayit) {
+  const eski = kayit.ads;
+  if (!Array.isArray(eski) || !eski.length) return kayit;
+  const video = [], gorsel = [];
+  for (const f of eski) (String(f.type || "").startsWith("video/") ? video : gorsel).push(f);
+  const { ads, ...kalan } = kayit;   // eslint-disable-line no-unused-vars
+  return {
+    ...kalan,
+    bannerAds: [...(kayit.bannerAds || []), ...gorsel],
+    rewardedAds: [...(kayit.rewardedAds || []), ...video],
+  };
+}
 
 function mekan(state, restaurantId) {
-  return { ...bosMekan(), ...(state[String(restaurantId)] || {}) };
+  return tasi({ ...bosMekan(), ...(state[String(restaurantId)] || {}) });
 }
 
 // ─── Okuma ───────────────────────────────────────────────────────────────
@@ -113,7 +186,10 @@ export function ownerMediaFor(restaurantId, state = read()) {
 /** Yöneticinin önündeki bütün bekleyen dosyalar, eskiden yeniye. */
 export function pendingAll(state = read()) {
   const cikti = [];
-  for (const [rid, kinds] of Object.entries(state)) {
+  for (const [rid, ham] of Object.entries(state)) {
+    // Eski `ads` kayıtları burada da yerleşimlere dağılmalı; yoksa yönetici
+    // kuyruğunda görünmez ama işletme panelinde "beklemede" yazardı.
+    const kinds = tasi(ham);
     for (const kind of KIND_LIST) {
       for (const f of kinds[kind] || []) {
         if (f.status === "pending") cikti.push({ ...f, restaurantId: rid, kind });

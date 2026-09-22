@@ -36,7 +36,7 @@ import { useModeration, pendingChangeFor } from '../lib/moderation.js';
 import * as secondChance from '../lib/second-chance.js';
 import { useRequests, requestFor, requestQuote, withdraw } from '../lib/requests.js';
 import {
-  useMedia, KINDS as MEDIA_KINDS, listMedia, addMedia, removeMedia,
+  useMedia, KINDS as MEDIA_KINDS, AD_KINDS, listMedia, addMedia, removeMedia,
   statusSummary, ownerMediaFor, isVideo as mediaIsVideo, sizeLabel as mediaSize,
 } from '../lib/media.js';
 import { useCreatives, promoFor, isVideo as promoIsVideo } from '../lib/creatives.js';
@@ -2161,13 +2161,42 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
                   Yukarıdaki kartlar "ne satın alıyorum"u anlatıyor; burası
                   "yayınlanmasını istediğim dosya". İkisi ayrı: biri bizim
                   tanıtımımız (yönetici yüklüyor), bu ise müşterinin
-                  gönderdiği içerik ve ONAYDAN GEÇİYOR. */}
+                  gönderdiği içerik ve ONAYDAN GEÇİYOR.
+
+                  HER YERLEŞİMİN KENDİ KUTUSU. Tek bir "reklam dosyası"
+                  kutusu vardı ve banner ile ödüllü video aynı havuzdan
+                  besleniyordu; işletme hangi dosyanın nereye gittiğini
+                  göremiyor, bir dosya bırakıp ikisini de doldurduğunu
+                  sanıyordu. Kutular yan yana değil ALT ALTA: telefonda iki
+                  yükleme alanını yan yana sıkıştırmak ikisini de hedef
+                  olmaktan çıkarırdı. */}
               <GrowthSection title="Reklam materyaliniz">
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 14px", lineHeight: 1.55 }}>
-                  Yayınlanmasını istediğiniz görsel veya videoyu buradan gönderin.
-                  GUR ekibi onayladıktan sonra satın aldığınız reklam alanında kullanılır.
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 16px", lineHeight: 1.55 }}>
+                  Her reklam alanının dosyası ayrı: banner yatay bir görsel,
+                  ödüllü reklam dikey bir video ister. GUR ekibi onayladıktan
+                  sonra satın aldığınız alanda yayınlanır.
                 </p>
-                <MediaManager restaurant={ownerRestaurant} kind="ads" />
+                {AD_KINDS.map(k => (
+                  <div key={k} style={{ marginBottom: 18 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff" }}>
+                        {MEDIA_KINDS[k].label}
+                      </span>
+                      {/* Nereye çıkacağı dosyanın yanında yazıyor: "reklam
+                          materyali" başlığı tek başına hangi ekranı
+                          kastettiğini söylemiyordu. */}
+                      <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700,
+                        color: "var(--c-brand-light)", background: "rgba(255,102,0,0.14)",
+                        border: "1px solid rgba(255,102,0,0.26)", borderRadius: 999, padding: "2px 9px" }}>
+                        {MEDIA_KINDS[k].accept.startsWith("video") ? "video" : "görsel"}
+                      </span>
+                    </div>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: "0 0 10px", lineHeight: 1.5 }}>
+                      {MEDIA_KINDS[k].slot}
+                    </p>
+                    <MediaManager restaurant={ownerRestaurant} kind={k} />
+                  </div>
+                ))}
               </GrowthSection>
             </div>
           )}

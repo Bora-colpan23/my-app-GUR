@@ -95,9 +95,13 @@ export function pickRewardedAd({
 
     // Videonun kendisi onaylı olmalı: rezervasyon yayını satın alır,
     // oynatılacak dosyayı onay kuyruğu belirler (bkz. lib/media.js).
-    const video = approvedMedia(r.id, "ads", media)
-      .find(f => String(f.type || "").startsWith("video/"))
-      || approvedMedia(r.id, "ads", media)[0];
+    // Kendi yerleşiminden ve YALNIZCA video. Eskiden `|| liste[0]` yedeği
+    // vardı: restoran sadece banner görseli yüklediyse ödüllü video
+    // yuvasında hareketsiz bir JPEG "oynuyordu" — kullanıcı süresi olmayan
+    // bir reklamı izlemiş sayılıp hak kazanıyordu. Video yoksa bu restoran
+    // aday değil; akış Google yedeğine düşüyor, tıkanmıyor.
+    const video = approvedMedia(r.id, "rewardedAds", media)
+      .find(f => String(f.type || "").startsWith("video/"));
     if (!video) continue;
 
     // ── Yakınlık ──
