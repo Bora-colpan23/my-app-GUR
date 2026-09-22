@@ -31,6 +31,20 @@ const router = createBrowserRouter([
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
 
+// ─── ÇEVRİMDIŞI KABUK ───────────────────────────────────────────────
+// Uçak modunda sayfa yenilenince uygulama ölüyordu (ERR_INTERNET_
+// DISCONNECTED). GUR'un YEREL modu zaten sunucusuz çalışıyor; eksik olan
+// yalnızca kabuğun kendisiydi. Ayrıntılar public/sw.js içinde.
+//
+// Tek dosyalık artifact önizlemesinde KAYIT YAPILMIYOR: sayfa claude.ai'den
+// servis ediliyor, kendi kaynağı yok. Geliştirmede de yapılmıyor — HMR ile
+// önbellek birbirini yer.
+if (!__GUR_ARTIFACT__ && import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => { /* kayıt olmazsa uygulama yine çalışır */ });
+  });
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     {/* reducedMotion="user" — sistem "Hareketi Azalt" ayarını tüm spring/tap animasyonlarına otomatik uygular */}

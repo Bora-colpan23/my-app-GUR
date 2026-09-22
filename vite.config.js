@@ -11,6 +11,10 @@ const SINGLE_FILE = process.env.GUR_ARTIFACT === '1';
 
 export default defineConfig({
   plugins: [react()],
+  // Tek dosyalık artifact önizlemesinde Service Worker kaydı YAPILMAMALI:
+  // sayfa claude.ai'den servis ediliyor, kendi kaynağı yok ve kayıt hem
+  // anlamsız hem engelli. Bayrak istemciye bu sabitle geçiyor.
+  define: { __GUR_ARTIFACT__: JSON.stringify(SINGLE_FILE) },
   build: SINGLE_FILE
     ? {
         rollupOptions: {

@@ -5,6 +5,9 @@ module.exports = {
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module', ecmaFeatures: { jsx: true } },
   settings: { react: { version: '18.3' } },
   plugins: ['react'],
+  // Vite `define` ile derleme anında yerine konan sabitler. Kaynakta bir
+  // bildirim yok, o yüzden ESLint'e burada tanıtılıyor.
+  globals: { __GUR_ARTIFACT__: 'readonly' },
   rules: {
     'react/prop-types': 'off',
     'react/no-unescaped-entities': 'off',

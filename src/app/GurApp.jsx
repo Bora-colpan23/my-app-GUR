@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { animate } from 'motion';
@@ -336,19 +336,47 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
 // SCREENS
 // ═══════════════════════════════════════════════
 
+// Açılış animasyonu hiçbir yüklemeye bağlı değil: saf marka anı. Bu yüzden
+// üç kural var, üçü de ölçümden geldi (soğuk açılışta etkileşime kadar
+// 3294 ms ve bunun 3200'ü sabit bekleme idi):
+//
+//  1. ATLANABİLİR. Ekrana dokunmak doğrudan geçiriyor. Bekleyebileceğin
+//     bir animasyon değilse bekletmek saygısızlık.
+//  2. İKİNCİ AÇILIŞTAN İTİBAREN KISA. İlk açılışta marka anı yerinde;
+//     beşinci açılışta aynı 3.2 saniye sadece gecikme. Dönen kullanıcı
+//     ~900 ms görüyor.
+//  3. AZALTILMIŞ HAREKET tercihinde hiç oynatılmıyor.
+const SPLASH_GORULDU = "gur.splashSeen";
+
 function SplashScreen({ onNext }) {
-  const [phase, setPhase] = useState(0); // 0=wait, 1=G, 2=U, 3=R, 4=together, 5=done
+  const reduced = usePrefersReducedMotion();
+  // İlk açılış mı: depoya yazılmamışsa evet. try/catch — gizli sekmede
+  // localStorage erişimi hata atabiliyor, o zaman ilk açılış sayılır.
+  const ilkAcilis = useMemo(() => {
+    try { return !localStorage.getItem(SPLASH_GORULDU); } catch { return true; }
+  }, []);
+  const [phase, setPhase] = useState(reduced ? 5 : 0); // 0=bekle 1=G 2=U 3=R 4=birlikte 5=bitti
+  const gecildi = useRef(false);
+  const gec = useCallback(() => {
+    if (gecildi.current) return;
+    gecildi.current = true;
+    try { localStorage.setItem(SPLASH_GORULDU, "1"); } catch { /* depolama kapalı */ }
+    onNext();
+  }, [onNext]);
+
   useEffect(() => {
+    if (reduced) { const t = setTimeout(gec, 200); return () => clearTimeout(t); }
+    const k = ilkAcilis ? 1 : 0.28;   // dönen kullanıcı: aynı koreografi, dörtte bir sürede
     const timers = [
-      setTimeout(() => setPhase(1), 300),
-      setTimeout(() => setPhase(2), 800),
-      setTimeout(() => setPhase(3), 1300),
-      setTimeout(() => setPhase(4), 1900),
-      setTimeout(() => setPhase(5), 2600),
-      setTimeout(onNext, 3200),
+      setTimeout(() => setPhase(1), 300 * k),
+      setTimeout(() => setPhase(2), 800 * k),
+      setTimeout(() => setPhase(3), 1300 * k),
+      setTimeout(() => setPhase(4), 1900 * k),
+      setTimeout(() => setPhase(5), 2600 * k),
+      setTimeout(gec, 3200 * k),
     ];
     return () => timers.forEach(clearTimeout);
-  }, []);
+  }, [reduced, ilkAcilis, gec]);
 
   const letterStyle = (letter, delay) => ({
     fontSize: phase >= 4 ? 110 : 130,
@@ -367,7 +395,11 @@ function SplashScreen({ onNext }) {
 
   return (
     <Screen grad={false}>
-      <div style={{
+      {/* Dokununca geç. Ayrı bir "Atla" düğmesi yok: ekranda başka hedef
+          olmadığı için tamamı zaten tek bir dokunma alanı. */}
+      <div role="button" tabIndex={0} aria-label="Açılışı geç"
+        onClick={gec} onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") gec(); }}
+        style={{
         height: "100%", display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
         background: "#fff", position: "relative",
@@ -581,8 +613,13 @@ function LoginScreen({ onBack, onLogin, onRegister, live }) {
   // Canlı modda hesap sunucuda; yerel modda giriş ekranı bir formalite ve
   // bunu kullanıcıya söylüyoruz, sessizce "başarılı" göstermek yerine.
   const submit = async () => {
-    if (!live) return onLogin();
+    // DOĞRULAMA HER İKİ MODDA DA. Önceden `if (!live) return onLogin()`
+    // ilk satırdaydı: BOŞ e-posta ve BOŞ parolayla giriş yapılıyordu.
+    // "Yerel modda giriş bir formalite" doğru olabilir ama formu
+    // doğrulamamak, alanları hiç sormamaktan kötü — kullanıcı yazdığının
+    // bir yere gittiğini sanıyor.
     if (!e.includes("@") || p.length < 6) { setError("E-posta ve en az 6 karakter parola gerekli."); return; }
+    if (!live) return onLogin();
     setBusy(true); setError(null);
     try { await backend.signIn({ email: e.trim(), password: p }); onLogin(); }
     catch (err) { setError(err.message || "Giriş yapılamadı"); }
@@ -593,7 +630,11 @@ function LoginScreen({ onBack, onLogin, onRegister, live }) {
 
 function RegisterScreen({ onBack, onDone, onLegal, live }) {
   const [n,setN]=useState(""); const [e,setE]=useState(""); const [p,setP]=useState(""); const [d,setD]=useState(""); const [a,setA]=useState(false);
-  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "var(--f-body)", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "var(--c-brand-ink)", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" onClick={async () => { if (live) { try { await backend.signIn({ email: e, password: p, name: n }); } catch { /* var olan hesap: giriş ekranı denenmeli */ } } onDone(); }} /><SocialAuthRow tone="dark" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onDone(); }} /></div></Screen>;
+  // KOŞUL ONAYI DEKORATİFTİ: kutu işaretlenmeden de kayıt tamamlanıyordu.
+  // Ekranda "kabul ettiğinizi onaylıyorsunuz" yazarken onayı sormamak hem
+  // yalan hem hukuken sakıncalı. Artık düğme kapalı ve sebebi yazılı.
+  const [err,setErr]=useState(null);
+  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "var(--f-body)", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "var(--c-brand-ink)", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" disabled={!a || !n.trim() || !e.includes("@") || p.length < 6} onClick={async () => { if (!a || !n.trim() || !e.includes("@") || p.length < 6) { setErr(!a ? "Devam etmek için koşulları onaylamanız gerekiyor." : "Ad, geçerli bir e-posta ve en az 6 karakter parola gerekli."); return; } setErr(null); if (live) { try { await backend.signIn({ email: e, password: p, name: n }); } catch { /* var olan hesap: giriş ekranı denenmeli */ } } onDone(); }} />{err && <p role="alert" style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-bad-ink)", background: "var(--c-bad-soft)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{err}</p>}<SocialAuthRow tone="dark" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onDone(); }} /></div></Screen>;
 }
 
 // ═══════════════════════════════════════════════
@@ -1269,7 +1310,10 @@ function PremiumSheet({ onClose }) {
   return (
     <Sheet title="GUR Plus" subtitle="Sınırsız keşif" onClose={onClose}>
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-        {[["month", "Aylık"], ["year", "Yıllık · 2 ay hediye"]].map(([id, label]) => (
+        {/* İNDİRİM ORANI ÖLÇÜLDÜ. "2 ay hediye" tutmuyordu: ₺79×12 = ₺948,
+            yıllık ₺690 → aradaki fark ₺258, yani ~%27 (2 ay değil ~3.3 ay).
+            Fiyat iddiası doğrulanabilir olmalı, oranı yazıyoruz. */}
+        {[["month", "Aylık"], ["year", "Yıllık · %27 indirim"]].map(([id, label]) => (
           <button key={id} type="button" className="gur-btn" onClick={() => setPeriod(id)}
             style={{
               flex: 1, border: period === id ? "none" : "1px solid rgba(45,36,25,0.14)",
@@ -1296,7 +1340,14 @@ function PremiumSheet({ onClose }) {
       </div>
 
       <Btn text={`${price} ile başla`} onClick={onClose} variant="filled" />
+      {/* Abonelik ekranının söylemesi GEREKEN şey: ne zaman yenilendiği ve
+          nasıl durdurulacağı. Fiyatı ve faydayı yazıp bunu atlamak, kararı
+          eksik bilgiyle aldırmak olurdu. */}
       <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", textAlign: "center", margin: "10px 0 0", lineHeight: 1.5 }}>
+        {period === "month" ? "Her ay" : "Her yıl"} otomatik yenilenir; profilinden
+        istediğin zaman iptal edebilirsin. İptal edersen dönem sonuna kadar açık kalır.
+      </p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", textAlign: "center", margin: "6px 0 0", lineHeight: 1.5 }}>
         Demo sürümü — ödeme entegrasyonu (iyzico/Stripe) bağlanmadı.
       </p>
     </Sheet>

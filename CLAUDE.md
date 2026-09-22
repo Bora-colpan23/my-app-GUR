@@ -502,6 +502,84 @@ hata `detail`i null bırakır ve yorum iskeleti sonsuza kadar döner. Dönen
 ama asla bitmeyen bir yükleme, hatanın en kötü hâli — iki çağrı yerinde de
 `.catch()` var.
 
+### Açılış, doğrulama ve çevrimdışı — ölçülmüş kurallar
+
+**Splash hiçbir yüklemeye bağlı değil.** Sabit 3200 ms bekliyordu ve
+atlanamıyordu: soğuk açılışta ilk boya 108 ms'de geliyor, etkileşime kadar
+3294 ms geçiyordu — neredeyse tamamı boş bekleme. Üç kural:
+
+| | Süre |
+|---|---|
+| İlk açılış (marka anı) | ~3.2 sn |
+| İkinci açılıştan sonra (`gur.splashSeen`) | ~0.9 sn |
+| Azaltılmış hareket | ~0.2 sn |
+| Ekrana dokunma | anında |
+
+Katsayı tek yerde (`k`), koreografi aynı kalıyor — süreleri tek tek
+kısaltmak fazların birbirine girmesi demekti.
+
+**Giriş formu HER İKİ MODDA doğrulanıyor.** `if (!live) return onLogin()`
+doğrulamadan ÖNCE geliyordu: yerel modda BOŞ e-posta ve BOŞ parolayla
+giriş yapılıyordu. "Yerel modda giriş bir formalite" doğru olabilir ama
+formu doğrulamamak, alanları hiç sormamaktan kötü — kullanıcı yazdığının
+bir yere gittiğini sanıyor. Doğrulama artık ilk satırda, mod kontrolü
+sonra.
+
+**Kayıt ekranındaki koşul onayı DEKORATİFTİ.** Kutu işaretlenmeden de
+kayıt tamamlanıyordu; ekranda "kabul ettiğinizi onaylıyorsunuz" yazarken
+onayı sormamak hem yalan hem hukuken sakıncalı. Düğme artık ad + geçerli
+e-posta + 6 karakter parola + onay kutusu olmadan kapalı ve sebebi
+`role="alert"` ile yazılı.
+
+**Çevrimdışı kabuk (`public/sw.js`).** Uçak modunda sayfa yenilenince
+uygulama ölüyordu (ERR_INTERNET_DISCONNECTED) — oysa YEREL mod tam da
+bunun için var, veriler zaten localStorage'da; eksik olan yalnızca
+kabuktu. İki strateji, bilinçli ayrı:
+
+- **Belge (HTML) → önce ağ.** Yeni dağıtım hemen gelmeli; ağ yoksa
+  önbellekteki kabuk devreye giriyor.
+- **Varlık (hash'li js/css) → önce önbellek.** Dosya adı içeriğin hash'ini
+  taşıyor: aynı ad = aynı içerik, ağa sormak boşuna.
+
+Tersini yapmak (belgeyi önbellekten vermek) en klasik hatayı doğururdu:
+dağıtım yapılır, kullanıcı haftalarca eski sürümü görür. Eski sürüm
+önbellekleri `activate`'te siliniyor.
+
+**Artifact önizlemesinde SW KAYDI YAPILMAZ.** Sayfa claude.ai'den servis
+ediliyor, kendi kaynağı yok. Bayrak `__GUR_ARTIFACT__` (vite `define`) ve
+ESLint'e `globals` ile tanıtılı. `public/sw.js` `dist/` köküne çıkıyor,
+`dist/assets/` altına değil — artifact betiğinin "tek JS dosyası" kontrolü
+bu yüzden etkilenmiyor.
+
+**Paywall metni.** "Yıllık · 2 ay hediye" tutmuyordu: ₺79×12 = ₺948,
+yıllık ₺690 → fark ₺258, yani **~%27** (2 ay değil ~3.3 ay). Fiyat iddiası
+doğrulanabilir olmalı. Ayrıca yenileme ve iptal bilgisi hiç yoktu; fiyatı
+ve faydayı yazıp bunu atlamak kararı eksik bilgiyle aldırmaktı.
+
+### Ölçülüp TEMİZ çıkanlar (tekrar aramayın)
+
+| Test | Sonuç |
+|---|---|
+| Yatay mod | İçerik kayıyor, taşma yok; alt fold'un altındaki düğmelere kaydırarak erişiliyor |
+| Isınma (50 kaydırma) | DOM +7, animasyon +0, yığın +0.6 MB — sızıntı yok |
+| Sil ve kur (depo tamamen silinir) | Uygulama temiz açılıyor |
+| Kapladığı yer | İlk yükte ~188 KB JS; bir oturum sonrası localStorage < 1 KB |
+| Çarpıyı bul | Sayfalar `aria-modal`, her birinde en az iki kapatma yolu |
+| Karanlık mod | `color-scheme: light` bildirili — tek tema bilinçli, işletim sistemi koyu modda beyaz patlaması yok |
+
+### BİLİNEN EKSİK: büyük yazı ölçeklenmiyor
+
+Tarayıcı taban yazı boyutu 16 → 24 px yapıldığında **hiçbir metin
+büyümüyor**: kök 24 px olurken başlık 36 px, gövde 13 px, düğme 16 px
+olduğu yerde kalıyor. Sebebi yapısal — uygulama satır içi stille yazılı ve
+her `fontSize` sabit piksel.
+
+Düzeltmek `fontSize: N` → `rem` dönüşümü demek, ama **tek başına
+yetmiyor**: genişlik/yükseklik/dolgu da sabit pikselde, yalnızca yazıyı
+büyütmek taşma ve kırpılma üretir. Yani bu, ölçüm eşliğinde yapılması
+gereken ayrı bir geçiş — yarım yapılırsa görünürde "destekliyor" ama
+pratikte bozuk bir arayüz çıkar.
+
 ### Erişilebilirlik kuralları (uyulacak)
 - Alan etiketleri `htmlFor` ile bağlı (`InputField`), `<label>` süs değil.
 - Bildirim ve geri bildirim yüzeyleri `role="status" aria-live="polite"`.
@@ -1212,6 +1290,10 @@ Google Places + Foursquare + Tripadvisor + OSM'den cron ile beslenir.
   Akış tam çalışıyor, yalnızca reklamın kendisi gelmiyor.
 - **Ödeme entegrasyonu yok** (iyzico/Stripe). GUR Plus ve ücretli özellikler
   arayüzde var, tahsilat yok.
+- **Tek dil.** Arayüz yalnızca Türkçe; dil değiştirme seçeneği yok ve
+  metinler bileşenlerin içinde sabit. Çok dil desteği i18n katmanı +
+  metinlerin dışarı çıkarılması demek, ayrı bir iş.
+- **Büyük yazı ölçeklenmiyor** (bkz. "BİLİNEN EKSİK" bölümü).
 - Yasal metinlerdeki işletme bilgileri yer tutucu; yayına çıkmadan doldurulmalı.
 - Artifact önizlemesi tanımı gereği YEREL modda çalışır: statik tek dosya,
   arkasında sunucu yok.
