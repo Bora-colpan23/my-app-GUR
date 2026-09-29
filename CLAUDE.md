@@ -450,6 +450,77 @@ yok sayardı. Zil görsel bir işaret.
 Azaltılmış hareket tercihinde salınım ve halkalar duruyor, zil görünmeye
 devam ediyor.
 
+### Doyurucu panosu: "İstatistikler" değil "Pano"
+
+İşletme panelinin ilk sekmesi yeniden yazıldı (`GurBusiness.jsx` → PANO
+bölümü). Referans pano düzeni (üstte KPI kartları, altında tek serili
+büyük grafik, sonra takvim ve program) telefon genişliğine **yeniden
+dizildi**: masaüstündeki üç sütun burada tek sütun ve sıra "ne oldu →
+ne zaman oluyor → sırada ne var". Üç sütunu küçültüp yan yana bırakmak
+390 px'de üç okunmaz şerit demekti.
+
+| Parça | Ne gösterir | Kaynak |
+|---|---|---|
+| Selamlama + tarih | saate göre selam, `Intl` ile tr-TR tarih | — |
+| Dönem seçici | 7 gün / 30 gün / 12 hafta | seçim GERÇEKTEN veri değiştirir |
+| Dört KPI kartı | görüntülenme, beğeni oranı, beğenen, masa talebi | seri + `reservations` |
+| Etkileşim takibi | tek serili çizgi + alan, tepe etiketli | seri |
+| Aktif yayın kartı | yayındaki/sıradaki reklam, kalan gün, bedel | `adslots` + `media` |
+| Isı haritası | gün × saat yoğunluk (eskiden beri) | seri üreteci |
+| Yayın takvimi | bu ay hangi günler yayında | `adslots` |
+| Sırada | yaklaşan yayınlar + bekleyen masa talepleri | `adslots` + `reservations` |
+| Puan dağılımı | (eskiden beri) | demo |
+
+**İki ayrı veri, karıştırmayın.** Görüntülenme/kaydırma serisi DEMO —
+CANLI modda `analytics_events`ten gelecek. Takvim, yaklaşan yayınlar ve
+masa talepleri UYDURMA DEĞİL: doğrudan depolardan okunuyor. İşletmenin
+karar vereceği yerde uydurma sayı olmaz.
+
+**TEK SERİ, TEK TOHUM.** Dönem seçici üç ayrı seri üretmiyor: 182 günlük
+(26 tam hafta) tek bir günlük seri `tohumlu()` ile üretilip dilimleniyor,
+haftalıkta toplanıyor. Her dönem kendi tohumundan doğsaydı "7 gün"
+toplamı "30 gün"ün son yedi gününü tutmazdı ve aynı ekranda iki farklı
+gerçek yazardı. Ölçüldü: 7 günün toplamı (1.570) haftalık grafikteki son
+sütunun aynısı. Başlıktaki **beğeni oranı rozeti de bu seriden** okunuyor
+(30 günlük) ve rozetin altında dönemi yazıyor — başlık bir sayı, kart
+başka bir sayı yazsaydı hangisinin doğru olduğu sorulurdu.
+
+`tohumlu(seed)` ısı haritasıyla ORTAK: aynı restoran = aynı sayılar.
+`Math.random()` olsaydı her yeniden çizimde değişir, sekme değiştirip
+dönen işletme "veri yenilendi" sanırdı.
+
+**Koyu zeminde metin opaklığı en az 0.5.** Panelin eski ekranlarında
+ikincil yazılar `rgba(255,255,255,0.3)`–`0.45` arasında; ölçüldüğünde
+0.35 → **3.23:1**, yani AA'nın altında. Yeni ekran aynı hatayı
+taşımıyor: 0.5 en koyu yüzeyde bile 5.06:1. Bu, "pasif durumu opacity
+ile kurma" kuralının yerine geçmiyor — yalnızca okunur bir taban.
+
+Panoyu tarayınca kalan kontrast uyarılarının **tamamı** ya turuncu
+başlıktan (bilinen karar) ya da pano öncesinden gelen bileşenlerden
+(sekme şeridi 0.4, ısı haritası 0.35) geliyor; panonun kendi eklediği
+tek kategori beyaz-üstü-turuncu (seçili dönem hapı, takvimde yayın günü).
+Not: tarayıcı SVG metnini `color`dan okuduğu için grafik eksen etiketleri
+yanlış olarak "siyah" raporlanıyor — `fill` özniteliği görülmüyor.
+
+**Grafik parmakla okunuyor.** Yalnız `mousemove` dinlenseydi telefonda
+hiçbir nokta okunamazdı. `pointerdown` yakalanıp sürükleme boyunca
+izleniyor, `touchAction: "pan-y"` dikey kaydırmayı bırakıyor — grafiğin
+üstünde parmak yukarı giderse sayfa kaymalı, grafik onu yutmamalı.
+
+**Takvim özetinde bedel yazmıyor.** İlk yazılışta "3 gün yayın · ₺1.400"
+diyordu; oysa o yayın 4 günlüktü ve bir günü sonraki aya taşıyordu —
+satır, dört günün bedelini üç güne yazılmış gibi okutuyordu. Şimdi
+"Bu ay 3 gün yayın · 1 rezervasyon".
+
+**KPI'daki küçük görseller süs değil**: sparkline eğilimi, halka oranı,
+sütunlar dengeyi anlatıyor; üçü de yanındaki sayıyı tekrar ediyor, tek
+başına bilgi taşımıyor. Mini sparkline'ın dolgusu düz renk + opaklık:
+gradyan olsaydı her kopyası aynı id'li bir `<defs>` çizerdi ve tarayıcı
+hepsini ilkine bağlardı (bkz. `GlossDefs`).
+
+Dönem hapları **44 px yüksekliğinde**: ilk ölçümde 38 px'ti ve dokunma
+hedefi kuralının altında kalıyordu.
+
 ### Yönetici panosu: One düzeni
 Panel açık gri kâğıt (`C.bg`) üzerinde beyaz kartlar. Üç imza parçası
 `GurAdmin.jsx` içinde:

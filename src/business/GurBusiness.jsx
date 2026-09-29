@@ -21,7 +21,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   GurLogo, Icon, Img, InputField, SelectField, Btn, IconBtn, Spinner, GlossDefs,
   HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
-  GRAD, BackBtn, haptic, keepVisible, toMediaFiles,
+  GRAD, BackBtn, haptic, keepVisible, toMediaFiles, usePrefersReducedMotion,
 } from '../ui/kit.jsx';
 import {
   submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles,
@@ -37,13 +37,14 @@ import * as secondChance from '../lib/second-chance.js';
 import { useRequests, requestFor, requestQuote, withdraw } from '../lib/requests.js';
 import {
   useMedia, KINDS as MEDIA_KINDS, AD_KINDS, listMedia, addMedia, removeMedia,
-  statusSummary, ownerMediaFor, isVideo as mediaIsVideo, sizeLabel as mediaSize,
+  statusSummary, ownerMediaFor, approvedMedia, isVideo as mediaIsVideo,
+  sizeLabel as mediaSize,
 } from '../lib/media.js';
 import { useCreatives, promoFor, isVideo as promoIsVideo } from '../lib/creatives.js';
 import {
   AD_PRODUCTS, isFixedPrice, useAdSlots, priceOf, canBook, requestBooking,
   cancelBooking, bookingsOfRestaurant, dayState, monthGrid, today, endOf,
-  prettyDay, gunFarki, slotsOf, WEEKDAYS_TR, MONTHS_TR as AY_ADLARI,
+  addDays, prettyDay, gunFarki, slotsOf, WEEKDAYS_TR, MONTHS_TR as AY_ADLARI,
 } from '../lib/adslots.js';
 import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
@@ -1594,15 +1595,27 @@ const HEAT_SLOTS = [
   { label: "21-24", peak: 0.60 },
 ];
 
+/**
+ * Tohumlu rastgelelik: AYNI RESTORAN = AYNI SAYILAR.
+ *
+ * Demo verisi `Math.random()` ile üretilseydi her yeniden çizimde
+ * değişirdi ve sekme değiştirip geri dönen işletme "veri yenilendi"
+ * sanırdı — oysa yalnızca bileşen yeniden çizilmişti. Isı haritası ve
+ * pano serisi aynı üreteci kullanıyor.
+ */
+function tohumlu(seed) {
+  let a = ((Number(String(seed).replace(/\D/g, "")) || 7) * 2654435761) >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function InteractionHeatmap({ restaurant }) {
   const grid = useMemo(() => {
-    let a = ((Number(String(restaurant?.id).replace(/\D/g, "")) || 7) * 2654435761) >>> 0;
-    const rnd = () => {
-      a = (a + 0x6D2B79F5) >>> 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
+    const rnd = tohumlu(restaurant?.id);
     return HEAT_SLOTS.map(slot => HEAT_DAYS.map((d, di) => {
       const weekend = di >= 4 ? 1.25 : 1;               // Cuma-Pazar daha yoğun
       const v = slot.peak * weekend * (0.7 + rnd() * 0.6);
@@ -1666,6 +1679,770 @@ function InteractionHeatmap({ restaurant }) {
         <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-warn)", background: "rgba(255,165,0,0.14)", borderRadius: 999, padding: "5px 11px" }}>
           En sakin: {HEAT_DAYS[worst.di]} {HEAT_SLOTS[worst.si].label} — anlık fırsat için uygun
         </span>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANO — tek bakışta iş
+//
+// Düzen referans panolardan alındı (üstte KPI kartları, altında tek serili
+// büyük grafik, sonra takvim ve program) ama telefon genişliğine YENİDEN
+// DİZİLDİ: masaüstündeki üç sütun burada tek sütun ve sıra "ne oldu → ne
+// zaman oluyor → sırada ne var" olarak okunuyor. Üç sütunu küçültüp yan
+// yana bırakmak 390 px'de üç okunmaz şerit demekti.
+//
+// Sayılar nereden geliyor — ikisi ayrı şey, karıştırmayın:
+//   • Görüntülenme / kaydırma serisi DEMO. CANLI modda analytics_events
+//     tablosundan gelecek; burada restoran kimliğinden DETERMİNİSTİK
+//     üretiliyor (ısı haritasıyla aynı üreteç) ki sekme değiştirirken
+//     sayılar zıplamasın.
+//   • Takvim, yaklaşan yayınlar ve masa talepleri UYDURMA DEĞİL: doğrudan
+//     adslots / reservations depolarından okunuyor. İşletmenin karar
+//     vereceği yerde uydurma sayı olmaz.
+//
+// KOYU ZEMİNDE METİN OPAKLIĞI EN AZ 0.5. Panelin eski ekranlarında ikincil
+// yazılar rgba(255,255,255,0.3)–0.45 arasında; ölçüldüğünde 0.35 → 3.23:1,
+// yani AA'nın altında. Yeni ekran aynı hatayı taşımıyor: 0.5 en koyu
+// yüzeyde bile 5.06:1 veriyor. Pasif/ikincil farkı hâlâ opaklıkla değil
+// (bkz. "Pasif durumu opacity ile kurma") — bu yalnızca okunur bir taban.
+//
+// TEK SERİ, TEK TOHUM. Dönem seçici üç ayrı seri üretmiyor: 182 günlük tek
+// bir günlük seri üretilip dilimleniyor ve haftalıkta toplanıyor. Her dönem
+// kendi tohumundan doğsaydı "7 gün" toplamı "30 gün"ün son yedi gününü
+// tutmazdı ve aynı ekranda iki farklı gerçek yazardı.
+// ═══════════════════════════════════════════════════════════════════════
+
+const PANO_ARALIK = [
+  { id: "7g", label: "7 gün", n: 7, birim: "gun", oncekiAd: "önceki 7 güne göre" },
+  { id: "30g", label: "30 gün", n: 30, birim: "gun", oncekiAd: "önceki 30 güne göre" },
+  { id: "12h", label: "12 hafta", n: 12, birim: "hafta", oncekiAd: "önceki 12 haftaya göre" },
+];
+
+const PANO_GUN_KISA = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+
+// 182 = 26 tam hafta. Haftalık toplamada yarım hafta kalmasın diye tam
+// katı: son dilim eksik günle toplansaydı grafiğin son sütunu sebepsiz
+// düşük çıkardı ve "düşüşteyiz" diye okunurdu.
+const PANO_GUN_SAYISI = 182;
+
+function panoGunlukSeri(restaurantId) {
+  const rnd = tohumlu(restaurantId);
+  const bugun = new Date();
+  bugun.setHours(12, 0, 0, 0);          // saat 12: yaz saati kaymasında gün atlamaz
+  const out = [];
+  for (let i = PANO_GUN_SAYISI - 1; i >= 0; i--) {
+    const d = new Date(bugun);
+    d.setDate(d.getDate() - i);
+    const haftaSonu = d.getDay() === 0 || d.getDay() === 5 || d.getDay() === 6;
+    const yukselis = 1 + ((PANO_GUN_SAYISI - 1 - i) / PANO_GUN_SAYISI) * 0.4;
+    const gorunum = Math.round(132 * (haftaSonu ? 1.3 : 1) * yukselis * (0.76 + rnd() * 0.5));
+    const kaydirma = Math.round(gorunum * 0.62);
+    const sag = Math.round(kaydirma * (0.6 + rnd() * 0.14));
+    out.push({ tarih: d, gorunum, sag, sol: kaydirma - sag });
+  }
+  return out;
+}
+
+/** Seçilen dönem + ondan hemen önceki eşit dönem (kıyas için). */
+function panoSerisi(restaurantId, aralikId) {
+  const conf = PANO_ARALIK.find(a => a.id === aralikId) || PANO_ARALIK[0];
+  const ham = panoGunlukSeri(restaurantId);
+
+  let noktalar;
+  if (conf.birim === "hafta") {
+    const haftalar = [];
+    for (let i = ham.length - 7; i >= 0; i -= 7) {
+      const dilim = ham.slice(i, i + 7);
+      haftalar.unshift({
+        tarih: dilim[0].tarih,
+        gorunum: dilim.reduce((t, x) => t + x.gorunum, 0),
+        sag: dilim.reduce((t, x) => t + x.sag, 0),
+        sol: dilim.reduce((t, x) => t + x.sol, 0),
+      });
+    }
+    noktalar = haftalar.slice(-conf.n * 2);
+  } else {
+    noktalar = ham.slice(-conf.n * 2);
+  }
+
+  const etiketle = p => ({
+    ...p,
+    d: conf.birim === "hafta"
+      ? `${p.tarih.getDate()} ${AY_ADLARI[p.tarih.getMonth()].slice(0, 3)}`
+      : conf.n <= 7 ? PANO_GUN_KISA[p.tarih.getDay()] : String(p.tarih.getDate()),
+    tam: new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long" }).format(p.tarih)
+      + (conf.birim === "hafta" ? " haftası" : ""),
+  });
+
+  return {
+    conf,
+    onceki: noktalar.slice(0, conf.n).map(etiketle),
+    simdi: noktalar.slice(conf.n).map(etiketle),
+  };
+}
+
+function panoToplam(seri) {
+  const gorunum = seri.reduce((t, x) => t + x.gorunum, 0);
+  const sag = seri.reduce((t, x) => t + x.sag, 0);
+  const sol = seri.reduce((t, x) => t + x.sol, 0);
+  return { gorunum, sag, sol, oran: sag + sol ? (sag / (sag + sol)) * 100 : 0 };
+}
+
+/** Yüzde değişim; önceki dönem sıfırsa iddia da yok. */
+function panoDelta(simdi, onceki) {
+  if (!onceki) return null;
+  return Math.round(((simdi - onceki) / onceki) * 100);
+}
+
+const panoSayi = n => Math.round(n).toLocaleString("tr");
+
+// ─── Dönem seçici ────────────────────────────────────────────────────
+// Yönetici panosundaki `Segmented` ile aynı iş ama koyu zeminde ve
+// dokunma hedefi 44 px: telefonda üç ince hap seçilemiyordu. Seçim
+// GERÇEKTEN veri değiştiriyor, yalnızca etiket değil.
+function PanoSegmented({ options, value, onChange, label }) {
+  return (
+    <div role="group" aria-label={label} style={{
+      display: "inline-flex", gap: 3, background: "rgba(255,255,255,0.05)",
+      border: "1px solid rgba(255,255,255,0.08)", borderRadius: 999, padding: 3,
+    }}>
+      {options.map(o => {
+        const on = o.id === value;
+        return (
+          <button key={o.id} type="button" aria-pressed={on}
+            onClick={() => { onChange(o.id); haptic(8); }}
+            style={{
+              border: "none", borderRadius: 999, padding: "0 14px", minHeight: 44,
+              background: on ? "#FF6600" : "transparent",
+              color: on ? "var(--c-on-brand)" : "rgba(255,255,255,0.55)",
+              fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700,
+              whiteSpace: "nowrap", outline: "none", cursor: "pointer",
+              transition: "background 0.2s, color 0.2s",
+            }}>{o.label}</button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── KPI kartındaki küçük görseller ──────────────────────────────────
+// Üçü de SÜS DEĞİL: kartın sayısını bir boyut daha anlatıyor (eğilim,
+// oran, denge). Hiçbiri tek başına bilgi taşımıyor — yanındaki sayı ve
+// alt satır aynı şeyi yazıyor, renk körlüğünde de okunur.
+
+function MiniSpark({ points, w = 60, h = 30, color = "#FF9A4D" }) {
+  if (!points || points.length < 2) return null;
+  const min = Math.min(...points), max = Math.max(...points);
+  const span = max - min || 1;
+  const koor = points.map((v, i) => [
+    (i / (points.length - 1)) * (w - 2) + 1,
+    h - 3 - ((v - min) / span) * (h - 8),
+  ]);
+  const cizgi = koor.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  // Dolgu düz renk + opaklık: gradyan olsaydı her kopyası aynı id'li bir
+  // <defs> çizerdi ve tarayıcı hepsini ilkine bağlardı (bkz. GlossDefs).
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" focusable="false" style={{ display: "block" }}>
+      <path d={`${cizgi} L${w - 1} ${h} L1 ${h} Z`} fill={color} opacity="0.13" />
+      <path d={cizgi} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function MiniRing({ pct, size = 46, color = "#FF6600" }) {
+  const r = (size - 6) / 2;
+  const c = 2 * Math.PI * r;
+  const dolu = Math.max(0, Math.min(100, pct)) / 100;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true" focusable="false" style={{ display: "block" }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
+        strokeDasharray={`${(c * dolu).toFixed(1)} ${(c + 1).toFixed(1)}`}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+    </svg>
+  );
+}
+
+function MiniBars({ points, w = 60, h = 30, color = "#FF9A4D" }) {
+  if (!points || !points.length) return null;
+  const max = Math.max(...points) || 1;
+  const gen = w / points.length;
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" focusable="false" style={{ display: "block" }}>
+      {points.map((v, i) => {
+        const yuk = Math.max(3, (v / max) * (h - 4));
+        return <rect key={i} x={i * gen + 1} y={h - yuk} width={Math.max(2, gen - 2.5)} height={yuk}
+          rx="2" fill={color} opacity={i === points.length - 1 ? 1 : 0.42} />;
+      })}
+    </svg>
+  );
+}
+
+function PanoKpi({ etiket, deger, alt, delta, gorsel, tone = "#FF9A4D" }) {
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+      borderRadius: 20, padding: "14px 14px 12px",
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.5)", margin: "0 0 4px", fontWeight: 600 }}>{etiket}</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: tone, margin: 0, lineHeight: 1.1 }}>{deger}</p>
+        </div>
+        <div style={{ flexShrink: 0 }}>{gorsel}</div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
+        {delta != null && (
+          <span style={{
+            fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800,
+            color: delta >= 0 ? "var(--c-ok-light)" : "var(--c-bad-light)",
+            background: delta >= 0 ? "rgba(74,222,128,0.14)" : "rgba(255,122,112,0.14)",
+            borderRadius: 999, padding: "3px 7px",
+          }}>{delta >= 0 ? "↑" : "↓"} %{Math.abs(delta)}</span>
+        )}
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.5)" }}>{alt}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Büyük eğilim grafiği ────────────────────────────────────────────
+// Tek seri: gösterge kutusu yok, başlık seriyi zaten adlandırıyor. Her
+// noktaya sayı yazılmıyor — TEPE noktası her zaman etiketli, gerisi
+// parmakla geliyor.
+//
+// Parmakla: `pointerdown` yakalayıp sürükleme boyunca izliyor. Yalnız
+// `mousemove` dinlenseydi telefonda hiçbir nokta okunamazdı — imleç yok.
+// `touchAction: "pan-y"` dikey kaydırmayı bırakıyor: grafiğin üstünde
+// parmak yukarı giderse sayfa kaymalı, grafik onu yutmamalı.
+function PanoTrend({ data, height = 172, birim = "gün" }) {
+  const wrap = useRef(null);
+  const suruk = useRef(false);
+  const [w, setW] = useState(320);
+  const [sec, setSec] = useState(null);
+  const azHareket = usePrefersReducedMotion();
+
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(220, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const padT = 30, padB = 22, padX = 12;
+  const degerler = data.map(d => d.gorunum);
+  const min = Math.min(...degerler), max = Math.max(...degerler);
+  const span = max - min || 1;
+  const plotH = height - padT - padB;
+  const xAt = i => padX + (i / Math.max(1, data.length - 1)) * (w - padX * 2);
+  const yAt = v => padT + plotH - ((v - min) / span) * plotH;
+
+  const cizgi = data.map((d, i) => `${i ? "L" : "M"}${xAt(i).toFixed(1)} ${yAt(d.gorunum).toFixed(1)}`).join(" ");
+  const alan = `${cizgi} L${xAt(data.length - 1).toFixed(1)} ${padT + plotH} L${xAt(0).toFixed(1)} ${padT + plotH} Z`;
+  const tepe = degerler.indexOf(max);
+  const aktif = sec == null ? null : data[sec];
+
+  // Etiket sıklığı: 30 günde her günün numarasını yazmak okunmaz bir
+  // şerit demekti. En çok yedi etiket kalıyor.
+  const adim = Math.max(1, Math.ceil(data.length / 7));
+
+  const yakala = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const oran = (e.clientX - r.left - padX) / Math.max(1, r.width - padX * 2);
+    setSec(Math.max(0, Math.min(data.length - 1, Math.round(oran * (data.length - 1)))));
+  };
+
+  const tepeEtiket = panoSayi(max);
+  const tepeW = 22 + tepeEtiket.length * 7.2;
+  const tepeX = Math.max(tepeW / 2 + 2, Math.min(w - tepeW / 2 - 2, xAt(tepe)));
+
+  return (
+    <div ref={wrap} style={{ position: "relative", width: "100%" }}>
+      <svg
+        width={w} height={height} viewBox={`0 0 ${w} ${height}`}
+        role="img"
+        aria-label={`${birim} bazında görüntülenme eğilimi. En yüksek ${data[tepe].tam}: ${tepeEtiket}.`}
+        onPointerDown={e => { suruk.current = true; e.currentTarget.setPointerCapture?.(e.pointerId); yakala(e); }}
+        onPointerMove={e => { if (suruk.current || e.pointerType === "mouse") yakala(e); }}
+        onPointerUp={() => { suruk.current = false; }}
+        onPointerCancel={() => { suruk.current = false; setSec(null); }}
+        onPointerLeave={e => { if (e.pointerType === "mouse") setSec(null); }}
+        style={{ display: "block", touchAction: "pan-y" }}>
+
+        {/* Izgara geri planda: veri önde */}
+        {[0, 0.25, 0.5, 0.75, 1].map(t => (
+          <line key={t} x1={padX} x2={w - padX} y1={padT + plotH * t} y2={padT + plotH * t}
+            stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+        ))}
+
+        {aktif && (
+          <rect x={xAt(sec) - (w / data.length) / 2} y={padT - 6}
+            width={w / data.length} height={plotH + 12} rx="7"
+            fill="#FF6600" opacity="0.10" />
+        )}
+
+        <path d={alan} fill="#FF6600" opacity="0.12" />
+        <motion.path
+          d={cizgi} fill="none" stroke="#FF9A4D" strokeWidth="2.5"
+          strokeLinecap="round" strokeLinejoin="round"
+          initial={{ pathLength: azHareket ? 1 : 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: azHareket ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }} />
+
+        {/* Tepe noktası: referanstaki koyu balon. Her zaman yazılı. */}
+        <circle cx={xAt(tepe)} cy={yAt(max)} r="4" fill="#100D0B" stroke="#FF6600" strokeWidth="2.5" />
+        <rect x={tepeX - tepeW / 2} y={4} width={tepeW} height={19} rx="9.5" fill="#FF6600" />
+        <text x={tepeX} y={17.5} textAnchor="middle"
+          style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 800 }}
+          fill="var(--c-on-brand)">{tepeEtiket}</text>
+
+        {aktif && (
+          <>
+            <line x1={xAt(sec)} x2={xAt(sec)} y1={padT - 6} y2={padT + plotH}
+              stroke="#FF9A4D" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+            <circle cx={xAt(sec)} cy={yAt(aktif.gorunum)} r="5.5" fill="#FF6600" stroke="#100D0B" strokeWidth="2.5" />
+          </>
+        )}
+
+        {data.map((d, i) => (
+          (i % adim === 0 || i === data.length - 1) && (
+            <text key={i} x={xAt(i)} y={height - 6}
+              textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}
+              style={{ fontFamily: "var(--f-body)", fontSize: 10, fontWeight: sec === i ? 700 : 500 }}
+              fill={sec === i ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.5)"}>{d.d}</text>
+          )
+        ))}
+      </svg>
+
+      {aktif && (
+        <div role="status" style={{
+          position: "absolute", top: 26, pointerEvents: "none", width: 132,
+          left: Math.min(Math.max(xAt(sec) - 66, 0), Math.max(w - 132, 0)),
+          background: "rgba(16,13,11,0.94)", border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 12, padding: "8px 10px", boxShadow: "var(--sh-d3)",
+        }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.55)", margin: "0 0 3px" }}>{aktif.tam}</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>{panoSayi(aktif.gorunum)} görüntülenme</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.5)", margin: 0 }}>
+            {panoSayi(aktif.sag)} beğeni · {panoSayi(aktif.sol)} geçme
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Şu an yayında olan reklam ───────────────────────────────────────
+// Referanstaki büyük medya kartının karşılığı: görseli var, iki sayısı
+// var ve gerçek bir işi anlatıyor. Kaynağı DEPO — onaylı rezervasyon +
+// onaylı reklam materyali. İkisinden biri eksikse kart o eksiği yazıyor:
+// "yayında" deyip ekranda hiçbir şey olmaması en kötü hâl.
+function AktifYayinKarti({ restaurant, onGo }) {
+  const durum = useAdSlots();
+  const medya = useMedia();
+  if (!restaurant) return null;
+
+  const bugun = today();
+  const kendi = bookingsOfRestaurant(restaurant.id, durum)
+    .filter(b => b.status === "approved" && b.end >= bugun);
+  const aktif = kendi.find(b => b.start <= bugun) || null;
+  const sirada = kendi.filter(b => b.start > bugun).sort((a, b) => (a.start < b.start ? -1 : 1))[0] || null;
+  const b = aktif || sirada;
+
+  if (!b) {
+    return (
+      <div style={{
+        background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.14)",
+        borderRadius: 20, padding: "18px 16px", marginBottom: 16,
+      }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 6px" }}>Şu an yayında reklamınız yok</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.5)", margin: "0 0 12px", lineHeight: 1.5 }}>
+          Keşfet banner'ı, ödüllü video ve push bildirimi takvimden tarih seçilerek alınıyor.
+        </p>
+        <Btn text="Büyüme sekmesine git" onClick={() => onGo("growth")} variant="filled" size="sm" fullWidth={false} />
+      </div>
+    );
+  }
+
+  const p = AD_PRODUCTS[b.streamKey];
+  const gorsel = approvedMedia(restaurant.id, b.streamKey, medya)[0] || null;
+  const kalan = aktif ? gunFarki(bugun, b.end) + 1 : gunFarki(bugun, b.start);
+  const video = gorsel && mediaIsVideo(gorsel);
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg, rgba(255,102,0,0.16) 0%, rgba(255,255,255,0.04) 62%)",
+      border: "1px solid rgba(255,102,0,0.22)", borderRadius: 22, padding: 14, marginBottom: 16,
+      display: "flex", gap: 13, alignItems: "center",
+    }}>
+      <div style={{
+        width: 74, height: 74, borderRadius: 16, flexShrink: 0, overflow: "hidden",
+        background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {gorsel && !video
+          ? <img src={gorsel.url} alt={`${p?.name} reklam görseli`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : gorsel && video
+            ? <video src={gorsel.url} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : <Icon n="photo" size={22} color="rgba(255,255,255,0.5)" />}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{
+          display: "inline-block", fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800,
+          letterSpacing: "0.04em", borderRadius: 999, padding: "3px 8px", marginBottom: 6,
+          color: aktif ? "var(--c-ok-light)" : "var(--c-warn-light)",
+          background: aktif ? "rgba(74,222,128,0.15)" : "rgba(255,180,84,0.15)",
+        }}>{aktif ? "YAYINDA" : "SIRADA"}</span>
+
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p?.name || b.streamKey}</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.5)", margin: "0 0 8px" }}>
+          {prettyDay(b.start)}{b.end !== b.start ? ` – ${prettyDay(b.end)}` : ""}
+        </p>
+
+        <div style={{ display: "flex", gap: 16 }}>
+          <div>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#FF9A4D", margin: 0, lineHeight: 1.1 }}>{Math.max(0, kalan)}</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.5)", margin: 0 }}>{aktif ? "gün kaldı" : "gün sonra"}</p>
+          </div>
+          <div>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1.1 }}>₺{(b.priceMinor || 0).toLocaleString("tr")}</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.5)", margin: 0 }}>{b.days} günlük bedel</p>
+          </div>
+        </div>
+
+        {!gorsel && (
+          <p role="status" style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "var(--c-warn-light)", margin: "8px 0 0", lineHeight: 1.45 }}>
+            Tarih onaylandı, görsel yüklenmedi — Büyüme sekmesinden yükleyin.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Yayın takvimi ───────────────────────────────────────────────────
+// Referanstaki renkli takvimin karşılığı, ama süs değil: RESTORANIN KENDİ
+// rezervasyonlarını gösteriyor. "Bu ay hangi günler yayındayım" sorusunun
+// tek bakışta cevabı; satın alma buradan yapılmıyor (o Büyüme sekmesinde,
+// kurallarıyla birlikte) — burası okuma ekranı.
+//
+// GEÇMİŞ GÜN OPACITY İLE SOLUKLAŞTIRILMIYOR (projenin kendi kuralı):
+// fark renkle.
+function YayinTakvimi({ restaurant }) {
+  const durum = useAdSlots();
+  const [ay, setAy] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const [secili, setSecili] = useState(null);
+
+  const gunler = useMemo(() => {
+    const m = {};
+    if (!restaurant) return m;
+    bookingsOfRestaurant(restaurant.id, durum)
+      .filter(b => b.status === "approved" || b.status === "pending")
+      .forEach(b => {
+        // Aralığı gün gün açıyoruz; bozuk bir kayıt (end < start) sonsuz
+        // döngü yapmasın diye sayaç var.
+        let g = b.start;
+        for (let i = 0; i < 40 && g <= b.end; i++) {
+          (m[g] = m[g] || []).push(b);
+          g = addDays(g, 1);
+        }
+      });
+    return m;
+  }, [durum, restaurant]);
+
+  const hucreler = monthGrid(ay.y, ay.m);
+  const bugun = today();
+  const ayOnEki = `${ay.y}-${String(ay.m + 1).padStart(2, "0")}`;
+  const ayGunleri = Object.keys(gunler).filter(g => g.startsWith(ayOnEki));
+  // Bu aya değen REZERVASYON sayısı. Bedeli buraya yazmıyoruz: bir yayın
+  // ay sınırını aşabiliyor ve "3 gün · ₺1.400" satırı dört günlük bir
+  // yayının bedelini üç güne yazılmış gibi okutuyordu (ölçüldü).
+  const ayRezervasyon = useMemo(() => {
+    const gorulen = new Set();
+    ayGunleri.forEach(g => gunler[g].forEach(b => gorulen.add(b.id)));
+    return gorulen.size;
+  }, [ayGunleri, gunler]);
+
+  return (
+    <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 14px", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: 0 }}>Yayın takviminiz</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <IconBtn size={30} shape="rounded" tone="glassLight" title="Önceki ay"
+            onClick={() => { setSecili(null); setAy(a => a.m === 0 ? { y: a.y - 1, m: 11 } : { y: a.y, m: a.m - 1 }); }}
+            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>} />
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: "#fff", minWidth: 78, textAlign: "center" }}>
+            {AY_ADLARI[ay.m]} {ay.y}
+          </span>
+          <IconBtn size={30} shape="rounded" tone="glassLight" title="Sonraki ay"
+            onClick={() => { setSecili(null); setAy(a => a.m === 11 ? { y: a.y + 1, m: 0 } : { y: a.y, m: a.m + 1 }); }}
+            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>} />
+        </div>
+      </div>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.5)", margin: "0 0 12px" }}>
+        {ayGunleri.length
+          ? `Bu ay ${ayGunleri.length} gün yayın · ${ayRezervasyon} rezervasyon`
+          : "Bu ay planlanmış yayın yok"}
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 4 }}>
+        {WEEKDAYS_TR.map(g => (
+          <div key={g} style={{ textAlign: "center", fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>{g}</div>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+        {hucreler.map((gunISO, i) => {
+          if (!gunISO) return <div key={`b${i}`} />;
+          const kayitlar = gunler[gunISO] || [];
+          const onayli = kayitlar.some(b => b.status === "approved");
+          const bekleyen = !onayli && kayitlar.length > 0;
+          const bugunMu = gunISO === bugun;
+          const gecmis = gunISO < bugun;
+          const sayi = Number(gunISO.slice(-2));
+          const ortak = {
+            aspectRatio: "1", borderRadius: 9, padding: 0, outline: "none",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700,
+            // Geçmiş gün SOLUKLAŞTIRILMIYOR: mürekkep koyulaşıyor, zemin aynı.
+            color: onayli ? "var(--c-on-brand)" : gecmis ? "rgba(255,255,255,0.5)" : "#fff",
+            background: onayli ? "#FF6600" : bekleyen ? "rgba(255,180,84,0.18)" : "rgba(255,255,255,0.04)",
+            border: secili === gunISO ? "2px solid #fff"
+              : bugunMu ? "2px solid rgba(255,255,255,0.5)"
+                : bekleyen ? "1px dashed rgba(255,180,84,0.6)" : "1px solid rgba(255,255,255,0.07)",
+          };
+          if (!kayitlar.length) return <div key={gunISO} style={ortak}>{sayi}</div>;
+          return (
+            <button key={gunISO} type="button"
+              onClick={() => setSecili(s => (s === gunISO ? null : gunISO))}
+              aria-pressed={secili === gunISO}
+              title={`${prettyDay(gunISO)} · ${kayitlar.map(b => AD_PRODUCTS[b.streamKey]?.name).join(", ")}`}
+              style={{ ...ortak, cursor: "pointer" }}>{sayi}</button>
+          );
+        })}
+      </div>
+
+      {/* Renk tek başına bilgi taşımasın: gösterge yazılı. */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+        {[["#FF6600", "yayında"], ["rgba(255,180,84,0.18)", "onay bekliyor"], ["rgba(255,255,255,0.04)", "boş"]].map(([c, t]) => (
+          <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 3, background: c, border: "1px solid rgba(255,255,255,0.12)" }} />
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{t}</span>
+          </span>
+        ))}
+      </div>
+
+      {secili && (
+        <div role="status" style={{ marginTop: 11, paddingTop: 11, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "#fff", margin: "0 0 5px" }}>{prettyDay(secili)}</p>
+          {(gunler[secili] || []).map(b => (
+            <p key={b.id} style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.55)", margin: "0 0 3px" }}>
+              {AD_PRODUCTS[b.streamKey]?.name || b.streamKey} · {b.status === "approved" ? "yayında" : "onay bekliyor"}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sırada ne var ───────────────────────────────────────────────────
+// Referanstaki "Scheduled" listesi. İki kaynak tek listede: yaklaşan
+// reklam yayınları ve cevap bekleyen masa talepleri. İkisi de işletmenin
+// BUGÜN yapacağı iş; ayrı iki kutuya koymak "iki ayrı gün" gibi okunurdu.
+function YaklasanListe({ restaurant, canReserve, onGo }) {
+  const durum = useAdSlots();
+  const tumTalepler = reservations.useReservations();
+  if (!restaurant) return null;
+
+  const bugun = today();
+  const yayinlar = bookingsOfRestaurant(restaurant.id, durum)
+    .filter(b => (b.status === "approved" || b.status === "pending") && b.end >= bugun)
+    .sort((a, b) => (a.start < b.start ? -1 : 1))
+    .slice(0, 4);
+
+  const masalar = canReserve
+    ? tumTalepler.filter(x => x.restaurantId === String(restaurant.id) && x.status === "pending").slice(0, 3)
+    : [];
+
+  const bos = !yayinlar.length && !masalar.length;
+
+  return (
+    <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 14px", marginBottom: 20 }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 12px" }}>Sırada</p>
+
+      {bos && (
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.5 }}>
+          Bekleyen bir iş yok. Yaklaşan yayınlarınız ve cevap bekleyen masa talepleriniz burada görünür.
+        </p>
+      )}
+
+      {yayinlar.map(b => {
+        const onayli = b.status === "approved";
+        return (
+          <button key={b.id} type="button" onClick={() => onGo("growth")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left",
+              background: "transparent", border: "none", borderRadius: 14, padding: "9px 6px",
+              cursor: "pointer", outline: "none", minHeight: 44,
+            }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+              background: onayli ? "#FF6600" : "var(--c-warn-light)",
+            }} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {AD_PRODUCTS[b.streamKey]?.name || b.streamKey}
+              </span>
+              <span style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.5)" }}>
+                {prettyDay(b.start)}{b.end !== b.start ? ` – ${prettyDay(b.end)}` : ""} · {onayli ? "onaylandı" : "onay bekliyor"}
+              </span>
+            </span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>
+              ₺{(b.priceMinor || 0).toLocaleString("tr")}
+            </span>
+          </button>
+        );
+      })}
+
+      {masalar.map(x => (
+        <button key={x.id} type="button" onClick={() => onGo("tables")}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left",
+            background: "transparent", border: "none", borderRadius: 14, padding: "9px 6px",
+            cursor: "pointer", outline: "none", minHeight: 44,
+          }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-ok-light)", flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "#fff" }}>
+              Masa talebi · {x.people} kişi
+            </span>
+            <span style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.5)" }}>
+              {x.day} · {x.time} · cevap bekliyor
+            </span>
+          </span>
+          <Icon n="clock" size={14} color="rgba(255,255,255,0.5)" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Panonun kendisi ─────────────────────────────────────────────────
+function PanoTab({ restaurant, canReserve, onGo, reviewCount }) {
+  const [aralik, setAralik] = useState("7g");
+  const seri = useMemo(() => panoSerisi(restaurant?.id, aralik), [restaurant?.id, aralik]);
+  const simdi = useMemo(() => panoToplam(seri.simdi), [seri]);
+  const onceki = useMemo(() => panoToplam(seri.onceki), [seri]);
+  const tumTalepler = reservations.useReservations();
+  const masaSayisi = tumTalepler.filter(x => x.restaurantId === String(restaurant?.id)).length;
+
+  const saat = new Date().getHours();
+  const selam = saat < 6 ? "İyi geceler" : saat < 12 ? "Günaydın" : saat < 18 ? "İyi günler" : "İyi akşamlar";
+  const bugunYazi = new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
+
+  return (
+    <div>
+      {/* Selamlama: panonun sahibi bir işletme ve bugünün tarihi kararın
+          bir parçası (bugün cuma mı, hafta sonu mu). */}
+      <div style={{ marginBottom: 16 }}>
+        <h3 style={{ fontFamily: "var(--f-display)", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 3px" }}>
+          {selam} 👋
+        </h3>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: 0 }}>{bugunYazi}</p>
+      </div>
+
+      {/* Dönem seçici: ÜSTTE, çünkü altındaki her sayıyı o belirliyor. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+        <PanoSegmented options={PANO_ARALIK} value={aralik} onChange={setAralik} label="Dönem" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+        <PanoKpi
+          etiket="Görüntülenme" tone="#fff"
+          deger={panoSayi(simdi.gorunum)}
+          alt={seri.conf.oncekiAd}
+          delta={panoDelta(simdi.gorunum, onceki.gorunum)}
+          gorsel={<MiniSpark points={seri.simdi.map(p => p.gorunum)} />} />
+
+        <PanoKpi
+          etiket="Beğeni oranı"
+          deger={`%${simdi.oran.toFixed(1)}`}
+          alt="sağa kaydırma payı"
+          delta={panoDelta(simdi.oran, onceki.oran)}
+          gorsel={
+            <div style={{ position: "relative", width: 46, height: 46 }}>
+              <MiniRing pct={simdi.oran} />
+              {/* Halkanın ortasındaki kalp: oranın NEYİN oranı olduğunu
+                  söylüyor. Sayı zaten kartın solunda yazılı. */}
+              <span aria-hidden="true" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon n="heart" size={15} color="#FF9A4D" />
+              </span>
+            </div>
+          } />
+
+        <PanoKpi
+          etiket="Beğenen" tone="var(--c-ok-light)"
+          deger={panoSayi(simdi.sag)}
+          alt={`${panoSayi(simdi.sol)} kişi geçti`}
+          delta={panoDelta(simdi.sag, onceki.sag)}
+          gorsel={<MiniBars points={seri.simdi.slice(-7).map(p => p.sag)} color="var(--c-ok-light)" />} />
+
+        {canReserve ? (
+          <PanoKpi
+            etiket="Masa talebi" tone="#FF9A4D"
+            deger={panoSayi(masaSayisi)}
+            alt="uygulamadan gelen"
+            gorsel={<div style={{ width: 46, height: 46, borderRadius: 14, background: "rgba(255,102,0,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="plate" size={19} color="#FF9A4D" /></div>} />
+        ) : (
+          <PanoKpi
+            etiket="Yorum" tone="#FF9A4D"
+            deger={panoSayi(reviewCount)}
+            alt="toplam"
+            gorsel={<div style={{ width: 46, height: 46, borderRadius: 14, background: "rgba(255,102,0,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="chat" size={19} color="#FF9A4D" /></div>} />
+        )}
+      </div>
+
+      {/* Büyük grafik */}
+      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 12px 10px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "0 4px", marginBottom: 6 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: 0 }}>Etkileşim takibi</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.5)", margin: 0 }}>
+            {seri.conf.birim === "hafta" ? "haftalık" : "günlük"} görüntülenme
+          </p>
+        </div>
+        <PanoTrend data={seri.simdi} birim={seri.conf.birim === "hafta" ? "hafta" : "gün"} />
+      </div>
+
+      <AktifYayinKarti restaurant={restaurant} onGo={onGo} />
+
+      <InteractionHeatmap restaurant={restaurant} />
+
+      <YayinTakvimi restaurant={restaurant} />
+
+      <YaklasanListe restaurant={restaurant} canReserve={canReserve} onGo={onGo} />
+
+      {/* Puan dağılımı */}
+      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 16px" }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 14px" }}>Puan dağılımı</p>
+        {[
+          { stars: 5, count: 18, pct: 47 },
+          { stars: 4, count: 11, pct: 29 },
+          { stars: 3, count: 5, pct: 13 },
+          { stars: 2, count: 2, pct: 5 },
+          { stars: 1, count: 2, pct: 5 },
+        ].map((r, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: i < 4 ? 8 : 0 }}>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", width: 14, textAlign: "right" }}>{r.stars}</span>
+            <span style={{ fontSize: 12, color: "var(--c-warn)" }}>★</span>
+            <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+              <div style={{ width: `${r.pct}%`, height: "100%", borderRadius: 4, background: r.stars >= 4 ? "rgba(76,175,80,0.5)" : r.stars === 3 ? "rgba(255,165,0,0.5)" : "rgba(255,59,48,0.4)", transition: "width 0.6s ease-out", transitionDelay: `${i * 0.1}s` }} />
+            </div>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.5)", width: 28, textAlign: "right" }}>{r.count}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1860,23 +2637,18 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
   // Eskiden burada kökten prop olarak inen geçici bir dizi vardı: sayfa
   // yenilenince kayboluyor, yönetici panelinden hiç görünmüyordu.
 
-  // Mock istatistik verileri
+  // Başlıktaki beğeni oranı PANONUN kendi serisinden okunuyor: başlık bir
+  // sayı, panodaki kart başka bir sayı yazsaydı hangisinin doğru olduğu
+  // sorulurdu. Dönem 30 gün — başlık dönem seçicisiyle değişmemeli, orası
+  // sabit bir künye.
+  const ozet30 = useMemo(
+    () => panoToplam(panoSerisi(ownerRestaurant?.id, "30g").simdi),
+    [ownerRestaurant?.id]);
+
+  // Puan ve yorumlar hâlâ demo (sunucu tarafında reviews tablosu var).
   const stats = {
-    totalViews: 1248,
-    swipeRight: 847,
-    swipeLeft: 401,
-    favRate: 67.9,
     avgRating: 4.6,
     totalReviews: 38,
-    weeklyData: [
-      { day: "Pzt", right: 95, left: 45 },
-      { day: "Sal", right: 120, left: 55 },
-      { day: "Çar", right: 140, left: 60 },
-      { day: "Per", right: 110, left: 50 },
-      { day: "Cum", right: 165, left: 70 },
-      { day: "Cmt", right: 190, left: 80 },
-      { day: "Paz", right: 170, left: 75 },
-    ],
     reviews: [
       { user: "Ahmet Y.", stars: 5, text: "Muhteşem lezzetler! Özellikle köfte tabağı harikaydı. Kesinlikle tekrar geleceğim.", date: "2 saat önce" },
       { user: "Elif K.", stars: 4, text: "Ambiyans çok güzel, servis hızlı. Fiyatlar biraz yüksek ama kalite var.", date: "1 gün önce" },
@@ -1885,8 +2657,6 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
       { user: "Can B.", stars: 5, text: "Arkadaşlarımla harika bir akşam geçirdik. Tatlılar enfes!", date: "5 gün önce" },
     ],
   };
-
-  const maxBar = Math.max(...stats.weeklyData.map(d => d.right + d.left));
 
   return (
     <Screen grad={false}>
@@ -1935,8 +2705,8 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
             <div style={{ background: "#fff", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, boxShadow: "var(--sh-1)" }}>
 <Icon n="flame" color="#FF6600" size={18} />
               <div>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-brand-ink)", margin: 0, lineHeight: 1 }}>%{stats.favRate}</p>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,102,0,0.75)", margin: 0 }}>Beğeni Oranı</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-brand-ink)", margin: 0, lineHeight: 1 }}>%{ozet30.oran.toFixed(1)}</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,102,0,0.75)", margin: 0 }}>Beğeni oranı · 30 gün</p>
               </div>
             </div>
           </div>
@@ -1948,7 +2718,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
               Sekme sayısı arttıkça yazılar kırpılıyordu. */}
           <HScroll style={{ marginBottom: 20, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
             {[
-              { id: "stats", label: "İstatistikler" },
+              { id: "stats", label: "Pano" },
               ...(canReserve ? [{ id: "tables", label: "Masalar", badge: pendingCount }] : []),
               { id: "offers", label: "Teklifler", badge: openOffers },
               { id: "info", label: "Bilgiler" },
@@ -1997,100 +2767,13 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
           )}
 
           {/* ─── TAB: İstatistikler ─── */}
+          {/* ─── TAB: Pano ───
+              Referans panolardaki düzen telefon genişliğine dizildi.
+              Bileşenler yukarıda, PANO bölümünde. */}
           {activeTab === "stats" && (
-            <div>
-              {/* Büyük stat kartları */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-                {/* Sağ kaydırma */}
-                <div style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.15)", borderRadius: 20, padding: "18px 16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-<div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(76,175,80,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="heart" color="var(--c-ok-light)" size={16} /></div>
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(76,175,80,0.8)", fontWeight: 600 }}>Sağ Kaydırma</span>
-                  </div>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ok-light)", margin: "0 0 2px" }}>{stats.swipeRight}</p>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>kişi beğendi</p>
-                </div>
-                {/* Sol kaydırma */}
-                <div style={{ background: "rgba(255,59,48,0.08)", border: "1px solid rgba(255,59,48,0.15)", borderRadius: 20, padding: "18px 16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-<div style={{ width: 36, height: 36, borderRadius: 12, background: "var(--c-bad-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="cross" color="var(--c-bad-ink)" size={16} /></div>
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,59,48,0.8)", fontWeight: 600 }}>Sol Kaydırma</span>
-                  </div>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-bad-ink)", margin: "0 0 2px" }}>{stats.swipeLeft}</p>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>kişi geçti</p>
-                </div>
-              </div>
-
-              {/* Toplam görüntülenme */}
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-<div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(255,165,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="eye" color="var(--c-warn)" size={18} /></div>
-                  <div>
-                    <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Toplam Görüntülenme</p>
-                    <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: 0 }}>{stats.totalViews.toLocaleString()}</p>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ok-light)", fontWeight: 700 }}>↑ 12%</span>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.3)", margin: "2px 0 0" }}>bu hafta</p>
-                </div>
-              </div>
-
-              <InteractionHeatmap restaurant={ownerRestaurant} />
-
-              {/* Haftalık grafik */}
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 16px", marginBottom: 20 }}>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 16px" }}>Haftalık Kaydırma Grafiği</p>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120, paddingBottom: 24, position: "relative" }}>
-                  {stats.weeklyData.map((d, i) => {
-                    const totalH = ((d.right + d.left) / maxBar) * 100;
-                    const rightH = (d.right / (d.right + d.left)) * totalH;
-                    const leftH = totalH - rightH;
-                    return (
-                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-                        <div style={{ width: "100%", display: "flex", flexDirection: "column", borderRadius: 8, overflow: "hidden" }}>
-                          <div style={{ height: leftH * 0.96, background: "rgba(255,59,48,0.4)", transition: "height 0.5s ease-out", transitionDelay: `${i * 0.05}s` }} />
-                          <div style={{ height: rightH * 0.96, background: "rgba(76,175,80,0.6)", transition: "height 0.5s ease-out", transitionDelay: `${i * 0.05}s` }} />
-                        </div>
-                        <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 6 }}>{d.day}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {/* Legend */}
-                <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 4 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 3, background: "rgba(76,175,80,0.6)" }} />
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Beğeni</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 3, background: "rgba(255,59,48,0.4)" }} />
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Geçme</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Puan dağılımı */}
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 16px" }}>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 14px" }}>Puan Dağılımı</p>
-                {[
-                  { stars: 5, count: 18, pct: 47 },
-                  { stars: 4, count: 11, pct: 29 },
-                  { stars: 3, count: 5, pct: 13 },
-                  { stars: 2, count: 2, pct: 5 },
-                  { stars: 1, count: 2, pct: 5 },
-                ].map((r, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: i < 4 ? 8 : 0 }}>
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", width: 14, textAlign: "right" }}>{r.stars}</span>
-                    <span style={{ fontSize: 12, color: "var(--c-warn)" }}>★</span>
-                    <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-                      <div style={{ width: `${r.pct}%`, height: "100%", borderRadius: 4, background: r.stars >= 4 ? "rgba(76,175,80,0.5)" : r.stars === 3 ? "rgba(255,165,0,0.5)" : "rgba(255,59,48,0.4)", transition: "width 0.6s ease-out", transitionDelay: `${i * 0.1}s` }} />
-                    </div>
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.35)", width: 28, textAlign: "right" }}>{r.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <PanoTab
+              restaurant={ownerRestaurant} canReserve={canReserve}
+              onGo={setActiveTab} reviewCount={stats.totalReviews} />
           )}
 
           {/* ─── TAB: Yorumlar ─── */}
