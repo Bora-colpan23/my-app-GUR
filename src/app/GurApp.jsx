@@ -15,7 +15,7 @@ import {
   InputField, SelectField, ELEV,
   Spinner, Btn, IconBtn, HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
   BadgeChips, BadgeMarks, GlossDefs, GLOSS, DinnerBell, SplitText, Orb, Skeleton,
-  scrim,
+  scrim, SocialAuthRow, StepProgress,
 } from '../ui/kit.jsx';
 import { I, RESTAURANTS, CATEGORIES, fetchLiveRestaurants, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { Sheet, DangerConfirm, Chip } from '../ui/sheets.jsx';
@@ -32,7 +32,6 @@ import * as pricing from '../lib/pricing.js';
 import * as geo from '../lib/geo.js';
 import { seenCampaigns, markShown } from '../lib/ad-frequency.js';
 import { badgesOf, useBadgeMap } from '../lib/badges.js';
-import { signIn as socialSignIn, isAppleDevice, isConfigured as socialConfigured } from '../lib/social-auth.js';
 
 // ── GUR Match: arkadaşın kararları ───────────────────────────────────────
 // Backend yok; arkadaşın beğenileri davet kodundan türeyen deterministik bir
@@ -367,13 +366,20 @@ function SplashScreen({ onNext }) {
   useEffect(() => {
     if (reduced) { const t = setTimeout(gec, 200); return () => clearTimeout(t); }
     const k = ilkAcilis ? 1 : 0.28;   // dönen kullanıcı: aynı koreografi, dörtte bir sürede
+    // TOPLAM 2600 ms. Kural: açılış ekranı 1–3 saniye görünür, daha
+    // uzunsa bir yükleme göstergesi ister. 3200 ms eşiğin üstündeydi ve
+    // gösterge takmak da yanlış olurdu: bu ekran HİÇBİR YÜKLEMEYE BAĞLI
+    // DEĞİL, dönen bir çark orada olmayan bir işi varmış gibi gösterirdi.
+    // 2600 seçildi, 3000 değil: kullanıcının saydığı süre sayfanın
+    // açılmasıyla başlıyor ve tam eşiğe yaslanmak ölçümde 3007 ms
+    // veriyordu. Bütün fazlar aynı oranda kısaldı, koreografi birebir aynı.
     const timers = [
-      setTimeout(() => setPhase(1), 300 * k),
-      setTimeout(() => setPhase(2), 800 * k),
-      setTimeout(() => setPhase(3), 1300 * k),
-      setTimeout(() => setPhase(4), 1900 * k),
-      setTimeout(() => setPhase(5), 2600 * k),
-      setTimeout(gec, 3200 * k),
+      setTimeout(() => setPhase(1), 240 * k),
+      setTimeout(() => setPhase(2), 650 * k),
+      setTimeout(() => setPhase(3), 1060 * k),
+      setTimeout(() => setPhase(4), 1545 * k),
+      setTimeout(() => setPhase(5), 2110 * k),
+      setTimeout(gec, 2600 * k),
     ];
     return () => timers.forEach(clearTimeout);
   }, [reduced, ilkAcilis, gec]);
@@ -517,94 +523,6 @@ function WelcomeScreen({ onStart }) {
   );
 }
 
-// ═══════════════════════════════════════════════
-// GOOGLE / APPLE İLE GİRİŞ
-//
-// Belirteç istemcide "doğrulanmış" sayılmaz: SDK'nın verdiği id_token
-// sunucuya gönderilir, imza orada doğrulanır (server/src/auth/social.js).
-// Yapılandırma yoksa akış demo profiliyle tamamlanır ve bunu söyler.
-// ═══════════════════════════════════════════════
-function SocialAuthRow({ onDone, tone = "light" }) {
-  const [busy, setBusy] = useState(null);
-  const [error, setError] = useState(null);
-  // App Store kuralı: başka sosyal giriş sunuluyorsa iOS'ta Apple ile
-  // giriş de sunulmak zorunda. Apple dışı cihazda göstermek ise yalnızca
-  // ekranı kalabalıklaştırıyor.
-  const showApple = isAppleDevice();
-
-  const go = async (provider) => {
-    setBusy(provider); setError(null);
-    try {
-      const res = await socialSignIn(provider);
-      haptic(12);
-      onDone?.(res);
-    } catch (err) {
-      setError(err.message || "Giriş tamamlanamadı");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  // Üç bağlam: koyu zemin (light), kâğıt (dark) ve turuncu (brand).
-  // Turuncunun kendi tonu olmadan beyaz yazı 2.94:1'de kalıyordu.
-  const dim = tone === "brand" ? "var(--c-on-brand-2)" : tone === "light" ? "rgba(255,255,255,0.6)" : "rgba(45,36,25,0.45)";
-  const line = tone === "brand" ? "rgba(43,20,0,0.22)" : tone === "light" ? "rgba(255,255,255,0.25)" : "var(--c-border)";
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0 14px" }}>
-        <div style={{ flex: 1, height: 1, background: line }} />
-        <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: dim, fontWeight: 600 }}>veya</span>
-        <div style={{ flex: 1, height: 1, background: line }} />
-      </div>
-
-      <button
-        type="button" className="gur-btn" onClick={() => go("google")} disabled={busy === "google"}
-        style={{
-          width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10,
-          padding: "14px 0", borderRadius: 999, border: "1px solid rgba(45,36,25,0.14)",
-          background: "var(--c-card)", cursor: busy ? "wait" : "pointer", outline: "none",
-          fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 600, color: "var(--c-ink)",
-          opacity: busy === "google" ? 0.6 : 1, marginBottom: 10,
-        }}>
-        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-          <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.2-3.8 6.6-9.5 6.6-16.1z" />
-          <path fill="#34A853" d="M24 46c6 0 11-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.3-9H4.4v5.7C7.9 41 15.4 46 24 46z" />
-          <path fill="#FBBC05" d="M11.7 28.2c-.4-1.3-.7-2.7-.7-4.2s.3-2.9.7-4.2v-5.7H4.4C2.9 17 2 20.4 2 24s.9 7 2.4 9.9l7.3-5.7z" />
-          <path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 30 2 24 2 15.4 2 7.9 7 4.4 14.1l7.3 5.7c1.8-5.2 6.6-9 12.3-9z" />
-        </svg>
-        {busy === "google" ? "Bağlanıyor…" : "Google ile devam et"}
-      </button>
-
-      {showApple && (
-        <button
-          type="button" className="gur-btn" onClick={() => go("apple")} disabled={busy === "apple"}
-          style={{
-            width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9,
-            padding: "14px 0", borderRadius: 999, border: "none", background: "#000",
-            cursor: busy ? "wait" : "pointer", outline: "none",
-            fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 600, color: "#fff",
-            opacity: busy === "apple" ? 0.6 : 1,
-          }}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
-            <path d="M17.05 12.53c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.98.9-3.77 2.28-1.61 2.79-.41 6.92 1.15 9.18.76 1.11 1.67 2.35 2.86 2.3 1.15-.05 1.58-.74 2.97-.74s1.78.74 3 .72c1.24-.02 2.02-1.12 2.78-2.24.87-1.28 1.23-2.53 1.25-2.6-.03-.01-2.4-.92-2.4-3.68zM14.8 5.53c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.06-.52 2.68-1.28z" />
-          </svg>
-          {busy === "apple" ? "Bağlanıyor…" : "Apple ile devam et"}
-        </button>
-      )}
-
-      {error && (
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-bad-ink)", textAlign: "center", margin: "9px 0 0" }}>{error}</p>
-      )}
-      {!socialConfigured.google && (
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: dim, textAlign: "center", margin: "9px 0 0", lineHeight: 1.5 }}>
-          Demo sürümü — istemci kimliği tanımlanınca gerçek Google/Apple akışı devreye girer.
-        </p>
-      )}
-    </div>
-  );
-}
-
 function LoginScreen({ onBack, onLogin, onRegister, live }) {
   const [e, setE] = useState(""); const [p, setP] = useState("");
   const [busy, setBusy] = useState(false);
@@ -634,7 +552,9 @@ function RegisterScreen({ onBack, onDone, onLegal, live }) {
   // Ekranda "kabul ettiğinizi onaylıyorsunuz" yazarken onayı sormamak hem
   // yalan hem hukuken sakıncalı. Artık düğme kapalı ve sebebi yazılı.
   const [err,setErr]=useState(null);
-  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "var(--f-body)", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "var(--c-brand-ink)", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" disabled={!a || !n.trim() || !e.includes("@") || p.length < 6} onClick={async () => { if (!a || !n.trim() || !e.includes("@") || p.length < 6) { setErr(!a ? "Devam etmek için koşulları onaylamanız gerekiyor." : "Ad, geçerli bir e-posta ve en az 6 karakter parola gerekli."); return; } setErr(null); if (live) { try { await backend.signIn({ email: e, password: p, name: n }); } catch { /* var olan hesap: giriş ekranı denenmeli */ } } onDone(); }} />{err && <p role="alert" style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-bad-ink)", background: "var(--c-bad-soft)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{err}</p>}<SocialAuthRow tone="dark" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onDone(); }} /></div></Screen>;
+  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div>{/* Kurulum iki ekran: kayıt → konum. Göstergesiz akışta kullanıcı kaç
+          ekran kaldığını bilmiyor; "daha ne kadar sürecek" belirsizliği
+          ikinci ekranda bırakmanın en yaygın sebebi. */}<StepProgress current={1} total={2} label="Kurulum adımı 1 / 2" /><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "var(--f-body)", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "var(--c-brand-ink)", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" disabled={!a || !n.trim() || !e.includes("@") || p.length < 6} onClick={async () => { if (!a || !n.trim() || !e.includes("@") || p.length < 6) { setErr(!a ? "Devam etmek için koşulları onaylamanız gerekiyor." : "Ad, geçerli bir e-posta ve en az 6 karakter parola gerekli."); return; } setErr(null); if (live) { try { await backend.signIn({ email: e, password: p, name: n }); } catch { /* var olan hesap: giriş ekranı denenmeli */ } } onDone(); }} />{err && <p role="alert" style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-bad-ink)", background: "var(--c-bad-soft)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{err}</p>}<SocialAuthRow tone="dark" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onDone(); }} /></div></Screen>;
 }
 
 // ═══════════════════════════════════════════════
@@ -923,17 +843,53 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
             ))}
             {results.length === 0 && (
               <div style={{ background: "var(--c-card)", borderRadius: 20, padding: "18px 18px", textAlign: "center", boxShadow: ELEV.restLight }}>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: 0, lineHeight: 1.5 }}>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
                   Başka bir isim ya da mutfak deneyebilirsin.
                 </p>
+                {/* Boş sonuç bir çıkmaz sokak olmamalı: uygulamanın asıl
+                    işi kaydırarak keşif, oraya bir kapı duruyor. */}
+                <Btn text="Kaydırarak keşfet" onClick={() => { setQuery(""); onSwipe(); }}
+                  variant="brandSoft" size="md" fullWidth={false} />
               </div>
             )}
           </div>
         )}
 
+        {/* BOŞ DURUM — görünür hiçbir mekan yok.
+            Yönetici hepsini gizlemiş, moderasyon kuyruğu hepsini tutuyor
+            ya da besleme hiç dönmemiş olabilir. Önceden bu durumda ekran
+            yine çiziliyordu: kategoriler hepsi "0", "yakınında popüler"
+            şeridi bomboş, fırsat yok — kullanıcı uygulamanın bozuk
+            olduğunu sanıyordu. Artık ne olduğunu yazıyor ve tek bir yol
+            gösteriyor. */}
+        {!searching && restaurants.length === 0 && (
+          <div style={{ textAlign: "center", padding: "48px 24px 32px" }}>
+            <div style={{
+              width: 92, height: 92, borderRadius: "50%", background: "var(--c-brand-soft)",
+              margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Icon n="plate" color="#FF6600" size={32} />
+            </div>
+            <h3 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 8px" }}>
+              Burada henüz mekan yok
+            </h3>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)", margin: "0 0 22px", lineHeight: 1.55 }}>
+              Yakınındaki restoranlar yüklenemedi. Konumunu değiştirip tekrar
+              deneyebilir ya da birazdan yeniden bakabilirsin.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              <Btn text="Konumu değiştir" onClick={() => setLocSheet(true)} variant="filled" size="md" fullWidth={false} />
+              {/* İkincil yol kâğıt üstünde `brandSoft`: `outline` koyu zemin
+                  için tasarlandı, kremsi kâğıtta hap neredeyse görünmüyordu
+                  (ölçüldü — ekran görüntüsünde boş bir leke). */}
+              <Btn text="Favorilerim" onClick={onFavorites} variant="brandSoft" size="md" fullWidth={false} />
+            </div>
+          </div>
+        )}
+
         {/* Arama açıkken keşif akışı gizlenir: kullanıcı bir şey aradığında
             sayfanın geri kalanı gürültüdür. */}
-        {!searching && (
+        {!searching && restaurants.length > 0 && (
         <>
         {/* Dönen banner — marka slaytı + sponsor reklamları, ekranın en üstünde */}
         <HeroCarousel slides={slides} />
@@ -1390,7 +1346,7 @@ function DistrictGrid({ onPick, selected }) {
   );
 }
 
-function LocationSetupScreen({ onDone }) {
+function LocationSetupScreen({ onDone, step = null }) {
   const [busy, setBusy] = useState(false);
   const [denied, setDenied] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -1408,6 +1364,10 @@ function LocationSetupScreen({ onDone }) {
   return (
     <Screen>
       <div style={{ padding: "56px 26px 40px", minHeight: "100%", display: "flex", flexDirection: "column" }}>
+        {/* Gösterge YALNIZCA kayıttan gelindiğinde. Girişten gelen
+            kullanıcı için bu tek ekranlık bir adım ve "1/1" yazan bir
+            çubuk bilgi değil gürültü olurdu. */}
+        {step && <StepProgress current={step} total={2} label={`Kurulum adımı ${step} / 2`} />}
         <div style={{ textAlign: "center", marginBottom: 26 }}>
           {/* İzin kutusu açıkken konum bulmak saniyeler sürebiliyor ve
               o sırada ekranda hiçbir şey olmuyordu — kullanıcı düğmenin
@@ -4383,7 +4343,13 @@ export default function GurApp(props = {}) {
   }, [platform.matchEnabled, screen]);
 
   // Girişten sonra: konum kararı verilmediyse önce o adım.
-  const afterAuth = () => nav(geo.consentAsked() ? "explore" : "location");
+  // Konum ekranı kurulum akışının İKİNCİ adımı mı, yoksa girişten gelen
+  // tek ekranlık bir soru mu — adım göstergesi buna bakıyor.
+  const [kurulumAkisi, setKurulumAkisi] = useState(false);
+  const afterAuth = (kayittan = false) => {
+    setKurulumAkisi(kayittan);
+    nav(geo.consentAsked() ? "explore" : "location");
+  };
 
   // Sekme sırası geçişin YÖNÜNÜ belirliyor: alt barda sağdaki sekmeye
   // giderken içerik sağdan, soldakine dönerken soldan geliyor. Yön
@@ -4404,9 +4370,9 @@ export default function GurApp(props = {}) {
       case "welcome": return <WelcomeScreen onStart={() => nav("login")} />;
       // Girişten sonra konum adımı: kullanıcı daha önce karar verdiyse
       // (izin verdi, ilçe seçti ya da "şimdi değil" dedi) tekrar sorulmaz.
-      case "login": return <LoginScreen onBack={back} onLogin={afterAuth} onRegister={() => nav("register")} live={session.mode === "live"} />;
-      case "register": return <RegisterScreen onBack={back} onDone={afterAuth} onLegal={() => nav("legal")} live={session.mode === "live"} />;
-      case "location": return <LocationSetupScreen onDone={goExplore} />;
+      case "login": return <LoginScreen onBack={back} onLogin={() => afterAuth(false)} onRegister={() => nav("register")} live={session.mode === "live"} />;
+      case "register": return <RegisterScreen onBack={back} onDone={() => afterAuth(true)} onLegal={() => nav("legal")} live={session.mode === "live"} />;
+      case "location": return <LocationSetupScreen onDone={goExplore} step={kurulumAkisi ? 2 : null} />;
       case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} matchEnabled={platform.matchEnabled} restaurants={feed} onDetail={openDetail} />;
       case "match-start": return <MatchStartScreen onBack={back} onStart={startMatch} />;
       case "match-swipe": return <MatchSwipeScreen code={matchCode} restaurants={feed} onExit={goExplore} onFinish={finishMatch} />;

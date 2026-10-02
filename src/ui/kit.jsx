@@ -13,6 +13,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
+import { signIn as socialSignIn, isAppleDevice, isConfigured as socialConfigured } from '../lib/social-auth.js';
 
 export const GRAD = "#FF6600";
 
@@ -287,8 +288,12 @@ export function Btn({
     // Yumuşak haplar: %10-12 tonlu zemin, renkli kalın yazı, gölge yok.
     destructiveSoft: { bg: "rgba(229,72,77,0.10)", hover: "rgba(229,72,77,0.16)", press: "rgba(229,72,77,0.22)", color: "#C2282D", border: "1px solid rgba(229,72,77,0.16)",
                  chip: { bg: "#E5484D", ink: "#fff" }, badge: { bg: "rgba(229,72,77,0.18)", ink: "#C2282D" } },
-    brandSoft: { bg: "rgba(255,102,0,0.10)", hover: "rgba(255,102,0,0.16)", press: "rgba(255,102,0,0.22)", color: "#B4530A", border: "1px solid rgba(255,102,0,0.16)",
-                 chip: { bg: "#FF6600", ink: "#fff" }, badge: { bg: "rgba(255,102,0,0.18)", ink: "#B4530A" } },
+    // Mürekkep marka mürekkebinden (#B4530A) BİR TON KOYU. Sebebi ölçüm:
+    // #B4530A kâğıt üstünde 5.02:1 ama bu hapın KENDİ zemini kâğıt değil,
+    // %10 turuncu tint (#FDECDE) — orada 4.36:1'e düşüyor, AA eşiğinin
+    // altında. #A84D09 aynı zeminde 4.87:1, kâğıtta 5.42:1.
+    brandSoft: { bg: "rgba(255,102,0,0.10)", hover: "rgba(255,102,0,0.16)", press: "rgba(255,102,0,0.22)", color: "#A84D09", border: "1px solid rgba(255,102,0,0.16)",
+                 chip: { bg: "#FF6600", ink: "#fff" }, badge: { bg: "rgba(255,102,0,0.18)", ink: "#A84D09" } },
     successSoft: { bg: "rgba(19,179,100,0.10)", hover: "rgba(19,179,100,0.16)", press: "rgba(19,179,100,0.22)", color: "#0B7D46", border: "1px solid rgba(19,179,100,0.16)",
                  chip: { bg: "#13B364", ink: "#fff" }, badge: { bg: "rgba(19,179,100,0.18)", ink: "#0B7D46" } },
     plain:     { bg: "transparent", hover: "rgba(255,255,255,0.10)", press: "rgba(255,255,255,0.16)", color: "rgba(255,255,255,0.72)",
@@ -525,6 +530,123 @@ export function UploadBox({ label, icon, accept, files, setFiles, multiple = tru
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── ADIM GÖSTERGESİ ─────────────────────────────────────────────────
+// "Kaç adım kaldı?" sorusunun cevabı. Göstergesiz bir kurulum akışında
+// kullanıcı kaçıncı ekranda olduğunu bilmiyor ve ikincide bırakıyor.
+//
+// Doyurucu kaydı (3 adım) ve tüketici kurulumu (2 adım) AYNI bileşeni
+// kullanıyor; iki kopya olsaydı biri "tamamlandı" rengini ya da
+// yüksekliğini değiştirirdi.
+//
+// RENK TEK BAŞINA BİLGİ TAŞIMIYOR: çubukların yanında "1/3" de yazılı.
+export function StepProgress({ current, total = 3, tone = "light", label }) {
+  return (
+    <div role="group" aria-label={label || `Adım ${current} / ${total}`}
+      style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 22 }}>
+      {Array.from({ length: total }, (_, i) => (
+        <div key={i} aria-hidden="true" style={{
+          flex: 1, height: 4, borderRadius: 4,
+          background: i < current
+            ? (tone === "brand" ? "var(--c-on-brand)" : "#FF6600")
+            : (tone === "brand" ? "rgba(255,255,255,0.3)" : "rgba(45,36,25,0.1)"),
+          transition: "background 0.4s",
+        }} />
+      ))}
+      <span style={{
+        fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, marginLeft: 4,
+        color: tone === "brand" ? "var(--c-on-brand-2)" : "var(--c-muted)",
+      }}>{current}/{total}</span>
+    </div>
+  );
+}
+
+// ─── SOSYAL GİRİŞ SATIRI ─────────────────────────────────────────────
+// TÜKETİCİ VE İŞLETME AYNI BİLEŞENİ KULLANIYOR. Önceden yalnızca tüketici
+// uygulamasının içinde tanımlıydı ve Doyurucu girişinde Google/Apple yolu
+// HİÇ YOKTU: işletme sahibi parola kurmak zorundaydı. Kopyalamak yerine
+// buraya taşındı — iki kopya er geç ayrışır (biri Apple kuralını unutur,
+// öbürü hata metnini değiştirir).
+export function SocialAuthRow({ onDone, tone = "light" }) {
+  const [busy, setBusy] = useState(null);
+  const [error, setError] = useState(null);
+  // App Store kuralı: başka sosyal giriş sunuluyorsa iOS'ta Apple ile
+  // giriş de sunulmak zorunda. Apple dışı cihazda göstermek ise yalnızca
+  // ekranı kalabalıklaştırıyor.
+  const showApple = isAppleDevice();
+
+  const go = async (provider) => {
+    setBusy(provider); setError(null);
+    try {
+      const res = await socialSignIn(provider);
+      haptic(12);
+      onDone?.(res);
+    } catch (err) {
+      setError(err.message || "Giriş tamamlanamadı");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Üç bağlam: koyu zemin (light), kâğıt (dark) ve turuncu (brand).
+  // Turuncunun kendi tonu olmadan beyaz yazı 2.94:1'de kalıyordu.
+  const dim = tone === "brand" ? "var(--c-on-brand-2)" : tone === "light" ? "rgba(255,255,255,0.6)" : "rgba(45,36,25,0.45)";
+  const line = tone === "brand" ? "rgba(43,20,0,0.22)" : tone === "light" ? "rgba(255,255,255,0.25)" : "var(--c-border)";
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0 14px" }}>
+        <div style={{ flex: 1, height: 1, background: line }} />
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: dim, fontWeight: 600 }}>veya</span>
+        <div style={{ flex: 1, height: 1, background: line }} />
+      </div>
+
+      <button
+        type="button" className="gur-btn" onClick={() => go("google")} disabled={busy === "google"}
+        style={{
+          width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10,
+          padding: "14px 0", borderRadius: 999, border: "1px solid rgba(45,36,25,0.14)",
+          background: "var(--c-card)", cursor: busy ? "wait" : "pointer", outline: "none",
+          fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 600, color: "var(--c-ink)",
+          opacity: busy === "google" ? 0.6 : 1, marginBottom: 10,
+        }}>
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.2-3.8 6.6-9.5 6.6-16.1z" />
+          <path fill="#34A853" d="M24 46c6 0 11-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.3-9H4.4v5.7C7.9 41 15.4 46 24 46z" />
+          <path fill="#FBBC05" d="M11.7 28.2c-.4-1.3-.7-2.7-.7-4.2s.3-2.9.7-4.2v-5.7H4.4C2.9 17 2 20.4 2 24s.9 7 2.4 9.9l7.3-5.7z" />
+          <path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 30 2 24 2 15.4 2 7.9 7 4.4 14.1l7.3 5.7c1.8-5.2 6.6-9 12.3-9z" />
+        </svg>
+        {busy === "google" ? "Bağlanıyor…" : "Google ile devam et"}
+      </button>
+
+      {showApple && (
+        <button
+          type="button" className="gur-btn" onClick={() => go("apple")} disabled={busy === "apple"}
+          style={{
+            width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9,
+            padding: "14px 0", borderRadius: 999, border: "none", background: "#000",
+            cursor: busy ? "wait" : "pointer", outline: "none",
+            fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 600, color: "#fff",
+            opacity: busy === "apple" ? 0.6 : 1,
+          }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
+            <path d="M17.05 12.53c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.98.9-3.77 2.28-1.61 2.79-.41 6.92 1.15 9.18.76 1.11 1.67 2.35 2.86 2.3 1.15-.05 1.58-.74 2.97-.74s1.78.74 3 .72c1.24-.02 2.02-1.12 2.78-2.24.87-1.28 1.23-2.53 1.25-2.6-.03-.01-2.4-.92-2.4-3.68zM14.8 5.53c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.06-.52 2.68-1.28z" />
+          </svg>
+          {busy === "apple" ? "Bağlanıyor…" : "Apple ile devam et"}
+        </button>
+      )}
+
+      {error && (
+        <p role="alert" style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-bad-ink)", textAlign: "center", margin: "9px 0 0" }}>{error}</p>
+      )}
+      {!socialConfigured.google && (
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: dim, textAlign: "center", margin: "9px 0 0", lineHeight: 1.5 }}>
+          Demo sürümü — istemci kimliği tanımlanınca gerçek Google/Apple akışı devreye girer.
+        </p>
+      )}
     </div>
   );
 }

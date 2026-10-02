@@ -642,13 +642,22 @@ atlanamıyordu: soğuk açılışta ilk boya 108 ms'de geliyor, etkileşime kada
 
 | | Süre |
 |---|---|
-| İlk açılış (marka anı) | ~3.2 sn |
-| İkinci açılıştan sonra (`gur.splashSeen`) | ~0.9 sn |
+| İlk açılış (marka anı) | ~2.6 sn |
+| İkinci açılıştan sonra (`gur.splashSeen`) | ~0.7 sn |
 | Azaltılmış hareket | ~0.2 sn |
 | Ekrana dokunma | anında |
 
 Katsayı tek yerde (`k`), koreografi aynı kalıyor — süreleri tek tek
 kısaltmak fazların birbirine girmesi demekti.
+
+**Neden 2.6 ve neden gösterge yok.** Kabul edilen kural: açılış ekranı
+1–3 saniye görünür, daha uzun kalacaksa bir yükleme göstergesi ister.
+3.2 sn eşiğin üstündeydi. Gösterge takmak da yanlış olurdu: bu ekran
+HİÇBİR YÜKLEMEYE BAĞLI DEĞİL (bkz. yukarısı), dönen bir çark orada
+olmayan bir işi varmış gibi gösterirdi. 3.0 değil 2.6 seçildi çünkü
+kullanıcının saydığı süre sayfanın açılmasıyla başlıyor: 2.8 sn'lik
+koreografi uçtan uca **3007 ms** ölçülüyordu. 2.6 ile uçtan uca
+~2.96 sn.
 
 **Giriş formu HER İKİ MODDA doğrulanıyor.** `if (!live) return onLogin()`
 doğrulamadan ÖNCE geliyordu: yerel modda BOŞ e-posta ve BOŞ parolayla
@@ -687,6 +696,57 @@ bu yüzden etkilenmiyor.
 yıllık ₺690 → fark ₺258, yani **~%27** (2 ay değil ~3.3 ay). Fiyat iddiası
 doğrulanabilir olmalı. Ayrıca yenileme ve iptal bilgisi hiç yoktu; fiyatı
 ve faydayı yazıp bunu atlamak kararı eksik bilgiyle aldırmaktı.
+
+### Her uygulamanın olması gereken ekranları — ölçülmüş kurallar
+
+Beş kural tek tek mevcut ekranlara karşı denetlendi. Ölçüm betiği her
+akışı 393×852'de gezip göstergeyi, doğrulamayı ve boş durumu okuyor.
+
+| Kural | Durum | Ne yapıldı |
+|---|---|---|
+| Karşılama ekranı 1–3 sn, ortalanmış, yalnız ad/logo/slogan | eksikti | 3.2 → 2.6 sn (bkz. yukarısı) |
+| Giriş: alanlar + onay düğmesi | tüketicide vardı | — |
+| Giriş: Google/Apple yolu | **Doyurucu'da hiç yoktu** | `SocialAuthRow` kite taşındı, işletme girişine eklendi |
+| Giriş doğrulaması | **Doyurucu'da hiç yoktu** | boş e-posta + boş parolayla panele giriliyordu |
+| Kurulumda adım göstergesi | Doyurucu'da vardı (1/3) | tüketici kurulumuna eklendi (1/2 → 2/2) |
+| Ana ekranda boş durum + CTA | **Keşfet'te yoktu** | "Burada henüz mekan yok" + konum/favori yolu |
+| Boş aramada çıkış yolu | yarım | "Kaydırarak keşfet" hapı eklendi |
+
+**`SocialAuthRow` ve `StepProgress` artık `ui/kit.jsx`'te.** İkisi de
+önce tek bir uygulamanın içinde tanımlıydı: sosyal giriş tüketicide,
+adım göstergesi işletmede. Kopyalamak yerine taşındılar — iki kopya er
+geç ayrışır (biri App Store'un Apple kuralını unutur, öbürü
+"tamamlandı" rengini değiştirir ve iki akış kullanıcıya farklı bir
+ilerleme anlatır).
+
+**Doyurucu girişi doğrulamıyordu.** Düğme doğrudan `onLogin`e bağlıydı:
+BOŞ e-posta ve BOŞ parolayla işletme paneline giriliyordu. Tüketici
+tarafında aynı hata daha önce ölçülüp düzeltilmişti, işletme tarafında
+kalmış. Ölçüldü: boş formla "panele girdi mi: false", uyarı
+`role="alert"` ile yazılı.
+
+**Adım göstergesi YALNIZCA kayıttan gelindiğinde.** Girişten gelen
+kullanıcı için konum tek ekranlık bir soru ve "1/1" yazan bir çubuk
+bilgi değil gürültü olurdu. `afterAuth(kayittan)` bunu taşıyor; ölçüldü:
+girişten gelince gösterge sayısı 0.
+
+**Keşfet'in boş durumu yoktu.** Yönetici bütün mekanları gizlediğinde
+(ya da moderasyon hepsini tuttuğunda, ya da besleme hiç dönmediğinde)
+ekran yine çiziliyordu: kategoriler hepsi "0", "yakınında popüler"
+şeridi bomboş, fırsat yok. Kullanıcı uygulamanın bozuk olduğunu
+sanıyordu. Artık ne olduğunu yazıyor ve iki yol gösteriyor (konumu
+değiştir / favorilerim). Destenin ve favorilerin boş durumları zaten
+vardı; eksik olan ana ekrandı.
+
+**`brandSoft` hapının mürekkebi koyulaştı** (`#B4530A` → `#A84D09`).
+Variant kitte duruyordu ama hiçbir yerde kullanılmamıştı; ilk kullanımda
+ölçülünce çıktı: marka mürekkebi kâğıt üstünde 5.02:1 ama bu hapın KENDİ
+zemini kâğıt değil, %10 turuncu tint (`#FDECDE`) — orada **4.36:1**.
+Yeni ton aynı zeminde 4.87:1, kâğıtta 5.42:1.
+
+Taramada kalan uyarılar: Doyurucu girişinde 9, Keşfet boş durumunda 3 —
+hepsi beyaz-üstü-turuncu kararı ve GUR kelime markası. Yeni kaynaklı
+sıfır.
 
 ### Ölçülüp TEMİZ çıkanlar (tekrar aramayın)
 

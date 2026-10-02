@@ -22,6 +22,7 @@ import {
   GurLogo, Icon, Img, InputField, SelectField, Btn, IconBtn, Spinner, GlossDefs,
   HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
   GRAD, BackBtn, haptic, keepVisible, toMediaFiles, usePrefersReducedMotion,
+  SocialAuthRow, StepProgress,
 } from '../ui/kit.jsx';
 import {
   submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles,
@@ -410,6 +411,21 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
 function DoyurucuLoginScreen({ onBack, onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [hata, setHata] = useState(null);
+
+  // DOĞRULAMA. Önceden düğme doğrudan `onLogin`e bağlıydı: BOŞ e-posta ve
+  // BOŞ parolayla panele giriliyordu. Tüketici tarafında aynı hata
+  // ölçülüp düzeltilmişti, işletme tarafında kalmış — formu doğrulamamak,
+  // alanları hiç sormamaktan kötü: kullanıcı yazdığının bir yere
+  // gittiğini sanıyor.
+  const gir = () => {
+    if (!email.includes("@") || password.length < 6) {
+      setHata("E-posta ve en az 6 karakter parola gerekli.");
+      return;
+    }
+    setHata(null);
+    onLogin();
+  };
 
   return (
     <Screen grad={false}>
@@ -439,23 +455,28 @@ function DoyurucuLoginScreen({ onBack, onLogin }) {
             <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-on-brand-2)", textAlign: "right", margin: "0 0 20px", cursor: "pointer", textDecoration: "underline" }}>Şifremi unuttum</p>
           </div>
 
-          <Btn text="İşletme Paneline Gir" onClick={onLogin} />
+          <Btn text="İşletme Paneline Gir" onClick={gir} />
+          {hata && (
+            <p role="alert" style={{
+              fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff",
+              background: "rgba(0,0,0,0.25)", borderRadius: 12,
+              padding: "8px 12px", margin: "10px 0 0", textAlign: "center",
+            }}>{hata}</p>
+          )}
+
+          {/* Google/Apple yolu tüketici uygulamasında vardı, Doyurucu'da
+              yoktu: işletme sahibi yalnızca parola kurarak girebiliyordu.
+              Aynı bileşen (ui/kit.jsx), aynı Apple kuralı. */}
+          <SocialAuthRow tone="brand" onDone={() => onLogin()} />
         </div>
       </div>
     </Screen>
   );
 }
 
-// ─── Progress Bar Component ───
-function StepProgress({ current, total = 3 }) {
-  return (
-    <div style={{ display: "flex", gap: 6, marginBottom: 22 }}>
-      {Array.from({ length: total }, (_, i) => (
-        <div key={i} style={{ flex: 1, height: 4, borderRadius: 4, background: i < current ? "#FF6600" : "rgba(45,36,25,0.1)", transition: "background 0.4s" }} />
-      ))}
-    </div>
-  );
-}
+// Adım göstergesi ui/kit.jsx'te: tüketici kurulumu da aynı bileşeni
+// kullanıyor (bkz. StepProgress). Buradaki kopya kaldırıldı — iki kopya
+// er geç ayrışır ve iki akış kullanıcıya farklı bir ilerleme anlatır.
 
 // ─── Step Header ───
 function StepHeader({ step, title, subtitle, onBack }) {
@@ -2062,7 +2083,7 @@ function AktifYayinKarti({ restaurant, onGo }) {
         <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.5)", margin: "0 0 12px", lineHeight: 1.5 }}>
           Keşfet banner'ı, ödüllü video ve push bildirimi takvimden tarih seçilerek alınıyor.
         </p>
-        <Btn text="Büyüme sekmesine git" onClick={() => onGo("growth")} variant="filled" size="sm" fullWidth={false} />
+        <Btn text="Büyüme sekmesine git" onClick={() => onGo("growth")} variant="filled" size="md" fullWidth={false} />
       </div>
     );
   }
