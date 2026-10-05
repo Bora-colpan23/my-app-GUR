@@ -22,7 +22,7 @@ import GurBusiness from '../src/business/GurBusiness.jsx';
 
 const router = createHashRouter([
   { path: '/', element: <GurApp /> },
-  { path: '/isletme', element: <GurBusiness /> },
+  { path: '/isletme/*', element: <GurBusiness /> },
   { path: '/admin', element: <GurAdmin /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ]);

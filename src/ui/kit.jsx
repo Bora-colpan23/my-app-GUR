@@ -84,6 +84,36 @@ export function usePrefersReducedMotion() {
 }
 
 // Logo: beyaz hap şeklinde arka plan ile her yerde okunur
+/**
+ * Medya sorgusu — SATIR İÇİ STİLLE responsive düzen.
+ *
+ * Proje CSS-in-JS kullanmıyor ve satır içi stile `@media` yazılamıyor.
+ * Telefon çerçevesindeki ekranlarda sorun değildi (genişlik sabit), ama
+ * Doyurucu artık bir WEB SİTESİ: aynı sayfa 390 px'te de 1440 px'te de
+ * doğru durmalı. Düzen kararını JS'te veriyoruz.
+ *
+ * `matchMedia` yoksa (eski tarayıcı, sunucu tarafı) `false` dönüyor —
+ * yani dar düzen. Geniş düzeni varsayıp dar ekranda bozulmaktansa tersi.
+ */
+export function useMediaQuery(query) {
+  const [esles, setEsles] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia(query).matches;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    const onChange = () => setEsles(mq.matches);
+    onChange();
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, [query]);
+  return esles;
+}
+
+/** Doyurucu sitesinin kırılma noktası: altında tek sütun, üstünde iki. */
+export const GENIS = "(min-width: 900px)";
+
 export function GurLogo({ size = 48, pill = false }) {
   const logo = <span style={{ fontSize: size, fontWeight: 900, fontFamily: "var(--f-display)", letterSpacing: -size/24, lineHeight: 1 }}>
     <span style={{ color: "#FFA500" }}>G</span><span style={{ color: "#FF6600" }}>U</span><span style={{ color: "#FF0000" }}>R</span>
@@ -292,14 +322,20 @@ export function Btn({
     // #B4530A kâğıt üstünde 5.02:1 ama bu hapın KENDİ zemini kâğıt değil,
     // %10 turuncu tint (#FDECDE) — orada 4.36:1'e düşüyor, AA eşiğinin
     // altında. #A84D09 aynı zeminde 4.87:1, kâğıtta 5.42:1.
-    brandSoft: { bg: "rgba(255,102,0,0.10)", hover: "rgba(255,102,0,0.16)", press: "rgba(255,102,0,0.22)", color: "#A84D09", border: "1px solid rgba(255,102,0,0.16)",
-                 chip: { bg: "#FF6600", ink: "#fff" }, badge: { bg: "rgba(255,102,0,0.18)", ink: "#A84D09" } },
+    brandSoft: { bg: "rgba(255,102,0,0.10)", hover: "rgba(255,102,0,0.16)", press: "rgba(255,102,0,0.22)", color: "var(--c-brand-ink-soft)", border: "1px solid rgba(255,102,0,0.16)",
+                 chip: { bg: "#FF6600", ink: "#fff" }, badge: { bg: "rgba(255,102,0,0.18)", ink: "var(--c-brand-ink-soft)" } },
     successSoft: { bg: "rgba(19,179,100,0.10)", hover: "rgba(19,179,100,0.16)", press: "rgba(19,179,100,0.22)", color: "#0B7D46", border: "1px solid rgba(19,179,100,0.16)",
                  chip: { bg: "#13B364", ink: "#fff" }, badge: { bg: "rgba(19,179,100,0.18)", ink: "#0B7D46" } },
     plain:     { bg: "transparent", hover: "rgba(255,255,255,0.10)", press: "rgba(255,255,255,0.16)", color: "rgba(255,255,255,0.72)",
                  chip: { bg: "rgba(255,255,255,0.2)", ink: "#fff" }, badge: { bg: "rgba(255,255,255,0.18)", ink: "#fff" } },   // koyu/turuncu zemin
     plainDark: { bg: "transparent", hover: "rgba(255,102,0,0.08)", press: "rgba(255,102,0,0.14)", color: "#B4530A",
                  chip: { bg: "#FF6600", ink: "#fff" }, badge: { bg: "rgba(255,102,0,0.14)", ink: "#B4530A" } },                 // beyaz zemin
+    // KOYU zemindeki düz hap. `plainDark` ADI yanıltıcı: oradaki "dark"
+    // MÜREKKEBİ anlatıyor, zemini değil — beyaz kâğıt için. Koyu panelde
+    // kullanıldığında marka mürekkebi (#B4530A) siyaha yakın zeminde
+    // 3.64:1 veriyordu. Burada paletin koyu-zemin tonu var.
+    plainOnDark: { bg: "transparent", hover: "rgba(255,255,255,0.08)", press: "rgba(255,255,255,0.14)", color: "#FF9A4D",
+                 chip: { bg: "#FF6600", ink: "#fff" }, badge: { bg: "rgba(255,102,0,0.2)", ink: "#FF9A4D" } },
   };
   const p = palettes[variant] || palettes.onColor;
   const busy = !!loading;
@@ -1046,6 +1082,9 @@ export function GurStyles() {
           /* Aşağıdan yükselen sayfa gölgesini yukarı atar. */
           --sh-up: 0 -2px 6px rgba(var(--sh-tint),0.04), 0 -8px 20px rgba(var(--sh-tint),0.06), 0 -20px 46px rgba(var(--sh-tint),0.08);
           --c-brand-soft: rgba(255,102,0,0.08);
+          /* YUMUŞAK TURUNCU ZEMİN ÜSTÜNDEKİ METİN. --c-brand-ink kâğıtta
+             5.02:1 ama %8-10 turuncu tintin üstünde 4.4'e düşüyor. */
+          --c-brand-ink-soft: #A84D09;
           --c-brand-ink: #B4530A;       /* turuncu TONLU açık zemin üstünde metin (5.0:1) */
 
           /* ── BAĞLAMA DUYARLI MÜREKKEP ────────────────────────────

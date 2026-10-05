@@ -48,9 +48,12 @@ npm run dev:all                       # API (8787) + arayüz (5173)
 
 Yalnız arayüz: `npm run dev`. Yalnız API: `npm run dev:api`.
 
-- `/`         → Tüketici uygulaması (telefon çerçevesi yalnızca masaüstünde)
-- `/isletme`  → Doyurucu: işletme uygulaması (kendi girişi, kendi oturumu)
-- `/admin`    → Yönetici paneli (tam ekran masaüstü)
+- `/`          → Tüketici uygulaması (telefon çerçevesi yalnızca masaüstünde)
+- `/isletme`   → Doyurucu: işletme **web sitesi** (tanıtım + kayıt + panel)
+- `/admin`     → Yönetici paneli (tam ekran masaüstü)
+
+Doyurucu'nun alt yolları: `/isletme/kayit`, `/isletme/sahiplen`,
+`/isletme/giris`, `/isletme/panel`.
 
 Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
 `demo@gur.app` / `gur1234`.
@@ -182,7 +185,9 @@ gur/
     │   ├── second-chance.js   # haftalık yeniden gösterim paketi + geçilenler
     │   └── social-auth.js     # Google / Apple ile giriş
     ├── app/GurApp.jsx         # Tüketici uygulaması
-    ├── business/GurBusiness.jsx  # Doyurucu: işletme uygulaması
+    ├── business/
+    │   ├── site.jsx           # İŞLETME WEB SİTESİ: başlık, tanıtım, alt bilgi
+    │   └── GurBusiness.jsx    # Doyurucu: yönlendirme, kayıt akışı, panel
     └── admin/GurAdmin.jsx     # Yönetici paneli
 ```
 
@@ -401,6 +406,16 @@ kısalması. İçeriden parlayan `inset` gölgeler kaldırıldı.
 | `outlineDark` | beyaz zemin üstünde beyaz hap + ince kenarlık |
 | `brandSoft` / `successSoft` / `destructiveSoft` | %10 tonlu zemin, renkli kalın yazı |
 | `outline` / `plain` / `plainDark` | kenarlıklı ve düz metin hapları |
+| `plainOnDark` | KOYU zeminde düz hap |
+
+**`plainDark` ADI YANILTICI**: oradaki "dark" MÜREKKEBİ anlatıyor, zemini
+değil — beyaz kâğıt içindir. Koyu panelde kullanıldığında marka mürekkebi
+siyaha yakın zeminde **3.64:1** veriyordu (ölçüldü, beş yerde). Koyu zemin
+için `plainOnDark` var; mürekkebi paletin koyu-zemin tonu (`#FF9A4D`).
+
+**Yumuşak turuncu zeminde metin `--c-brand-ink-soft`** (`#A84D09`).
+`--c-brand-ink` kâğıtta 5.02:1 ama %8–10 turuncu tintin üstünde 4.4'e
+düşüyor; `brandSoft` hapı ve sitedeki çipler bu jetondan okuyor.
 
 İki ek yuva: `trailing` bir simgeyi yuvarlak cebe alır (referanstaki
 "Download ⬇"), `count` hapın içine küçük bir sayaç rozeti koyar ("Done ①").
@@ -449,6 +464,87 @@ yok sayardı. Zil görsel bir işaret.
 
 Azaltılmış hareket tercihinde salınım ve halkalar duruyor, zil görünmeye
 devam ediyor.
+
+### Doyurucu artık bir WEB SİTESİ
+
+`/isletme` telefon çerçevesi içinde bir maket değil, kendi yolları olan
+bir site. Restoran sahibi masaüstünden geliyor, ne sunduğumuzu okuyor,
+**siteden kayıt oluyor** ve aynı site üzerinden panele giriyor.
+
+| Yol | Ne |
+|---|---|
+| `/isletme` | tanıtım sayfası (kahraman, nasıl çalışır, kazançlar, ücretlendirme, SSS) |
+| `/isletme/kayit` | yeni kayıt — üç adım tek yolda |
+| `/isletme/sahiplen` | havuzdaki kaydı sahiplen |
+| `/isletme/giris` | giriş |
+| `/isletme/panel` | işletme paneli (oturum ister) |
+
+**ÜÇ ARAYÜZ HÂLÂ TEK VERİ KATMANI.** Site yeni bir ürün değil, Doyurucu'nun
+yeni kabuğu: sahiplenme `lib/b2b.js`e, dosyalar `lib/media.js`e, reklam
+tarihleri `lib/adslots.js`e yazılıyor. Ölçüldü (`butunluk.mjs`, tek
+tarayıcı bağlamında üç sekme): siteden gönderilen sahiplenme başvurusu
+`gur.claims`e düşüyor, **yönetici panelinde adıyla görünüyor** ve tüketici
+uygulaması aynı mekan havuzunu okumaya devam ediyor.
+
+**YOLLAR GERÇEK.** Ekran bir state değil, adres çubuğundaki yol: kayıt
+sayfasının linki paylaşılabiliyor, tarayıcının geri tuşu kendiliğinden
+çalışıyor, sayfa yenilenince aynı yerde kalınıyor. Önceki `screen` state'i
++ elle tutulan `history` yığını üçünü de veremiyordu. `main.jsx`te rota
+`'/isletme/*'` — splat olmadan alt adresler `"*"` kuralına düşüp ana
+sayfaya yönleniyordu.
+
+**Oturum `localStorage`da** (`gur.doyurucu.session`). Gerçek bir kimlik
+doğrulaması değil — YEREL modda işletme girişi zaten bir formalite — ama
+bir işaret gerekiyor: olmadan `/isletme/panel` adresini yenileyen kullanıcı
+girişe düşer ve sitede kaybolur. Oturumsuz panel isteği `replace` ile
+girişe yönleniyor (geri tuşu kapalı kapıya çarpmasın).
+
+**SİTE AÇIK, PANEL KOYU.** Bilinçli bir sınır: site pazarlama, panel ürün.
+Geçiş girişte oluyor ve kullanıcı o anda zaten "içeri giriyorum" diyor.
+Paneli de açığa çevirmek 2500 satırlık koyu arayüzü (ve üstüne yeni
+yazılmış panoyu) baştan boyamak demekti.
+
+**Responsive düzen JS'te.** Satır içi stile `@media` yazılamıyor; kararı
+`useMediaQuery(GENIS)` veriyor (`ui/kit.jsx`, kırılma 900 px). Telefon
+çerçevesindeki ekranlarda gerek yoktu — genişlik sabitti.
+
+| | < 900 px | ≥ 900 px |
+|---|---|---|
+| Site başlığı | hamburger + açılır panel | yatay gezinme + iki eylem |
+| Tanıtım ızgaraları | tek sütun | `auto-fit` çoklu sütun |
+| Panel | eski yığın düzen (turuncu başlık + yatay sekme şeridi) | sol kenar çubuğu + içerik |
+
+**Sekme listesi TEK YERDE** (`sekmeler`): dar ekrandaki yatay şerit ve
+geniş ekrandaki kenar çubuğu aynı diziyi çiziyor, gövde de aynı
+(`panelIcerik`). İki kopya olsaydı biri katalogda açılan yeni sekmeyi
+göstermeyi unuturdu.
+
+**Panelde site başlığı yok.** Panelin kendi başlığı ve gezinmesi var; iki
+gezinme şeridi üst üste hangisinin ana olduğunu sildirir. Siteye dönüş
+yolu iki düzende de duruyor (kenar çubuğunun altı / dar düzende üst
+satır) ve **çıkıştan ayrı**: oturumu kapatmıyor.
+
+**Bildirim ve çıkış modalı `fixed`.** Telefon kabuğunda `absolute`
+doğruydu: kaydırma `Screen`in içindeydi. Web'de belge kayıyor ve
+`absolute; inset: 0` perde uzun sayfanın tamamını kaplıyor, kart o kutunun
+ortasına — yani ekranın dışına — düşüyordu.
+
+**Eski `DoyurucuAuthScreen` kaldırıldı.** Üç düğmeli o telefon ekranının
+yerini tanıtım sayfası aldı: işletme sahibi artık ne sunduğumuzu okuyup
+öyle kayıt oluyor, boş bir giriş kapısıyla karşılaşmıyor.
+
+**Giriş ekranı yüzdeyle bölünmüyor artık.** Telefonda üst %32 krem / alt
+turuncu idi; web'de yükseklik serbest olduğu için yüzdeli bölme kart
+içinde çöküyor ve turuncu alan içeriğe göre zıplıyordu. İkisi de içerik
+kadar.
+
+**Ölçüm.** Tanıtım sayfasında 3, kayıtta 3, sahiplenmede 2, girişte 9
+kontrast uyarısı kaldı; hepsi GUR kelime markası, bilinen beyaz-üstü-
+turuncu kararı ya da **devre dışı** hap (WCAG 1.4.3 devre dışı denetimleri
+kapsam dışı bırakıyor). Bu geçişte kapatılanlar: kâğıt üstünde 4.15:1'de
+kalan `#8A7A68` açıklama metinleri (13 yer) ve 2.69:1'deki `rgba(45,36,25,
+0.45)` ipuçları (2 yer) `--c-muted`e çekildi. Telefon genişliğinde yatay
+taşma 0 px, 44 px altında dokunma hedefi yok.
 
 ### Doyurucu panosu: "İstatistikler" değil "Pano"
 

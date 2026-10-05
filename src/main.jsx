@@ -6,7 +6,7 @@ import GurApp from './app/GurApp.jsx';
 
 // Üç ayrı uygulama, tek ürün:
 //   /          → Tüketici mobil uygulaması (telefon çerçevesi içinde)
-//   /isletme   → Doyurucu: işletme uygulaması (kendi girişi, kendi oturumu)
+//   /isletme/* → Doyurucu: işletme WEB SİTESİ (tanıtım + kayıt + panel)
 //   /admin     → Yönetici paneli (tam ekran masaüstü)
 //
 // Ortak olan ekranlar değil VERİ: src/lib/* depoları ve src/data/restaurants.js
@@ -26,7 +26,10 @@ const AdminFallback = () => (
 
 const router = createBrowserRouter([
   { path: '/', element: <GurApp /> },
-  { path: '/isletme', element: <Suspense fallback={<AdminFallback />}><GurBusiness /></Suspense> },
+  // Doyurucu artık bir web sitesi ve kendi alt yolları var
+  // (/isletme/kayit, /isletme/giris, /isletme/panel …). Splat olmadan
+  // bu adresler "*" kuralına düşüp ana sayfaya yönleniyordu.
+  { path: '/isletme/*', element: <Suspense fallback={<AdminFallback />}><GurBusiness /></Suspense> },
   { path: '/admin', element: <Suspense fallback={<AdminFallback />}><GurAdmin /></Suspense> },
   { path: '*', element: <Navigate to="/" replace /> },
 ]);

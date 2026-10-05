@@ -17,13 +17,15 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 import {
   GurLogo, Icon, Img, InputField, SelectField, Btn, IconBtn, Spinner, GlossDefs,
-  HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
+  HScroll, UploadBox, Screen, GurStyles, VerifiedStar,
   GRAD, BackBtn, haptic, keepVisible, toMediaFiles, usePrefersReducedMotion,
-  SocialAuthRow, StepProgress,
+  SocialAuthRow, StepProgress, useMediaQuery, GENIS,
 } from '../ui/kit.jsx';
+import { SiteHeader, SiteFooter, Landing, FormKap } from './site.jsx';
 import {
   submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles,
   saveOwnerProfile, saveOwnerLogo, clearOwnerLogo, ownerLogo, OVERRIDABLE,
@@ -53,50 +55,10 @@ import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
 // ═══════════════════════════════════════════════
 // DOYURUCU GİRİŞ — Hesap seçimi
 // ═══════════════════════════════════════════════
-function DoyurucuAuthScreen({ onLogin, onRegister, onClaim }) {
-  return (
-    <Screen grad={false}>
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-        {/* Üst beyaz alan */}
-        <div style={{ flex: 1, background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative" }}>
-          <div style={{ position: "absolute", top: -30, right: -30, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,102,0,0.04)" }} />
-          <div style={{ position: "absolute", bottom: -15, left: -20, width: 70, height: 70, borderRadius: "50%", background: "rgba(255,0,0,0.03)" }} />
-          
-{/* Yalnızca logo: üstteki ikon ve "DOYURUCU PANELİ" yazısı, altındaki
-              başlık zaten aynı şeyi söylediği için gereksizdi. */}
-          <div style={{ animation: "fadeInUp 0.6s ease-out" }}>
-            <GurLogo size={72} pill />
-          </div>
-        </div>
-
-        {/* Alt turuncu alan */}
-        <div className="gur-on-brand" style={{ background: GRAD, padding: "28px 28px 50px", borderTopLeftRadius: 40, borderTopRightRadius: 40, position: "relative" }}>
-          {/* Bu ekran işletme uygulamasının başlangıcı: geri gidilecek bir
-              yer yok, geri düğmesi de yok. Tıklandığında hiçbir şey
-              yapmayan bir düğme, olmayan düğmeden kötü. */}
-
-          <div style={{ position: "absolute", top: -22, left: "50%", transform: "translateX(-50%)", background: "#fff", borderRadius: 20, padding: "8px 20px", boxShadow: "var(--sh-brand)" }}>
-            <GurLogo size={22} pill />
-          </div>
-
-          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-on-brand)", textAlign: "center", margin: "16px 0 8px" }}>Doyurucu Girişi</h2>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-on-brand-2)", textAlign: "center", margin: "0 0 28px", lineHeight: 1.5 }}>
-            Restoranınızı yönetin, istatistikleri takip edin
-          </p>
-
-          <Btn text="Giriş Yap" onClick={onLogin} />
-          <div style={{ height: 12 }} />
-          <Btn text="Yeni Hesap Oluştur" onClick={onRegister} variant="outlineBrand" />
-          <div style={{ height: 12 }} />
-          {/* Havuzdaki kayıtların çoğu dış API'lerden geliyor: işletmenin
-              sıfırdan kayıt açması değil, var olanı sahiplenmesi asıl yol. */}
-          <Btn text="İşletmem zaten GUR'da — sahiplen" onClick={onClaim} variant="outlineBrand" />
-        </div>
-      </div>
-    </Screen>
-  );
-}
-
+// Eski `DoyurucuAuthScreen` KALDIRILDI. Üç düğmeli o telefon ekranının
+// yerini tanıtım sitesi aldı (./site.jsx → Landing): işletme sahibi artık
+// ne sunduğumuzu okuyup öyle kayıt oluyor, boş bir giriş kapısıyla
+// karşılaşmıyor.
 // İşletmenin kendi bilgileri.
 //
 // Havuzdaki kaydın çoğu dış API'lerden geliyor. İşletme bir alanı
@@ -312,7 +274,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
             <BackBtn onClick={onBack} variant="light" />
             <h2 style={{ fontFamily: "var(--f-body)", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "#1C1917", margin: 0 }}>İşletmemi sahiplen</h2>
           </div>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#8A7A68", lineHeight: 1.55, margin: "0 0 18px" }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", lineHeight: 1.55, margin: "0 0 18px" }}>
             İşletmen büyük ihtimalle GUR'da zaten var: harita servislerinden otomatik olarak
             ekleniyor. Kaydını bul, sahiplen; onaydan sonra menü, fotoğraf ve bilgileri sen yönetirsin.
           </p>
@@ -334,7 +296,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
 
               {query.trim().length >= 2 && results.length === 0 && (
                 <div style={{ textAlign: "center", padding: "26px 16px" }}>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "#8A7A68", margin: "0 0 4px" }}>Bu isimde bir kayıt bulamadık</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)", margin: "0 0 4px" }}>Bu isimde bir kayıt bulamadık</p>
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "#A8A29E", lineHeight: 1.5, margin: 0 }}>
                     Havuzda yoksa sıfırdan kayıt açabilirsin — geri dönüp "Yeni Hesap Oluştur" adımını seç.
                   </p>
@@ -358,7 +320,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
-                      <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "#8A7A68", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.addr}</p>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.addr}</p>
                     </div>
                     <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, flexShrink: 0, color: st === "approved" ? "var(--c-ok-ink)" : st === "pending" ? "var(--c-warn-ink)" : "#FF6600" }}>
                       {st === "approved" ? "Sahiplenilmiş" : st === "pending" ? "Beklemede" : "Sahiplen"}
@@ -375,7 +337,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "#1C1917", margin: 0 }}>{picked.name}</p>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "#8A7A68", margin: 0 }}>{picked.addr}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: 0 }}>{picked.addr}</p>
                 </div>
                 <Btn text="Değiştir" onClick={() => setPicked(null)} variant="plainDark" size="sm" fullWidth={false} />
               </div>
@@ -387,7 +349,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
               <InputField label="E-posta" value={form.email} onChange={set("email")} placeholder="isletme@mail.com" />
 
               <div style={{ background: "#FBFAF8", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "#8A7A68", lineHeight: 1.55, margin: 0 }}>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", lineHeight: 1.55, margin: 0 }}>
                   Başvurun yönetici onayına düşer. Onaylanınca panelde menü, fotoğraf ve bilgileri
                   düzenleyebilirsin; doldurmadığın alanlar harita servislerinden gelmeye devam eder.
                 </p>
@@ -427,21 +389,23 @@ function DoyurucuLoginScreen({ onBack, onLogin }) {
     onLogin();
   };
 
+  // WEB DÜZENİ. Telefon sürümünde ekran yüzdeyle ikiye bölünüyordu
+  // (üst %32 krem, alt turuncu). Yükseklik web'de serbest: yüzdeli bölme
+  // kart içinde çöküyor ve turuncu alan içeriğe göre zıplıyordu. Artık
+  // krem bir başlık + turuncu bir form gövdesi, ikisi de içerik kadar.
   return (
     <Screen grad={false}>
-      <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-        {/* Üst beyaz */}
-        <div style={{ height: "32%", background: "var(--c-warm-1)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ background: "var(--c-warm-1)", padding: "34px 28px 30px", display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
+          <div style={{ position: "absolute", left: 14, top: 14 }}>
+            <BackBtn onClick={onBack} variant="light" />
+          </div>
 <div style={{ marginBottom: 10 }}><Icon n="plate" color="#FF6600" size={22} /></div>
           <GurLogo size={60} pill />
           <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", marginTop: 4, letterSpacing: 1.5 }}>DOYURUCU</p>
         </div>
 
-        {/* Alt gradient */}
-        <div className="gur-on-brand" style={{ flex: 1, background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}>
-          <div style={{ position: "absolute", left: 14, top: 18 }}>
-            <BackBtn onClick={onBack} />
-          </div>
+        <div className="gur-on-brand" style={{ background: GRAD, padding: "28px 28px 40px", position: "relative" }}>
 
           <h2 style={{ fontFamily: "var(--f-body)", fontSize: 16, color: "var(--c-on-brand)", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>Giriş Yap</h2>
           <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-on-brand-2)", textAlign: "center", margin: "0 0 30px" }}>
@@ -489,7 +453,7 @@ function StepHeader({ step, title, subtitle, onBack }) {
       </div>
       <StepProgress current={step} />
       <h2 style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 800, color: "#2D2419", margin: "0 0 6px", textAlign: "center" }}>{title}</h2>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#8A7A68", textAlign: "center", marginBottom: 24 }}>{subtitle}</p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", textAlign: "center", marginBottom: 24 }}>{subtitle}</p>
     </>
   );
 }
@@ -576,7 +540,7 @@ function RestRegStep1({ onBack, onNext }) {
         <div style={{ marginTop: 24 }}>
           <Btn text="Devam Et →" onClick={onNext} disabled={!canProceed} />
           {!canProceed && (
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(45,36,25,0.45)", textAlign: "center", marginTop: 10 }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", textAlign: "center", marginTop: 10 }}>
               İşletme adı, lokasyon, hizmet türü ve büyüklük alanları zorunludur
             </p>
           )}
@@ -623,14 +587,14 @@ function RestRegStep2({ onBack, onNext }) {
           {["Telefonunuzdan fotoğraf çekerek yükleyebilirsiniz", "PDF veya görsel formatları kabul edilir", "Belgenin tamamının görünür olduğundan emin olun"].map((tip, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < 2 ? 5 : 0 }}>
               <div style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(45,36,25,0.3)", flexShrink: 0 }} />
-              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "#8A7A68", margin: 0 }}>{tip}</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", margin: 0 }}>{tip}</p>
             </div>
           ))}
         </div>
 
         <Btn text="Devam Et →" onClick={onNext} disabled={!canProceed} />
         {!canProceed && (
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(45,36,25,0.45)", textAlign: "center", marginTop: 10 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", textAlign: "center", marginTop: 10 }}>
             {levhaFiles.length === 0 ? "Devam etmek için vergi levhası yüklemeniz gerekiyor" : "Vergi numarası zorunludur"}
           </p>
         )}
@@ -687,12 +651,12 @@ function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
             padding: "18px 18px 14px", marginBottom: 28, boxShadow: "var(--sh-1)",
             animation: "fadeInUp 0.5s ease-out 0.3s both",
           }}>
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#8A7A68", margin: "0 0 12px" }}>Yükleme Özeti</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-muted)", margin: "0 0 12px" }}>Yükleme Özeti</p>
             {[
-              { icon: <Icon n="bank" size={16} color="#8A7A68" />, text: "Vergi levhası", done: true },
-              { icon: <Icon n="palette" size={16} color="#8A7A68" />, text: logoFiles.length > 0 ? "Logo yüklendi" : "Logo yüklenmedi", done: logoFiles.length > 0 },
-              { icon: <Icon n="doc" size={16} color="#8A7A68" />, text: menuFiles.length > 0 ? `${menuFiles.length} menü dosyası` : "Menü yüklenmedi", done: menuFiles.length > 0 },
-              { icon: <Icon n="camera" size={16} color="#8A7A68" />, text: photoFiles.length > 0 ? `${photoFiles.length} fotoğraf` : "Fotoğraf yüklenmedi", done: photoFiles.length > 0 },
+              { icon: <Icon n="bank" size={16} color="var(--c-muted)" />, text: "Vergi levhası", done: true },
+              { icon: <Icon n="palette" size={16} color="var(--c-muted)" />, text: logoFiles.length > 0 ? "Logo yüklendi" : "Logo yüklenmedi", done: logoFiles.length > 0 },
+              { icon: <Icon n="doc" size={16} color="var(--c-muted)" />, text: menuFiles.length > 0 ? `${menuFiles.length} menü dosyası` : "Menü yüklenmedi", done: menuFiles.length > 0 },
+              { icon: <Icon n="camera" size={16} color="var(--c-muted)" />, text: photoFiles.length > 0 ? `${photoFiles.length} fotoğraf` : "Fotoğraf yüklenmedi", done: photoFiles.length > 0 },
             ].map((item, i) => (
               <div key={i} style={{
                 display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
@@ -773,7 +737,7 @@ function RestRegStep3({ onBack, onDone, ownerMedia, setOwnerMedia }) {
           ].map((tip, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < 3 ? 5 : 0 }}>
               <div style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(45,36,25,0.3)", flexShrink: 0 }} />
-              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "#8A7A68", margin: 0 }}>{tip}</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", margin: 0 }}>{tip}</p>
             </div>
           ))}
         </div>
@@ -924,7 +888,7 @@ function SecondChanceCard({ restaurant }) {
             <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-warn-light)" }}>
               {talep.status === "quoted" ? "Fiyatlandırılıyor" : "Teklif istendi"}
             </span>
-            <Btn text="Vazgeç" onClick={() => withdraw(talep.id)} variant="plainDark" size="sm" fullWidth={false} />
+            <Btn text="Vazgeç" onClick={() => withdraw(talep.id)} variant="plainOnDark" size="sm" fullWidth={false} />
           </div>
         ) : (
           <Btn text="Teklif iste" variant="filled" size="md"
@@ -1119,7 +1083,7 @@ function SlotBooking({ streamKey, restaurant }) {
           <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-warn-light)" }}>
             {prettyDay(bekleyen.start)}{bekleyen.end !== bekleyen.start ? ` – ${prettyDay(bekleyen.end)}` : ""} · {(bekleyen.days ?? gunFarki(bekleyen.start, bekleyen.end) + 1)} gün · onay bekliyor
           </span>
-          <Btn text="Vazgeç" onClick={() => cancelBooking(bekleyen.id)} variant="plainDark" size="sm" fullWidth={false} />
+          <Btn text="Vazgeç" onClick={() => cancelBooking(bekleyen.id)} variant="plainOnDark" size="sm" fullWidth={false} />
         </div>
       ) : !acik ? (
         <Btn text="Tarih seç" onClick={() => { setAcik(true); setHata(""); }}
@@ -1224,7 +1188,7 @@ function SlotBooking({ streamKey, restaurant }) {
           )}
 
           <div style={{ marginTop: 10 }}>
-            <Btn text="Kapat" onClick={() => { setAcik(false); setSecili(null); setGun(1); }} variant="plainDark" size="sm" fullWidth={false} />
+            <Btn text="Kapat" onClick={() => { setAcik(false); setSecili(null); setGun(1); }} variant="plainOnDark" size="sm" fullWidth={false} />
           </div>
         </div>
       )}
@@ -1309,7 +1273,7 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
           <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-warn-light)" }}>
             {talep.status === "quoted" ? "Fiyatlandırılıyor" : "Teklif istendi"}
           </span>
-          <Btn text="Vazgeç" onClick={() => withdraw(talep.id)} variant="plainDark" size="sm" fullWidth={false} />
+          <Btn text="Vazgeç" onClick={() => withdraw(talep.id)} variant="plainOnDark" size="sm" fullWidth={false} />
         </div>
       ) : (
         <Btn text="Teklif iste" onClick={iste}
@@ -2631,7 +2595,7 @@ function PriceOffers({ restaurant }) {
   );
 }
 
-function RestaurantDashboard({ onLogout, ownerRestaurant }) {
+function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite }) {
   const [activeTab, setActiveTab] = useState("stats");
   // Masa ayırtma yönetici panelinden kapatılabiliyor; kapalıysa sekme de
   // talep de yok — işletmeye cevaplayamayacağı bir kuyruk göstermeyiz.
@@ -2679,91 +2643,25 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
     ],
   };
 
-  return (
-    <Screen grad={false}>
-      <div style={{ height: "100%", background: "#100D0B", overflowY: "auto" }}>
-        {/* Header */}
-        <div className="gur-on-brand" style={{ background: GRAD, padding: "44px 20px 24px", borderBottomLeftRadius: 32, borderBottomRightRadius: 32, marginBottom: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <Btn
-              text="Çıkış" onClick={() => setShowLogout(true)}
-              variant="outline" size="sm" fullWidth={false}
-              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>}
-            />
-            <GurLogo size={42} pill />
-            <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 12, padding: "6px 12px", backdropFilter: "blur(8px)" }}>
-              <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "#fff", fontWeight: 700 }}>İŞLETME PANELİ</span>
-            </div>
-          </div>
+  // ── Sekmeler TEK LİSTEDEN ──
+  // Dar ekranda yatay şerit, geniş ekranda sol kenar çubuğu aynı diziyi
+  // çiziyor. İki kopya olsaydı biri katalogda açılan yeni sekmeyi
+  // göstermeyi unuturdu.
+  const sekmeler = [
+    { id: "stats", label: "Pano", ikon: "chart" },
+    ...(canReserve ? [{ id: "tables", label: "Masalar", ikon: "clock", badge: pendingCount }] : []),
+    { id: "offers", label: "Teklifler", ikon: "bank", badge: openOffers },
+    { id: "info", label: "Bilgiler", ikon: "doc" },
+    { id: "reviews", label: "Yorumlar", ikon: "chat" },
+    { id: "menu", label: "Menü", ikon: "plate" },
+    { id: "photos", label: "Fotoğraflar", ikon: "photo" },
+    { id: "growth", label: "Büyüme", ikon: "sparkle" },
+  ];
 
-          {/* Restoran bilgisi */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-            <LogoUpload restaurant={ownerRestaurant} />
-            <div>
-              <h2 style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>{ownerRestaurant?.name || "Restoranınız"}</h2>
-              <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.7)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{ownerRestaurant?.addr || "Kadıköy, İstanbul"} • Aktif</p>
-            </div>
-          </div>
-
-          {/* Puan badge */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)" }}>
-<Icon n="star" color="#fff" size={18} />
-              <div>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.avgRating}</p>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Ortalama Puan</p>
-              </div>
-            </div>
-            <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)" }}>
-<Icon n="chat" color="#fff" size={18} />
-              <div>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.totalReviews}</p>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Toplam Yorum</p>
-              </div>
-            </div>
-            {/* Turuncu zeminde yeşil-üstüne-yeşil okunmuyordu: beyaz kart,
-                marka turuncusu yazı. */}
-            <div style={{ background: "#fff", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, boxShadow: "var(--sh-1)" }}>
-<Icon n="flame" color="#FF6600" size={18} />
-              <div>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-brand-ink)", margin: 0, lineHeight: 1 }}>%{ozet30.oran.toFixed(1)}</p>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,102,0,0.75)", margin: 0 }}>Beğeni oranı · 30 gün</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ padding: "0 16px 40px" }}>
-          {/* Tab seçici */}
-          {/* Sekmeler sığmıyor: eşit bölmek yerine kaydırılabilir şerit.
-              Sekme sayısı arttıkça yazılar kırpılıyordu. */}
-          <HScroll style={{ marginBottom: 20, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-            {[
-              { id: "stats", label: "Pano" },
-              ...(canReserve ? [{ id: "tables", label: "Masalar", badge: pendingCount }] : []),
-              { id: "offers", label: "Teklifler", badge: openOffers },
-              { id: "info", label: "Bilgiler" },
-              { id: "reviews", label: "Yorumlar" },
-              { id: "menu", label: "Menü" },
-              { id: "photos", label: "Fotoğraflar" },
-              { id: "growth", label: "Büyüme" },
-            ].map(tab => (
-              <div key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-                flexShrink: 0, padding: "13px 16px", textAlign: "center", cursor: "pointer", whiteSpace: "nowrap",
-                background: activeTab === tab.id ? "rgba(255,102,0,0.15)" : "transparent",
-                borderBottom: activeTab === tab.id ? "2px solid #FF6600" : "2px solid transparent",
-                transition: "all 0.25s",
-              }}>
-                <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 500, color: activeTab === tab.id ? "#FF6600" : "rgba(255,255,255,0.4)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {tab.label}
-                  {/* Bekleyen talep sayısı: işletmenin ilk bakacağı yer */}
-                  {tab.badge > 0 && (
-                    <span style={{ minWidth: 15, height: 15, borderRadius: 8, background: "var(--c-bad)", color: "#fff", fontSize: 9, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{tab.badge}</span>
-                  )}
-                </span>
-              </div>
-            ))}
-          </HScroll>
+  // Sekme gövdesi: iki düzen de AYNI ağacı çiziyor, yalnızca çerçevesi
+  // değişiyor.
+  const panelIcerik = (
+    <>
 
           {/* Onay durumu her sekmede görünür: bekleyen bir menü onayını
               görmek için Menü sekmesine girmek gerekseydi işletme onu
@@ -3012,8 +2910,188 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
 
             </div>
           )}
+    </>
+  );
+
+  const kunye = [
+    { ikon: "star", deger: stats.avgRating, alt: "Ortalama puan" },
+    { ikon: "chat", deger: stats.totalReviews, alt: "Toplam yorum" },
+    { ikon: "flame", deger: `%${ozet30.oran.toFixed(1)}`, alt: "Beğeni oranı · 30 gün" },
+  ];
+
+  return (
+    <main className="gur-screen" style={{ width: "100%", flex: 1, display: "flex", flexDirection: "column", background: "#100D0B", position: "relative" }}>
+      {genis ? (
+        /* ── GENİŞ EKRAN: kenar çubuğu + içerik ──
+           Telefon düzenini masaüstünde ortada 390 px'lik bir şerit olarak
+           bırakmak ekranın dörtte üçünü boşa harcardı. Sekmeler sola
+           dikey iniyor: sekiz sekme yatay şeritte kaydırma istiyordu,
+           dikeyde hepsi aynı anda görünüyor. */
+        <div style={{ display: "flex", alignItems: "flex-start", minHeight: "100vh" }}>
+          <aside style={{
+            width: 258, flexShrink: 0, alignSelf: "stretch", position: "sticky", top: 0,
+            maxHeight: "100vh", overflowY: "auto",
+            background: "rgba(255,255,255,0.03)", borderRight: "1px solid rgba(255,255,255,0.07)",
+            padding: "20px 14px 18px", display: "flex", flexDirection: "column", gap: 14,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 4px" }}>
+              <GurLogo size={36} pill />
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, letterSpacing: "0.06em", color: "rgba(255,255,255,0.5)" }}>DOYURUCU</span>
+            </div>
+
+            <div style={{
+              display: "flex", alignItems: "center", gap: 11, padding: 11,
+              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16,
+            }}>
+              <LogoUpload restaurant={ownerRestaurant} size={42} />
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ownerRestaurant?.name || "Restoranınız"}</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.5)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ownerRestaurant?.addr || "Kadıköy, İstanbul"}</p>
+              </div>
+            </div>
+
+            <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {sekmeler.map(tab => {
+                const secili = activeTab === tab.id;
+                return (
+                  <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
+                    aria-current={secili ? "page" : undefined}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, width: "100%",
+                      minHeight: 44, padding: "0 12px", borderRadius: 12, cursor: "pointer",
+                      border: "none", outline: "none", textAlign: "left",
+                      background: secili ? "rgba(255,102,0,0.16)" : "transparent",
+                      color: secili ? "#FF9A4D" : "rgba(255,255,255,0.62)",
+                      fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: secili ? 700 : 500,
+                    }}>
+                    <Icon n={tab.ikon} size={16} color={secili ? "#FF9A4D" : "rgba(255,255,255,0.45)"} />
+                    <span style={{ flex: 1 }}>{tab.label}</span>
+                    {tab.badge > 0 && (
+                      <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: "var(--c-bad)", color: "#fff", fontSize: 10, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{tab.badge}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+              <Btn text="Siteye dön" onClick={() => onSite?.()} variant="plainOnDark" size="sm" />
+              <Btn text="Çıkış" onClick={() => setShowLogout(true)} variant="outline" size="sm" />
+            </div>
+          </aside>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+              flexWrap: "wrap", padding: "18px 28px", borderBottom: "1px solid rgba(255,255,255,0.07)",
+            }}>
+              <h1 style={{ fontFamily: "var(--f-display)", fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: 0 }}>
+                {sekmeler.find(t => t.id === activeTab)?.label || "Pano"}
+              </h1>
+              <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
+                {kunye.map(k => (
+                  <div key={k.alt} style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "7px 13px", borderRadius: 14,
+                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+                  }}>
+                    <Icon n={k.ikon} size={16} color="#FF9A4D" />
+                    <div>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1.1 }}>{k.deger}</p>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.5)", margin: 0 }}>{k.alt}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ maxWidth: 1000, padding: "22px 28px 60px" }}>
+              {panelIcerik}
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style={{ minHeight: "100%", background: "#100D0B" }}>
+        {/* Header */}
+        <div className="gur-on-brand" style={{ background: GRAD, padding: "44px 20px 24px", borderBottomLeftRadius: 32, borderBottomRightRadius: 32, marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <Btn
+              text="Çıkış" onClick={() => setShowLogout(true)}
+              variant="outline" size="md" fullWidth={false}
+              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>}
+            />
+            <GurLogo size={42} pill />
+            {/* Dar düzende siteye dönüş yolu. Geniş düzende bu kenar
+                çubuğunun altında duruyor; burada yerinde "İŞLETME PANELİ"
+                yazan bir etiket vardı ve hangi sayfada olduğunu zaten
+                bilen kullanıcıya bir şey söylemiyordu — oysa siteye
+                dönmenin hiçbir yolu yoktu. Çıkıştan ayrı: bu oturumu
+                kapatmıyor. */}
+            <Btn text="Siteye dön" onClick={() => onSite?.()} variant="outline" size="md" fullWidth={false} />
+          </div>
+
+          {/* Restoran bilgisi */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+            <LogoUpload restaurant={ownerRestaurant} />
+            <div>
+              <h2 style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>{ownerRestaurant?.name || "Restoranınız"}</h2>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.7)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{ownerRestaurant?.addr || "Kadıköy, İstanbul"} • Aktif</p>
+            </div>
+          </div>
+
+          {/* Puan badge */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)" }}>
+<Icon n="star" color="#fff" size={18} />
+              <div>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.avgRating}</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Ortalama Puan</p>
+              </div>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)" }}>
+<Icon n="chat" color="#fff" size={18} />
+              <div>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.totalReviews}</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Toplam Yorum</p>
+              </div>
+            </div>
+            {/* Turuncu zeminde yeşil-üstüne-yeşil okunmuyordu: beyaz kart,
+                marka turuncusu yazı. */}
+            <div style={{ background: "#fff", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, boxShadow: "var(--sh-1)" }}>
+<Icon n="flame" color="#FF6600" size={18} />
+              <div>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-brand-ink)", margin: 0, lineHeight: 1 }}>%{ozet30.oran.toFixed(1)}</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,102,0,0.75)", margin: 0 }}>Beğeni oranı · 30 gün</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+          <div style={{ padding: "0 16px 40px" }}>
+          {/* Tab seçici */}
+          {/* Sekmeler sığmıyor: eşit bölmek yerine kaydırılabilir şerit.
+              Sekme sayısı arttıkça yazılar kırpılıyordu. */}
+          <HScroll style={{ marginBottom: 20, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            {sekmeler.map(tab => (
+              <div key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+                flexShrink: 0, padding: "13px 16px", textAlign: "center", cursor: "pointer", whiteSpace: "nowrap",
+                background: activeTab === tab.id ? "rgba(255,102,0,0.15)" : "transparent",
+                borderBottom: activeTab === tab.id ? "2px solid #FF6600" : "2px solid transparent",
+                transition: "all 0.25s",
+              }}>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 500, color: activeTab === tab.id ? "#FF6600" : "rgba(255,255,255,0.4)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {tab.label}
+                  {/* Bekleyen talep sayısı: işletmenin ilk bakacağı yer */}
+                  {tab.badge > 0 && (
+                    <span style={{ minWidth: 15, height: 15, borderRadius: 8, background: "var(--c-bad)", color: "#fff", fontSize: 9, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{tab.badge}</span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </HScroll>
+            {panelIcerik}
+          </div>
+        </div>
+      )}
 
       {/* Büyüme sekmesi bildirimi */}
       <AnimatePresence>
@@ -3022,7 +3100,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
             transition={{ type: "spring", bounce: 0, duration: 0.35 }}
             style={{
-              position: "absolute", left: 16, right: 16, bottom: 22, zIndex: 200,
+              position: "fixed", left: 16, right: 16, bottom: 22, zIndex: 200, maxWidth: 420, margin: "0 auto",
               background: "var(--c-ok)", borderRadius: 16, padding: "12px 16px",
               display: "flex", alignItems: "center", gap: 9, boxShadow: "var(--sh-d2)",
             }}>
@@ -3039,7 +3117,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             style={{
-              position: "absolute", inset: 0, zIndex: 200,
+              position: "fixed", inset: 0, zIndex: 300,
               background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
               display: "flex", alignItems: "center", justifyContent: "center",
               padding: 30,
@@ -3077,7 +3155,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
         )}
       </AnimatePresence>
 
-    </Screen>
+    </main>
   );
 }
 
@@ -3088,36 +3166,82 @@ function RestaurantDashboard({ onLogout, ownerRestaurant }) {
 // Oturum bellekte tutuluyor (demo); gerçek dağıtımda sunucudaki işletme
 // oturumu bunun yerini alır ve hangi restoranın yönetildiği token'dan gelir.
 // ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// DOYURUCU — WEB SİTESİ KÖKÜ
+//
+// Telefon çerçevesi KALDIRILDI. `/isletme` artık kendi yolları olan bir
+// web sitesi:
+//
+//   /isletme            tanıtım sayfası
+//   /isletme/kayit      yeni kayıt (3 adım)
+//   /isletme/sahiplen   havuzdaki kaydı sahiplen
+//   /isletme/giris      giriş
+//   /isletme/panel      işletme paneli (giriş ister)
+//
+// YOLLAR GERÇEK. Ekran bir state değil, adres çubuğundaki yol: kayıt
+// sayfasının linki paylaşılabiliyor, tarayıcının geri tuşu kendiliğinden
+// çalışıyor ve sayfa yenilenince aynı yerde kalınıyor. Önceki `screen`
+// state'i + elle tutulan `history` yığını bunların üçünü de veremiyordu.
+//
+// OTURUM localStorage'da. Gerçek bir kimlik doğrulaması değil — YEREL
+// modda işletme girişi zaten bir formalite (bkz. CLAUDE.md) — ama bir
+// işaret gerekiyor: olmadan `/isletme/panel` adresini yenileyen kullanıcı
+// girişe düşer ve sitede kaybolur.
+// ═══════════════════════════════════════════════════════════════════════
+
+const YOL = {
+  landing: "/isletme",
+  giris: "/isletme/giris",
+  kayit: "/isletme/kayit",
+  sahiplen: "/isletme/sahiplen",
+  panel: "/isletme/panel",
+};
+const EKRANLAR = { "": "landing", giris: "giris", kayit: "kayit", sahiplen: "sahiplen", panel: "panel" };
+const OTURUM_ANAHTARI = "gur.doyurucu.session";
+
+function oturumOku() {
+  try { return JSON.parse(localStorage.getItem(OTURUM_ANAHTARI) || "null"); }
+  catch { return null; }
+}
+
 export default function GurBusiness() {
-  const [screen, setScreen] = useState("auth");   // auth | login | claim | reg1..3 | dashboard
-  const [history, setHistory] = useState([]);
-  // Kayıt akışındaki (reg3) geçici yüklemeler. Orada henüz sahiplenilmiş
-  // bir kayıt YOK — dosyayı hangi restoranın altına yazacağımızı
-  // bilmiyoruz — o yüzden depoya değil ekrana bağlı duruyorlar. Panele
-  // girildikten sonraki yüklemeler ortak depoya ve onay kuyruğuna gider.
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Yol → ekran. Bilinmeyen alt yol tanıtım sayfasına düşüyor; 404 yerine
+  // ana sayfa, çünkü sitenin tamamı beş sayfa.
+  const altYol = location.pathname.replace(/^\/isletme\/?/, "").split("/")[0];
+  const ekran = EKRANLAR[altYol] || "landing";
+
+  const [oturum, setOturum] = useState(oturumOku);
+  const girisli = !!oturum;
+
+  // Kayıt akışının adımı. Üç adım tek yolda duruyor: her adıma ayrı bir
+  // adres vermek, formu yarıda bırakıp linki paylaşan kullanıcıya boş bir
+  // ikinci adım açardı.
+  const [regAdim, setRegAdim] = useState(1);
   const [ownerMedia, setOwnerMedia] = useState({ photos: [], menu: [] });
   const [claimedRestaurant, setClaimedRestaurant] = useState(null);
 
   const ownerProfiles = useOwnerProfiles();
   const mediaState = useMedia();
+  const genis = useMediaQuery(GENIS);
 
-  // Yönetilen mekan: sahiplenilen kayıt, yoksa demo işletmesi. Liste
-  // tüketici uygulamasıyla ortak (src/data/restaurants.js).
-  //
-  // İki adım şart: hangi mekanı yönettiğimizi bilmeden onun medyasını
-  // ekleyemeyiz, ama medyayı eklemeden de kaydın son hâli çıkmaz. Önce
-  // kimliği buluyoruz, sonra o kimliğin ONAYLI dosyalarını bindiriyoruz —
-  // işletme kendi panelinde tüketicinin gördüğü kaydın aynısını görsün.
   const basePool = useMemo(
     () => RESTAURANTS.map(r => applyOwnerProfile(r, ownerProfiles)),
     [ownerProfiles]
   );
-  const baseOwner = useMemo(
-    () => (claimedRestaurant
-      ? basePool.find(r => String(r.id) === String(claimedRestaurant.id)) || claimedRestaurant
-      : findOwnerRestaurant(basePool)),
-    [basePool, claimedRestaurant]
-  );
+  // Yönetilen mekan: sahiplenilen kayıt (bu oturumda ya da önceki
+  // oturumdan hatırlanan), yoksa demo işletmesi.
+  const baseOwner = useMemo(() => {
+    const id = claimedRestaurant?.id ?? oturum?.claimedId;
+    if (id != null) {
+      return basePool.find(r => String(r.id) === String(id))
+        || claimedRestaurant
+        || findOwnerRestaurant(basePool);
+    }
+    return findOwnerRestaurant(basePool);
+  }, [basePool, claimedRestaurant, oturum]);
   const pool = useMemo(
     () => withOwnerMedia(basePool, baseOwner?.id, ownerMediaFor(baseOwner?.id, mediaState)),
     [basePool, baseOwner, mediaState]
@@ -3127,49 +3251,100 @@ export default function GurBusiness() {
     [pool, baseOwner]
   );
 
-  const nav = (next) => { setHistory(h => [...h, screen]); setScreen(next); };
-  const back = () => setHistory(h => {
-    if (!h.length) return h;
-    setScreen(h[h.length - 1]);
-    return h.slice(0, -1);
-  });
-  const logout = () => { setHistory([]); setClaimedRestaurant(null); setScreen("auth"); };
+  const git = (hedef, kanca) => {
+    navigate(YOL[hedef] || YOL.landing);
+    // Tanıtım sayfasındaki bir bölüme gidiliyorsa önce sayfanın çizilmesi
+    // gerekiyor; kanca o yüzden bir kare sonra aranıyor.
+    if (kanca) setTimeout(() => document.getElementById(kanca)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  };
+
+  const girisYap = (claimed = null) => {
+    const s = { at: Date.now(), claimedId: claimed?.id ?? null };
+    try { localStorage.setItem(OTURUM_ANAHTARI, JSON.stringify(s)); } catch { /* depolama kapalı */ }
+    setOturum(s);
+    if (claimed) setClaimedRestaurant(claimed);
+    navigate(YOL.panel);
+  };
+
+  const cikis = () => {
+    try { localStorage.removeItem(OTURUM_ANAHTARI); } catch { /* depolama kapalı */ }
+    setOturum(null);
+    setClaimedRestaurant(null);
+    navigate(YOL.landing);
+  };
+
+  // Panelin kapısı: oturum yoksa girişe. `replace` — kullanıcı geri
+  // tuşuyla tekrar kapalı kapıya çarpmasın.
+  useEffect(() => {
+    if (ekran === "panel" && !girisli) navigate(YOL.giris, { replace: true });
+  }, [ekran, girisli, navigate]);
+
+  // Sayfa değişince başa dön. Tek sayfalık uygulamada tarayıcı bunu
+  // kendiliğinden yapmıyor: uzun tanıtım sayfasının ortasından kayıt
+  // sayfasına geçen kullanıcı formun ortasına düşüyordu.
+  useEffect(() => { window.scrollTo(0, 0); }, [ekran]);
+
+  // Kayıt sayfasından her çıkışta akış başa sarılıyor.
+  useEffect(() => { if (ekran !== "kayit") setRegAdim(1); }, [ekran]);
 
   // Sunucu var mı — tüketici uygulamasıyla aynı ölçüm.
   useEffect(() => { backend.boot(); }, []);
 
-  const render = () => {
-    switch (screen) {
-      case "login": return <DoyurucuLoginScreen onBack={back} onLogin={() => nav("dashboard")} />;
-      case "claim": return <ClaimScreen onBack={back} restaurants={pool}
-        onDone={(r) => { setClaimedRestaurant(r); nav("dashboard"); }} />;
-      case "reg1": return <RestRegStep1 onBack={back} onNext={() => nav("reg2")} />;
-      case "reg2": return <RestRegStep2 onBack={back} onNext={() => nav("reg3")} />;
-      case "reg3": return <RestRegStep3 onBack={back} onDone={() => nav("dashboard")} ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} />;
-      case "dashboard": return <RestaurantDashboard onLogout={logout} ownerRestaurant={ownerRestaurant} />;
-      default: return <DoyurucuAuthScreen
-        onLogin={() => nav("login")} onRegister={() => nav("reg1")} onClaim={() => nav("claim")} />;
+  const kayitAkisi = () => {
+    if (regAdim === 2) return <RestRegStep2 onBack={() => setRegAdim(1)} onNext={() => setRegAdim(3)} />;
+    if (regAdim === 3) return <RestRegStep3 onBack={() => setRegAdim(2)} onDone={() => girisYap()}
+      ownerMedia={ownerMedia} setOwnerMedia={setOwnerMedia} />;
+    return <RestRegStep1 onBack={() => git("landing")} onNext={() => setRegAdim(2)} />;
+  };
+
+  const icerik = () => {
+    switch (ekran) {
+      case "giris":
+        return <FormKap><DoyurucuLoginScreen onBack={() => git("landing")} onLogin={() => girisYap()} /></FormKap>;
+      case "sahiplen":
+        return <FormKap en={640}><ClaimScreen onBack={() => git("landing")} restaurants={pool}
+          onDone={(r) => girisYap(r)} /></FormKap>;
+      case "kayit":
+        return <FormKap en={640}>{kayitAkisi()}</FormKap>;
+      case "panel":
+        // Kapı yukarıdaki effect'te; o çalışana kadar bir kare boş kalıyor.
+        return girisli
+          ? <RestaurantDashboard onLogout={cikis} ownerRestaurant={ownerRestaurant} genis={genis} onSite={() => git("landing")} />
+          : null;
+      default:
+        return <Landing onGo={git} />;
     }
   };
 
+  const panelde = ekran === "panel" && girisli;
+
   return (
-    <div className="gur-stage" style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", colorScheme: "light" }}>
+    <div className="gur-site" style={{
+      minHeight: "100vh", background: "var(--c-bg)", colorScheme: "light",
+      display: "flex", flexDirection: "column",
+    }}>
       <GurStyles />
       {/* Parlak turuncu simge gradyanı bir kez tanımlanıyor; simgeler
-          url(#gur-gloss) ile buna bağlanıyor. Her düğmede ayrı <defs>
-          çizilseydi aynı id çoğalır, tarayıcı ilkine bağlanırdı. */}
+          url(#gur-gloss) ile buna bağlanıyor. */}
       <GlossDefs />
-      <PhoneFrame>
+
+      {/* Panelde site başlığı yok: panelin kendi başlığı ve gezinmesi var,
+          iki gezinme şeridi üst üste hangisinin ana olduğunu sildirir. */}
+      {!panelde && <SiteHeader onGo={git} girisli={girisli} onLogout={cikis} aktif={ekran} />}
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <AnimatePresence mode="wait">
           <motion.div
-            key={screen}
+            key={ekran}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            style={{ height: "100%" }}>
-            {render()}
+            transition={{ duration: 0.16 }}
+            style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+            {icerik()}
           </motion.div>
         </AnimatePresence>
-      </PhoneFrame>
+      </div>
+
+      {!panelde && <SiteFooter onGo={git} />}
     </div>
   );
 }
