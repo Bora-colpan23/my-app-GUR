@@ -48,17 +48,20 @@ npm run dev:all                       # API (8787) + arayüz (5173)
 
 Yalnız arayüz: `npm run dev`. Yalnız API: `npm run dev:api`.
 
-- `/`          → Tüketici **tanıtım sayfası** (web sitesi)
-- `/uygulama`  → Tüketici uygulaması (telefonda bugünkü düzen, masaüstünde web kabuğu)
+- `/`          → **telefonda uygulama**, masaüstünde tüketici tanıtım sayfası
+- `/site`      → tüketici tanıtım sayfası, her genişlikte
+- `/uygulama`  → tüketici uygulaması, her genişlikte
 - `/isletme`   → Doyurucu: işletme **web sitesi** (tanıtım + kayıt + panel)
 - `/admin`     → Yönetici paneli (tam ekran masaüstü)
 
 Doyurucu'nun alt yolları: `/isletme/kayit`, `/isletme/sahiplen`,
 `/isletme/giris`, `/isletme/panel`.
 
-**`/` ARTIK UYGULAMA DEĞİL.** Tüketici tarafı da Doyurucu gibi bir siteye
-dönüştü (bkz. "Tüketici tarafı da bir WEB SİTESİ"). Eski `/` yer imleri
-tanıtım sayfasına düşüyor; uygulamaya oradan tek dokunuşta geçiliyor.
+**TELEFONDA `/` UYGULAMADIR.** Müşteri telefonda uygulamayı kullanıyor;
+pazarlama sayfası onun önüne çıkmaz. Masaüstünden gelen ziyaretçinin işi
+ise uygulamayı kullanmak değil, ne olduğunu okuyup **mağazadan
+indirmek** — site o yüzden orada (bkz. "Tüketici tarafı da bir WEB
+SİTESİ").
 
 Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
 `demo@gur.app` / `gur1234`.
@@ -191,7 +194,8 @@ gur/
     │   └── social-auth.js     # Google / Apple ile giriş
     ├── app/
     │   ├── GurApp.jsx         # Tüketici uygulaması
-    │   └── site.jsx           # TÜKETİCİ SİTESİ: tanıtım sayfası + masaüstü kabuğu
+    │   ├── site.jsx           # TÜKETİCİ SİTESİ: tanıtım + mağaza hunisi + masaüstü kabuğu
+    │   └── giris.jsx          # `/` ayrımı: telefonda uygulama, masaüstünde site
     ├── business/
     │   ├── site.jsx           # İŞLETME WEB SİTESİ: başlık, tanıtım, alt bilgi
     │   └── GurBusiness.jsx    # Doyurucu: yönlendirme, kayıt akışı, panel
@@ -474,20 +478,54 @@ devam ediyor.
 
 ### Tüketici tarafı da bir WEB SİTESİ
 
-`/` artık uygulamanın kendisi değil, **tanıtım sayfası**; uygulama
-`/uygulama` adresinde. Doyurucu'ya yapılanın aynısı, tüketici tarafında:
+Tüketici tarafının artık bir tanıtım sayfası var; ama **telefonda `/`
+hâlâ uygulamadır**. İkisi ayrı iş yapıyor:
 
-| Yol | Ne |
-|---|---|
-| `/` | tanıtım sayfası (kahraman, kaydırma dili, bento, gizlilik, SSS) |
-| `/uygulama` | uygulamanın kendisi |
+| Yol | Telefon | Masaüstü |
+|---|---|---|
+| `/` | **uygulama** | tanıtım sayfası |
+| `/site` | tanıtım sayfası | tanıtım sayfası |
+| `/uygulama` | uygulama | uygulama (web kabuğu içinde) |
+
+Ayrım `src/app/giris.jsx`te ve **karar ilk çizimde bir kez** veriliyor.
+`useMediaQuery` ile canlı dinlenseydi masaüstünde pencereyi daraltan
+kullanıcının altından pazarlama sayfası çekilir, yerine uygulama (ve
+açılış ekranı) konurdu.
+
+Site telefonda ERİŞİLEMEZ DEĞİL: kendi adresi var (`/site`). Reklamdan,
+bağlantıdan gelen telefon kullanıcısı orada mağaza rozetlerini görür.
+Sitenin kendi içindeki bağlantıları `siteYolu(genis)` kullanıyor —
+telefonda `/site`, masaüstünde `/`.
+
+#### Site bir İNDİRME HUNİSİ
+
+Sitenin birincil eylemi "uygulamayı aç" değil **App Store / Google
+Play**. Ada gezinmesindeki hap, kahramandaki eylem satırı, `#indir`
+bölümü ve alt bilgi aynı iki adrese bakıyor.
+
+**İki adres TEK YERDE**: `src/app/site.jsx` → `MAGAZA.ios` /
+`MAGAZA.android`. Yayına çıkarken yalnız o iki satır doldurulacak,
+arayüzün geri kalanı kendiliğinden gerçek bağlantıya döner
+(`target="_blank" rel="noopener noreferrer"`).
+
+**BOŞKEN SAHTE BAĞLANTI ÜRETİLMİYOR.** Olmayan bir mağaza sayfasına
+götüren rozet, rozetin hiç olmamasından kötü: kullanıcı tıklar, 404
+görür ve ürünün var olmadığını sanır. Adres boşken rozet **tıklanamaz**
+bir "YAKINDA" çipi; devre dışı hap değil (pasif durumu `opacity` ile
+kurmak yasak), fark renkle ve etiketle. Yanında her zaman çalışan bir
+yol duruyor: "Tarayıcıdan hemen deneyin". Alt bilgide de eylemi olmayan
+satır düğme değil düz metin — ölü bağlantı yazmıyoruz.
+
+Apple logosu `SocialAuthRow`daki yolun aynısı; Google Play üçgeni
+Google'ın kendi marka renklerinde (paletin kural dışılarından).
 
 Dosya `src/app/site.jsx`: tanıtım sayfası (`TuketiciLanding`), yüzen ada
-gezinmesi (`WebHeader`), alt bilgi (`WebFooter`) ve masaüstü uygulama
-kabuğu (`MasaustuKabuk`) bir arada — gezinme ve alt bilgi iki sayfanın
-ortak malı, iki kopya er geç ayrışırdı.
+gezinmesi (`WebHeader`), alt bilgi (`WebFooter`), mağaza rozetleri
+(`MagazaRozetleri`) ve masaüstü uygulama kabuğu (`MasaustuKabuk`) bir
+arada — gezinme ve alt bilgi iki sayfanın ortak malı, iki kopya er geç
+ayrışırdı.
 
-**TELEFONDA HİÇBİR ŞEY DEĞİŞMEDİ.** `GurApp` kökünde tek bir ayrım var:
+**TELEFONDA UYGULAMA DÜZENİ DEĞİŞMEDİ.** `GurApp` kökünde tek bir ayrım var:
 `useMediaQuery(GENIS)` false ise gövde eskisi gibi doğrudan `PhoneFrame`
 içinde çiziliyor, sahne de eski koyu gradyanını kullanıyor. Ölçüldü
 (393×852): çerçeve 393×852, yarıçap 0, sahne zemini kremsi, kabuk
@@ -565,6 +603,14 @@ kuralı `[style*="backdrop-filter"]` taşıyan her şeye koyu bir dolgu
 basıyordu; tanıtım sayfasının açık ada gezinmesi o dolguyla koyu
 mürekkep-koyu zemin oluyordu. `.gur-glass-light` artık o blokta da kendi
 dolgusunu alıyor.
+
+**Ölçüm (mağaza geçişi).** Telefonda (393×852) `/` uygulamayı açıyor:
+çerçeve 393×852, yarıçap 0, sahne kremsi, site başlığı 0 — yani eski
+düzen birebir. Masaüstünde `/` siteyi açıyor, "Uygulamayı indir" `#indir`
+bölümüne kaydırıyor, rozetler adres boşken "YAKINDA" çipi; adresler
+doldurulunca gerçek `apps.apple.com` / `play.google.com` bağlantısına
+dönüyor (ölçüldü). `/site` telefonda 0 px yatay taşma, 44 altında hedef
+yok. `/uygulama` iki genişlikte de uygulama.
 
 **Ölçüm.** Tüketici tanıtım sayfası masaüstünde ve telefonda **3'er**
 kontrast uyarısı veriyor, uygulama kabuğu **2**: ikisi GUR kelime markası

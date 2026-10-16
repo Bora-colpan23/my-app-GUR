@@ -18,11 +18,13 @@ import { createHashRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import GurApp from '../src/app/GurApp.jsx';
 import { TuketiciLanding } from '../src/app/site.jsx';
+import TuketiciGiris from '../src/app/giris.jsx';
 import GurAdmin from '../src/admin/GurAdmin.jsx';
 import GurBusiness from '../src/business/GurBusiness.jsx';
 
 const router = createHashRouter([
-  { path: '/', element: <TuketiciLanding /> },
+  { path: '/', element: <TuketiciGiris /> },
+  { path: '/site', element: <TuketiciLanding /> },
   { path: '/uygulama', element: <GurApp /> },
   { path: '/isletme/*', element: <GurBusiness /> },
   { path: '/admin', element: <GurAdmin /> },

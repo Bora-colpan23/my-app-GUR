@@ -4,20 +4,21 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { MotionConfig } from 'motion/react';
 import GurApp from './app/GurApp.jsx';
 import { TuketiciLanding } from './app/site.jsx';
+import TuketiciGiris from './app/giris.jsx';
 
 // Üç ayrı uygulama, tek ürün:
-//   /          → Tüketici TANITIM SAYFASI (web sitesi)
-//   /uygulama  → Tüketici uygulaması (telefonda bugünkü düzen, masaüstünde
-//                yüzen ada gezinmesi + yan sütun + tepsi içinde çerçeve)
+//   /          → TELEFONDA uygulama, masaüstünde tanıtım sayfası
+//                (bkz. app/giris.jsx — karar ilk çizimde bir kez veriliyor)
+//   /site      → tüketici tanıtım sayfası, her genişlikte
+//   /uygulama  → tüketici uygulaması, her genişlikte
 //   /isletme/* → Doyurucu: işletme WEB SİTESİ (tanıtım + kayıt + panel)
 //   /admin     → Yönetici paneli (tam ekran masaüstü)
 //
-// `/` ARTIK UYGULAMA DEĞİL. Tüketici tarafı da Doyurucu gibi bir siteye
-// dönüştü: adres çubuğundaki yol gerçek, tanıtım sayfasının linki
-// paylaşılabiliyor, uygulamanın kendi adresi var ve yenilenince aynı
-// yerde kalıyor. Eski `/` yer imleri otomatik olarak tanıtım sayfasına
-// düşüyor; oradan uygulamaya tek dokunuş (sabit ada gezinmesindeki
-// "Uygulamayı aç").
+// TELEFONDA `/` UYGULAMADIR. Müşteri telefonda uygulamayı kullanıyor;
+// pazarlama sayfası onun önüne çıkmaz. Masaüstünden gelen ziyaretçinin
+// işi ise uygulamayı kullanmak değil, ne olduğunu okuyup MAĞAZADAN
+// indirmek — site o yüzden orada ve sitenin birincil eylemi App Store /
+// Google Play (bkz. app/site.jsx → MAGAZA).
 //
 // Ortak olan ekranlar değil VERİ: src/lib/* depoları ve src/data/restaurants.js
 // üçünü birbirine bağlıyor; ortak arayüz parçaları src/ui/kit.jsx'te.
@@ -35,7 +36,8 @@ const AdminFallback = () => (
 );
 
 const router = createBrowserRouter([
-  { path: '/', element: <TuketiciLanding /> },
+  { path: '/', element: <TuketiciGiris /> },
+  { path: '/site', element: <TuketiciLanding /> },
   { path: '/uygulama', element: <GurApp /> },
   // Doyurucu artık bir web sitesi ve kendi alt yolları var
   // (/isletme/kayit, /isletme/giris, /isletme/panel …). Splat olmadan

@@ -1,4 +1,12 @@
 <title>GUR Önizleme</title>
+<!-- GÖRÜNTÜ ALANI. Bu satır yoktu ve eksikliği artifact telefonda
+     açıldığında görünüyordu: viewport meta'sı olmayan sayfaya tarayıcı
+     980 px'lik sanal bir genişlik veriyor, dolayısıyla matchMedia
+     "(min-width: 900px)" EŞLEŞİYOR ve `/` telefonda uygulama yerine
+     tanıtım sayfasını açıyordu (ölçüldü). viewport-fit=cover ise
+     env(safe-area-inset-*) değerlerinin dönmesi için gerekli —
+     index.html'deki satırın aynısı. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <!-- Fontlar bloke etmeden yüklenir: yavaş bir stil sayfası modül scriptinin

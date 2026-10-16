@@ -5,9 +5,15 @@
 // yalnızca koyu bir gradyanın ortasında duran bir telefon maketi değil,
 // kendi tanıtım sayfası ve geniş ekran düzeni olan bir SİTE.
 //
-//   /           → bu dosyadaki tanıtım sayfası (TuketiciLanding)
+//   /           → TELEFONDA uygulama, masaüstünde tanıtım sayfası
+//                 (ayrım src/app/giris.jsx'te, ilk çizimde bir kez)
+//   /site       → tanıtım sayfası, her genişlikte
 //   /uygulama   → uygulamanın kendisi (GurApp), masaüstünde MasaustuKabuk
 //                 içinde, telefonda BUGÜNKÜ düzeniyle
+//
+// SİTENİN İŞİ İNDİRTMEK. Müşteri telefonda uygulamayı kullanıyor; site
+// masaüstünden gelen ziyaretçiyi App Store ve Google Play'e yönlendiren
+// bir huni. İki mağaza adresi tek yerde: aşağıdaki MAGAZA.
 //
 // TELEFONDA HİÇBİR ŞEY DEĞİŞMEDİ. `useMediaQuery(GENIS)` false olduğunda
 // GurApp eskisi gibi doğrudan `PhoneFrame` içinde çiziliyor; masaüstü
@@ -163,6 +169,122 @@ function Baslik({ kas, baslik, aciklama, orta = true, tone = "light", en = 680 }
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// MAĞAZA BAĞLANTILARI — TEK YER
+//
+// Site bir indirme hunisi: ziyaretçiyi App Store ve Google Play'e
+// yönlendiriyor. İki adres BURADA, başka hiçbir yerde yazılı değil —
+// yayına çıkarken yalnızca bu iki satır doldurulacak, arayüzün geri
+// kalanı kendiliğinden gerçek bağlantıya döner.
+//
+// BOŞKEN SAHTE BAĞLANTI ÜRETİLMİYOR. Olmayan bir mağaza sayfasına
+// götüren bir rozet, rozetin hiç olmamasından kötü: kullanıcı tıklar,
+// 404 görür ve ürünün var olmadığını düşünür. Adres boşken rozet
+// TIKLANAMAZ bir "yakında" çipi olarak çiziliyor ve yanında tarayıcı
+// sürümüne giden gerçek bir yol duruyor.
+export const MAGAZA = {
+  ios: "",        // örn. https://apps.apple.com/tr/app/gur/id000000000
+  android: "",    // örn. https://play.google.com/store/apps/details?id=app.gur
+};
+export const MAGAZA_HAZIR = !!(MAGAZA.ios || MAGAZA.android);
+
+const APPLE_GLYPH = (
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M17.05 12.53c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.98.9-3.77 2.28-1.61 2.79-.41 6.92 1.15 9.18.76 1.11 1.67 2.35 2.86 2.3 1.15-.05 1.58-.74 2.97-.74s1.78.74 3 .72c1.24-.02 2.02-1.12 2.78-2.24.87-1.28 1.23-2.53 1.25-2.6-.03-.01-2.4-.92-2.4-3.68zM14.8 5.53c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.68-1.09 1.77-.95 2.81 1.02.08 2.06-.52 2.68-1.28z" />
+  </svg>
+);
+
+// Google Play üçgeni: Google'ın kendi marka renkleri paletin kural
+// dışılarından (bkz. CLAUDE.md → "Tutarlı renk seçimi").
+const PLAY_GLYPH = (
+  <svg width="18" height="19" viewBox="0 0 24 26" aria-hidden="true">
+    <path d="M2.1 1.2C1.7 1.6 1.5 2.2 1.5 3v20c0 .8.2 1.4.6 1.8l.1.1L13.4 13v-.2L2.2 1.2h-.1z" fill="#34A853" />
+    <path d="M17.1 16.8 13.4 13v-.2l3.7-3.8.1.1 4.4 2.5c1.3.7 1.3 1.9 0 2.6l-4.4 2.5-.1.1z" fill="#FBBC05" />
+    <path d="m17.2 16.7-3.8-3.8L2.1 24.8c.4.5 1.1.5 1.9.1l13.2-8.2" fill="#EA4335" />
+    <path d="M17.2 9.1 4 1c-.8-.5-1.5-.4-1.9.1l11.3 11.8 3.8-3.8z" fill="#4285F4" />
+  </svg>
+);
+
+// Tek rozet. Adres varsa gerçek bir bağlantı (yeni sekme), yoksa
+// tıklanamaz bir çip. Devre dışı hap DEĞİL: projede pasif durumu
+// `opacity` ile kurmak yasak ve soluk bir hap zaten okunmuyordu —
+// fark RENKLE ve "YAKINDA" etiketiyle.
+function MagazaRozeti({ tur }) {
+  const url = tur === "ios" ? MAGAZA.ios : MAGAZA.android;
+  const ad = tur === "ios" ? "App Store" : "Google Play";
+  const glif = tur === "ios" ? APPLE_GLYPH : PLAY_GLYPH;
+  const ortak = {
+    display: "inline-flex", alignItems: "center", gap: 11,
+    minHeight: 56, padding: "0 24px", borderRadius: 999,
+    fontFamily: "var(--f-body)", fontWeight: 700, fontSize: 15,
+    textDecoration: "none", whiteSpace: "nowrap",
+  };
+
+  if (!url) {
+    return (
+      <span style={{
+        ...ortak, background: "var(--c-bg-2)", border: "1px solid var(--c-line)",
+        color: "var(--c-muted)", cursor: "default",
+      }}>
+        <span style={{ display: "inline-flex", color: "var(--c-muted)" }}>{glif}</span>
+        {ad}
+        <span style={{
+          fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", borderRadius: 999,
+          padding: "4px 9px", background: "var(--c-card)", border: "1px solid var(--c-line)",
+          color: "var(--c-ink-2)",
+        }}>YAKINDA</span>
+      </span>
+    );
+  }
+
+  const koyuHap = tur === "ios";
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="gur-btn"
+      style={{
+        ...ortak,
+        "--btn-bg": koyuHap ? "var(--c-espresso)" : "var(--c-card)",
+        "--btn-bg-hover": koyuHap ? "#241E18" : "#FAF8F6",
+        "--btn-bg-press": koyuHap ? "#0D0A08" : "#F1ECE7",
+        "--btn-shadow": "var(--sh-2)", "--btn-shadow-press": "var(--sh-1)",
+        border: koyuHap ? "1px solid transparent" : "1px solid var(--c-line)",
+        color: koyuHap ? "var(--c-bg)" : "var(--c-ink)",
+      }}>
+      <span style={{ display: "inline-flex" }}>{glif}</span>
+      {ad}
+    </a>
+  );
+}
+
+// İki rozet + altındaki dürüst satır. `yol` tarayıcı sürümüne giden
+// gerçek eylem: mağazalar hazır olana kadar TEK çalışan yol o.
+export function MagazaRozetleri({ orta = false, not = true }) {
+  const nav = useNavigate();
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, alignItems: orta ? "center" : "flex-start" }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: orta ? "center" : "flex-start" }}>
+        <MagazaRozeti tur="ios" />
+        <MagazaRozeti tur="android" />
+      </div>
+      {not && (
+        <p style={{
+          fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)",
+          margin: 0, lineHeight: 1.6, textAlign: orta ? "center" : "left",
+        }}>
+          {MAGAZA_HAZIR
+            ? "Ücretsiz indirilir. "
+            : "Mağaza sürümleri yayına hazırlanıyor. "}
+          <button type="button" onClick={() => nav("/uygulama")} className="gur-tap"
+            style={{
+              background: "none", border: "none", padding: 0, cursor: "pointer",
+              fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700,
+              color: "var(--c-brand-ink)", textDecoration: "underline", textUnderlineOffset: 3,
+            }}>Tarayıcıdan hemen deneyin →</button>
+        </p>
+      )}
+    </div>
+  );
+}
+
 const OK = (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -179,7 +301,16 @@ const OK = (
 // yeniden boyar.
 // ═══════════════════════════════════════════════════════════════════════
 
+// SİTENİN İKİ ADRESİ VAR ve sebebi şu: `/` telefonda UYGULAMAYI açıyor
+// (bkz. src/app/giris.jsx) — müşteri telefonda uygulamayı kullanıyor,
+// pazarlama sayfasını değil. Site telefonda da gezilebilsin diye kendi
+// adresini taşıyor: `/site`. Geniş ekranda ikisi de siteyi gösteriyor,
+// `/` olanı kanonik adres.
+export const SITE_YOLLARI = ["/", "/site"];
+export const siteYolu = (genis) => (genis ? "/" : "/site");
+
 const MENU = [
+  { id: "indir", label: "İndir" },
   { id: "kaydir", label: "Nasıl çalışır" },
   { id: "ozellik", label: "Uygulamada ne var" },
   { id: "gizlilik", label: "Gizlilik" },
@@ -208,7 +339,11 @@ export function WebHeader({ koyu = false, uygulamada = false }) {
 
   const git = (id) => {
     setAcik(false);
-    if (yer.pathname !== "/") { nav("/"); setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80); return; }
+    if (!SITE_YOLLARI.includes(yer.pathname)) {
+      nav(siteYolu(genis));
+      setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+      return;
+    }
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -220,9 +355,11 @@ export function WebHeader({ koyu = false, uygulamada = false }) {
   // birincil eylem yok (uygulamanın kendisi zaten orada); iki bağlantı
   // da turuncu olsaydı hangisinin ana yol olduğu okunmazdı. Ana yol
   // kenarlıklı beyaz hap, Doyurucu nötr.
+  // SİTENİN İŞİ İNDİRTMEK. Ada gezinmesindeki birincil eylem mağaza
+  // bölümüne götürüyor; tarayıcı sürümü oradaki ikinci yol.
   const uygulamaHapi = uygulamada
-    ? <Btn text="Ana sayfa" onClick={() => nav("/")} variant={koyu ? "outline" : "outlineDark"} size="md" fullWidth={false} />
-    : <Btn text="Uygulamayı aç" onClick={() => nav("/uygulama")} variant="filled" size="md" fullWidth={false} trailing={OK} />;
+    ? <Btn text="Ana sayfa" onClick={() => nav(siteYolu(genis))} variant={koyu ? "outline" : "outlineDark"} size="md" fullWidth={false} />
+    : <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="md" fullWidth={false} trailing={OK} />;
 
   return (
     <>
@@ -238,7 +375,7 @@ export function WebHeader({ koyu = false, uygulamada = false }) {
           boxShadow: koyu ? "var(--sh-d3)" : "var(--sh-2)",
           maxWidth: "100%",
         }}>
-          <button type="button" onClick={() => nav("/")} className="gur-tap"
+          <button type="button" onClick={() => nav(siteYolu(genis))} className="gur-tap"
             aria-label="GUR ana sayfası"
             style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
             <GurLogo size={34} pill />
@@ -324,7 +461,7 @@ export function WebHeader({ koyu = false, uygulamada = false }) {
                 initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.06 + bolumler.length * 0.05, ease: EGRI }}
                 style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 26 }}>
-                <Btn text="Uygulamayı aç" onClick={() => { setAcik(false); nav("/uygulama"); }} variant="filled" size="lg" trailing={OK} />
+                <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="lg" trailing={OK} />
                 <Btn text="Restoran mısınız? Doyurucu'ya geçin" onClick={() => { setAcik(false); nav("/isletme"); }} variant="outlineDark" size="lg" />
               </motion.div>
             </nav>
@@ -342,10 +479,12 @@ export function WebFooter() {
   const sutun = (baslik, satirlar) => (
     <div>
       <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.18em", color: "rgba(253,251,247,0.5)", margin: "0 0 12px", textTransform: "uppercase" }}>{baslik}</p>
-      {satirlar.map(([t, fn]) => (
+      {satirlar.map(([t, fn]) => (fn ? (
         <button key={t} type="button" onClick={fn} className="gur-tap"
           style={{ display: "block", background: "none", border: "none", cursor: "pointer", padding: "6px 0", textAlign: "left", fontFamily: "var(--f-body)", fontSize: 14, color: "rgba(253,251,247,0.78)" }}>{t}</button>
-      ))}
+      ) : (
+        <span key={t} style={{ display: "block", padding: "6px 0", fontFamily: "var(--f-body)", fontSize: 14, color: "rgba(253,251,247,0.5)" }}>{t}</span>
+      )))}
     </div>
   );
   return (
@@ -362,7 +501,13 @@ export function WebFooter() {
           </p>
         </div>
         <div style={{ display: "flex", gap: genis ? 56 : 32, flexWrap: "wrap" }}>
-          {sutun("Uygulama", [["Keşfetmeye başla", () => nav("/uygulama")], ["Nasıl çalışır", () => nav("/")]])}
+          {sutun("İndir", [
+            // Adres boşken ÖLÜ BAĞLANTI yazmıyoruz: satır ne durumda
+            // olduğunu söylüyor (bkz. MAGAZA).
+            [MAGAZA.ios ? "App Store" : "App Store · yakında", MAGAZA.ios ? () => window.open(MAGAZA.ios, "_blank", "noopener") : null],
+            [MAGAZA.android ? "Google Play" : "Google Play · yakında", MAGAZA.android ? () => window.open(MAGAZA.android, "_blank", "noopener") : null],
+            ["Tarayıcıda aç", () => nav("/uygulama")],
+          ])}
           {sutun("Restoranlar", [["Doyurucu'ya git", () => nav("/isletme")], ["Kaydını sahiplen", () => nav("/isletme/sahiplen")]])}
         </div>
       </div>
@@ -403,8 +548,8 @@ const OZELLIKLER = [
 
 const SSS = [
   {
-    s: "Uygulamayı indirmem gerekiyor mu?",
-    c: "Gerekmiyor. GUR tarayıcıda çalışıyor; telefonda açtığında çerçeve ve adres çubuğu kalkar, uygulama ekranı kaplar. Ana ekrana ekleyip uygulama gibi de kullanabilirsin.",
+    s: "Uygulamayı nereden indiririm?",
+    c: "App Store ve Google Play'den. Mağaza sürümü yayına girene kadar aynı uygulamayı tarayıcıdan kullanabilirsin: telefonda açtığında çerçeve ve adres çubuğu kalkar, uygulama ekranı kaplar; ana ekrana ekleyip uygulama gibi de kullanabilirsin.",
   },
   {
     s: "Konumumu vermek zorunda mıyım?",
@@ -579,16 +724,15 @@ export function TuketiciLanding() {
             <motion.div
               initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.24, ease: EGRI }}
-              style={{ display: "flex", gap: 10, flexWrap: "wrap", margin: "34px 0 0" }}>
-              <Btn text="Keşfetmeye başla" onClick={() => nav("/uygulama")} variant="filled" size="lg" fullWidth={false} trailing={OK} />
-              <Btn text="Nasıl çalışıyor" onClick={() => document.getElementById("kaydir")?.scrollIntoView({ behavior: "smooth", block: "start" })} variant="outlineDark" size="lg" fullWidth={false} />
+              style={{ margin: "34px 0 0" }}>
+              <MagazaRozetleri />
             </motion.div>
 
             <motion.p
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.34, ease: EGRI }}
               style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: "20px 0 0", lineHeight: 1.6 }}>
-              Ücretsiz · İndirme gerekmiyor · Ham konumun hiçbir yere gönderilmiyor
+              Ücretsiz · İstanbul geneli · Ham konumun hiçbir yere gönderilmiyor
             </motion.p>
           </div>
 
@@ -736,6 +880,34 @@ export function TuketiciLanding() {
         </Belir>
       </Bolum>
 
+      {/* ═══ İNDİRME — sitenin asıl işi ═══ */}
+      {/* Kap dar: 1180 px'lik bir kutuda ortalanmış üç satır metin
+          "bitmemiş" duruyordu; kart içeriğinin boyuna yakın. */}
+      <Bolum id="indir" pad={104} en={880}>
+        <Belir>
+          <Bezel r={36} pad={9} tepsi="rgba(255,102,0,0.08)"
+            icStyle={{ padding: genis ? "64px 48px" : "40px 24px", textAlign: "center" }}>
+            <Kas>İndir</Kas>
+            <h2 style={{
+              fontFamily: "var(--f-display)", fontSize: genis ? 40 : 28, fontWeight: 800,
+              letterSpacing: "-0.035em", lineHeight: 1.08, color: "var(--c-ink)", margin: "18px 0 0",
+            }}>
+              GUR cebinizde
+            </h2>
+            <p style={{
+              fontFamily: "var(--f-body)", fontSize: genis ? 17 : 15.5, lineHeight: 1.62,
+              color: "var(--c-muted)", margin: "14px auto 30px", maxWidth: 480,
+            }}>
+              Keşif akışı, favoriler ve masa ayırtma telefonunuzda. Hesabınız
+              her iki sürümde de aynı.
+            </p>
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <MagazaRozetleri orta />
+            </div>
+          </Bezel>
+        </Belir>
+      </Bolum>
+
       {/* ═══ SON ÇAĞRI + RESTORAN YOLU ═══ */}
       <Bolum pad={96}>
         <Belir>
@@ -758,7 +930,8 @@ export function TuketiciLanding() {
               bir dokunuş kaldı.
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              <Btn text="Keşfetmeye başla" onClick={() => nav("/uygulama")} variant="onColor" size="lg" fullWidth={false} trailing={OK} />
+              <Btn text="Uygulamayı indir" onClick={() => document.getElementById("indir")?.scrollIntoView({ behavior: "smooth", block: "start" })} variant="onColor" size="lg" fullWidth={false} trailing={OK} />
+              <Btn text="Tarayıcıda dene" onClick={() => nav("/uygulama")} variant="outlineBrand" size="lg" fullWidth={false} />
             </div>
           </div>
         </Belir>
