@@ -375,7 +375,7 @@ export function Btn({
       {busy ? "Yükleniyor…" : text}
       {!busy && count != null && <OneCount value={count} bg={p.badge.bg} ink={p.badge.ink} d={d - 4} />}
       {!busy && trailing && (
-        <span aria-hidden style={{
+        <span aria-hidden className="gur-btn-chip" style={{
           width: d, height: d, borderRadius: "50%", flexShrink: 0,
           background: p.chip.bg, color: p.chip.ink,
           display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -1033,6 +1033,11 @@ export function GurStyles() {
         :root {
           --c-bg: #FDFBF7;              /* ekran zemini */
           --c-bg-2: #F4EFE7;            /* zeminin ikinci tonu */
+          /* ESPRESSO ŞERİT. Tüketici sitesinde gizlilik bölümü ve alt
+             bilgi bu zeminde duruyor. YENİ BİR RENK DEĞİL: ink hapının
+             kendi zemini (#17130F). Jetona alındı ki site onu elle
+             yazmasın — palet tek yerden değişsin. */
+          --c-espresso: #17130F;        /* koyu şerit zemini */
           --c-card: #ffffff;            /* kart ve sayfa yüzeyi */
           --c-subtle: #FBFAF8;          /* kart içi ikinci yüzey */
           --c-ink: #1C1917;             /* ana metin */
@@ -1200,6 +1205,19 @@ export function GurStyles() {
           background: var(--btn-bg-press, var(--btn-bg));
           box-shadow: var(--btn-shadow-press, var(--btn-shadow, none));
         }
+        /* DÜĞME-İÇİNDE-DÜĞME. trailing yuvası simgeyi yuvarlak bir cebe
+           alıyor (bkz. Btn). Üzerine gelince cep çapraz kayıp büyüyor:
+           hapın içinde kinetik bir gerilim. Yalnızca transform — cep
+           boyutunu animasyona sokmak her karede yeniden yerleşim
+           yaptırırdı. */
+        .gur-btn-chip { transition: transform 420ms cubic-bezier(0.32,0.72,0,1); }
+        @media (hover: hover) and (pointer: fine) {
+          .gur-btn:not(:disabled):hover .gur-btn-chip { transform: translate(2px, -1px) scale(1.07); }
+        }
+        /* Gezinme bağlantısı: ada hapının içinde yumuşak bir zemin. */
+        @media (hover: hover) and (pointer: fine) {
+          .gur-nav-link:hover { background: rgba(255,102,0,0.08) !important; }
+        }
         .gur-btn:focus-visible, .gur-icon-btn:focus-visible, .gur-dot:focus-visible {
           outline: none;
           box-shadow: 0 0 0 3px rgba(255,102,0,0.65), var(--btn-shadow, 0 0 0 0 transparent);
@@ -1349,6 +1367,7 @@ export function GurStyles() {
         .gur-btn::before, .gur-fill::before { transition-duration: 260ms, 420ms; }
 
         @media (prefers-reduced-motion: reduce) {
+          .gur-btn-chip { transition: none; }
           .gur-bell-ring { animation: none; }
           .gur-bell-wave { animation: none; opacity: 0; }
           .gur-btn::before, .gur-fill::before { transition: opacity 120ms ease; }
@@ -1452,6 +1471,12 @@ export function GurStyles() {
             backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
             box-shadow: inset 0 0 0 999px #140d06 !important;
             border: 1px solid rgba(255,255,255,0.65) !important;
+          }
+          /* AÇIK zeminli cam (tüketici sitesinin ada gezinmesi) koyu
+             dolguyu alırsa koyu mürekkep koyu zeminde kalıyor. */
+          .gur-glass-light {
+            box-shadow: inset 0 0 0 999px #ffffff !important;
+            border: 1px solid rgba(28,25,23,0.55) !important;
           }
         }
       `}</style>

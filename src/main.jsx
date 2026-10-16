@@ -3,11 +3,21 @@ import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import GurApp from './app/GurApp.jsx';
+import { TuketiciLanding } from './app/site.jsx';
 
 // Üç ayrı uygulama, tek ürün:
-//   /          → Tüketici mobil uygulaması (telefon çerçevesi içinde)
+//   /          → Tüketici TANITIM SAYFASI (web sitesi)
+//   /uygulama  → Tüketici uygulaması (telefonda bugünkü düzen, masaüstünde
+//                yüzen ada gezinmesi + yan sütun + tepsi içinde çerçeve)
 //   /isletme/* → Doyurucu: işletme WEB SİTESİ (tanıtım + kayıt + panel)
 //   /admin     → Yönetici paneli (tam ekran masaüstü)
+//
+// `/` ARTIK UYGULAMA DEĞİL. Tüketici tarafı da Doyurucu gibi bir siteye
+// dönüştü: adres çubuğundaki yol gerçek, tanıtım sayfasının linki
+// paylaşılabiliyor, uygulamanın kendi adresi var ve yenilenince aynı
+// yerde kalıyor. Eski `/` yer imleri otomatik olarak tanıtım sayfasına
+// düşüyor; oradan uygulamaya tek dokunuş (sabit ada gezinmesindeki
+// "Uygulamayı aç").
 //
 // Ortak olan ekranlar değil VERİ: src/lib/* depoları ve src/data/restaurants.js
 // üçünü birbirine bağlıyor; ortak arayüz parçaları src/ui/kit.jsx'te.
@@ -25,7 +35,8 @@ const AdminFallback = () => (
 );
 
 const router = createBrowserRouter([
-  { path: '/', element: <GurApp /> },
+  { path: '/', element: <TuketiciLanding /> },
+  { path: '/uygulama', element: <GurApp /> },
   // Doyurucu artık bir web sitesi ve kendi alt yolları var
   // (/isletme/kayit, /isletme/giris, /isletme/panel …). Splat olmadan
   // bu adresler "*" kuralına düşüp ana sayfaya yönleniyordu.

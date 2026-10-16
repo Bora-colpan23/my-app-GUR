@@ -48,12 +48,17 @@ npm run dev:all                       # API (8787) + arayüz (5173)
 
 Yalnız arayüz: `npm run dev`. Yalnız API: `npm run dev:api`.
 
-- `/`          → Tüketici uygulaması (telefon çerçevesi yalnızca masaüstünde)
+- `/`          → Tüketici **tanıtım sayfası** (web sitesi)
+- `/uygulama`  → Tüketici uygulaması (telefonda bugünkü düzen, masaüstünde web kabuğu)
 - `/isletme`   → Doyurucu: işletme **web sitesi** (tanıtım + kayıt + panel)
 - `/admin`     → Yönetici paneli (tam ekran masaüstü)
 
 Doyurucu'nun alt yolları: `/isletme/kayit`, `/isletme/sahiplen`,
 `/isletme/giris`, `/isletme/panel`.
+
+**`/` ARTIK UYGULAMA DEĞİL.** Tüketici tarafı da Doyurucu gibi bir siteye
+dönüştü (bkz. "Tüketici tarafı da bir WEB SİTESİ"). Eski `/` yer imleri
+tanıtım sayfasına düşüyor; uygulamaya oradan tek dokunuşta geçiliyor.
 
 Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
 `demo@gur.app` / `gur1234`.
@@ -184,7 +189,9 @@ gur/
     │   ├── import-restaurants.js  # Excel/CSV ile toplu restoran yükleme
     │   ├── second-chance.js   # haftalık yeniden gösterim paketi + geçilenler
     │   └── social-auth.js     # Google / Apple ile giriş
-    ├── app/GurApp.jsx         # Tüketici uygulaması
+    ├── app/
+    │   ├── GurApp.jsx         # Tüketici uygulaması
+    │   └── site.jsx           # TÜKETİCİ SİTESİ: tanıtım sayfası + masaüstü kabuğu
     ├── business/
     │   ├── site.jsx           # İŞLETME WEB SİTESİ: başlık, tanıtım, alt bilgi
     │   └── GurBusiness.jsx    # Doyurucu: yönlendirme, kayıt akışı, panel
@@ -464,6 +471,116 @@ yok sayardı. Zil görsel bir işaret.
 
 Azaltılmış hareket tercihinde salınım ve halkalar duruyor, zil görünmeye
 devam ediyor.
+
+### Tüketici tarafı da bir WEB SİTESİ
+
+`/` artık uygulamanın kendisi değil, **tanıtım sayfası**; uygulama
+`/uygulama` adresinde. Doyurucu'ya yapılanın aynısı, tüketici tarafında:
+
+| Yol | Ne |
+|---|---|
+| `/` | tanıtım sayfası (kahraman, kaydırma dili, bento, gizlilik, SSS) |
+| `/uygulama` | uygulamanın kendisi |
+
+Dosya `src/app/site.jsx`: tanıtım sayfası (`TuketiciLanding`), yüzen ada
+gezinmesi (`WebHeader`), alt bilgi (`WebFooter`) ve masaüstü uygulama
+kabuğu (`MasaustuKabuk`) bir arada — gezinme ve alt bilgi iki sayfanın
+ortak malı, iki kopya er geç ayrışırdı.
+
+**TELEFONDA HİÇBİR ŞEY DEĞİŞMEDİ.** `GurApp` kökünde tek bir ayrım var:
+`useMediaQuery(GENIS)` false ise gövde eskisi gibi doğrudan `PhoneFrame`
+içinde çiziliyor, sahne de eski koyu gradyanını kullanıyor. Ölçüldü
+(393×852): çerçeve 393×852, yarıçap 0, sahne zemini kremsi, kabuk
+başlığı 0, yatay taşma 0 — yani 440 px altındaki "çerçeve yok" kuralı
+aynen işliyor.
+
+**Masaüstü kabuğu ÇERÇEVEYİ ÖLÇEKLİYOR.** 844 px'lik maket 900 px'lik
+bir dizüstü ekranında alttan taşıyor ve uygulamanın ALT BARI sayfa
+kaydırılmadan görünmüyordu — bir uygulamada kabul edilemez. Kabuk
+pencere yüksekliğini okuyup tepsiyi `transform: scale` ile küçültüyor;
+dış kutu ölçeklenmiş boyu taşıyor, yoksa altında o kadar boşluk kalırdı.
+Ölçüldü: 1280×800, 1440×900 ve 1920×1080'de çerçeve tamamen görünüyor ve
+belge hiç kaymıyor. Ölçek `transform` olduğu için yeniden yerleşim
+yaptırmıyor; uygulamanın içindeki perdeler `absolute` (telefon kabuğu
+kuralı) olduğundan ölçekten etkilenmiyorlar — `fixed` olsalardı
+ölçeklenen ataya göre konumlanırlardı.
+
+**Kabukta bölüm bağlantısı yok.** Ada gezinmesi tanıtım sayfasında dört
+bölüm bağlantısı taşıyor; uygulama kabuğunda o bölümler olmadığı için
+yalnız marka + iki yol kalıyor (Doyurucu, Ana sayfa). Dördü de orada
+dursaydı "burada bir yere götürür" diye okunurdu.
+
+**Sol sütun süs değil.** Masaüstü kullanıcısı bir kaydırma uygulamasının
+fareyle de sürüklendiğini başka nereden bilecek? Kabuğun sol sütunu üç
+yönü ve ne yaptıklarını yazıyor.
+
+**`GurStyles` tanıtım sayfasında da çiziliyor.** Jetonlar oradan geliyor
+ve sayfa ayrı bir rota: olmadan `var(--c-bg)` çözülmüyor, satır içi
+`background` geçersiz kalıyor ve `index.html`in koyu gövde zemini
+(`#0d0d1a`) sayfanın tamamını yutuyordu (ölçüldü: kâğıt siyah çıktı).
+
+#### Tasarım dili: kılavuz vs proje
+
+Katman `high-end-visual-design` kılavuzuyla kuruldu; panoda olduğu gibi
+kılavuzun bazı maddeleri projenin kendi kurallarıyla çakıştı ve
+çakışanlarda **proje kazandı**:
+
+| Kılavuz | Proje | Sonuç |
+|---|---|---|
+| Tailwind | satır içi stil, Tailwind YOK | satır içi stil |
+| Geist / Clash Display | Poppins + Outfit | Poppins + Outfit |
+| Phosphor / Remix ikon | `kit.jsx` → `Icon` | kendi kiti |
+| OLED siyah + mor/yeşil küre | yeni renk ailesi yok | kremsi kâğıt + turuncunun %6'sı |
+| `blur(md)` → `blur(0)` giriş | yalnız `transform` + `opacity` | blur animasyonu yok |
+
+Uygulananlar: **Editorial Luxury** doku (kremsi kâğıt + sabit film greni
++ yüksek kontrastlı iri başlık), kahramanda **Editorial Split**,
+özelliklerde **asimetrik bento** (2+2 · 2+1+1), her kartta **çift bizel**
+(dış tepsi `--c-bg-2`, iç çekirdek beyaz, eş merkezli yarıçap: iç = dış −
+dolgu), haplarda **düğme-içinde-düğme** simge cebi, 112 px bölüm dolgusu,
+özel `cubic-bezier(0.16,1,0.3,1)` ve `whileInView` giriş.
+
+**SÜREKLİ HAREKET YOK.** Kılavuz "hiçbir şey durağan belirmesin" diyor;
+giriş animasyonları var ama sayfada sonsuz dönen/salınan bir nesne
+bilinçli olarak yok — 0.2 Hz civarındaki salınım vestibüler rahatsızlık
+kaynağı (panodaki "tek sürekli hareket" kuralının aynısı).
+
+**Yüzen ada kenardan kopuk.** Kılavuzun yasakladığı şey "üste yapışmış
+kenardan kenara çubuk". Ölçüldü: hap `fixed`, üstten 18 px, soldan 232 px,
+yarıçap 999, `backdrop-filter: blur(20px)`. `backdrop-filter` yalnızca
+SABİT öğede — kayan bir kapta her karede GPU yeniden boyar.
+
+**Film greni SABİT ve `pointer-events: none`.** Kayan bir kabın içinde
+olsaydı sürekli yeniden boyanırdı. Uygulama kabuğunda gren YOK: telefon
+ekranındaki arayüzün renkleri telefondakiyle birebir aynı kalmalı,
+`multiply` bir doku ölçülen kontrastı değiştirirdi.
+
+**İki jeton eklendi** (`kit.jsx`): `--c-espresso` (#17130F — yeni renk
+değil, `ink` hapının kendi zemini; gizlilik şeridi ve alt bilgi) ve
+`.gur-btn-chip` sınıfı (`Btn`in `trailing` cebi üzerine gelince çapraz
+kayıp büyüyor — yalnız `transform`).
+
+**Yüksek kontrastta AÇIK cam yüzey düzeltildi.** `prefers-contrast: more`
+kuralı `[style*="backdrop-filter"]` taşıyan her şeye koyu bir dolgu
+basıyordu; tanıtım sayfasının açık ada gezinmesi o dolguyla koyu
+mürekkep-koyu zemin oluyordu. `.gur-glass-light` artık o blokta da kendi
+dolgusunu alıyor.
+
+**Ölçüm.** Tüketici tanıtım sayfası masaüstünde ve telefonda **3'er**
+kontrast uyarısı veriyor, uygulama kabuğu **2**: ikisi GUR kelime markası
+(logotype, kural dışı), biri de "GASTRO ONAYLI" çipinde beyaz-üstü-turuncu
+(bilinen ürün kararı). Yeni kaynaklı sıfır. Yatay taşma masaüstünde de
+telefonda da 0 px; 44 px altında dokunma hedefi yok. Dar ekran menüsü
+`role="dialog" aria-modal="true"` ve üç kapatma yolu var (çarpı, perde,
+Escape).
+
+**Bilinen takas:** tanıtım sayfası artık herkesin ilk indirdiği sayfa ama
+uygulamayla aynı parçada (`index.js`, ~660 kB ham / ~202 kB gzip).
+`GurApp`i `React.lazy`ye almak tanıtımı belirgin biçimde küçültürdü;
+yapılmadı çünkü açılış ekranı HİÇBİR YÜKLEMEYE BAĞLI DEĞİL kuralı gereği
+splash'tan önce bir yükleme durumu göstermek istemiyoruz ve kabuğun
+zemini (masaüstünde koyu, telefonda krem) yer tutucuda yeniden
+üretilmeliydi. Ayrı bir geçiş olarak yapılabilir.
 
 ### Doyurucu artık bir WEB SİTESİ
 

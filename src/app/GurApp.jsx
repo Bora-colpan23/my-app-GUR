@@ -15,8 +15,12 @@ import {
   InputField, SelectField, ELEV,
   Spinner, Btn, IconBtn, HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
   BadgeChips, BadgeMarks, GlossDefs, GLOSS, DinnerBell, SplitText, Orb, Skeleton,
-  scrim, SocialAuthRow, StepProgress,
+  scrim, SocialAuthRow, StepProgress, useMediaQuery, GENIS,
 } from '../ui/kit.jsx';
+// Masaüstü kabuğu: 900 px üstünde telefon artık boş bir gradyanın
+// ortasında asılı durmuyor (bkz. src/app/site.jsx). TELEFONDA HİÇBİR
+// ŞEY DEĞİŞMİYOR — `genis` false olduğunda eski ağaç aynen çiziliyor.
+import { MasaustuKabuk } from './site.jsx';
 import { I, RESTAURANTS, CATEGORIES, fetchLiveRestaurants, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { Sheet, DangerConfirm, Chip } from '../ui/sheets.jsx';
 import * as visits from '../lib/visits.js';
@@ -4048,6 +4052,10 @@ function distText(r) {
 }
 
 export default function GurApp(props = {}) {
+  // 900 px üstü = masaüstü web düzeni (site.jsx → MasaustuKabuk).
+  // Altında bugünkü telefon kabuğu; 440 px altında ya da dokunmatik kısa
+  // ekranda kit.jsx'teki medya kuralı çerçeveyi de kaldırıyor.
+  const genis = useMediaQuery(GENIS);
   const accentColor = props.accentColor || "#FF6600";
   const showBadges = props.showBadges !== undefined ? props.showBadges : true;
   const badgeSpeed = props.badgeSpeed || 14;
@@ -4387,14 +4395,12 @@ export default function GurApp(props = {}) {
     }
   };
 
-  return (
-    <div className="gur-stage" style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", colorScheme: "light" }}>
-      <GurStyles />
-      {/* Parlak turuncu simge gradyanı bir kez tanımlanıyor; simgeler
-          url(#gur-gloss) ile buna bağlanıyor. Her düğmede ayrı <defs>
-          çizilseydi aynı id çoğalır, tarayıcı ilkine bağlanırdı. */}
-      <GlossDefs />
-      <PhoneFrame>
+  // Uygulamanın kendisi (ekran geçişleri, perdeler, mod rozeti). Hangi
+  // kabuğun içine girdiğine bakmıyor: CANLI/YEREL rozeti mutlak
+  // konumlandığı için ÇERÇEVENİN içinde kalmak zorunda, bu yüzden gövde
+  // iki durumda da PhoneFrame'in çocuğu.
+  const govde = (
+    <>
         {/* Ekran geçişi. mode="popLayout" giden ekranı akıştan çıkarıyor;
             olmazsa iki ekran bir kare boyunca üst üste yığılıp sayfayı
             uzatıyor. Yalnızca transform + opacity animasyonu var. */}
@@ -4469,7 +4475,41 @@ export default function GurApp(props = {}) {
             </span>
           </div>
         )}
-      </PhoneFrame>
+    </>
+  );
+
+  return (
+    <div className="gur-stage" style={genis ? {
+      // MASAÜSTÜ: sayfa gibi davranır — dikeyde ortalamak yerine akar,
+      // çünkü üstte sabit bir ada gezinmesi ve yanında bir metin sütunu
+      // var. 844 px'lik çerçeve kısa pencerelerde taşıyor; belge kaysın.
+      minHeight: "100dvh", background: "#0E0B09", colorScheme: "light",
+      display: "flex", flexDirection: "column", justifyContent: "center",
+      padding: "104px 24px 56px", position: "relative", overflowX: "hidden",
+    } : {
+      minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "20px 0", colorScheme: "light",
+    }}>
+      <GurStyles />
+      {/* Parlak turuncu simge gradyanı bir kez tanımlanıyor; simgeler
+          url(#gur-gloss) ile buna bağlanıyor. Her düğmede ayrı <defs>
+          çizilseydi aynı id çoğalır, tarayıcı ilkine bağlanırdı. */}
+      <GlossDefs />
+      {genis ? (
+        <>
+          {/* Kâğıdın ısındığı iki nokta: marka turuncusunun çok soluk
+              hâli. Koyu zeminde yüksekliği gölge değil yüzeyin açılması
+              anlatıyor (panelin koyu temasındaki kuralın aynısı). */}
+          <div aria-hidden="true" style={{
+            position: "absolute", inset: 0, pointerEvents: "none",
+            background: "radial-gradient(900px 600px at 72% 12%, rgba(255,122,26,0.14), transparent 70%), radial-gradient(700px 500px at 10% 88%, rgba(255,102,0,0.08), transparent 70%)",
+          }} />
+          <MasaustuKabuk>{govde}</MasaustuKabuk>
+        </>
+      ) : (
+        <PhoneFrame>{govde}</PhoneFrame>
+      )}
     </div>
   );
 }

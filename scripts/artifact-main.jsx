@@ -17,11 +17,13 @@ import ReactDOM from 'react-dom/client';
 import { createHashRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import GurApp from '../src/app/GurApp.jsx';
+import { TuketiciLanding } from '../src/app/site.jsx';
 import GurAdmin from '../src/admin/GurAdmin.jsx';
 import GurBusiness from '../src/business/GurBusiness.jsx';
 
 const router = createHashRouter([
-  { path: '/', element: <GurApp /> },
+  { path: '/', element: <TuketiciLanding /> },
+  { path: '/uygulama', element: <GurApp /> },
   { path: '/isletme/*', element: <GurBusiness /> },
   { path: '/admin', element: <GurAdmin /> },
   { path: '*', element: <Navigate to="/" replace /> },
@@ -35,6 +37,9 @@ function ArtifactSwitcher() {
   useEffect(() => router.subscribe((state) => setPath(state.location.pathname)), []);
   const admin = path.startsWith('/admin');
   const business = path.startsWith('/isletme');
+  // "Müşteri" sekmesi tanıtım sayfasını da uygulamayı da kapsıyor:
+  // tüketici tarafı artık iki yoldan oluşuyor (/ ve /uygulama) ve
+  // ikisinin arasında sayfanın kendi gezinmesi var.
   const go = (to) => { router.navigate(to); };
   const style = (active) => ({
     border: 'none', cursor: 'pointer', borderRadius: 999, padding: '6px 14px',
