@@ -38,6 +38,7 @@ import {
   GurLogo, Icon, Btn, Img, GurStyles, useMediaQuery, GENIS, ELEV,
 } from '../ui/kit.jsx';
 import { I } from '../data/restaurants.js';
+import { MAGAZA, MAGAZA_HAZIR } from '../lib/magaza.js';
 
 export const KAP = 1180;                       // içerik kabının en geniş hâli
 const EGRI = [0.16, 1, 0.3, 1];                // giriş eğrisi (Motion dizisi)
@@ -153,24 +154,10 @@ function Baslik({ kas, baslik, aciklama, orta = true, tone = "light", en = 680 }
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// MAĞAZA BAĞLANTILARI — TEK YER
-//
-// Site bir indirme hunisi: ziyaretçiyi App Store ve Google Play'e
-// yönlendiriyor. İki adres BURADA, başka hiçbir yerde yazılı değil —
-// yayına çıkarken yalnızca bu iki satır doldurulacak, arayüzün geri
-// kalanı kendiliğinden gerçek bağlantıya döner.
-//
-// BOŞKEN SAHTE BAĞLANTI ÜRETİLMİYOR. Olmayan bir mağaza sayfasına
-// götüren bir rozet, rozetin hiç olmamasından kötü: kullanıcı tıklar,
-// 404 görür ve ürünün var olmadığını düşünür. Adres boşken rozet
-// TIKLANAMAZ bir "yakında" çipi olarak çiziliyor ve yanında tarayıcı
-// sürümüne giden gerçek bir yol duruyor.
-export const MAGAZA = {
-  ios: "",        // örn. https://apps.apple.com/tr/app/gur/id000000000
-  android: "",    // örn. https://play.google.com/store/apps/details?id=app.gur
-};
-export const MAGAZA_HAZIR = !!(MAGAZA.ios || MAGAZA.android);
+// MAĞAZA BAĞLANTILARI. İki adres `src/lib/magaza.js` içinde — işletme
+// sitesinin alt bilgisi de aynı yerden okuyor. Buradan yeniden dışa
+// aktarılıyor ki sayfayı okuyan eski içe aktarmalar kırılmasın.
+export { MAGAZA, MAGAZA_HAZIR };
 
 const APPLE_GLYPH = (
   <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

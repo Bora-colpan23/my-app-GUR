@@ -31,22 +31,35 @@ tek yerden yönetiliyor (restoran bazlı görünürlük anahtarı).
 kaydını **sahiplenmiş** işletmelerde açık: sahipsiz bir mekan adına söz
 veremeyiz. Kapı hem arayüzde hem sunucuda (`POST /api/reservations`).
 
-## ÜRÜN DÖRT PARÇA — başka parça yok
+## ÜRÜN: BİR ANA UYGULAMA + İKİ BAĞLI WEB YÜZEYİ
+
+**GUR bir mobil uygulamadır.** Ürün odur; web tarafındaki yüzeyler ona
+bağlı — biri restoranı sisteme sokar, biri sistemi yönetir.
 
 | # | Parça | Nerede | Kim kullanır |
 |---|---|---|---|
-| 1 | **Mobil uygulama** | `mobile/` (Expo, App Store + Google Play) | tüketici |
-| 2 | **Tanıtım web sitesi** | `/` (`src/app/site.jsx`) | tüketici (indirmeye gider) |
-| 3 | **Restoran kayıt web sitesi** | `/isletme/*` (Doyurucu) | restoran sahibi |
-| 4 | **Yönetici paneli** | `/admin` | GUR ekibi |
+| **1** | **GUR uygulaması — ANA ÜRÜN** | `mobile/` (Expo, App Store + Google Play) | tüketici |
+| 2 | **Restoran kayıt web sitesi** | `/isletme/*` (Doyurucu) | restoran sahibi |
+| 3 | **Yönetici panosu (web dashboard)** | `/admin` | GUR ekibi |
 
-Beşinci bir parça YOK. Özellikle: **tarayıcıda tüketici uygulaması yok.**
-Bir dönem vardı (`src/app/GurApp.jsx`) ve kök yol genişliğe göre
+Üçü eşit değil ve arayüz bunu söylemek zorunda: önizleme kabuğunda
+uygulama ilk sırada, "ANA" rozetiyle ve açılışta seçili; ikisi
+"BAĞLI WEB YÜZEYLERİ" başlığı altında. Üçünü eşit ağırlıkta yan yana
+dizmek hangisinin ürün olduğunu okunmaz kılıyordu.
+
+**Tanıtım sayfası (`/`, `src/app/site.jsx`) bir parça DEĞİL.** Depoda
+duruyor ve işini yapıyor — ana uygulamanın mağaza hunisi, ziyaretçiyi
+App Store / Google Play'e yollar — ama ürünün bir bileşeni olarak
+sayılmıyor ve birleşik önizlemede sekmesi yok. Kaldırılmadı: mağaza
+bağlantılarının bir yerden verilmesi gerekiyor.
+
+Dördüncü bir parça YOK. Özellikle: **tarayıcıda tüketici uygulaması
+yok.** Bir dönem vardı (`src/app/GurApp.jsx`) ve kök yol genişliğe göre
 dallanıyordu — telefonda uygulama, masaüstünde site. İki kabuk aynı işi
 yapınca hangisinin gerçek ürün olduğu okunmuyordu. Kaldırıldı; git
 geçmişinde duruyor (`git show 8b17fa0:src/app/GurApp.jsx`).
 
-Bunların altında bir de **sunucu** var ama o bir arayüz değil, dördünün
+Bunların altında bir de **sunucu** var ama o bir arayüz değil, üçünün
 ortak zemini: mekan beslemesi, swipe motoru, bildirim cron'ları,
 analitik toplama (`server/`).
 
@@ -84,18 +97,22 @@ yükleniyor, tek dosyalık artifact o ayrı chunk'ı bulamaz ve panel açılmaz.
 Betik `GUR_ARTIFACT=1` ile tek parça derliyor ve çıktıda birden fazla JS
 dosyası kalırsa hata veriyor.
 
-**DÖRT PARÇA TEK ÖNİZLEME:** `npm run onizleme` → `dist/onizleme/`.
+**ÜÇ PARÇA TEK ÖNİZLEME:** `npm run onizleme` → `dist/onizleme/`.
 
 ```bash
 cd mobile && npx expo export --platform web --output-dir dist-web && cd ..
-npm run artifact      # üç web yüzeyi → dist/gur-preview.html
-npm run onizleme      # dördünü tek kabukta toplar
+npm run artifact      # web yüzeyleri → dist/gur-preview.html
+npm run onizleme      # üçünü tek kabukta toplar
 ```
 
-Kabuk `scripts/onizleme-kabuk.html`: üstte dört sekme, altında iki
-iframe. Üç web yüzeyi TEK derlemenin içinde (hash yönlendiricisi),
-mobil uygulama ayrı bir Expo paketi ve 393×852'lik bir cihaz
-çerçevesinde duruyor. Bilinmesi gereken dört şey:
+Kabuk `scripts/onizleme-kabuk.html`: üstte üç sekme (ana uygulama +
+bağlı iki web yüzeyi), altında iki iframe. Web yüzeyleri TEK derlemenin
+içinde (hash yönlendiricisi), mobil uygulama ayrı bir Expo paketi ve
+393×852'lik bir cihaz çerçevesinde duruyor. Bilinmesi gereken beş şey:
+
+- **AÇILIŞ ANA ÜRÜNDE.** Kabuk mobil sekmesiyle açılıyor, web iframe'i
+  ilk gerekince yükleniyor. Sıra bir tercih değil ifade: GUR bir mobil
+  uygulama, web yüzeyleri ona bağlı.
 
 - **İki ayrı iframe, çünkü iki ayrı paket.** Vite + React DOM ile
   Expo + React Native Web'i aynı belgeye koymak iki react kopyası ve
@@ -119,9 +136,10 @@ Telefon çerçevesi burada ürünün içinde değil ÖNİZLEMENİN dışında: w
 tarafındaki telefon maketi tam da bu yüzden kaldırılmıştı (bkz. "TELEFON
 MAKETİ KALDIRILDI"). Burada taklit edilen ürün değil cihaz.
 
-Ölçüldü (`birlesik-test.mjs`): dört sekmenin dördü de kendi yüzeyini
-açıyor, iframe'ler yeniden yüklenmiyor, içeriden `/admin`e geçince şerit
-"Yönetici"ye düşüyor, 44 px altında sekme yok, 393 px'te yatay taşma 0 px.
+Ölçüldü (`uc-parca.mjs`): açılış ana üründe, üç sekmenin üçü de kendi
+yüzeyini açıyor, iframe'ler yeniden yüklenmiyor, içeriden `/admin`e
+geçince şerit "Yönetici panosu"na düşüyor, 44 px altında sekme yok,
+393 px'te yatay taşma 0 px, istek/JS hatası yok.
 
 ### Base44'te çalıştırma — dört parça tek origin
 
@@ -235,6 +253,7 @@ gur/
     │   ├── b2b.js             # sahiplenme başvuruları + işletmenin girdiği alanlar
     │   ├── campaigns.js       # demo kampanya envanteri
     │   ├── badges.js          # rozet kataloğu + atamalar (Gastro + editoryal)
+    │   ├── magaza.js          # App Store / Google Play adresleri — TEK YER
     │   ├── invites.js         # havuz daveti: kanal seçimi + mailto taslağı
     │   ├── geo.js             # konum izni, elle ilçe seçimi, başlangıç noktası
     │   ├── moderation.js      # yayın öncesi onay kuyruğu (mekan + alan değişikliği)
@@ -607,11 +626,17 @@ ziyaretçiyi App Store / Google Play'e yollamak. Tarayıcıda açılan bir
 tüketici uygulaması olmadığı için "uygulamayı aç" diye bir yol da yok —
 tek birincil eylem indirme.
 
-**İki mağaza adresi TEK YERDE**: `src/app/site.jsx` → `MAGAZA.ios` /
+**İki mağaza adresi TEK YERDE**: `src/lib/magaza.js` → `MAGAZA.ios` /
 `MAGAZA.android`. Yayına çıkarken yalnız o iki satır doldurulacak; ada
-gezinmesindeki hap, kahramandaki eylem satırı, `#indir` bölümü ve alt
-bilgi aynı iki adrese bakıyor ve kendiliğinden gerçek bağlantıya dönüyor
+gezinmesindeki hap, kahramandaki eylem satırı, `#indir` bölümü, alt bilgi
+ve **işletme sitesinin alt bilgisi** aynı iki adrese bakıyor ve
+kendiliğinden gerçek bağlantıya dönüyor
 (`target="_blank" rel="noopener noreferrer"`).
+
+Kendi modülünde duruyor, tanıtım sayfasının içinde değil: işletme sitesi
+de aynı adresleri okuyor ve `src/app/site.jsx`ten içe aktarsaydı 900
+satırlık tanıtım sayfası işletme parçasına da girerdi. `site.jsx` ikisini
+yeniden dışa aktarıyor, eski içe aktarmalar kırılmasın diye.
 
 **BOŞKEN SAHTE BAĞLANTI ÜRETİLMİYOR.** Olmayan bir mağaza sayfasına
 götüren rozet, rozetin hiç olmamasından kötü: kullanıcı tıklar, 404
@@ -679,11 +704,10 @@ uyarısı veriyor: ikisi GUR kelime markası (logotype, kural dışı), biri
 "GASTRO ONAYLI" çipinde beyaz-üstü-turuncu (bilinen ürün kararı). Yeni
 kaynaklı sıfır. Yatay taşma iki genişlikte de 0 px; 44 px altında dokunma
 hedefi yok. Dar ekran menüsü `role="dialog" aria-modal="true"` ve üç
-kapatma yolu var (çarpı, perde, Escape). Tek dosyalık artifact
-derlemesinde üç sekme (Tanıtım · İşletme · Yönetici) kendi yüzeyini
-açıyor (`dort-yuzey.mjs`); dördüncü parça olan mobil uygulama O
-derlemenin içinde değil — dördü birden `npm run onizleme` kabuğunda
-(bkz. "DÖRT PARÇA TEK ÖNİZLEME").
+kapatma yolu var (çarpı, perde, Escape). Tanıtım sayfası ürünün bir
+parçası değil (bkz. başlık): birleşik önizlemede sekmesi yok, tek
+dosyalık artifact derlemesinde hâlâ `#/` yolunda duruyor
+(`dort-yuzey.mjs`).
 
 ### Doyurucu artık bir WEB SİTESİ
 
@@ -738,6 +762,13 @@ yazılmış panoyu) baştan boyamak demekti.
 geniş ekrandaki kenar çubuğu aynı diziyi çiziyor, gövde de aynı
 (`panelIcerik`). İki kopya olsaydı biri katalogda açılan yeni sekmeyi
 göstermeyi unuturdu.
+
+**Alt bilgideki "Tüketici uygulaması" bağlantısı MAĞAZAYA gider.**
+Eskiden `href="/"` ile tanıtım sayfasına gidiyordu. İki sorun: restoran
+sahibinin müşterisi bir web sayfası değil mağaza uygulaması indiriyor
+(ana ürün o), ve o mutlak yol hash yönlendiricili önizlemede kabuğun
+kendisini iframe'in içine açıyordu. Adres boşken bağlantı üretilmiyor —
+eylemi olmayan satır düğme değil düz metin ("App Store · yakında").
 
 **Panelde site başlığı yok.** Panelin kendi başlığı ve gezinmesi var; iki
 gezinme şeridi üst üste hangisinin ana olduğunu sildirir. Siteye dönüş

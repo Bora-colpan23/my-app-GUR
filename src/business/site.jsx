@@ -24,6 +24,7 @@
 
 import React, { useState } from 'react';
 import { GurLogo, Icon, Btn, useMediaQuery, GENIS, ELEV } from '../ui/kit.jsx';
+import { MAGAZA } from '../lib/magaza.js';
 
 const KAP = 1120;          // içerik kabının en büyük genişliği
 
@@ -198,7 +199,19 @@ export function SiteFooter({ onGo }) {
           </div>
           <div>
             <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, letterSpacing: "0.06em", color: "var(--c-ink)", margin: "0 0 10px" }}>GUR</p>
-            <a href="/" className="gur-tap" style={{ display: "block", padding: "5px 0", fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink-2)", textDecoration: "none" }}>Tüketici uygulaması</a>
+            {/* TÜKETİCİ ÜRÜNÜ MOBİL UYGULAMA — burada eskiden href="/" ile
+                tanıtım sayfasına giden bir bağlantı vardı. İki sorun: restoran
+                sahibinin müşterisi bir web sayfası değil mağaza uygulaması
+                indiriyor, ve o mutlak yol hash yönlendiricili önizlemede
+                kabuğun kendisini iframe'in içine açıyordu.
+                Adres boşken bağlantı ÜRETİLMİYOR (bkz. lib/magaza.js): eylemi
+                olmayan satır düğme değil düz metin. */}
+            {[["ios", "App Store"], ["android", "Google Play"]].map(([tur, ad]) => (
+              MAGAZA[tur]
+                ? <a key={tur} href={MAGAZA[tur]} target="_blank" rel="noopener noreferrer" className="gur-tap"
+                     style={{ display: "block", padding: "5px 0", fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink-2)", textDecoration: "none" }}>{ad}</a>
+                : <span key={tur} style={{ display: "block", padding: "5px 0", fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)" }}>{ad} · yakında</span>
+            ))}
             <span style={{ display: "block", padding: "5px 0", fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)" }}>İstanbul</span>
           </div>
         </div>

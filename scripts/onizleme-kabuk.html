@@ -3,21 +3,24 @@
 <head>
 <meta charset="utf-8" />
 <title>GUR Önizleme</title>
-<!-- Dört parçayı TEK yerde toplayan kabuk.
-     Bu dosya ürünün bir parçası DEĞİL, önizleme iskelesi: üç web yüzeyi
-     (tanıtım · işletme · yönetici) tek bir Vite derlemesinin içinde ve
-     hash yönlendiricisiyle geçiliyor, mobil uygulama ise ayrı bir Expo
-     derlemesi ve telefon ölçüsünde bir çerçevede duruyor.
+<!-- ÜÇ PARÇA, BİRİ ANA.
+     GUR'un ürünü MOBİL UYGULAMA. Ona bağlı iki web yüzeyi var: restoranın
+     kayıt olduğu site (/isletme) ve GUR ekibinin web panosu (/admin).
+     Şeritteki sıra bunu söylüyor — önce uygulama, sonra ayırıcı, sonra
+     "BAĞLI WEB YÜZEYLERİ". Üçünü eşit ağırlıkta yan yana dizmek hangisinin
+     ürün olduğunu okunmaz kılıyordu.
 
-     Neden iki ayrı iframe: iki derleme iki ayrı paket. Tek sayfada
-     birleştirmek React Native Web'i ve web uygulamasını aynı belgeye
-     koymak demekti — iki react kopyası, çakışan global stiller.
+     Tanıtım sayfası (`/`) depoda duruyor ve mağaza hunisi olarak işini
+     yapıyor, ama bir PARÇA değil: önizlemede sekmesi yok.
+
+     Neden iki ayrı iframe: iki ayrı paket. Web yüzeyleri Vite + React DOM,
+     mobil uygulama Expo + React Native Web. Tek belgeye koymak iki react
+     kopyası ve çakışan global stil demekti.
 
      Neden iframe'ler yeniden YÜKLENMİYOR: sekme değişince src'ye
-     dokunulmuyor; web yüzeyinde yalnızca yönlendirici çağrılıyor,
-     mobil çerçeve ise gizlenip gösteriliyor. src'yi her seferinde
-     yazsaydık kullanıcı iki sekme arasında gidip gelirken yazdığı her
-     şeyi kaybederdi. -->
+     dokunulmuyor; web yüzeyinde yalnızca yönlendirici çağrılıyor, mobil
+     çerçeve gizlenip gösteriliyor. src'yi her seferinde yazsaydık kullanıcı
+     iki sekme arasında gidip gelirken yazdığı her şeyi kaybederdi. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -53,7 +56,7 @@
      duruyor — ürünün bir parçası gibi değil. */
   header {
     position: fixed; inset: 0 0 auto 0; height: var(--ust); z-index: 10;
-    display: flex; align-items: center; gap: 14px;
+    display: flex; align-items: center; gap: 12px;
     padding: 0 14px;
     background: var(--c-bg-2);
     border-bottom: 1px solid var(--c-line);
@@ -62,14 +65,15 @@
   .marka i { font-style: normal; }
   .g { color: #FFA500; } .u { color: #FF6600; } .r { color: #FF0000; }
 
-  nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+  nav { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; }
   nav::-webkit-scrollbar { display: none; }
   nav button {
     flex: none; border: none; cursor: pointer;
     min-height: 44px; padding: 0 16px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 8px;
     font-family: var(--f-body); font-size: 14px; font-weight: 700;
     background: transparent; color: var(--c-ink-2);
-    /* Yalnız transform ve opacity değişir; gölge basınca kısalır. */
+    /* Yalnız transform ve renk değişir. */
     transition: transform 180ms cubic-bezier(0.16,1,0.3,1), background-color 180ms ease, color 180ms ease;
   }
   nav button:hover { background: rgba(45,36,25,0.05); }
@@ -78,6 +82,21 @@
      Pasif/aktif farkı opacity ile KURULMUYOR. */
   nav button[aria-current="page"] { background: var(--c-brand); color: #fff; box-shadow: var(--sh-1); }
   nav button[aria-current="page"]:hover { background: var(--c-brand); }
+
+  /* ANA ürünün rozeti. Sıra tek başına yeterli değil: şerit dar ekranda
+     kayıyor ve ilk sekme görünmeden de kalabiliyor. */
+  .ana-rozet {
+    font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em;
+    padding: 3px 7px; border-radius: 999px;
+    background: var(--c-brand); color: #fff;
+  }
+  nav button[aria-current="page"] .ana-rozet { background: rgba(255,255,255,0.22); }
+
+  .ayirici { flex: none; width: 1px; height: 24px; background: var(--c-line); margin: 0 6px; }
+  .grup-adi {
+    flex: none; font-size: 9.5px; font-weight: 800; letter-spacing: 0.09em;
+    color: var(--c-muted); white-space: nowrap; margin-right: 2px;
+  }
 
   main { position: absolute; inset: var(--ust) 0 0 0; }
   .yuzey { position: absolute; inset: 0; }
@@ -104,7 +123,7 @@
   }
   .ekran { width: 100%; height: 100%; border-radius: 43px; overflow: hidden; background: #000; }
   .sahne-not {
-    flex: none; max-width: 560px; text-align: center;
+    flex: none; max-width: 580px; text-align: center;
     font-size: 12px; line-height: 1.55; color: rgba(255,255,255,0.72);
   }
   .sahne-not b { color: #fff; font-weight: 700; }
@@ -120,6 +139,7 @@
   }
   .not b { color: var(--c-brand-ink); font-weight: 700; }
 
+  @media (max-width: 760px) { .grup-adi { display: none; } }
   @media (max-width: 560px) {
     .marka { display: none; }
     .not { display: none; }     /* dar ekranda notun yeri yok, sahnede zaten yazıyor */
@@ -132,29 +152,29 @@
 <body>
   <header>
     <span class="marka" aria-hidden="true"><i class="g">G</i><i class="u">U</i><i class="r">R</i></span>
-    <nav id="serit" aria-label="GUR'un dört parçası"></nav>
+    <nav id="serit" aria-label="GUR uygulaması ve ona bağlı web yüzeyleri"></nav>
   </header>
 
   <main>
-    <div class="yuzey" id="yuzey-web">
-      <!-- Üç web yüzeyi TEK derleme: hash yönlendiricisi aralarında geçiyor. -->
-      <iframe id="cerceve-web" src="web/index.html#/" title="GUR web yüzeyleri"></iframe>
-    </div>
-    <div class="yuzey" id="yuzey-app" hidden>
+    <div class="yuzey" id="yuzey-app">
       <div class="sahne">
         <div class="telefon" id="telefon">
           <div class="ekran">
-            <!-- src ilk açılışta yazılır: 5,7 MB'lık paketi hiç bakılmayacak
-                 bir sekme için indirmek gereksiz. -->
-            <iframe id="cerceve-app" title="GUR mobil uygulaması (393x852)"></iframe>
+            <iframe id="cerceve-app" src="app/index.html" title="GUR mobil uygulaması (393x852)"></iframe>
           </div>
         </div>
         <p class="sahne-not">
-          Mağazaya çıkan <b>Expo / React Native</b> paketinin web dışa aktarımı,
-          iPhone 14 Pro ölçüsünde (393&times;852). Aynı bileşen ağacı, aynı düzen kodu.
+          <b>Ana ürün.</b> Mağazaya çıkan Expo / React Native paketinin web dışa aktarımı,
+          iPhone 14 Pro ölçüsünde (393&times;852) — aynı bileşen ağacı, aynı düzen kodu.
           Dokunsal geri bildirim, konum izni ve mağaza paketlemesi yalnızca gerçek cihazda görülür.
         </p>
       </div>
+    </div>
+    <div class="yuzey" id="yuzey-web" hidden>
+      <!-- İki web yüzeyi TEK derleme: hash yönlendiricisi aralarında geçiyor.
+           src ilk gerekince yazılır: 1,2 MB'lık paketi hiç bakılmayacak bir
+           sekme için indirmek gereksiz. -->
+      <iframe id="cerceve-web" title="GUR web yüzeyleri"></iframe>
     </div>
   </main>
 
@@ -162,77 +182,87 @@
 
 <script>
 (function () {
-  // Dört parça. Web olanların üçü aynı iframe'de, yol farkıyla.
+  // ÜÇ PARÇA. İlki ürün, diğer ikisi ona bağlı web yüzeyleri ve ikisi de
+  // aynı iframe'de, yol farkıyla.
   var PARCALAR = [
-    { ad: 'Tanıtım',         tur: 'web', yol: '/',         esle: function (y) { return y === '/'; } },
-    { ad: 'İşletme',         tur: 'web', yol: '/isletme',  esle: function (y) { return y.indexOf('/isletme') === 0; } },
-    { ad: 'Yönetici',        tur: 'web', yol: '/admin',    esle: function (y) { return y.indexOf('/admin') === 0; } },
-    { ad: 'Mobil uygulama',  tur: 'app' },
+    { ad: 'GUR uygulaması', tur: 'app', ana: true },
+    { ad: 'Restoran kaydı', tur: 'web', yol: '/isletme', esle: function (y) { return y.indexOf('/isletme') === 0; } },
+    { ad: 'Yönetici panosu', tur: 'web', yol: '/admin',  esle: function (y) { return y.indexOf('/admin') === 0; } },
   ];
 
   var serit    = document.getElementById('serit');
   var yuzeyWeb = document.getElementById('yuzey-web');
   var yuzeyApp = document.getElementById('yuzey-app');
   var cerWeb   = document.getElementById('cerceve-web');
-  var cerApp   = document.getElementById('cerceve-app');
   var telefon  = document.getElementById('telefon');
 
-  var secili = 0;
-  var webYol = '/';
+  var secili = 0;        // açılışta ANA ürün
+  var webYol = '/isletme';
 
-  var dugmeler = PARCALAR.map(function (p, i) {
+  var dugmeler = [];
+  PARCALAR.forEach(function (p, i) {
+    // Ayırıcı ve grup adı ilk web yüzeyinin önüne: şerit "ürün | bağlı
+    // yüzeyler" diye okunsun.
+    if (p.tur === 'web' && !dugmeler.some(function (d) { return d.web; })) {
+      var cizgi = document.createElement('span'); cizgi.className = 'ayirici'; cizgi.setAttribute('aria-hidden', 'true');
+      var ad = document.createElement('span'); ad.className = 'grup-adi'; ad.textContent = 'BAĞLI WEB YÜZEYLERİ';
+      serit.appendChild(cizgi); serit.appendChild(ad);
+    }
     var b = document.createElement('button');
     b.type = 'button';
-    b.textContent = p.ad;
+    b.web = p.tur === 'web';
+    b.appendChild(document.createTextNode(p.ad));
+    if (p.ana) {
+      var rozet = document.createElement('span');
+      rozet.className = 'ana-rozet'; rozet.textContent = 'ANA';
+      b.appendChild(rozet);
+    }
     b.addEventListener('click', function () { git(i); });
     serit.appendChild(b);
-    return b;
+    dugmeler.push(b);
   });
 
   function ciz() {
     dugmeler.forEach(function (b, i) {
-      var aktif = PARCALAR[i].tur === 'app' ? secili === i
-                : secili !== 3 && PARCALAR[i].esle(webYol);
+      var aktif = PARCALAR[i].tur === 'app' ? secili === 0
+                : secili !== 0 && PARCALAR[i].esle(webYol);
       if (aktif) b.setAttribute('aria-current', 'page');
       else b.removeAttribute('aria-current');
     });
-    yuzeyWeb.hidden = secili === 3;
-    yuzeyApp.hidden = secili !== 3;
+    yuzeyApp.hidden = secili !== 0;
+    yuzeyWeb.hidden = secili === 0;
   }
 
   function git(i) {
     secili = i;
     if (PARCALAR[i].tur === 'web') {
       webYol = PARCALAR[i].yol;
+      var w = cerWeb.contentWindow;
       // Yönlendiriciyi doğrudan çağırıyoruz: iframe'in src'sini yeniden
       // yazmak sayfayı baştan yükler ve oturum, form, filtre uçar.
-      var w = cerWeb.contentWindow;
-      if (w && typeof w.__gurGit === 'function') w.__gurGit(PARCALAR[i].yol);
-      else cerWeb.src = 'web/index.html#' + PARCALAR[i].yol;   // derleme henüz yüklenmediyse
-    } else if (!cerApp.src) {
-      cerApp.src = 'app/index.html';
+      if (cerWeb.src && w && typeof w.__gurGit === 'function') w.__gurGit(PARCALAR[i].yol);
+      else cerWeb.src = 'web/index.html#' + PARCALAR[i].yol;
     }
     ciz();
     olcekle();
   }
 
-  // İÇERİDEN GELEN GEÇİŞİ DE DİNLİYORUZ. Kullanıcı tanıtım sayfasındaki
-  // "İşletme girişi"ne bastığında şeridin "Tanıtım"da kalması, iki
-  // gezinmenin birbirine yalan söylemesi demekti.
+  // İÇERİDEN GELEN GEÇİŞİ DE DİNLİYORUZ. Kullanıcı kayıt sitesinden
+  // panele girdiğinde şeridin yanlış sekmede kalması, iki gezinmenin
+  // birbirine yalan söylemesi demekti.
   window.addEventListener('message', function (e) {
     if (e.source !== cerWeb.contentWindow) return;
     var d = e.data;
     if (!d || d.gur !== 'yol' || typeof d.yol !== 'string') return;
     webYol = d.yol;
-    if (secili !== 3) ciz();
+    if (secili !== 0) ciz();
   });
 
-  // Telefon çerçevesi dizüstü ekranına sığmıyor: 852 px + kenarlık +
-  // not, 900 px'in altındaki her pencerede taşıyor. Ölçek yalnızca
-  // transform ile — yükseklik animasyonu her karede yeniden yerleşim
-  // yaptırırdı.
+  // Telefon çerçevesi dizüstü ekranına sığmıyor: 852 px + kenarlık + not,
+  // 900 px'in altındaki her pencerede taşıyor. Ölçek yalnızca transform
+  // ile — yükseklik animasyonu her karede yeniden yerleşim yaptırırdı.
   function olcekle() {
-    if (secili !== 3) return;
+    if (secili !== 0) return;
     var bos = yuzeyApp.clientHeight - 36 - 64;       /* dolgu + sahne notu */
     var genis = yuzeyApp.clientWidth - 36;
     var k = Math.min(1, bos / 874, genis / 415);
@@ -242,6 +272,7 @@
   window.addEventListener('resize', olcekle);
 
   ciz();
+  olcekle();
 })();
 </script>
 </body>
