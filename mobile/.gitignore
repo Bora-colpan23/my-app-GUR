@@ -42,3 +42,4 @@ yarn-error.*
 
 # web önizleme çıktısı (ölçüm için üretilir)
 dist-web/
+dist-artifact/
