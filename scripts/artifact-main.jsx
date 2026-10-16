@@ -37,11 +37,17 @@ function ArtifactSwitcher() {
   // uygulama içinden gelen geçişlerde sekme yanlış yerde kalırdı.
   const [path, setPath] = useState(() => router.state.location.pathname);
   useEffect(() => router.subscribe((state) => setPath(state.location.pathname)), []);
-  const admin = path.startsWith('/admin');
-  const business = path.startsWith('/isletme');
-  // "Müşteri" sekmesi tanıtım sayfasını da uygulamayı da kapsıyor:
-  // tüketici tarafı artık iki yoldan oluşuyor (/ ve /uygulama) ve
-  // ikisinin arasında sayfanın kendi gezinmesi var.
+  // DÖRT YÜZEY, DÖRT SEKME. Tüketici tarafı iki ayrı şey: tanıtım
+  // SİTESİ ve UYGULAMANIN kendisi. Tek bir "Müşteri" sekmesi `/`ye
+  // gidiyordu ve o yol masaüstü genişliğinde siteyi açtığı için
+  // önizlemede uygulamaya ulaşmanın hiçbir yolu kalmıyordu —
+  // uygulama duruyordu ama görünmüyordu. Her yüzeyin kendi sekmesi var.
+  const sekmeler = [
+    ['Uygulama', '/uygulama', (y) => y === '/uygulama' || y === '/'],
+    ['Site', '/site', (y) => y === '/site'],
+    ['İşletme', '/isletme', (y) => y.startsWith('/isletme')],
+    ['Yönetici', '/admin', (y) => y.startsWith('/admin')],
+  ];
   const go = (to) => { router.navigate(to); };
   const style = (active) => ({
     border: 'none', cursor: 'pointer', borderRadius: 999, padding: '6px 14px',
@@ -51,9 +57,9 @@ function ArtifactSwitcher() {
   });
   return (
     <div style={{ position: 'fixed', top: 12, left: 12, zIndex: 99999, display: 'flex', gap: 4, background: 'rgba(20,18,26,0.82)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: 4 }}>
-      <button style={style(!admin && !business)} onClick={() => go('/')}>Müşteri</button>
-      <button style={style(business)} onClick={() => go('/isletme')}>İşletme</button>
-      <button style={style(admin)} onClick={() => go('/admin')}>Yönetici</button>
+      {sekmeler.map(([ad, yol, aktifMi]) => (
+        <button key={yol} style={style(aktifMi(path))} onClick={() => go(yol)}>{ad}</button>
+      ))}
     </div>
   );
 }

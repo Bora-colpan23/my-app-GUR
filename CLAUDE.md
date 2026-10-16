@@ -497,6 +497,23 @@ bağlantıdan gelen telefon kullanıcısı orada mağaza rozetlerini görür.
 Sitenin kendi içindeki bağlantıları `siteYolu(genis)` kullanıyor —
 telefonda `/site`, masaüstünde `/`.
 
+**UYGULAMA SİTENİN ALT BÖLÜMÜ DEĞİL, YANINDAKİ YÜZEY.** Doyurucu ve
+yönetici paneli gibi kendi başına bir yer ve her yerden bir dokunuş
+uzakta:
+
+- Ada gezinmesinin **birincil hapı** "Uygulamayı aç" (`/uygulama`) ve
+  sayfanın her yerinde görünüyor.
+- Artifact önizlemesinde **dört sekme** var: Uygulama · Site · İşletme ·
+  Yönetici. Önceden tek bir "Müşteri" sekmesi `/`ye gidiyordu; o yol
+  masaüstü genişliğinde siteyi açtığı için önizlemede uygulamaya
+  ULAŞMANIN HİÇBİR YOLU KALMIYORDU — uygulama duruyordu ama görünmüyordu.
+- Alt bilgide "Uygulamayı aç", uygulamanın kabuğunda "Ana sayfa".
+
+İndirme hunisi bundan etkilenmedi: gezinmede "İndir" bağlantısı,
+kahramanda mağaza rozetleri ve ayrı bir `#indir` bölümü duruyor. İki hapı
+birden turuncu yapmak hangisinin ana yol olduğunu sildirirdi (bkz.
+"Renkle hiyerarşi").
+
 #### Site bir İNDİRME HUNİSİ
 
 Sitenin birincil eylemi "uygulamayı aç" değil **App Store / Google
@@ -603,6 +620,21 @@ kuralı `[style*="backdrop-filter"]` taşıyan her şeye koyu bir dolgu
 basıyordu; tanıtım sayfasının açık ada gezinmesi o dolguyla koyu
 mürekkep-koyu zemin oluyordu. `.gur-glass-light` artık o blokta da kendi
 dolgusunu alıyor.
+
+**Ölçüm (dört yüzey).** Önizlemede dört sekmenin dördü de kendi
+yüzeyini açıyor (`dort-yuzey.mjs`): Uygulama → telefon çerçevesi,
+Site → tanıtım, İşletme → Doyurucu, Yönetici → panel. Siteden
+"Uygulamayı aç" tek dokunuşta uygulamaya, kabuktaki "Ana sayfa" geri
+siteye götürüyor.
+
+**Ölçüm (veri katmanı, tek tarayıcı bağlamında — `butunluk.mjs`).** Dört
+ayak: (1) siteden gönderilen sahiplenme başvurusu `gur.claims`e düşüyor,
+(2) yönetici panelinde adıyla ve başvuranıyla görünüyor, (3) tüketici
+uygulaması (`/uygulama`) aynı mekan havuzunu okuyor, (4) **ters yön**:
+yönetici restoranın görünürlük anahtarını kapatınca (GİZLİ rozeti)
+tüketici uygulamasının aramasında o mekan artık ÇIKMIYOR. Dördüncü ayak
+okumayı değil YAZMAYI kanıtlıyor — yöneticinin anahtarı gerçekten
+uygulamanın destesini etkiliyor.
 
 **Ölçüm (mağaza geçişi).** Telefonda (393×852) `/` uygulamayı açıyor:
 çerçeve 393×852, yarıçap 0, sahne kremsi, site başlığı 0 — yani eski

@@ -355,11 +355,15 @@ export function WebHeader({ koyu = false, uygulamada = false }) {
   // birincil eylem yok (uygulamanın kendisi zaten orada); iki bağlantı
   // da turuncu olsaydı hangisinin ana yol olduğu okunmazdı. Ana yol
   // kenarlıklı beyaz hap, Doyurucu nötr.
-  // SİTENİN İŞİ İNDİRTMEK. Ada gezinmesindeki birincil eylem mağaza
-  // bölümüne götürüyor; tarayıcı sürümü oradaki ikinci yol.
+  // UYGULAMA SİTENİN YANINDA DURAN AYRI BİR YÜZEY, sitenin bir alt
+  // bölümü değil: ada gezinmesinin birincil eylemi onu açıyor ve bu hap
+  // sayfanın her yerinde görünüyor. İndirme hunisi kaybolmadı —
+  // gezinmede kendi bağlantısı ("İndir"), kahramanda mağaza rozetleri
+  // ve ayrı bir `#indir` bölümü var. İki hapı da turuncu yapmak
+  // hangisinin ana yol olduğunu sildirirdi.
   const uygulamaHapi = uygulamada
     ? <Btn text="Ana sayfa" onClick={() => nav(siteYolu(genis))} variant={koyu ? "outline" : "outlineDark"} size="md" fullWidth={false} />
-    : <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="md" fullWidth={false} trailing={OK} />;
+    : <Btn text="Uygulamayı aç" onClick={() => nav("/uygulama")} variant="filled" size="md" fullWidth={false} trailing={OK} />;
 
   return (
     <>
@@ -461,7 +465,8 @@ export function WebHeader({ koyu = false, uygulamada = false }) {
                 initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.06 + bolumler.length * 0.05, ease: EGRI }}
                 style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 26 }}>
-                <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="lg" trailing={OK} />
+                <Btn text="Uygulamayı aç" onClick={() => { setAcik(false); nav("/uygulama"); }} variant="filled" size="lg" trailing={OK} />
+                <Btn text="App Store / Google Play" onClick={() => git("indir")} variant="outlineDark" size="lg" />
                 <Btn text="Restoran mısınız? Doyurucu'ya geçin" onClick={() => { setAcik(false); nav("/isletme"); }} variant="outlineDark" size="lg" />
               </motion.div>
             </nav>
@@ -506,7 +511,7 @@ export function WebFooter() {
             // olduğunu söylüyor (bkz. MAGAZA).
             [MAGAZA.ios ? "App Store" : "App Store · yakında", MAGAZA.ios ? () => window.open(MAGAZA.ios, "_blank", "noopener") : null],
             [MAGAZA.android ? "Google Play" : "Google Play · yakında", MAGAZA.android ? () => window.open(MAGAZA.android, "_blank", "noopener") : null],
-            ["Tarayıcıda aç", () => nav("/uygulama")],
+            ["Uygulamayı aç", () => nav("/uygulama")],
           ])}
           {sutun("Restoranlar", [["Doyurucu'ya git", () => nav("/isletme")], ["Kaydını sahiplen", () => nav("/isletme/sahiplen")]])}
         </div>
