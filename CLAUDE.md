@@ -84,6 +84,45 @@ yükleniyor, tek dosyalık artifact o ayrı chunk'ı bulamaz ve panel açılmaz.
 Betik `GUR_ARTIFACT=1` ile tek parça derliyor ve çıktıda birden fazla JS
 dosyası kalırsa hata veriyor.
 
+**DÖRT PARÇA TEK ÖNİZLEME:** `npm run onizleme` → `dist/onizleme/`.
+
+```bash
+cd mobile && npx expo export --platform web --output-dir dist-web && cd ..
+npm run artifact      # üç web yüzeyi → dist/gur-preview.html
+npm run onizleme      # dördünü tek kabukta toplar
+```
+
+Kabuk `scripts/onizleme-kabuk.html`: üstte dört sekme, altında iki
+iframe. Üç web yüzeyi TEK derlemenin içinde (hash yönlendiricisi),
+mobil uygulama ayrı bir Expo paketi ve 393×852'lik bir cihaz
+çerçevesinde duruyor. Bilinmesi gereken dört şey:
+
+- **İki ayrı iframe, çünkü iki ayrı paket.** Vite + React DOM ile
+  Expo + React Native Web'i aynı belgeye koymak iki react kopyası ve
+  çakışan global stil demekti.
+- **Sekme değişince iframe YENİDEN YÜKLENMİYOR.** Web tarafında
+  yalnızca yönlendirici çağrılıyor (`window.__gurGit`), mobil çerçeve
+  gizlenip gösteriliyor. `src`yi her seferinde yazsaydık kullanıcı iki
+  sekme arasında gidip gelirken yazdığı her şeyi kaybederdi.
+- **Bağ İKİ YÖNLÜ.** Derleme gömülüyken kendi şeridini çizmiyor
+  (`GOMULU`) ama her yol değişiminde kabuğa `postMessage` atıyor:
+  kullanıcı tanıtım sayfasından "İşletme girişi"ne geçtiğinde kabuğun
+  sekmesi takip ediyor. Tek yön bağlansaydı iki gezinme birbirine yalan
+  söylerdi.
+- **Expo dışa aktarımı MUTLAK yol yazıyor** (`/assets/…`, `/_expo/…`) ve
+  artifact alt yolda servis ediliyor; üstelik servis `_` ile başlayan
+  yolları ayırıyor. Betik ikisini de düzeltiyor (`expo/`, bağıl yollar)
+  ve tek bir mutlak yol kalırsa hata veriyor — kalsaydı uygulama sessizce
+  beyaz ekran açardı.
+
+Telefon çerçevesi burada ürünün içinde değil ÖNİZLEMENİN dışında: web
+tarafındaki telefon maketi tam da bu yüzden kaldırılmıştı (bkz. "TELEFON
+MAKETİ KALDIRILDI"). Burada taklit edilen ürün değil cihaz.
+
+Ölçüldü (`birlesik-test.mjs`): dört sekmenin dördü de kendi yüzeyini
+açıyor, iframe'ler yeniden yüklenmiyor, içeriden `/admin`e geçince şerit
+"Yönetici"ye düşüyor, 44 px altında sekme yok, 393 px'te yatay taşma 0 px.
+
 ### Base44'te çalıştırma — dört parça tek origin
 
 Depoda Base44 için hazır bir yığın var (`docker-compose.base44.yml`,
@@ -640,9 +679,11 @@ uyarısı veriyor: ikisi GUR kelime markası (logotype, kural dışı), biri
 "GASTRO ONAYLI" çipinde beyaz-üstü-turuncu (bilinen ürün kararı). Yeni
 kaynaklı sıfır. Yatay taşma iki genişlikte de 0 px; 44 px altında dokunma
 hedefi yok. Dar ekran menüsü `role="dialog" aria-modal="true"` ve üç
-kapatma yolu var (çarpı, perde, Escape). Artifact önizlemesinde üç sekme
-(Tanıtım · İşletme · Yönetici) kendi yüzeyini açıyor — dördüncü parça
-olan mobil uygulama o derlemenin içinde değil (`dort-yuzey.mjs`).
+kapatma yolu var (çarpı, perde, Escape). Tek dosyalık artifact
+derlemesinde üç sekme (Tanıtım · İşletme · Yönetici) kendi yüzeyini
+açıyor (`dort-yuzey.mjs`); dördüncü parça olan mobil uygulama O
+derlemenin içinde değil — dördü birden `npm run onizleme` kabuğunda
+(bkz. "DÖRT PARÇA TEK ÖNİZLEME").
 
 ### Doyurucu artık bir WEB SİTESİ
 
@@ -1929,5 +1970,8 @@ Google Places + Foursquare + Tripadvisor + OSM'den cron ile beslenir.
   metinlerin dışarı çıkarılması demek, ayrı bir iş.
 - **Büyük yazı ölçeklenmiyor** (bkz. "BİLİNEN EKSİK" bölümü).
 - Yasal metinlerdeki işletme bilgileri yer tutucu; yayına çıkmadan doldurulmalı.
-- Artifact önizlemesi tanımı gereği YEREL modda çalışır: statik tek dosya,
-  arkasında sunucu yok.
+- Artifact önizlemesi tanımı gereği YEREL modda çalışır: statik dosyalar,
+  arkasında sunucu yok. Birleşik önizlemede mobil uygulama da YEREL'de:
+  kendi kumbarası (AsyncStorage yerine tarayıcı deposu) web sekmelerinin
+  deposundan ayrı, yani sekmeler arası veri paylaşımı yalnızca CANLI
+  modda olur.

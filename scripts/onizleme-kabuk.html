@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<title>GUR Önizleme</title>
+<!-- Dört parçayı TEK yerde toplayan kabuk.
+     Bu dosya ürünün bir parçası DEĞİL, önizleme iskelesi: üç web yüzeyi
+     (tanıtım · işletme · yönetici) tek bir Vite derlemesinin içinde ve
+     hash yönlendiricisiyle geçiliyor, mobil uygulama ise ayrı bir Expo
+     derlemesi ve telefon ölçüsünde bir çerçevede duruyor.
+
+     Neden iki ayrı iframe: iki derleme iki ayrı paket. Tek sayfada
+     birleştirmek React Native Web'i ve web uygulamasını aynı belgeye
+     koymak demekti — iki react kopyası, çakışan global stiller.
+
+     Neden iframe'ler yeniden YÜKLENMİYOR: sekme değişince src'ye
+     dokunulmuyor; web yüzeyinde yalnızca yönlendirici çağrılıyor,
+     mobil çerçeve ise gizlenip gösteriliyor. src'yi her seferinde
+     yazsaydık kullanıcı iki sekme arasında gidip gelirken yazdığı her
+     şeyi kaybederdi. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" /></noscript>
+<style>
+  /* Jetonlar src/ui/kit.jsx -> GurStyles ile BİREBİR aynı. Kabuk o stil
+     bloğunu render etmiyor (iframe'in dışında), bu yüzden kopyalanıyor;
+     yeni renk tanımlanmadı. */
+  :root {
+    --c-bg: #FDFBF7; --c-bg-2: #F4EFE7; --c-card: #ffffff;
+    --c-ink: #1C1917; --c-ink-2: #4A443E; --c-muted: #6F6459;
+    --c-line: #E3DCD2; --c-espresso: #17130F;
+    --c-brand: #FF6600; --c-brand-ink: #B4530A;
+    --sh-tint: 45, 36, 25;
+    --sh-1: 0 1px 2px rgba(var(--sh-tint),0.04), 0 2px 6px rgba(var(--sh-tint),0.04), 0 5px 14px rgba(var(--sh-tint),0.035);
+    --sh-d4: 0 6px 14px rgba(0,0,0,0.16), 0 18px 40px rgba(0,0,0,0.22), 0 42px 88px rgba(0,0,0,0.30);
+    --ust: 60px;
+    --f-display: 'Poppins', system-ui, -apple-system, sans-serif;
+    --f-body: 'Outfit', system-ui, -apple-system, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--c-bg); color: var(--c-ink);
+    font-family: var(--f-body);
+    overflow: hidden;            /* kaydırma iframe'in kendi içinde */
+  }
+
+  /* ŞERİT ÜSTTE VE OPAK. Ürünün kendi yüzen adası da üstte duruyor;
+     kabuğun şeridi de cam olsaydı ikisi üst üste binip hangisinin ana
+     gezinme olduğu okunmazdı. Bu şerit bilerek önizleme iskelesi gibi
+     duruyor — ürünün bir parçası gibi değil. */
+  header {
+    position: fixed; inset: 0 0 auto 0; height: var(--ust); z-index: 10;
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 14px;
+    background: var(--c-bg-2);
+    border-bottom: 1px solid var(--c-line);
+  }
+  .marka { font-family: var(--f-display); font-weight: 900; font-size: 20px; letter-spacing: -0.5px; line-height: 1; flex: none; }
+  .marka i { font-style: normal; }
+  .g { color: #FFA500; } .u { color: #FF6600; } .r { color: #FF0000; }
+
+  nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+  nav::-webkit-scrollbar { display: none; }
+  nav button {
+    flex: none; border: none; cursor: pointer;
+    min-height: 44px; padding: 0 16px; border-radius: 999px;
+    font-family: var(--f-body); font-size: 14px; font-weight: 700;
+    background: transparent; color: var(--c-ink-2);
+    /* Yalnız transform ve opacity değişir; gölge basınca kısalır. */
+    transition: transform 180ms cubic-bezier(0.16,1,0.3,1), background-color 180ms ease, color 180ms ease;
+  }
+  nav button:hover { background: rgba(45,36,25,0.05); }
+  nav button:active { transform: translateY(1px) scale(0.985); }
+  /* Seçili sekme turuncu dolgu + beyaz yazı: projenin bilinen kararı.
+     Pasif/aktif farkı opacity ile KURULMUYOR. */
+  nav button[aria-current="page"] { background: var(--c-brand); color: #fff; box-shadow: var(--sh-1); }
+  nav button[aria-current="page"]:hover { background: var(--c-brand); }
+
+  main { position: absolute; inset: var(--ust) 0 0 0; }
+  .yuzey { position: absolute; inset: 0; }
+  .yuzey[hidden] { display: none; }
+  iframe { width: 100%; height: 100%; border: none; display: block; background: var(--c-bg); }
+
+  /* ── MOBİL SAHNE ────────────────────────────────────────────────
+     Telefon çerçevesi UYGULAMANIN İÇİNDE DEĞİL, önizlemenin dışında:
+     web tarafındaki telefon maketi tam da bu yüzden kaldırılmıştı
+     (tarayıcıda telefon taklidi eden ürün yüzeyi bırakmamak için).
+     Burada taklit edilen ürün değil CİHAZ — mağazaya çıkan paketin
+     393x852'de nasıl durduğunu göstermenin başka yolu yok. */
+  .sahne {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    padding: 18px; background: var(--c-espresso); overflow: auto;
+  }
+  .telefon {
+    flex: none; width: 393px; height: 852px;
+    transform-origin: 50% 50%;
+    padding: 11px; border-radius: 54px;
+    background: linear-gradient(160deg, #3A3733, #141210 55%, #2B2724);
+    box-shadow: var(--sh-d4);
+  }
+  .ekran { width: 100%; height: 100%; border-radius: 43px; overflow: hidden; background: #000; }
+  .sahne-not {
+    flex: none; max-width: 560px; text-align: center;
+    font-size: 12px; line-height: 1.55; color: rgba(255,255,255,0.72);
+  }
+  .sahne-not b { color: #fff; font-weight: 700; }
+
+  /* Alt köşedeki mod notu: her yüzeyde aynı yerde. */
+  .not {
+    position: fixed; right: 12px; bottom: 12px; z-index: 20; max-width: 250px;
+    padding: 10px 14px; border-radius: 14px;
+    background: var(--c-card); border: 1px solid var(--c-line);
+    box-shadow: var(--sh-1);
+    font-size: 11.5px; line-height: 1.5; color: var(--c-muted);
+    pointer-events: none;
+  }
+  .not b { color: var(--c-brand-ink); font-weight: 700; }
+
+  @media (max-width: 560px) {
+    .marka { display: none; }
+    .not { display: none; }     /* dar ekranda notun yeri yok, sahnede zaten yazıyor */
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <span class="marka" aria-hidden="true"><i class="g">G</i><i class="u">U</i><i class="r">R</i></span>
+    <nav id="serit" aria-label="GUR'un dört parçası"></nav>
+  </header>
+
+  <main>
+    <div class="yuzey" id="yuzey-web">
+      <!-- Üç web yüzeyi TEK derleme: hash yönlendiricisi aralarında geçiyor. -->
+      <iframe id="cerceve-web" src="web/index.html#/" title="GUR web yüzeyleri"></iframe>
+    </div>
+    <div class="yuzey" id="yuzey-app" hidden>
+      <div class="sahne">
+        <div class="telefon" id="telefon">
+          <div class="ekran">
+            <!-- src ilk açılışta yazılır: 5,7 MB'lık paketi hiç bakılmayacak
+                 bir sekme için indirmek gereksiz. -->
+            <iframe id="cerceve-app" title="GUR mobil uygulaması (393x852)"></iframe>
+          </div>
+        </div>
+        <p class="sahne-not">
+          Mağazaya çıkan <b>Expo / React Native</b> paketinin web dışa aktarımı,
+          iPhone 14 Pro ölçüsünde (393&times;852). Aynı bileşen ağacı, aynı düzen kodu.
+          Dokunsal geri bildirim, konum izni ve mağaza paketlemesi yalnızca gerçek cihazda görülür.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <p class="not">Önizleme <b>YEREL</b> modda: arkasında sunucu yok, yazdıklarınız yalnızca bu tarayıcıda kalır. Tam sistem için depodaki <code>server/</code> kurulur.</p>
+
+<script>
+(function () {
+  // Dört parça. Web olanların üçü aynı iframe'de, yol farkıyla.
+  var PARCALAR = [
+    { ad: 'Tanıtım',         tur: 'web', yol: '/',         esle: function (y) { return y === '/'; } },
+    { ad: 'İşletme',         tur: 'web', yol: '/isletme',  esle: function (y) { return y.indexOf('/isletme') === 0; } },
+    { ad: 'Yönetici',        tur: 'web', yol: '/admin',    esle: function (y) { return y.indexOf('/admin') === 0; } },
+    { ad: 'Mobil uygulama',  tur: 'app' },
+  ];
+
+  var serit    = document.getElementById('serit');
+  var yuzeyWeb = document.getElementById('yuzey-web');
+  var yuzeyApp = document.getElementById('yuzey-app');
+  var cerWeb   = document.getElementById('cerceve-web');
+  var cerApp   = document.getElementById('cerceve-app');
+  var telefon  = document.getElementById('telefon');
+
+  var secili = 0;
+  var webYol = '/';
+
+  var dugmeler = PARCALAR.map(function (p, i) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = p.ad;
+    b.addEventListener('click', function () { git(i); });
+    serit.appendChild(b);
+    return b;
+  });
+
+  function ciz() {
+    dugmeler.forEach(function (b, i) {
+      var aktif = PARCALAR[i].tur === 'app' ? secili === i
+                : secili !== 3 && PARCALAR[i].esle(webYol);
+      if (aktif) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
+    });
+    yuzeyWeb.hidden = secili === 3;
+    yuzeyApp.hidden = secili !== 3;
+  }
+
+  function git(i) {
+    secili = i;
+    if (PARCALAR[i].tur === 'web') {
+      webYol = PARCALAR[i].yol;
+      // Yönlendiriciyi doğrudan çağırıyoruz: iframe'in src'sini yeniden
+      // yazmak sayfayı baştan yükler ve oturum, form, filtre uçar.
+      var w = cerWeb.contentWindow;
+      if (w && typeof w.__gurGit === 'function') w.__gurGit(PARCALAR[i].yol);
+      else cerWeb.src = 'web/index.html#' + PARCALAR[i].yol;   // derleme henüz yüklenmediyse
+    } else if (!cerApp.src) {
+      cerApp.src = 'app/index.html';
+    }
+    ciz();
+    olcekle();
+  }
+
+  // İÇERİDEN GELEN GEÇİŞİ DE DİNLİYORUZ. Kullanıcı tanıtım sayfasındaki
+  // "İşletme girişi"ne bastığında şeridin "Tanıtım"da kalması, iki
+  // gezinmenin birbirine yalan söylemesi demekti.
+  window.addEventListener('message', function (e) {
+    if (e.source !== cerWeb.contentWindow) return;
+    var d = e.data;
+    if (!d || d.gur !== 'yol' || typeof d.yol !== 'string') return;
+    webYol = d.yol;
+    if (secili !== 3) ciz();
+  });
+
+  // Telefon çerçevesi dizüstü ekranına sığmıyor: 852 px + kenarlık +
+  // not, 900 px'in altındaki her pencerede taşıyor. Ölçek yalnızca
+  // transform ile — yükseklik animasyonu her karede yeniden yerleşim
+  // yaptırırdı.
+  function olcekle() {
+    if (secili !== 3) return;
+    var bos = yuzeyApp.clientHeight - 36 - 64;       /* dolgu + sahne notu */
+    var genis = yuzeyApp.clientWidth - 36;
+    var k = Math.min(1, bos / 874, genis / 415);
+    telefon.style.transform = 'scale(' + (k > 0 ? k.toFixed(4) : 1) + ')';
+    telefon.style.margin = k < 1 ? (-(874 * (1 - k)) / 2) + 'px ' + (-(415 * (1 - k)) / 2) + 'px' : '0';
+  }
+  window.addEventListener('resize', olcekle);
+
+  ciz();
+})();
+</script>
+</body>
+</html>

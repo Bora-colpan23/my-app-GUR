@@ -27,7 +27,25 @@ const router = createHashRouter([
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
 
+// BİRLEŞİK ÖNİZLEMEDE KENDİ ŞERİDİNİ ÇİZMEZ. Dört parçayı tek yerde
+// toplayan kabuk bu derlemeyi bir iframe içine koyuyor ve kendi sekme
+// şeridini zaten çiziyor; iki şerit üst üste hangisinin ana olduğunu
+// sildirirdi (panelde öğrenilen kural).
+const GOMULU = typeof window !== 'undefined' && window.self !== window.top;
+
+// Gömülüyken şerit DIŞARIDA kalıyor ama bağ iki yönlü olmak zorunda:
+// kabuk sekmeye basınca buraya gelmeli, kullanıcı tanıtım sayfasından
+// "İşletme girişi"ne geçince de kabuğun şeridi takip etmeli. Tek yön
+// bağlansaydı iki gezinme birbirine yalan söylerdi.
+if (GOMULU) {
+  window.__gurGit = (yol) => router.navigate(yol);
+  const bildir = (yol) => window.parent.postMessage({ gur: 'yol', yol }, '*');
+  router.subscribe((state) => bildir(state.location.pathname));
+  bildir(router.state.location.pathname);
+}
+
 function ArtifactSwitcher() {
+  if (GOMULU) return null;
   // Yönlendiriciye abone oluruz, hash'e değil: React Router hash'i
   // pushState ile değiştirdiği için 'hashchange' olayı çıkmaz ve
   // uygulama içinden gelen geçişlerde sekme yanlış yerde kalırdı.
