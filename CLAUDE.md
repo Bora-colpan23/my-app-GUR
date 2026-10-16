@@ -31,15 +31,24 @@ tek yerden yönetiliyor (restoran bazlı görünürlük anahtarı).
 kaydını **sahiplenmiş** işletmelerde açık: sahipsiz bir mekan adına söz
 veremeyiz. Kapı hem arayüzde hem sunucuda (`POST /api/reservations`).
 
-Ürün dört arayüzden oluşur:
-1. **Tüketici uygulaması** — keşif, kaydırma, detay sayfası, favoriler, profil.
-   İki kabuğu var: tarayıcıda çalışan sürüm (`src/app/`) ve **App Store /
-   Google Play'e çıkan React Native uygulaması** (`mobile/`, bkz.
-   "Mağaza uygulaması")
-2. **Doyurucu (B2B) paneli** — sahiplenme, bilgi/menü/fotoğraf yönetimi, etkileşim analizi
-3. **Yönetici paneli** — başvuru ve sahiplenme onayı, mekan havuzu, Gastro
-   yönetimi, kampanyalar, fiyatlandırma, kohort/LTV
-4. **Sunucu** — mekan beslemesi, swipe motoru, bildirim cron'ları, analitik toplama
+## ÜRÜN DÖRT PARÇA — başka parça yok
+
+| # | Parça | Nerede | Kim kullanır |
+|---|---|---|---|
+| 1 | **Mobil uygulama** | `mobile/` (Expo, App Store + Google Play) | tüketici |
+| 2 | **Tanıtım web sitesi** | `/` (`src/app/site.jsx`) | tüketici (indirmeye gider) |
+| 3 | **Restoran kayıt web sitesi** | `/isletme/*` (Doyurucu) | restoran sahibi |
+| 4 | **Yönetici paneli** | `/admin` | GUR ekibi |
+
+Beşinci bir parça YOK. Özellikle: **tarayıcıda tüketici uygulaması yok.**
+Bir dönem vardı (`src/app/GurApp.jsx`) ve kök yol genişliğe göre
+dallanıyordu — telefonda uygulama, masaüstünde site. İki kabuk aynı işi
+yapınca hangisinin gerçek ürün olduğu okunmuyordu. Kaldırıldı; git
+geçmişinde duruyor (`git show 8b17fa0:src/app/GurApp.jsx`).
+
+Bunların altında bir de **sunucu** var ama o bir arayüz değil, dördünün
+ortak zemini: mekan beslemesi, swipe motoru, bildirim cron'ları,
+analitik toplama (`server/`).
 
 ## Çalıştırma
 
@@ -51,20 +60,15 @@ npm run dev:all                       # API (8787) + arayüz (5173)
 
 Yalnız arayüz: `npm run dev`. Yalnız API: `npm run dev:api`.
 
-- `/`          → **telefonda uygulama**, masaüstünde tüketici tanıtım sayfası
-- `/site`      → tüketici tanıtım sayfası, her genişlikte
-- `/uygulama`  → tüketici uygulaması, her genişlikte
-- `/isletme`   → Doyurucu: işletme **web sitesi** (tanıtım + kayıt + panel)
-- `/admin`     → Yönetici paneli (tam ekran masaüstü)
+- `/`          → **tanıtım web sitesi** (her genişlikte aynı; mağazaya yollar)
+- `/isletme`   → **restoran kayıt web sitesi** (tanıtım + kayıt + panel)
+- `/admin`     → **yönetici paneli** (tam ekran masaüstü)
 
 Doyurucu'nun alt yolları: `/isletme/kayit`, `/isletme/sahiplen`,
 `/isletme/giris`, `/isletme/panel`.
 
-**TELEFONDA `/` UYGULAMADIR.** Müşteri telefonda uygulamayı kullanıyor;
-pazarlama sayfası onun önüne çıkmaz. Masaüstünden gelen ziyaretçinin işi
-ise uygulamayı kullanmak değil, ne olduğunu okuyup **mağazadan
-indirmek** — site o yüzden orada (bkz. "Tüketici tarafı da bir WEB
-SİTESİ").
+Başka yol yok. Eski `/uygulama` ve `/site` yer imleri `*` kuralıyla
+tanıtım sayfasına düşüyor.
 
 Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
 `demo@gur.app` / `gur1234`.
@@ -129,8 +133,8 @@ döndürüyor ve istekler proxy üzerinden gidiyor (`canli.mjs`).
    3s/8s/20s aralıklarla üç kez yeniden yoklanır. **Yoklama başarınca
    `probe` de yerine konuyor** — yalnızca `mode`u güncellemek yetmiyordu,
    `ensureMode()` eski sözü döndürdüğü için rozet YEREL'de kalıyordu
-   (ölçüldü). `GurApp` de `subscribeApi`ye abone: mekanizma zaten vardı,
-   kimse abone olmamıştı.
+   (ölçüldü). Mod rozetini çizen her yüzey `subscribeApi`ye abone olmak
+   zorunda; mekanizma bir dönem vardı ama kimse abone olmamıştı.
 
 Ölçüldü: API kapalıyken açılan sayfa YEREL'e düşüyor, API sonradan
 başlatıldığında **sayfa yenilenmeden ~6 saniyede** CANLI'ya geçiyor
@@ -203,10 +207,7 @@ gur/
     │   ├── import-restaurants.js  # Excel/CSV ile toplu restoran yükleme
     │   ├── second-chance.js   # haftalık yeniden gösterim paketi + geçilenler
     │   └── social-auth.js     # Google / Apple ile giriş
-    ├── app/
-    │   ├── GurApp.jsx         # Tüketici uygulaması
-    │   ├── site.jsx           # TÜKETİCİ SİTESİ: tanıtım + mağaza hunisi + masaüstü kabuğu
-    │   └── giris.jsx          # `/` ayrımı: telefonda uygulama, masaüstünde site
+    ├── app/site.jsx           # TANITIM SİTESİ: anlatır + mağazaya yollar
     ├── business/
     │   ├── site.jsx           # İŞLETME WEB SİTESİ: başlık, tanıtım, alt bilgi
     │   └── GurBusiness.jsx    # Doyurucu: yönlendirme, kayıt akışı, panel
@@ -215,9 +216,10 @@ gur/
 
 ## Mimari notlar (ÖNEMLİ)
 
-### Üç uygulama, tek veri katmanı
-Tüketici, işletme ve yönetici ayrı uygulamalar ama aynı kayıtları okuyup
-yazıyorlar. Bağ ekranlarda değil depolarda:
+### Veri katmanı: web yüzeyleri depoyu, mobil SUNUCUYU paylaşır
+
+İki web yüzeyi (kayıt sitesi + yönetici paneli) ayrı uygulamalar ama
+aynı kayıtları okuyup yazıyorlar. Bağ ekranlarda değil depolarda:
 
 | Depo | Yazan | Okuyan |
 |---|---|---|
@@ -242,15 +244,22 @@ Bir mekanın kimliği tek yerde: `account` alanı işletmenin hesabı olup
 olmadığını söyler. Hesabı olmayan (yalnız dış beslemeden gelen) mekanlar
 fiyatlandırma panelinde görünmez — teklif gönderilecek muhatap yoktur.
 
-### Telefon çerçevesi yalnızca masaüstünde
-390×844'lük maket bir **önizleme kabuğu**. Gerçek telefonda `.gur-stage` ve
-`.gur-frame` üstündeki medya kuralı devreye girer: çerçeve, gölge, köşe
-yarıçapı ve sahte çentik kalkar, uygulama `100dvh` ile ekranı kaplar. Aksi
-hâlde ekranda ikinci bir telefon çiziliyor, sahte çentik gerçeğinin altına
-düşüyor ve 844px'lik kutu kısa ekranları taşırıyordu.
+**MOBİL UYGULAMA BU DEPOLARI PAYLAŞMAZ.** Telefondaki uygulamanın kendi
+kumbarası var (AsyncStorage) ve web yüzeyleriyle tek bağı SUNUCU:
+`/api/...`. Yani YEREL modda (sunucu yokken) mobil uygulama ile tarayıcı
+sekmeleri birbirini görmez — bu kasıtlı, iki ayrı cihazın localStorage'ı
+zaten paylaşılamaz. CANLI modda dördü de aynı PostgreSQL'i okur.
+Ölçüldü (`butunluk.mjs`): siteden gönderilen sahiplenme başvurusu
+`gur.claims`e düşüyor, yönetici panelinde adıyla görünüyor ve yöneticinin
+görünürlük anahtarı gerçekten yazıyor (GİZLİ rozeti).
 
-Kurallar `!important` — uygulama satır içi stille yazılı ve satır içi stil
-sınıf kuralını yener; tersini yapmanın tek yolu bu.
+### TELEFON MAKETİ KALDIRILDI
+390×844'lük `PhoneFrame` ve `.gur-stage` / `.gur-frame` / `.gur-notch`
+kuralları, tarayıcıda çalışan tüketici uygulamasının önizleme kabuğuydu.
+O uygulama artık gerçek bir mağaza paketi (`mobile/`) ve web tarafında
+telefon taklidi eden hiçbir yüzey kalmadı — maket de kaldırıldı.
+Kullanılmayan bir kabuğu "belki lazım olur" diye bırakmak, bir sonraki
+okuyana hâlâ bir telefon ekranı varmış gibi görünürdü.
 
 ### Yazı tipi: jetondan oku
 `--f-display` (Poppins) ve `--f-body` (Outfit) `GurStyles` içinde tanımlı;
@@ -552,102 +561,34 @@ gösterilmiyor): Google/Apple ile giriş (ikisi de anahtar istiyor ve App
 Store kuralı gereği biri varsa diğeri de olmalı), konum doğrulamalı
 yorum YAZMA adımı, push bildirimi, ödüllü video ve GUR Plus.
 
-### Tüketici tarafı da bir WEB SİTESİ
+### Tanıtım web sitesi (`/`) — işi İNDİRTMEK
 
-Tüketici tarafının artık bir tanıtım sayfası var; ama **telefonda `/`
-hâlâ uygulamadır**. İkisi ayrı iş yapıyor:
+Site tek genişlikte tek şey yapıyor: GUR'un ne olduğunu anlatıp
+ziyaretçiyi App Store / Google Play'e yollamak. Tarayıcıda açılan bir
+tüketici uygulaması olmadığı için "uygulamayı aç" diye bir yol da yok —
+tek birincil eylem indirme.
 
-| Yol | Telefon | Masaüstü |
-|---|---|---|
-| `/` | **uygulama** | tanıtım sayfası |
-| `/site` | tanıtım sayfası | tanıtım sayfası |
-| `/uygulama` | uygulama | uygulama (web kabuğu içinde) |
-
-Ayrım `src/app/giris.jsx`te ve **karar ilk çizimde bir kez** veriliyor.
-`useMediaQuery` ile canlı dinlenseydi masaüstünde pencereyi daraltan
-kullanıcının altından pazarlama sayfası çekilir, yerine uygulama (ve
-açılış ekranı) konurdu.
-
-Site telefonda ERİŞİLEMEZ DEĞİL: kendi adresi var (`/site`). Reklamdan,
-bağlantıdan gelen telefon kullanıcısı orada mağaza rozetlerini görür.
-Sitenin kendi içindeki bağlantıları `siteYolu(genis)` kullanıyor —
-telefonda `/site`, masaüstünde `/`.
-
-**UYGULAMA SİTENİN ALT BÖLÜMÜ DEĞİL, YANINDAKİ YÜZEY.** Doyurucu ve
-yönetici paneli gibi kendi başına bir yer ve her yerden bir dokunuş
-uzakta:
-
-- Ada gezinmesinin **birincil hapı** "Uygulamayı aç" (`/uygulama`) ve
-  sayfanın her yerinde görünüyor.
-- Artifact önizlemesinde **dört sekme** var: Uygulama · Site · İşletme ·
-  Yönetici. Önceden tek bir "Müşteri" sekmesi `/`ye gidiyordu; o yol
-  masaüstü genişliğinde siteyi açtığı için önizlemede uygulamaya
-  ULAŞMANIN HİÇBİR YOLU KALMIYORDU — uygulama duruyordu ama görünmüyordu.
-- Alt bilgide "Uygulamayı aç", uygulamanın kabuğunda "Ana sayfa".
-
-İndirme hunisi bundan etkilenmedi: gezinmede "İndir" bağlantısı,
-kahramanda mağaza rozetleri ve ayrı bir `#indir` bölümü duruyor. İki hapı
-birden turuncu yapmak hangisinin ana yol olduğunu sildirirdi (bkz.
-"Renkle hiyerarşi").
-
-#### Site bir İNDİRME HUNİSİ
-
-Sitenin birincil eylemi "uygulamayı aç" değil **App Store / Google
-Play**. Ada gezinmesindeki hap, kahramandaki eylem satırı, `#indir`
-bölümü ve alt bilgi aynı iki adrese bakıyor.
-
-**İki adres TEK YERDE**: `src/app/site.jsx` → `MAGAZA.ios` /
-`MAGAZA.android`. Yayına çıkarken yalnız o iki satır doldurulacak,
-arayüzün geri kalanı kendiliğinden gerçek bağlantıya döner
+**İki mağaza adresi TEK YERDE**: `src/app/site.jsx` → `MAGAZA.ios` /
+`MAGAZA.android`. Yayına çıkarken yalnız o iki satır doldurulacak; ada
+gezinmesindeki hap, kahramandaki eylem satırı, `#indir` bölümü ve alt
+bilgi aynı iki adrese bakıyor ve kendiliğinden gerçek bağlantıya dönüyor
 (`target="_blank" rel="noopener noreferrer"`).
 
 **BOŞKEN SAHTE BAĞLANTI ÜRETİLMİYOR.** Olmayan bir mağaza sayfasına
 götüren rozet, rozetin hiç olmamasından kötü: kullanıcı tıklar, 404
 görür ve ürünün var olmadığını sanır. Adres boşken rozet **tıklanamaz**
 bir "YAKINDA" çipi; devre dışı hap değil (pasif durumu `opacity` ile
-kurmak yasak), fark renkle ve etiketle. Yanında her zaman çalışan bir
-yol duruyor: "Tarayıcıdan hemen deneyin". Alt bilgide de eylemi olmayan
-satır düğme değil düz metin — ölü bağlantı yazmıyoruz.
+kurmak yasak), fark renkle ve etiketle. Alt bilgide de eylemi olmayan
+satır düğme değil düz metin.
 
 Apple logosu `SocialAuthRow`daki yolun aynısı; Google Play üçgeni
 Google'ın kendi marka renklerinde (paletin kural dışılarından).
 
 Dosya `src/app/site.jsx`: tanıtım sayfası (`TuketiciLanding`), yüzen ada
-gezinmesi (`WebHeader`), alt bilgi (`WebFooter`), mağaza rozetleri
-(`MagazaRozetleri`) ve masaüstü uygulama kabuğu (`MasaustuKabuk`) bir
-arada — gezinme ve alt bilgi iki sayfanın ortak malı, iki kopya er geç
-ayrışırdı.
-
-**TELEFONDA UYGULAMA DÜZENİ DEĞİŞMEDİ.** `GurApp` kökünde tek bir ayrım var:
-`useMediaQuery(GENIS)` false ise gövde eskisi gibi doğrudan `PhoneFrame`
-içinde çiziliyor, sahne de eski koyu gradyanını kullanıyor. Ölçüldü
-(393×852): çerçeve 393×852, yarıçap 0, sahne zemini kremsi, kabuk
-başlığı 0, yatay taşma 0 — yani 440 px altındaki "çerçeve yok" kuralı
-aynen işliyor.
-
-**Masaüstü kabuğu ÇERÇEVEYİ ÖLÇEKLİYOR.** 844 px'lik maket 900 px'lik
-bir dizüstü ekranında alttan taşıyor ve uygulamanın ALT BARI sayfa
-kaydırılmadan görünmüyordu — bir uygulamada kabul edilemez. Kabuk
-pencere yüksekliğini okuyup tepsiyi `transform: scale` ile küçültüyor;
-dış kutu ölçeklenmiş boyu taşıyor, yoksa altında o kadar boşluk kalırdı.
-Ölçüldü: 1280×800, 1440×900 ve 1920×1080'de çerçeve tamamen görünüyor ve
-belge hiç kaymıyor. Ölçek `transform` olduğu için yeniden yerleşim
-yaptırmıyor; uygulamanın içindeki perdeler `absolute` (telefon kabuğu
-kuralı) olduğundan ölçekten etkilenmiyorlar — `fixed` olsalardı
-ölçeklenen ataya göre konumlanırlardı.
-
-**Kabukta bölüm bağlantısı yok.** Ada gezinmesi tanıtım sayfasında dört
-bölüm bağlantısı taşıyor; uygulama kabuğunda o bölümler olmadığı için
-yalnız marka + iki yol kalıyor (Doyurucu, Ana sayfa). Dördü de orada
-dursaydı "burada bir yere götürür" diye okunurdu.
-
-**Sol sütun süs değil.** Masaüstü kullanıcısı bir kaydırma uygulamasının
-fareyle de sürüklendiğini başka nereden bilecek? Kabuğun sol sütunu üç
-yönü ve ne yaptıklarını yazıyor.
-
-**`GurStyles` tanıtım sayfasında da çiziliyor.** Jetonlar oradan geliyor
-ve sayfa ayrı bir rota: olmadan `var(--c-bg)` çözülmüyor, satır içi
-`background` geçersiz kalıyor ve `index.html`in koyu gövde zemini
+gezinmesi (`WebHeader`), alt bilgi (`WebFooter`) ve mağaza rozetleri
+(`MagazaRozetleri`). `GurStyles` BURADA DA çiziliyor — jetonlar oradan
+geliyor ve sayfa ayrı bir rota: olmadan `var(--c-bg)` çözülmüyor, satır
+içi `background` geçersiz kalıyor ve `index.html`in koyu gövde zemini
 (`#0d0d1a`) sayfanın tamamını yutuyordu (ölçüldü: kâğıt siyah çıktı).
 
 #### Tasarım dili: kılavuz vs proje
@@ -674,17 +615,15 @@ dolgu), haplarda **düğme-içinde-düğme** simge cebi, 112 px bölüm dolgusu,
 **SÜREKLİ HAREKET YOK.** Kılavuz "hiçbir şey durağan belirmesin" diyor;
 giriş animasyonları var ama sayfada sonsuz dönen/salınan bir nesne
 bilinçli olarak yok — 0.2 Hz civarındaki salınım vestibüler rahatsızlık
-kaynağı (panodaki "tek sürekli hareket" kuralının aynısı).
+kaynağı.
 
 **Yüzen ada kenardan kopuk.** Kılavuzun yasakladığı şey "üste yapışmış
-kenardan kenara çubuk". Ölçüldü: hap `fixed`, üstten 18 px, soldan 232 px,
-yarıçap 999, `backdrop-filter: blur(20px)`. `backdrop-filter` yalnızca
-SABİT öğede — kayan bir kapta her karede GPU yeniden boyar.
+kenardan kenara çubuk". Ölçüldü: hap `fixed`, üstten 18 px, yarıçap 999,
+`backdrop-filter: blur(20px)`. `backdrop-filter` yalnızca SABİT öğede —
+kayan bir kapta her karede GPU yeniden boyar.
 
 **Film greni SABİT ve `pointer-events: none`.** Kayan bir kabın içinde
-olsaydı sürekli yeniden boyanırdı. Uygulama kabuğunda gren YOK: telefon
-ekranındaki arayüzün renkleri telefondakiyle birebir aynı kalmalı,
-`multiply` bir doku ölçülen kontrastı değiştirirdi.
+olsaydı sürekli yeniden boyanırdı.
 
 **İki jeton eklendi** (`kit.jsx`): `--c-espresso` (#17130F — yeni renk
 değil, `ink` hapının kendi zemini; gizlilik şeridi ve alt bilgi) ve
@@ -693,48 +632,17 @@ kayıp büyüyor — yalnız `transform`).
 
 **Yüksek kontrastta AÇIK cam yüzey düzeltildi.** `prefers-contrast: more`
 kuralı `[style*="backdrop-filter"]` taşıyan her şeye koyu bir dolgu
-basıyordu; tanıtım sayfasının açık ada gezinmesi o dolguyla koyu
-mürekkep-koyu zemin oluyordu. `.gur-glass-light` artık o blokta da kendi
-dolgusunu alıyor.
+basıyordu; açık ada gezinmesi o dolguyla koyu mürekkep-koyu zemin
+oluyordu. `.gur-glass-light` artık o blokta da kendi dolgusunu alıyor.
 
-**Ölçüm (dört yüzey).** Önizlemede dört sekmenin dördü de kendi
-yüzeyini açıyor (`dort-yuzey.mjs`): Uygulama → telefon çerçevesi,
-Site → tanıtım, İşletme → Doyurucu, Yönetici → panel. Siteden
-"Uygulamayı aç" tek dokunuşta uygulamaya, kabuktaki "Ana sayfa" geri
-siteye götürüyor.
-
-**Ölçüm (veri katmanı, tek tarayıcı bağlamında — `butunluk.mjs`).** Dört
-ayak: (1) siteden gönderilen sahiplenme başvurusu `gur.claims`e düşüyor,
-(2) yönetici panelinde adıyla ve başvuranıyla görünüyor, (3) tüketici
-uygulaması (`/uygulama`) aynı mekan havuzunu okuyor, (4) **ters yön**:
-yönetici restoranın görünürlük anahtarını kapatınca (GİZLİ rozeti)
-tüketici uygulamasının aramasında o mekan artık ÇIKMIYOR. Dördüncü ayak
-okumayı değil YAZMAYI kanıtlıyor — yöneticinin anahtarı gerçekten
-uygulamanın destesini etkiliyor.
-
-**Ölçüm (mağaza geçişi).** Telefonda (393×852) `/` uygulamayı açıyor:
-çerçeve 393×852, yarıçap 0, sahne kremsi, site başlığı 0 — yani eski
-düzen birebir. Masaüstünde `/` siteyi açıyor, "Uygulamayı indir" `#indir`
-bölümüne kaydırıyor, rozetler adres boşken "YAKINDA" çipi; adresler
-doldurulunca gerçek `apps.apple.com` / `play.google.com` bağlantısına
-dönüyor (ölçüldü). `/site` telefonda 0 px yatay taşma, 44 altında hedef
-yok. `/uygulama` iki genişlikte de uygulama.
-
-**Ölçüm.** Tüketici tanıtım sayfası masaüstünde ve telefonda **3'er**
-kontrast uyarısı veriyor, uygulama kabuğu **2**: ikisi GUR kelime markası
-(logotype, kural dışı), biri de "GASTRO ONAYLI" çipinde beyaz-üstü-turuncu
-(bilinen ürün kararı). Yeni kaynaklı sıfır. Yatay taşma masaüstünde de
-telefonda da 0 px; 44 px altında dokunma hedefi yok. Dar ekran menüsü
-`role="dialog" aria-modal="true"` ve üç kapatma yolu var (çarpı, perde,
-Escape).
-
-**Bilinen takas:** tanıtım sayfası artık herkesin ilk indirdiği sayfa ama
-uygulamayla aynı parçada (`index.js`, ~660 kB ham / ~202 kB gzip).
-`GurApp`i `React.lazy`ye almak tanıtımı belirgin biçimde küçültürdü;
-yapılmadı çünkü açılış ekranı HİÇBİR YÜKLEMEYE BAĞLI DEĞİL kuralı gereği
-splash'tan önce bir yükleme durumu göstermek istemiyoruz ve kabuğun
-zemini (masaüstünde koyu, telefonda krem) yer tutucuda yeniden
-üretilmeliydi. Ayrı bir geçiş olarak yapılabilir.
+**Ölçüm.** Tanıtım sayfası masaüstünde ve telefonda **3'er** kontrast
+uyarısı veriyor: ikisi GUR kelime markası (logotype, kural dışı), biri
+"GASTRO ONAYLI" çipinde beyaz-üstü-turuncu (bilinen ürün kararı). Yeni
+kaynaklı sıfır. Yatay taşma iki genişlikte de 0 px; 44 px altında dokunma
+hedefi yok. Dar ekran menüsü `role="dialog" aria-modal="true"` ve üç
+kapatma yolu var (çarpı, perde, Escape). Artifact önizlemesinde üç sekme
+(Tanıtım · İşletme · Yönetici) kendi yüzeyini açıyor — dördüncü parça
+olan mobil uygulama o derlemenin içinde değil (`dort-yuzey.mjs`).
 
 ### Doyurucu artık bir WEB SİTESİ
 
@@ -1253,17 +1161,19 @@ sınıra yaklaşınca sıcak bir vinyet, dolunca `PremiumOffer` açılır.
 etmez, yalnızca küçük bir rozet çizer. Aralık 5-7 arasında rastgeledir —
 sabit aralık kullanıcı tarafından fark ediliyor.
 
-### GurApp.jsx — tek dosyalık uygulama
-- Ekran yönetimi: `screen` state'i + `render()` switch'i; gezinme `nav()`/`back()`.
-  `nav()` bir tarayıcı kaydı iter, geri dönüş tek yoldan `popstate` ile işlenir
-  (cihazın donanım geri tuşu böylece çalışır).
-- Ortak bileşenler: `GurLogo`, `Screen`, `PhoneFrame`, `Img`, `InputField`, `Btn`,
-  `IconBtn`, `Sheet`, `DangerConfirm`, `SocialAuthRow`, `CardDetailSheet`.
-- Stil: **inline style** (CSS-in-JS yok, Tailwind yok). `GRAD = "#FF6600"`.
-- Hareket: Motion (`motion/react` + imperatif `animate`). Springler Apple HIG'e
-  göre: damping 1.0 varsayılan, momentum taşıyan hareketlerde bounce 0.2.
-- Font: **Poppins** + **Outfit**, jetondan: `var(--f-display)` / `var(--f-body)`.
-  Başka font kullanma. Sayı sütunlarında sistem mono (yönetici: `FM`).
+### Tüketici ekranları artık `mobile/` içinde
+
+Keşfet, Kaydır, Favoriler, Profil, Detay, açılış, rıza, giriş ve konum
+ekranları **mobil uygulamada** (`mobile/src/ekran/`). Aşağıdaki bölümlerin
+bir kısmı (konum üç yolu, rıza modalı, açılış süreleri, rozetler, kota,
+sponsorlu kart, İkinci Şans, ödüllü video) o ekranların ÜRÜN KURALLARINI
+anlatıyor — kural geçerli, kodun yeri değişti.
+
+`src/lib/` altındaki tüketici modülleri (`visits`, `rewarded`,
+`ad-frequency`, `analytics`, `campaigns`, `geo`) web derlemesine artık
+GİRMİYOR: mobil tarafın port edeceği ve sunucunun aynadan uyguladığı
+kural kümesi olarak duruyorlar. Silinmediler çünkü içlerindeki eşikler
+(120 m / 15 dk, 15 km, günde 1 kez…) ürün kararı.
 
 ### Konum: giriş biter bitmez sorulur
 Kimlik akışı (`login` / `register`) bittiğinde ekran **doğrudan Keşfet'e
@@ -1450,10 +1360,17 @@ kapılar "bu mekanda şu özellik yok" der, bu "bu mekan yok" der.
 Ayarlar sayfasında **değil**, restoranın kendi detay ekranında — genel bir
 listede yanlış satıra basmak bir mekanı sessizce uygulamadan düşürürdü.
 
-Süzgeç tüketici tarafında **tek yerde** (`GurApp` → `feed`): deste, arama,
-kategori sayıları, favoriler ve GUR Match hepsi oradan besleniyor. İki ayrı
-süzgeç arka arkaya ve ikisi ayrı soru soruyor:
-`publishedOnly` (moderasyondan geçti mi) → `visibleRestaurants` (gizlendi mi).
+İki ayrı süzgeç arka arkaya çalışır ve ikisi AYRI soru sorar:
+`publishedOnly` (moderasyondan geçti mi) → `visibleRestaurants` (gizlendi
+mi). Süzgeç tüketiciye giden listenin kurulduğu TEK yerde durmalı, yoksa
+deste bir şey, arama başka bir şey gösterir.
+
+**AÇIK EKSİK — mobil tarafta bu süzgeç henüz yok.** Uygulama havuzu
+`/api/restaurants`ten alıyor; gizleme kararının telefona ulaşması için
+süzgecin SUNUCUDA, o uçta uygulanması gerekiyor. Yerel modda (tohum
+listeyle açılan uygulama) gizleme hiç etkili değil. Bunu "çalışıyor" diye
+yazmıyoruz: yöneticinin bastığı anahtarın bir işe yaradığını sanmak, hiç
+anahtar olmamasından kötü.
 
 ### İkinci Şans: ücretsiz mekanik + satın alınan paket
 İki ayrı şey, karıştırmayın:

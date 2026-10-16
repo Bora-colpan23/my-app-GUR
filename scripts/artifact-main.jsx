@@ -16,16 +16,12 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { createHashRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
-import GurApp from '../src/app/GurApp.jsx';
 import { TuketiciLanding } from '../src/app/site.jsx';
-import TuketiciGiris from '../src/app/giris.jsx';
 import GurAdmin from '../src/admin/GurAdmin.jsx';
 import GurBusiness from '../src/business/GurBusiness.jsx';
 
 const router = createHashRouter([
-  { path: '/', element: <TuketiciGiris /> },
-  { path: '/site', element: <TuketiciLanding /> },
-  { path: '/uygulama', element: <GurApp /> },
+  { path: '/', element: <TuketiciLanding /> },
   { path: '/isletme/*', element: <GurBusiness /> },
   { path: '/admin', element: <GurAdmin /> },
   { path: '*', element: <Navigate to="/" replace /> },
@@ -37,14 +33,11 @@ function ArtifactSwitcher() {
   // uygulama içinden gelen geçişlerde sekme yanlış yerde kalırdı.
   const [path, setPath] = useState(() => router.state.location.pathname);
   useEffect(() => router.subscribe((state) => setPath(state.location.pathname)), []);
-  // DÖRT YÜZEY, DÖRT SEKME. Tüketici tarafı iki ayrı şey: tanıtım
-  // SİTESİ ve UYGULAMANIN kendisi. Tek bir "Müşteri" sekmesi `/`ye
-  // gidiyordu ve o yol masaüstü genişliğinde siteyi açtığı için
-  // önizlemede uygulamaya ulaşmanın hiçbir yolu kalmıyordu —
-  // uygulama duruyordu ama görünmüyordu. Her yüzeyin kendi sekmesi var.
+  // ÜÇ WEB YÜZEYİ, ÜÇ SEKME. Dördüncü parça olan MOBİL UYGULAMA bu
+  // derlemenin içinde değil: o ayrı bir paket (mobile/, Expo) ve App
+  // Store / Google Play'e çıkıyor.
   const sekmeler = [
-    ['Uygulama', '/uygulama', (y) => y === '/uygulama' || y === '/'],
-    ['Site', '/site', (y) => y === '/site'],
+    ['Tanıtım', '/', (y) => y === '/'],
     ['İşletme', '/isletme', (y) => y.startsWith('/isletme')],
     ['Yönetici', '/admin', (y) => y.startsWith('/admin')],
   ];

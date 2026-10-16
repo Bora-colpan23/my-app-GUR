@@ -1,57 +1,41 @@
 // ═══════════════════════════════════════════════════════════════════════
-// GUR — TÜKETİCİ WEB KATMANI
+// GUR — TANITIM WEB SİTESİ (tüketici)
 //
-// Doyurucu'ya yapılanın tüketici tarafındaki karşılığı: uygulama artık
-// yalnızca koyu bir gradyanın ortasında duran bir telefon maketi değil,
-// kendi tanıtım sayfası ve geniş ekran düzeni olan bir SİTE.
+// GUR dört parçadan oluşuyor ve bu, birincisi:
 //
-//   /           → TELEFONDA uygulama, masaüstünde tanıtım sayfası
-//                 (ayrım src/app/giris.jsx'te, ilk çizimde bir kez)
-//   /site       → tanıtım sayfası, her genişlikte
-//   /uygulama   → uygulamanın kendisi (GurApp), masaüstünde MasaustuKabuk
-//                 içinde, telefonda BUGÜNKÜ düzeniyle
+//   /           → TANITIM SİTESİ (burası) — anlatır ve MAĞAZAYA yollar
+//   /isletme/*  → restoran kayıt sitesi (Doyurucu)
+//   /admin      → yönetici paneli
+//   mobile/     → mobil uygulama (Expo; App Store + Google Play)
 //
-// SİTENİN İŞİ İNDİRTMEK. Müşteri telefonda uygulamayı kullanıyor; site
-// masaüstünden gelen ziyaretçiyi App Store ve Google Play'e yönlendiren
-// bir huni. İki mağaza adresi tek yerde: aşağıdaki MAGAZA.
-//
-// TELEFONDA HİÇBİR ŞEY DEĞİŞMEDİ. `useMediaQuery(GENIS)` false olduğunda
-// GurApp eskisi gibi doğrudan `PhoneFrame` içinde çiziliyor; masaüstü
-// kabuğu yalnızca 900 px üstünde devreye giriyor. 440 px altında ya da
-// dokunmatik kısa ekranlarda `kit.jsx`teki medya kuralı çerçeveyi de
-// kaldırıyor — o yol hiç değişmedi.
+// TARAYICIDA TÜKETİCİ UYGULAMASI YOK. Bir dönem vardı ve kök yol
+// genişliğe göre dallanıyordu (telefonda uygulama, masaüstünde site);
+// iki kabuk aynı işi yapınca hangisinin gerçek ürün olduğu okunmuyordu.
+// Tek cevap: site anlatır, mağaza indirtir, uygulama çalışır. Bu yüzden
+// sitenin birincil eylemi "uygulamayı aç" değil App Store / Google Play
+// (bkz. aşağıdaki MAGAZA).
 //
 // ─── TASARIM DİLİ: KILAVUZ vs PROJE ─────────────────────────────────
-// Bu katman `high-end-visual-design` kılavuzuyla kuruldu. Kılavuzun bazı
+// Katman `high-end-visual-design` kılavuzuyla kuruldu. Kılavuzun bazı
 // maddeleri PROJENİN KENDİ KURALLARIYLA ÇAKIŞIYOR; çakışanlarda proje
-// kazandı. Bir dahakine tekrar tartışılmasın diye tablo:
-//
-//   Kılavuz                         | Proje                      | Sonuç
-//   --------------------------------|----------------------------|-------------
-//   Tailwind sınıfları              | satır içi stil, Tailwind YOK| satır içi
-//   Geist / Clash Display / Satoshi | Poppins + Outfit           | Poppins+Outfit
-//   Phosphor / Remix ikon           | kit.jsx → Icon             | kendi kiti
-//   OLED siyah + mor/yeşil küreler  | marka paleti, yeni renk yok | kremsi kâğıt
-//   blur(md) → blur(0) giriş        | yalnız transform + opacity | blur yok
-//   rounded-[2rem] yardımcıları     | yarıçap ölçeği             | RAD benzeri ölçek
+// kazandı. Tablo CLAUDE.md'de.
 //
 // UYGULANANLAR: "Editorial Luxury" doku (kremsi kâğıt + film grenli
 // kaplama + yüksek kontrastlı iri başlık), kahramanda "Editorial Split",
 // özelliklerde asimetrik bento, her kartta çift bizel (dış tepsi + iç
-// çekirdek, eş merkezli yarıçap), haplarda düğme-içinde-düğme simge cebi,
-// 112 px bölüm dolgusu, özel cubic-bezier ve `whileInView` giriş.
+// çekirdek, eş merkezli yarıçap), haplarda düğme-içinde-düğme simge
+// cebi, 112 px bölüm dolgusu, özel cubic-bezier ve `whileInView` giriş.
 //
-// SÜREKLİ HAREKET YOK. Kılavuz "hiçbir şey durağan belirmesin" diyor;
-// giriş animasyonları var ama sayfada sonsuz dönen/salınan bir nesne
-// bilinçli olarak yok: 0.2 Hz civarındaki salınım vestibüler rahatsızlık
-// kaynağı (bkz. CLAUDE.md → "Yemek zili" ve panonun tek nokta kuralı).
+// SÜREKLİ HAREKET YOK: giriş animasyonları var ama sayfada sonsuz
+// dönen/salınan bir nesne bilinçli olarak yok — 0.2 Hz civarındaki
+// salınım vestibüler rahatsızlık kaynağı.
 // ═══════════════════════════════════════════════════════════════════════
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  GurLogo, Icon, Btn, Img, PhoneFrame, GurStyles, useMediaQuery, GENIS, ELEV,
+  GurLogo, Icon, Btn, Img, GurStyles, useMediaQuery, GENIS, ELEV,
 } from '../ui/kit.jsx';
 import { I } from '../data/restaurants.js';
 
@@ -255,10 +239,9 @@ function MagazaRozeti({ tur }) {
   );
 }
 
-// İki rozet + altındaki dürüst satır. `yol` tarayıcı sürümüne giden
-// gerçek eylem: mağazalar hazır olana kadar TEK çalışan yol o.
+// İki rozet + altındaki dürüst satır. Adresler boşken burada bir yalan
+// yazmıyoruz: "yakında" diyoruz ve o kadar.
 export function MagazaRozetleri({ orta = false, not = true }) {
-  const nav = useNavigate();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, alignItems: orta ? "center" : "flex-start" }}>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: orta ? "center" : "flex-start" }}>
@@ -271,14 +254,8 @@ export function MagazaRozetleri({ orta = false, not = true }) {
           margin: 0, lineHeight: 1.6, textAlign: orta ? "center" : "left",
         }}>
           {MAGAZA_HAZIR
-            ? "Ücretsiz indirilir. "
-            : "Mağaza sürümleri yayına hazırlanıyor. "}
-          <button type="button" onClick={() => nav("/uygulama")} className="gur-tap"
-            style={{
-              background: "none", border: "none", padding: 0, cursor: "pointer",
-              fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700,
-              color: "var(--c-brand-ink)", textDecoration: "underline", textUnderlineOffset: 3,
-            }}>Tarayıcıdan hemen deneyin →</button>
+            ? "Ücretsiz indirilir · iOS 15+ ve Android 8+"
+            : "Mağaza sürümleri yayına hazırlanıyor."}
         </p>
       )}
     </div>
@@ -301,14 +278,6 @@ const OK = (
 // yeniden boyar.
 // ═══════════════════════════════════════════════════════════════════════
 
-// SİTENİN İKİ ADRESİ VAR ve sebebi şu: `/` telefonda UYGULAMAYI açıyor
-// (bkz. src/app/giris.jsx) — müşteri telefonda uygulamayı kullanıyor,
-// pazarlama sayfasını değil. Site telefonda da gezilebilsin diye kendi
-// adresini taşıyor: `/site`. Geniş ekranda ikisi de siteyi gösteriyor,
-// `/` olanı kanonik adres.
-export const SITE_YOLLARI = ["/", "/site"];
-export const siteYolu = (genis) => (genis ? "/" : "/site");
-
 const MENU = [
   { id: "indir", label: "İndir" },
   { id: "kaydir", label: "Nasıl çalışır" },
@@ -317,11 +286,8 @@ const MENU = [
   { id: "sss", label: "Sık sorulanlar" },
 ];
 
-export function WebHeader({ koyu = false, uygulamada = false }) {
-  // Uygulama kabuğunda tanıtım sayfasının bölüm bağlantıları çizilmiyor:
-  // o bölümler bu sayfada yok ve dört bağlantı "burada bir yere
-  // götürür" diye okunuyordu. Ada orada yalnız marka + iki yol taşıyor.
-  const bolumler = uygulamada ? [] : MENU;
+export function WebHeader({ koyu = false }) {
+  const bolumler = MENU;
   const genis = useMediaQuery(GENIS);
   const [acik, setAcik] = useState(false);
   const nav = useNavigate();
@@ -339,8 +305,8 @@ export function WebHeader({ koyu = false, uygulamada = false }) {
 
   const git = (id) => {
     setAcik(false);
-    if (!SITE_YOLLARI.includes(yer.pathname)) {
-      nav(siteYolu(genis));
+    if (yer.pathname !== "/") {
+      nav("/");
       setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
       return;
     }
@@ -351,19 +317,12 @@ export function WebHeader({ koyu = false, uygulamada = false }) {
     ? { bg: "rgba(24,18,14,0.72)", kenar: "1px solid rgba(255,255,255,0.1)", ink: "rgba(253,251,247,0.78)", inkGuclu: "var(--c-bg)" }
     : { bg: "rgba(253,251,247,0.78)", kenar: "1px solid var(--c-border)", ink: "var(--c-ink-2)", inkGuclu: "var(--c-ink)" };
 
-  // RENK YALNIZCA BİRİNCİL OLANDA. Uygulama kabuğunda turuncu bir
-  // birincil eylem yok (uygulamanın kendisi zaten orada); iki bağlantı
-  // da turuncu olsaydı hangisinin ana yol olduğu okunmazdı. Ana yol
-  // kenarlıklı beyaz hap, Doyurucu nötr.
-  // UYGULAMA SİTENİN YANINDA DURAN AYRI BİR YÜZEY, sitenin bir alt
-  // bölümü değil: ada gezinmesinin birincil eylemi onu açıyor ve bu hap
-  // sayfanın her yerinde görünüyor. İndirme hunisi kaybolmadı —
-  // gezinmede kendi bağlantısı ("İndir"), kahramanda mağaza rozetleri
-  // ve ayrı bir `#indir` bölümü var. İki hapı da turuncu yapmak
-  // hangisinin ana yol olduğunu sildirirdi.
-  const uygulamaHapi = uygulamada
-    ? <Btn text="Ana sayfa" onClick={() => nav(siteYolu(genis))} variant={koyu ? "outline" : "outlineDark"} size="md" fullWidth={false} />
-    : <Btn text="Uygulamayı aç" onClick={() => nav("/uygulama")} variant="filled" size="md" fullWidth={false} trailing={OK} />;
+  // SİTENİN TEK İŞİ İNDİRTMEK: ada gezinmesindeki tek turuncu hap
+  // mağaza bölümüne götürüyor. İkinci bir turuncu eylem koymak
+  // hangisinin ana yol olduğunu sildirirdi (bkz. "Renkle hiyerarşi").
+  const uygulamaHapi = (
+    <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="md" fullWidth={false} trailing={OK} />
+  );
 
   return (
     <>
@@ -379,7 +338,7 @@ export function WebHeader({ koyu = false, uygulamada = false }) {
           boxShadow: koyu ? "var(--sh-d3)" : "var(--sh-2)",
           maxWidth: "100%",
         }}>
-          <button type="button" onClick={() => nav(siteYolu(genis))} className="gur-tap"
+          <button type="button" onClick={() => nav("/")} className="gur-tap"
             aria-label="GUR ana sayfası"
             style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
             <GurLogo size={34} pill />
@@ -465,8 +424,7 @@ export function WebHeader({ koyu = false, uygulamada = false }) {
                 initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.06 + bolumler.length * 0.05, ease: EGRI }}
                 style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 26 }}>
-                <Btn text="Uygulamayı aç" onClick={() => { setAcik(false); nav("/uygulama"); }} variant="filled" size="lg" trailing={OK} />
-                <Btn text="App Store / Google Play" onClick={() => git("indir")} variant="outlineDark" size="lg" />
+                <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="lg" trailing={OK} />
                 <Btn text="Restoran mısınız? Doyurucu'ya geçin" onClick={() => { setAcik(false); nav("/isletme"); }} variant="outlineDark" size="lg" />
               </motion.div>
             </nav>
@@ -511,7 +469,6 @@ export function WebFooter() {
             // olduğunu söylüyor (bkz. MAGAZA).
             [MAGAZA.ios ? "App Store" : "App Store · yakında", MAGAZA.ios ? () => window.open(MAGAZA.ios, "_blank", "noopener") : null],
             [MAGAZA.android ? "Google Play" : "Google Play · yakında", MAGAZA.android ? () => window.open(MAGAZA.android, "_blank", "noopener") : null],
-            ["Uygulamayı aç", () => nav("/uygulama")],
           ])}
           {sutun("Restoranlar", [["Doyurucu'ya git", () => nav("/isletme")], ["Kaydını sahiplen", () => nav("/isletme/sahiplen")]])}
         </div>
@@ -554,7 +511,7 @@ const OZELLIKLER = [
 const SSS = [
   {
     s: "Uygulamayı nereden indiririm?",
-    c: "App Store ve Google Play'den. Mağaza sürümü yayına girene kadar aynı uygulamayı tarayıcıdan kullanabilirsin: telefonda açtığında çerçeve ve adres çubuğu kalkar, uygulama ekranı kaplar; ana ekrana ekleyip uygulama gibi de kullanabilirsin.",
+    c: "App Store ve Google Play'den; iki mağazada da ücretsiz. Mağaza sürümleri yayına hazırlanıyor, çıktığında bu sayfadaki düğmeler doğrudan mağazaya götürecek.",
   },
   {
     s: "Konumumu vermek zorunda mıyım?",
@@ -767,7 +724,7 @@ export function TuketiciLanding() {
                   Aşağı sürükleyip kapatıyorsun, akışta kaldığın yerde devam ediyorsun.
                 </p>
               </div>
-              <Btn text="Dene" onClick={() => nav("/uygulama")} variant="ink" size="md" fullWidth={false} trailing={OK} />
+              <Btn text="İndir" onClick={() => document.getElementById("indir")?.scrollIntoView({ behavior: "smooth", block: "start" })} variant="ink" size="md" fullWidth={false} trailing={OK} />
             </div>
           </Bezel>
         </Belir>
@@ -936,7 +893,6 @@ export function TuketiciLanding() {
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <Btn text="Uygulamayı indir" onClick={() => document.getElementById("indir")?.scrollIntoView({ behavior: "smooth", block: "start" })} variant="onColor" size="lg" fullWidth={false} trailing={OK} />
-              <Btn text="Tarayıcıda dene" onClick={() => nav("/uygulama")} variant="outlineBrand" size="lg" fullWidth={false} />
             </div>
           </div>
         </Belir>
@@ -963,116 +919,5 @@ export function TuketiciLanding() {
 
       <WebFooter />
     </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// MASAÜSTÜ UYGULAMA KABUĞU
-//
-// Uygulamanın kendisi mobil için yazıldı ve öyle kalıyor: 4400 satırlık
-// ekranları masaüstü düzenine çevirmek ayrı bir iş ve yarım yapılırsa
-// her ekran bozulur. Değişen şey ÇEVRESİ — telefon artık boş bir koyu
-// gradyanın ortasında asılı durmuyor:
-//
-//   • üstte yüzen cam ada gezinmesi (ana sayfa, Doyurucu)
-//   • solda masaüstü kullanıcısına NE YAPACAĞINI söyleyen sütun —
-//     fareyle kart sürüklenebileceğini bilmesinin başka yolu yok
-//   • telefon çift bizelli bir tepsinin içinde
-//
-// Yalnızca 900 px üstünde. Altında GurApp eskisi gibi doğrudan
-// PhoneFrame çiziyor.
-// ═══════════════════════════════════════════════════════════════════════
-
-// Pencere yüksekliği. 844 px'lik çerçeve 900 px'lik bir dizüstü
-// ekranında alttan taşıyor ve uygulamanın alt barı sayfayı kaydırmadan
-// görünmüyordu — bir UYGULAMA için kabul edilemez. Çerçeve pencereye
-// göre ölçekleniyor; `transform: scale` yeniden yerleşim yaptırmıyor ve
-// uygulamanın içindeki perdeler `absolute` olduğu için (telefon kabuğu
-// kuralı) ölçekten etkilenmiyorlar.
-function usePencereYuksekligi() {
-  const [h, setH] = useState(() => (typeof window === "undefined" ? 900 : window.innerHeight));
-  useEffect(() => {
-    const f = () => setH(window.innerHeight);
-    window.addEventListener("resize", f);
-    return () => window.removeEventListener("resize", f);
-  }, []);
-  return h;
-}
-
-const MASAUSTU_IPUCU = [
-  { ikon: "heart", b: "Sağa sürükle", a: "Kaydet — favorilerine düşer" },
-  { ikon: "cross", b: "Sola sürükle", a: "Geç — deste bitince geri gelebilir" },
-  { ikon: "sparkle", b: "Yukarı sürükle", a: "Bu akşam buradayım" },
-];
-
-export function MasaustuKabuk({ children }) {
-  const yuk = usePencereYuksekligi();
-  const TEPSI_EN = 414, TEPSI_BOY = 868;        // 390×844 + 12 px bizel
-  const olcek = Math.min(1, Math.max(0.62, (yuk - 210) / TEPSI_BOY));
-  return (
-    <>
-      <WebHeader koyu uygulamada />
-      <div style={{
-        maxWidth: 1060, margin: "0 auto", width: "100%",
-        display: "grid", gridTemplateColumns: "minmax(260px, 330px) auto",
-        gap: 56, alignItems: "center", justifyContent: "center",
-      }}>
-        <div>
-          <Kas tone="dark">GUR uygulaması</Kas>
-          <h1 style={{
-            fontFamily: "var(--f-display)", fontSize: 40, fontWeight: 800,
-            letterSpacing: "-0.035em", lineHeight: 1.05, color: "var(--c-bg)", margin: "20px 0 0",
-          }}>
-            Fareyle de<br />kaydırılır
-          </h1>
-          <p style={{
-            fontFamily: "var(--f-body)", fontSize: 15.5, lineHeight: 1.62,
-            color: "rgba(253,251,247,0.72)", margin: "16px 0 28px",
-          }}>
-            Kartı tutup sürükleyin ya da kartın altındaki düğmeleri kullanın.
-            Telefonda açtığınızda aynı uygulama ekranı kaplar.
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {MASAUSTU_IPUCU.map(h => (
-              <div key={h.b} style={{
-                display: "flex", gap: 13, alignItems: "center",
-                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 18, padding: "13px 16px",
-              }}>
-                <div style={{
-                  width: 34, height: 34, borderRadius: 999, flexShrink: 0,
-                  background: "rgba(255,154,77,0.14)", border: "1px solid rgba(255,154,77,0.22)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <Icon n={h.ikon} size={15} color="#FF9A4D" />
-                </div>
-                <div>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-bg)", margin: 0 }}>{h.b}</p>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(253,251,247,0.62)", margin: "2px 0 0" }}>{h.a}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Çift bizel: telefon bir TEPSİNİN içinde oturuyor. Koyu zeminde
-            yüksekliği gölge değil yüzeyin açılması anlatıyor — panelin
-            koyu temasındaki kuralın aynısı. Dış kutu ölçeklenmiş boyu
-            taşıyor, yoksa küçülen tepsinin altında o kadar boşluk
-            kalırdı. */}
-        <div style={{ width: TEPSI_EN * olcek, height: TEPSI_BOY * olcek, justifySelf: "center" }}>
-          <div style={{
-            width: TEPSI_EN, height: TEPSI_BOY, boxSizing: "border-box",
-            transform: `scale(${olcek})`, transformOrigin: "top left",
-            background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.09)",
-            borderRadius: 56, padding: 12, boxShadow: "var(--sh-d4)",
-          }}>
-            <div style={{ borderRadius: 44, overflow: "hidden", position: "relative" }}>
-              <PhoneFrame>{children}</PhoneFrame>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
   );
 }

@@ -2,62 +2,55 @@ import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
-import GurApp from './app/GurApp.jsx';
 import { TuketiciLanding } from './app/site.jsx';
-import TuketiciGiris from './app/giris.jsx';
 
-// Üç ayrı uygulama, tek ürün:
-//   /          → TELEFONDA uygulama, masaüstünde tanıtım sayfası
-//                (bkz. app/giris.jsx — karar ilk çizimde bir kez veriliyor)
-//   /site      → tüketici tanıtım sayfası, her genişlikte
-//   /uygulama  → tüketici uygulaması, her genişlikte
-//   /isletme/* → Doyurucu: işletme WEB SİTESİ (tanıtım + kayıt + panel)
-//   /admin     → Yönetici paneli (tam ekran masaüstü)
+// ═══════════════════════════════════════════════════════════════════════
+// GUR DÖRT PARÇADAN OLUŞUR — üçü burada, biri ayrı depo klasöründe:
 //
-// TELEFONDA `/` UYGULAMADIR. Müşteri telefonda uygulamayı kullanıyor;
-// pazarlama sayfası onun önüne çıkmaz. Masaüstünden gelen ziyaretçinin
-// işi ise uygulamayı kullanmak değil, ne olduğunu okuyup MAĞAZADAN
-// indirmek — site o yüzden orada ve sitenin birincil eylemi App Store /
-// Google Play (bkz. app/site.jsx → MAGAZA).
+//   /          → TANITIM WEB SİTESİ (tüketici; mağazaya yönlendirir)
+//   /isletme/* → RESTORAN KAYIT WEB SİTESİ (Doyurucu: tanıtım + kayıt + panel)
+//   /admin     → YÖNETİCİ PANELİ
+//   mobile/    → MOBİL UYGULAMA (Expo/React Native, App Store + Google Play)
 //
-// Ortak olan ekranlar değil VERİ: src/lib/* depoları ve src/data/restaurants.js
-// üçünü birbirine bağlıyor; ortak arayüz parçaları src/ui/kit.jsx'te.
+// Tüketicinin kullandığı uygulama MOBİL UYGULAMADIR. Tarayıcıda ikinci
+// bir tüketici uygulaması YOK: iki kabuk aynı işi yapınca hangisinin
+// gerçek ürün olduğu okunmuyordu ve genişliğe göre dallanan bir kök yol
+// (`/`) bunu iyice karıştırıyordu. Şimdi tek bir cevap var — site
+// anlatır, mağaza indirtir, uygulama çalışır.
 //
-// İşletme ve yönetici uygulamaları ayrı parçaya alındı: tüketiciler asla
-// açmayacağı hâlde ikisini de indiriyorlardı.
+// Ortak olan ekranlar değil VERİ: `src/lib/*` depoları, `src/data/
+// restaurants.js` ve `shared/*` dört parçayı birbirine bağlıyor.
+// ═══════════════════════════════════════════════════════════════════════
 const GurAdmin = lazy(() => import('./admin/GurAdmin.jsx'));
 const GurBusiness = lazy(() => import('./business/GurBusiness.jsx'));
 
 // Panel indirilirken beyaz ekran kalmasın diye paneli anımsatan koyu bir zemin
 const AdminFallback = () => (
   <div style={{ height: '100vh', background: '#0B0B0D', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B6B72', fontFamily: 'Poppins, system-ui, sans-serif', fontSize: 13 }}>
-    Panel yükleniyor…
+    Yükleniyor…
   </div>
 );
 
 const router = createBrowserRouter([
-  { path: '/', element: <TuketiciGiris /> },
-  { path: '/site', element: <TuketiciLanding /> },
-  { path: '/uygulama', element: <GurApp /> },
-  // Doyurucu artık bir web sitesi ve kendi alt yolları var
-  // (/isletme/kayit, /isletme/giris, /isletme/panel …). Splat olmadan
-  // bu adresler "*" kuralına düşüp ana sayfaya yönleniyordu.
+  { path: '/', element: <TuketiciLanding /> },
+  // Doyurucu'nun kendi alt yolları var (/isletme/kayit, /isletme/giris,
+  // /isletme/panel …). Splat olmadan bu adresler "*" kuralına düşüp ana
+  // sayfaya yönleniyordu.
   { path: '/isletme/*', element: <Suspense fallback={<AdminFallback />}><GurBusiness /></Suspense> },
   { path: '/admin', element: <Suspense fallback={<AdminFallback />}><GurAdmin /></Suspense> },
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
 
 // ─── ÇEVRİMDIŞI KABUK ───────────────────────────────────────────────
-// Uçak modunda sayfa yenilenince uygulama ölüyordu (ERR_INTERNET_
-// DISCONNECTED). GUR'un YEREL modu zaten sunucusuz çalışıyor; eksik olan
-// yalnızca kabuğun kendisiydi. Ayrıntılar public/sw.js içinde.
+// Uçak modunda sayfa yenilenince site ölüyordu (ERR_INTERNET_
+// DISCONNECTED). Ayrıntılar public/sw.js içinde.
 //
-// Tek dosyalık artifact önizlemesinde KAYIT YAPILMIYOR: sayfa claude.ai'den
-// servis ediliyor, kendi kaynağı yok. Geliştirmede de yapılmıyor — HMR ile
-// önbellek birbirini yer.
+// Tek dosyalık artifact önizlemesinde KAYIT YAPILMIYOR: sayfa
+// claude.ai'den servis ediliyor, kendi kaynağı yok. Geliştirmede de
+// yapılmıyor — HMR ile önbellek birbirini yer.
 if (!__GUR_ARTIFACT__ && import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => { /* kayıt olmazsa uygulama yine çalışır */ });
+    navigator.serviceWorker.register('/sw.js').catch(() => { /* kayıt olmazsa site yine çalışır */ });
   });
 }
 
