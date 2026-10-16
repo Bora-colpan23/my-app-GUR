@@ -32,7 +32,10 @@ kaydını **sahiplenmiş** işletmelerde açık: sahipsiz bir mekan adına söz
 veremeyiz. Kapı hem arayüzde hem sunucuda (`POST /api/reservations`).
 
 Ürün dört arayüzden oluşur:
-1. **Tüketici mobil uygulaması** — keşif, kaydırma, detay sayfası, favoriler, profil
+1. **Tüketici uygulaması** — keşif, kaydırma, detay sayfası, favoriler, profil.
+   İki kabuğu var: tarayıcıda çalışan sürüm (`src/app/`) ve **App Store /
+   Google Play'e çıkan React Native uygulaması** (`mobile/`, bkz.
+   "Mağaza uygulaması")
 2. **Doyurucu (B2B) paneli** — sahiplenme, bilgi/menü/fotoğraf yönetimi, etkileşim analizi
 3. **Yönetici paneli** — başvuru ve sahiplenme onayı, mekan havuzu, Gastro
    yönetimi, kampanyalar, fiyatlandırma, kohort/LTV
@@ -67,6 +70,9 @@ Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
 `demo@gur.app` / `gur1234`.
 
 Derleme: `npm run build` → `dist/`. Lint: `npm run lint` (src + server + shared).
+
+**Mağaza uygulaması:** `cd mobile && npm install && npx expo start`.
+Ayrıntı ve mağazaya çıkarma adımları `mobile/README.md` içinde.
 
 **Artifact önizlemesi:** `npm run artifact` → `dist/gur-preview.html` (tek dosya).
 Elle derlemeyin: yönetici paneli `src/main.jsx` içinde `React.lazy` ile
@@ -167,6 +173,11 @@ gur/
 │       ├── http/{server,routes}.js   # çerçevesiz router + API uçları
 │       ├── auth/{session,password,social}.js
 │       └── {ingestion,swipe,visits,notifications,analytics}/, cron.js
+├── mobile/                    # MAĞAZA UYGULAMASI (Expo / React Native)
+│   ├── app.json               # mağaza kimliği, simgeler, izin metinleri
+│   ├── eas.json               # derleme profilleri
+│   ├── metro.config.js        # depo kökündeki shared/ + data/ dosyalarını görür
+│   └── src/{tema,api,depo,veri,konum}.js + bilesen/ + ekran/
 └── src/
     ├── main.jsx               # React kökü + router; /isletme ve /admin ayrı parçada
     ├── data/restaurants.js    # MEKAN HAVUZU — üç uygulamanın ortak verisi
@@ -475,6 +486,71 @@ yok sayardı. Zil görsel bir işaret.
 
 Azaltılmış hareket tercihinde salınım ve halkalar duruyor, zil görünmeye
 devam ediyor.
+
+### Mağaza uygulaması (`mobile/`) — WebView kabuğu DEĞİL
+
+Tüketici uygulamasının App Store ve Google Play'e çıkan sürümü
+`mobile/` altında: **Expo SDK 58 / React Native 0.88**, yerli ekranlar,
+yerli dokunma hareketleri (Gesture Handler + Reanimated), yerli konum
+izni. Web sitesini saran bir `WebView` paketi değil — Apple'ın 4.2
+"Minimum Functionality" kuralı öyle bir paketi zaten reddediyor.
+
+**TEK VERİ KATMANI MOBİLDE DE GEÇERLİ.** Uygulama webdekiyle aynı
+sunucuya bakıyor (`mobile/src/api.js` → `/api/...`) ve saf kurgu
+modüllerini KOPYALAMIYOR: `shared/deck.js` (deste + yakınlık sıralaması)
+ile `shared/deeplink.js` (harita bağlantıları) depo kökünden
+okunuyor. Metro bunu `mobile/metro.config.js` → `watchFolders` ile
+yapıyor; `disableHierarchicalLookup` de açık, yoksa metro depo
+kökündeki WEB bağımlılıklarına (react-router, motion, ikinci bir react)
+ulaşır ve iki react kopyası yüklenirdi.
+
+Kopyalamanın bedeli somut: sponsorlu kart aralığı webde 5-7, mobilde
+başka bir şey olurdu ve kimse fark etmezdi.
+
+**Jetonlar birebir aynı** (`mobile/src/tema.js`): aynı turuncu, aynı
+kremsi kâğıt, aynı üç katmanlı gölge ölçeği, aynı Poppins + Outfit.
+React Native'de `var()` yok, bu yüzden jetonlar düz bir JS nesnesi —
+yönetici panelinin `C`si gibi. Gölgeler `boxShadow` ile yazılıyor (RN
+0.76+ CSS söz dizimini kabul ediyor), böylece ÜÇ KATMAN korunuyor; tek
+katmanlı `shadowRadius` kartı kâğıda yapıştırılmış bir leke gibi
+gösteriyordu.
+
+**Kaydırma hareketi Apple'ın akışkan arayüz ilkeleriyle**
+(`bilesen/KaydirmaKarti.js`): 1:1 takip, kesilebilirlik, bırakma hızının
+yaya devri, momentum izdüşümü (`(v/1000)·r/(1-r)` — fizik kitabındaki
+`v²/2a` DEĞİL) ve dikey eksende lastik bant. "Aşağı" bir karar
+taşımadığı için kart oraya kaçmıyor, kademeli olarak direniyor.
+
+**10 px histerezis AÇIKÇA yazılı** (`activeOffsetX/Y`). Varsayılana
+bırakıldığında hareket bazı ortamlarda hiç etkinleşmiyordu: `onBegin`
+geliyor, `onUpdate`/`onEnd` hiç gelmiyordu (ölçüldü). Dokunuş ile
+sürükleme `Gesture.Exclusive` ile ayrılıyor — `Simultaneous` ikisini
+birden tanımaya çalışıp karar anını bulanıklaştırıyordu.
+
+**Simgeler gerçek Poppins ile üretildi.** `assets/` altındaki mağaza
+simgesi, Android uyarlanabilir simgesi ve açılış görseli GUR kelime
+markasının kendi renkleriyle (G `#FFA500` · U `#FF6600` · R `#FF0000`)
+çiziliyor. Android ön katmanında marka küçük: uyarlanabilir maske dış
+%33'ü kesebiliyor.
+
+**Ürün kuralları web ile aynı** ve mobilde de ölçüldü: üç yön üç karar,
+konum ekranında üç yol eşit ağırlıkta, rıza bir modal, doğrulama her iki
+modda, ham koordinat gönderilmiyor, dokunma hedefi ≥ 44 px, pasif durum
+`opacity` ile kurulmuyor, masa ayırtma ücretsiz ve yalnızca
+sahiplenilmiş mekanlarda açık.
+
+**Ölçüm.** Gerçek cihaz/simülatör bu ortamda yok; doğrulama
+`npx expo export --platform web` çıktısı üzerinden yapıldı (aynı bileşen
+ağacı, aynı düzen kodu). 393×852'de: on ekranın onu da çiziliyor, yatay
+taşma 0 px, 44 px altında dokunma hedefi yok, boş formla giriş
+engelleniyor, **sağa sürükleme kartı ilerletip mekanı favorilere
+yazıyor**, sola sürükleme geçiyor. Dokunsal geri bildirim, konum izni ve
+mağaza paketlemesi yalnızca gerçek cihazda doğrulanabilir.
+
+**Henüz bağlanmamışlar** (arayüzde de yazıyor, "var gibi"
+gösterilmiyor): Google/Apple ile giriş (ikisi de anahtar istiyor ve App
+Store kuralı gereği biri varsa diğeri de olmalı), konum doğrulamalı
+yorum YAZMA adımı, push bildirimi, ödüllü video ve GUR Plus.
 
 ### Tüketici tarafı da bir WEB SİTESİ
 
