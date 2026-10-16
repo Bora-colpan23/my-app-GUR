@@ -1241,6 +1241,37 @@ export function GurStyles() {
           .gur-gold-sheen { animation: none; opacity: 0; }
         }
 
+        /* ── DOKUNSAL GERİ BİLDİRİM: KART ──────────────────────────────
+           Haplar basılınca içeriden doluyor (.gur-btn). Kart büyüklüğünde
+           tıklanabilir yüzeylerde (pano satırları, takvim günü) öyle bir
+           şey yoktu: basıyorsun, hiçbir şey olmuyor, basıp basmadığını
+           ancak sonuçtan anlıyorsun.
+
+           Nesne kâğıda YAKLAŞIYOR: aşağı 1px + hafif küçülme. Gölgenin
+           içeri dönmesi (yüzeyin çukurlaşması) projenin kuralı değil. */
+        .gur-press { transition: transform 150ms cubic-bezier(.16,1,.3,1); }
+        .gur-press:active { transform: translateY(1px) scale(0.988); }
+
+        /* ── NEFES ALAN NOKTA ─────────────────────────────────────────
+           "Şu an yayında" gibi CANLI bir durumun yanında duruyor ve
+           yalnızca orada: her şey kıpırdarsa hiçbiri dikkat çekmez.
+           transform + opacity — yeniden yerleşim yok. */
+        @keyframes gur-breathe {
+          0%, 100% { transform: scale(1);    opacity: 1; }
+          50%      { transform: scale(1.55); opacity: 0; }
+        }
+        .gur-breathe::after {
+          content: ""; position: absolute; inset: 0; border-radius: 50%;
+          background: inherit; animation: gur-breathe 2.4s ease-out infinite;
+          pointer-events: none; will-change: transform, opacity;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .gur-press { transition: none; }
+          .gur-press:active { transform: none; }
+          /* Nokta kalır, halka durur: durum bilgisi hareketten gelmiyor */
+          .gur-breathe::after { animation: none; opacity: 0; }
+        }
+
         /* ── İSKELET PARLAMASI ────────────────────────────────────────
            Parlama transform ile geçiyor: background-position animasyonu
            bileşik katmana çıkmıyor ve uzun listede kasıyor. */

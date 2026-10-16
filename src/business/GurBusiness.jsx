@@ -1620,20 +1620,19 @@ function InteractionHeatmap({ restaurant }) {
   }, [grid]);
 
   return (
-    <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 16px", marginBottom: 20 }}>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 4px" }}>Ne zaman keşfediliyorsunuz?</p>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 14px", lineHeight: 1.5 }}>
+    <PanoKart baslik="Ne zaman keşfediliyorsunuz?" pad={18}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.5)", margin: "-6px 0 14px", lineHeight: 1.5 }}>
         Son 30 günde kartınızın görüldüğü saatler. Koyu turuncu = yoğun.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "46px repeat(7, 1fr)", gap: 4 }}>
         <span />
         {HEAT_DAYS.map(d => (
-          <span key={d} style={{ fontFamily: "var(--f-body)", fontSize: 9.5, color: "rgba(255,255,255,0.35)", textAlign: "center" }}>{d}</span>
+          <span key={d} style={{ fontFamily: "var(--f-body)", fontSize: 9.5, color: "rgba(255,255,255,0.55)", textAlign: "center" }}>{d}</span>
         ))}
         {HEAT_SLOTS.map((slot, si) => (
           <React.Fragment key={slot.label}>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 9.5, color: "rgba(255,255,255,0.35)", alignSelf: "center" }}>{slot.label}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9.5, color: "rgba(255,255,255,0.55)", alignSelf: "center" }}>{slot.label}</span>
             {HEAT_DAYS.map((d, di) => {
               const v = grid[si][di];
               return (
@@ -1647,7 +1646,11 @@ function InteractionHeatmap({ restaurant }) {
                     background: `rgba(255,102,0,${(0.10 + v * 0.75).toFixed(2)})`,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontFamily: "var(--f-body)", fontSize: 9, fontWeight: 700,
-                    color: v > 0.55 ? "#fff" : "rgba(255,255,255,0.45)",
+                    // Düşük değerli hücrenin zemini daha KOYU: yazıyı orada
+                    // soluklaştırmak okunurluğu ters yönde bozuyordu
+                    // (0.45 alfa, rgb(84,42,14) üstünde 3.74:1). Değer
+                    // farkını zeminin tonu zaten anlatıyor.
+                    color: v > 0.55 ? "#fff" : "rgba(255,255,255,0.78)",
                   }}>
                   {Math.round(v * 100)}
                 </div>
@@ -1665,7 +1668,7 @@ function InteractionHeatmap({ restaurant }) {
           En sakin: {HEAT_DAYS[worst.di]} {HEAT_SLOTS[worst.si].label} — anlık fırsat için uygun
         </span>
       </div>
-    </div>
+    </PanoKart>
   );
 }
 
@@ -1787,6 +1790,82 @@ const panoSayi = n => Math.round(n).toLocaleString("tr");
 // Yönetici panosundaki `Segmented` ile aynı iş ama koyu zeminde ve
 // dokunma hedefi 44 px: telefonda üç ince hap seçilemiyordu. Seçim
 // GERÇEKTEN veri değiştiriyor, yalnızca etiket değil.
+// ═══════════════════════════════════════════════════════════════════
+// PANONUN TASARIM DİLİ — yüzey merdiveni, yarıçap ölçeği, sayı biçimi
+//
+// İlk hâlinde panodaki ALTI bloğun altısı da aynı kutuydu:
+// `rgba(255,255,255,0.04)` + 1px kenarlık + 20 yarıçap. Hepsi aynı
+// ağırlıkta olunca hiçbiri öne çıkmıyor; ekran bir "kart yığını" olarak
+// okunuyor ve göz nereye bakacağını bilmiyordu. Üç şey tanımlandı:
+//
+//  1. YÜZEY MERDİVENİ. Koyu zeminde yüksekliği GÖLGE anlatmaz — siyah
+//     üstünde soluk siyah görünmez. Yüzeyin AÇILMASI anlatır. Bu
+//     panelin kendi kuralı, yönetici panelinde de aynısı yazılı; bu
+//     yüzden "diffusion shadow" yerine merdiven var.
+//  2. YARIÇAP ÖLÇEĞİ. Tek bir 20 yerine üç basamak: dış kap 26, iç
+//     kart 18, parça 12. Yarıçap da hiyerarşi taşır.
+//  3. SAYI BİÇİMİ. Rakamlar sistem mono + `tabular-nums`: oransal
+//     rakamlar her basamakta farklı genişlikte ve değişen bir KPI
+//     sayısı yerinde zıplıyor. Yönetici panelinde bu zaten böyleydi.
+// ═══════════════════════════════════════════════════════════════════
+
+const YUZ = {
+  s1: "rgba(255,255,255,0.035)",          // taban kart
+  s2: "rgba(255,255,255,0.06)",           // öne çıkan kart
+  s3: "rgba(255,255,255,0.085)",          // kartın içindeki parça
+  kenar: "1px solid rgba(255,255,255,0.07)",
+  kenarGuclu: "1px solid rgba(255,255,255,0.11)",
+};
+const RAD = { kap: 26, kart: 18, parca: 12 };
+const NUM = {
+  fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+  fontVariantNumeric: "tabular-nums",
+  letterSpacing: "-0.02em",
+};
+
+// Panodaki her kutu bu tek yüzeyden geçiyor. Altı ayrı yerde elle
+// yazılmış altı kutu vardı ve biri er geç ötekilerden ayrılırdı.
+function PanoKart({ baslik, yan, children, one = false, pad = 16, style }) {
+  return (
+    <section style={{
+      background: one ? YUZ.s2 : YUZ.s1,
+      border: one ? YUZ.kenarGuclu : YUZ.kenar,
+      borderRadius: RAD.kap, padding: pad, height: "100%", minWidth: 0,
+      boxSizing: "border-box", ...style,
+    }}>
+      {(baslik || yan) && (
+        <header style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
+          {baslik && <h3 style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.72)", margin: 0 }}>{baslik}</h3>}
+          {yan && <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.5)" }}>{yan}</span>}
+        </header>
+      )}
+      {children}
+    </section>
+  );
+}
+
+// Nefes alan canlı noktası. KENDİ bileşeni ve `memo`lu: sürekli dönen
+// bir animasyonun ata bileşeni yeniden çizmesi panonun tamamını her
+// karede yeniden çizdirirdi. Halka CSS'te (`.gur-breathe`), React
+// döngüsünün tamamen dışında.
+const CanliNokta = React.memo(function CanliNokta({ renk = "var(--c-ok-light)", size = 8 }) {
+  return (
+    <span aria-hidden="true" className="gur-breathe" style={{
+      position: "relative", display: "inline-block", flexShrink: 0,
+      width: size, height: size, borderRadius: "50%", background: renk,
+    }} />
+  );
+});
+
+// Sıralı giriş: kartlar aynı anda değil, dalga hâlinde beliriyor.
+// Azaltılmış hareket tercihini kökteki `MotionConfig reducedMotion="user"`
+// zaten kapatıyor (src/main.jsx) — burada ayrıca bayrak tutmuyoruz.
+const SIRA = { hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.03 } } };
+const PARCA = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0, duration: 0.45 } },
+};
+
 function PanoSegmented({ options, value, onChange, label }) {
   return (
     <div role="group" aria-label={label} style={{
@@ -1865,31 +1944,32 @@ function MiniBars({ points, w = 60, h = 30, color = "#FF9A4D" }) {
   );
 }
 
-function PanoKpi({ etiket, deger, alt, delta, gorsel, tone = "#FF9A4D" }) {
+function PanoKpi({ etiket, deger, alt, delta, gorsel, tone = "#FF9A4D", buyuk = false, yay = false }) {
   return (
-    <div style={{
-      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
-      borderRadius: 20, padding: "14px 14px 12px",
-    }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+    <PanoKart pad={buyuk ? 20 : 16}
+      style={yay ? { display: "flex", flexDirection: "column", justifyContent: "space-between" } : undefined}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
         <div style={{ minWidth: 0 }}>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.5)", margin: "0 0 4px", fontWeight: 600 }}>{etiket}</p>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: tone, margin: 0, lineHeight: 1.1 }}>{deger}</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.5)", margin: "0 0 6px", fontWeight: 600 }}>{etiket}</p>
+          {/* Sayı mono: dönem değişince rakam genişliği sabit kalıyor,
+              değer yerinde zıplamıyor. */}
+          <p style={{ ...NUM, fontSize: buyuk ? 30 : 21, fontWeight: 700, color: tone, margin: 0, lineHeight: 1.05 }}>{deger}</p>
         </div>
         <div style={{ flexShrink: 0 }}>{gorsel}</div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: buyuk ? 14 : 10, flexWrap: "wrap" }}>
         {delta != null && (
           <span style={{
+            display: "inline-flex", alignItems: "center", gap: 3,
             fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800,
             color: delta >= 0 ? "var(--c-ok-light)" : "var(--c-bad-light)",
             background: delta >= 0 ? "rgba(74,222,128,0.14)" : "rgba(255,122,112,0.14)",
-            borderRadius: 999, padding: "3px 7px",
-          }}>{delta >= 0 ? "↑" : "↓"} %{Math.abs(delta)}</span>
+            borderRadius: 999, padding: "3px 8px",
+          }}>{delta >= 0 ? "↑" : "↓"}<span style={NUM}>%{Math.abs(delta)}</span></span>
         )}
         <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.5)" }}>{alt}</span>
       </div>
-    </div>
+    </PanoKart>
   );
 }
 
@@ -2040,13 +2120,17 @@ function AktifYayinKarti({ restaurant, onGo }) {
   if (!b) {
     return (
       <div style={{
-        background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.14)",
-        borderRadius: 20, padding: "18px 16px", marginBottom: 16,
+        background: YUZ.s1, border: "1px dashed rgba(255,255,255,0.16)",
+        borderRadius: RAD.kap, padding: 18, boxSizing: "border-box",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 16, flexWrap: "wrap",
       }}>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 6px" }}>Şu an yayında reklamınız yok</p>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.5)", margin: "0 0 12px", lineHeight: 1.5 }}>
-          Keşfet banner'ı, ödüllü video ve push bildirimi takvimden tarih seçilerek alınıyor.
-        </p>
+        <div style={{ minWidth: 240, flex: 1 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.72)", margin: "0 0 6px" }}>Şu an yayında reklamınız yok</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.5 }}>
+            Keşfet banner'ı, ödüllü video ve push bildirimi takvimden tarih seçilerek alınıyor.
+          </p>
+        </div>
         <Btn text="Büyüme sekmesine git" onClick={() => onGo("growth")} variant="filled" size="md" fullWidth={false} />
       </div>
     );
@@ -2060,8 +2144,8 @@ function AktifYayinKarti({ restaurant, onGo }) {
   return (
     <div style={{
       background: "linear-gradient(135deg, rgba(255,102,0,0.16) 0%, rgba(255,255,255,0.04) 62%)",
-      border: "1px solid rgba(255,102,0,0.22)", borderRadius: 22, padding: 14, marginBottom: 16,
-      display: "flex", gap: 13, alignItems: "center",
+      border: "1px solid rgba(255,102,0,0.26)", borderRadius: RAD.kap, padding: 16,
+      display: "flex", gap: 14, alignItems: "center", height: "100%", boxSizing: "border-box",
     }}>
       <div style={{
         width: 74, height: 74, borderRadius: 16, flexShrink: 0, overflow: "hidden",
@@ -2076,11 +2160,15 @@ function AktifYayinKarti({ restaurant, onGo }) {
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{
-          display: "inline-block", fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800,
-          letterSpacing: "0.04em", borderRadius: 999, padding: "3px 8px", marginBottom: 6,
+          display: "inline-flex", alignItems: "center", gap: 6,
+          fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800,
+          letterSpacing: "0.04em", borderRadius: 999, padding: "4px 9px", marginBottom: 7,
           color: aktif ? "var(--c-ok-light)" : "var(--c-warn-light)",
           background: aktif ? "rgba(74,222,128,0.15)" : "rgba(255,180,84,0.15)",
-        }}>{aktif ? "YAYINDA" : "SIRADA"}</span>
+        }}>
+          {aktif && <CanliNokta size={7} />}
+          {aktif ? "YAYINDA" : "SIRADA"}
+        </span>
 
         <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p?.name || b.streamKey}</p>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.5)", margin: "0 0 8px" }}>
@@ -2152,9 +2240,9 @@ function YayinTakvimi({ restaurant }) {
   }, [ayGunleri, gunler]);
 
   return (
-    <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 14px", marginBottom: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: 0 }}>Yayın takviminiz</p>
+    <PanoKart pad={16}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
+        <h3 style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.72)", margin: 0 }}>Yayın takviminiz</h3>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <IconBtn size={30} shape="rounded" tone="glassLight" title="Önceki ay"
             onClick={() => { setSecili(null); setAy(a => a.m === 0 ? { y: a.y - 1, m: 11 } : { y: a.y, m: a.m - 1 }); }}
@@ -2173,12 +2261,16 @@ function YayinTakvimi({ restaurant }) {
           : "Bu ay planlanmış yayın yok"}
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 4 }}>
+      {/* Gün hücresi kare (aspectRatio 1): kart genişledikçe kare de
+          büyüyor ve 620 px'lik bir kartta 85 px'lik devasa günler
+          çıkıyordu. Izgara sabitleniyor — dokunma hedefi hâlâ 44'ün
+          üstünde, hücre artık takvim gibi duruyor. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 4, maxWidth: 392 }}>
         {WEEKDAYS_TR.map(g => (
           <div key={g} style={{ textAlign: "center", fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>{g}</div>
         ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, maxWidth: 392 }}>
         {hucreler.map((gunISO, i) => {
           if (!gunISO) return <div key={`b${i}`} />;
           const kayitlar = gunler[gunISO] || [];
@@ -2200,7 +2292,7 @@ function YayinTakvimi({ restaurant }) {
           };
           if (!kayitlar.length) return <div key={gunISO} style={ortak}>{sayi}</div>;
           return (
-            <button key={gunISO} type="button"
+            <button key={gunISO} type="button" className="gur-press"
               onClick={() => setSecili(s => (s === gunISO ? null : gunISO))}
               aria-pressed={secili === gunISO}
               title={`${prettyDay(gunISO)} · ${kayitlar.map(b => AD_PRODUCTS[b.streamKey]?.name).join(", ")}`}
@@ -2229,7 +2321,7 @@ function YayinTakvimi({ restaurant }) {
           ))}
         </div>
       )}
-    </div>
+    </PanoKart>
   );
 }
 
@@ -2255,8 +2347,7 @@ function YaklasanListe({ restaurant, canReserve, onGo }) {
   const bos = !yayinlar.length && !masalar.length;
 
   return (
-    <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 14px", marginBottom: 20 }}>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 12px" }}>Sırada</p>
+    <PanoKart baslik="Sırada" pad={16}>
 
       {bos && (
         <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.5 }}>
@@ -2267,7 +2358,7 @@ function YaklasanListe({ restaurant, canReserve, onGo }) {
       {yayinlar.map(b => {
         const onayli = b.status === "approved";
         return (
-          <button key={b.id} type="button" onClick={() => onGo("growth")}
+          <button key={b.id} type="button" onClick={() => onGo("growth")} className="gur-press"
             style={{
               width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left",
               background: "transparent", border: "none", borderRadius: 14, padding: "9px 6px",
@@ -2293,7 +2384,7 @@ function YaklasanListe({ restaurant, canReserve, onGo }) {
       })}
 
       {masalar.map(x => (
-        <button key={x.id} type="button" onClick={() => onGo("tables")}
+        <button key={x.id} type="button" onClick={() => onGo("tables")} className="gur-press"
           style={{
             width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left",
             background: "transparent", border: "none", borderRadius: 14, padding: "9px 6px",
@@ -2311,12 +2402,12 @@ function YaklasanListe({ restaurant, canReserve, onGo }) {
           <Icon n="clock" size={14} color="rgba(255,255,255,0.5)" />
         </button>
       ))}
-    </div>
+    </PanoKart>
   );
 }
 
 // ─── Panonun kendisi ─────────────────────────────────────────────────
-function PanoTab({ restaurant, canReserve, onGo, reviewCount }) {
+function PanoTab({ restaurant, canReserve, onGo, reviewCount, genis = false }) {
   const [aralik, setAralik] = useState("7g");
   const seri = useMemo(() => panoSerisi(restaurant?.id, aralik), [restaurant?.id, aralik]);
   const simdi = useMemo(() => panoToplam(seri.simdi), [seri]);
@@ -2328,107 +2419,159 @@ function PanoTab({ restaurant, canReserve, onGo, reviewCount }) {
   const selam = saat < 6 ? "İyi geceler" : saat < 12 ? "Günaydın" : saat < 18 ? "İyi günler" : "İyi akşamlar";
   const bugunYazi = new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
 
+  // ── BENTO: her satır farklı bölünüyor ──
+  // İlk hâlinde pano tek sütunluk bir yığındı: on blok, hepsi tam
+  // genişlik, hepsi aynı yükseklik hissi. Masaüstünde bu hem ekranın
+  // yarısını boşa harcıyor hem de "neye önce bakayım" sorusunu
+  // cevapsız bırakıyordu. Dört sütunluk bir ızgara ve satır satır
+  // değişen bölünme: 2+1+1 · 1+3 · 4 · 2+2 · 2+2.
+  //
+  // Satır ATLAMA (grid-row span) bilerek yok: bir kart iki satıra
+  // yayıldığında komşusunun boyu onu geriyor ve içerik uzadıkça
+  // ızgara öngörülemez hâle geliyor. Her satır kendi içinde kapanıyor.
+  //
+  // Dar ekranda ızgara ikiye düşüyor ve sıra ESKİSİNİN AYNISI: dört
+  // KPI 2×2, altında tam genişlik bloklar.
+  // `hiza` neden var: ızgaranın tamamı `start` (kısa kart uzun kartın
+  // boyuna şişmesin diye), ama KPI SATIRININ üçü birbirine eşit olmalı
+  // — aynı satırdaki üç kutunun altı 10 px kaymış dursa bu tasarım
+  // değil, hizasızlık okunur. O üçü `stretch`.
+  const hucre = (w, n, hiza = "start") => ({ gridColumn: `span ${genis ? w : n}`, alignSelf: hiza, minWidth: 0 });
+
   return (
     <div>
-      {/* Selamlama: panonun sahibi bir işletme ve bugünün tarihi kararın
-          bir parçası (bugün cuma mı, hafta sonu mu). */}
-      <div style={{ marginBottom: 16 }}>
-        <h3 style={{ fontFamily: "var(--f-display)", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 3px" }}>
-          {selam} 👋
-        </h3>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", margin: 0 }}>{bugunYazi}</p>
-      </div>
-
-      {/* Dönem seçici: ÜSTTE, çünkü altındaki her sayıyı o belirliyor. */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+      {/* Selamlama. Emoji YOK: ürün arayüzünde emoji, yazı tipinin
+          kontrol etmediği bir görsel — platforma göre değişiyor ve
+          başlığın ağırlığını dağıtıyor. */}
+      <div style={{
+        display: "flex", alignItems: "flex-end", justifyContent: "space-between",
+        gap: 14, flexWrap: "wrap", marginBottom: 18,
+      }}>
+        <div>
+          <h2 style={{
+            fontFamily: "var(--f-display)", fontSize: genis ? 26 : 21, fontWeight: 800,
+            letterSpacing: "-0.03em", color: "#fff", margin: "0 0 4px", lineHeight: 1.1,
+          }}>{selam}</h2>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.5)", margin: 0 }}>{bugunYazi}</p>
+        </div>
+        {/* Dönem seçici başlıkla aynı satırda: altındaki her sayıyı o
+            belirliyor, ayrı bir satıra inince bağı kopuyordu. */}
         <PanoSegmented options={PANO_ARALIK} value={aralik} onChange={setAralik} label="Dönem" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-        <PanoKpi
-          etiket="Görüntülenme" tone="#fff"
-          deger={panoSayi(simdi.gorunum)}
-          alt={seri.conf.oncekiAd}
-          delta={panoDelta(simdi.gorunum, onceki.gorunum)}
-          gorsel={<MiniSpark points={seri.simdi.map(p => p.gorunum)} />} />
+      <motion.div
+        variants={SIRA} initial="hidden" animate="show"
+        style={{
+          display: "grid",
+          gridTemplateColumns: genis ? "repeat(4, minmax(0,1fr))" : "repeat(2, minmax(0,1fr))",
+          gap: genis ? 14 : 10,
+          // Kartlar DOĞAL boyunda. `stretch` ile kısa kart satırdaki en
+          // uzun kartın boyuna çekiliyordu: "Masa talebi" kutusu grafiğin
+          // yanında 260 px boş kalıyor, ısı haritası takvimin boyuna
+          // uzayıp altında kocaman bir boşluk bırakıyordu. Şişmiş bir
+          // kart bozuk görünür; satır altında kalan boşluk görünmez.
+          alignItems: "start",
+        }}>
 
-        <PanoKpi
-          etiket="Beğeni oranı"
-          deger={`%${simdi.oran.toFixed(1)}`}
-          alt="sağa kaydırma payı"
-          delta={panoDelta(simdi.oran, onceki.oran)}
-          gorsel={
-            <div style={{ position: "relative", width: 46, height: 46 }}>
-              <MiniRing pct={simdi.oran} />
-              {/* Halkanın ortasındaki kalp: oranın NEYİN oranı olduğunu
-                  söylüyor. Sayı zaten kartın solunda yazılı. */}
-              <span aria-hidden="true" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon n="heart" size={15} color="#FF9A4D" />
-              </span>
-            </div>
-          } />
-
-        <PanoKpi
-          etiket="Beğenen" tone="var(--c-ok-light)"
-          deger={panoSayi(simdi.sag)}
-          alt={`${panoSayi(simdi.sol)} kişi geçti`}
-          delta={panoDelta(simdi.sag, onceki.sag)}
-          gorsel={<MiniBars points={seri.simdi.slice(-7).map(p => p.sag)} color="var(--c-ok-light)" />} />
-
-        {canReserve ? (
+        <motion.div variants={PARCA} style={hucre(2, 1, "stretch")}>
           <PanoKpi
-            etiket="Masa talebi" tone="#FF9A4D"
-            deger={panoSayi(masaSayisi)}
-            alt="uygulamadan gelen"
-            gorsel={<div style={{ width: 46, height: 46, borderRadius: 14, background: "rgba(255,102,0,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="plate" size={19} color="#FF9A4D" /></div>} />
-        ) : (
+            buyuk={genis} etiket="Görüntülenme" tone="#fff"
+            deger={panoSayi(simdi.gorunum)}
+            alt={seri.conf.oncekiAd}
+            delta={panoDelta(simdi.gorunum, onceki.gorunum)}
+            gorsel={<MiniSpark points={seri.simdi.map(p => p.gorunum)} w={genis ? 132 : 60} h={genis ? 44 : 30} />} />
+        </motion.div>
+
+        <motion.div variants={PARCA} style={hucre(1, 1, "stretch")}>
           <PanoKpi
-            etiket="Yorum" tone="#FF9A4D"
-            deger={panoSayi(reviewCount)}
-            alt="toplam"
-            gorsel={<div style={{ width: 46, height: 46, borderRadius: 14, background: "rgba(255,102,0,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="chat" size={19} color="#FF9A4D" /></div>} />
-        )}
-      </div>
+            etiket="Beğeni oranı"
+            deger={`%${simdi.oran.toFixed(1)}`}
+            alt="sağa kaydırma payı"
+            delta={panoDelta(simdi.oran, onceki.oran)}
+            gorsel={
+              <div style={{ position: "relative", width: 46, height: 46 }}>
+                <MiniRing pct={simdi.oran} />
+                {/* Halkanın ortasındaki kalp: oranın NEYİN oranı olduğunu
+                    söylüyor. Sayı zaten kartın solunda yazılı. */}
+                <span aria-hidden="true" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon n="heart" size={15} color="#FF9A4D" />
+                </span>
+              </div>
+            } />
+        </motion.div>
 
-      {/* Büyük grafik */}
-      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 12px 10px", marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "0 4px", marginBottom: 6 }}>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: 0 }}>Etkileşim takibi</p>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.5)", margin: 0 }}>
-            {seri.conf.birim === "hafta" ? "haftalık" : "günlük"} görüntülenme
-          </p>
-        </div>
-        <PanoTrend data={seri.simdi} birim={seri.conf.birim === "hafta" ? "hafta" : "gün"} />
-      </div>
+        <motion.div variants={PARCA} style={hucre(1, 1, "stretch")}>
+          <PanoKpi
+            etiket="Beğenen" tone="var(--c-ok-light)"
+            deger={panoSayi(simdi.sag)}
+            alt={`${panoSayi(simdi.sol)} kişi geçti`}
+            delta={panoDelta(simdi.sag, onceki.sag)}
+            gorsel={<MiniBars points={seri.simdi.slice(-7).map(p => p.sag)} color="var(--c-ok-light)" />} />
+        </motion.div>
 
-      <AktifYayinKarti restaurant={restaurant} onGo={onGo} />
+        <motion.div variants={PARCA} style={hucre(1, 1, genis ? "stretch" : "start")}>
+          {canReserve ? (
+            <PanoKpi
+              yay={genis} etiket="Masa talebi" tone="#FF9A4D"
+              deger={panoSayi(masaSayisi)}
+              alt="uygulamadan gelen"
+              gorsel={<div style={{ width: 46, height: 46, borderRadius: RAD.parca, background: "rgba(255,102,0,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="plate" size={19} color="#FF9A4D" /></div>} />
+          ) : (
+            <PanoKpi
+              yay={genis} etiket="Yorum" tone="#FF9A4D"
+              deger={panoSayi(reviewCount)}
+              alt="toplam"
+              gorsel={<div style={{ width: 46, height: 46, borderRadius: RAD.parca, background: "rgba(255,102,0,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="chat" size={19} color="#FF9A4D" /></div>} />
+          )}
+        </motion.div>
 
-      <InteractionHeatmap restaurant={restaurant} />
+        {/* Büyük grafik — satırın üç bölmesi */}
+        <motion.div variants={PARCA} style={hucre(3, 2)}>
+          <PanoKart one baslik="Etkileşim takibi"
+            yan={`${seri.conf.birim === "hafta" ? "haftalık" : "günlük"} görüntülenme`}
+            pad={genis ? "20px 16px 12px" : "16px 12px 10px"}>
+            <PanoTrend data={seri.simdi} birim={seri.conf.birim === "hafta" ? "hafta" : "gün"}
+              height={genis ? 208 : 172} />
+          </PanoKart>
+        </motion.div>
 
-      <YayinTakvimi restaurant={restaurant} />
+        <motion.div variants={PARCA} style={hucre(4, 2)}>
+          <AktifYayinKarti restaurant={restaurant} onGo={onGo} />
+        </motion.div>
 
-      <YaklasanListe restaurant={restaurant} canReserve={canReserve} onGo={onGo} />
+        <motion.div variants={PARCA} style={hucre(2, 2)}>
+          <InteractionHeatmap restaurant={restaurant} />
+        </motion.div>
 
-      {/* Puan dağılımı */}
-      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 16px" }}>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 14px" }}>Puan dağılımı</p>
-        {[
-          { stars: 5, count: 18, pct: 47 },
-          { stars: 4, count: 11, pct: 29 },
-          { stars: 3, count: 5, pct: 13 },
-          { stars: 2, count: 2, pct: 5 },
-          { stars: 1, count: 2, pct: 5 },
-        ].map((r, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: i < 4 ? 8 : 0 }}>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.5)", width: 14, textAlign: "right" }}>{r.stars}</span>
-            <span style={{ fontSize: 12, color: "var(--c-warn)" }}>★</span>
-            <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-              <div style={{ width: `${r.pct}%`, height: "100%", borderRadius: 4, background: r.stars >= 4 ? "rgba(76,175,80,0.5)" : r.stars === 3 ? "rgba(255,165,0,0.5)" : "rgba(255,59,48,0.4)", transition: "width 0.6s ease-out", transitionDelay: `${i * 0.1}s` }} />
-            </div>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.5)", width: 28, textAlign: "right" }}>{r.count}</span>
-          </div>
-        ))}
-      </div>
+        <motion.div variants={PARCA} style={hucre(2, 2)}>
+          <YayinTakvimi restaurant={restaurant} />
+        </motion.div>
+
+        <motion.div variants={PARCA} style={hucre(2, 2)}>
+          <YaklasanListe restaurant={restaurant} canReserve={canReserve} onGo={onGo} />
+        </motion.div>
+
+        <motion.div variants={PARCA} style={hucre(2, 2)}>
+          <PanoKart baslik="Puan dağılımı" pad={18}>
+            {[
+              { stars: 5, count: 18, pct: 47 },
+              { stars: 4, count: 11, pct: 29 },
+              { stars: 3, count: 5, pct: 13 },
+              { stars: 2, count: 2, pct: 5 },
+              { stars: 1, count: 2, pct: 5 },
+            ].map((r, i) => (
+              <div key={r.stars} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: i < 4 ? 9 : 0 }}>
+                <span style={{ ...NUM, fontSize: 12, color: "rgba(255,255,255,0.5)", width: 12, textAlign: "right" }}>{r.stars}</span>
+                <span aria-hidden="true" style={{ fontSize: 12, color: "var(--c-warn)" }}>★</span>
+                <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+                  <div style={{ width: `${r.pct}%`, height: "100%", borderRadius: 4, background: r.stars >= 4 ? "rgba(76,175,80,0.55)" : r.stars === 3 ? "rgba(255,165,0,0.55)" : "rgba(255,59,48,0.45)", transition: "width 0.6s ease-out", transitionDelay: `${i * 0.08}s` }} />
+                </div>
+                <span style={{ ...NUM, fontSize: 11, color: "rgba(255,255,255,0.5)", width: 24, textAlign: "right" }}>{r.count}</span>
+              </div>
+            ))}
+          </PanoKart>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
@@ -2692,7 +2835,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
           {activeTab === "stats" && (
             <PanoTab
               restaurant={ownerRestaurant} canReserve={canReserve}
-              onGo={setActiveTab} reviewCount={stats.totalReviews} />
+              onGo={setActiveTab} reviewCount={stats.totalReviews} genis={genis} />
           )}
 
           {/* ─── TAB: Yorumlar ─── */}
@@ -2955,7 +3098,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
                 const secili = activeTab === tab.id;
                 return (
                   <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
-                    aria-current={secili ? "page" : undefined}
+                    aria-current={secili ? "page" : undefined} className="gur-press"
                     style={{
                       display: "flex", alignItems: "center", gap: 10, width: "100%",
                       minHeight: 44, padding: "0 12px", borderRadius: 12, cursor: "pointer",
@@ -2996,7 +3139,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
                   }}>
                     <Icon n={k.ikon} size={16} color="#FF9A4D" />
                     <div>
-                      <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1.1 }}>{k.deger}</p>
+                      <p style={{ ...NUM, fontSize: 13.5, fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.1 }}>{k.deger}</p>
                       <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.5)", margin: 0 }}>{k.alt}</p>
                     </div>
                   </div>
@@ -3004,7 +3147,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
               </div>
             </div>
 
-            <div style={{ maxWidth: 1000, padding: "22px 28px 60px" }}>
+            <div style={{ maxWidth: 1240, padding: "24px 28px 64px" }}>
               {panelIcerik}
             </div>
           </div>

@@ -617,6 +617,89 @@ hepsini ilkine bağlardı (bkz. `GlossDefs`).
 Dönem hapları **44 px yüksekliğinde**: ilk ölçümde 38 px'ti ve dokunma
 hedefi kuralının altında kalıyordu.
 
+### Panoda tasarım geçişi: yüzey, bento, dokunsal geri bildirim
+
+Pano bir tasarım gözüyle yeniden ele alındı. Çıkış noktası dış bir
+"anti-slop" kılavuzuydu; o kılavuzun bazı maddeleri PROJENİN KENDİ
+KURALLARIYLA ÇAKIŞIYOR ve çakışanlarda proje kazandı. Karar tablosu,
+bir dahakine tekrar tartışılmasın diye:
+
+| Kılavuz | Proje | Sonuç |
+|---|---|---|
+| Tailwind | satır içi stil, Tailwind YOK | satır içi stil |
+| Geist / Satoshi | Poppins + Outfit, "başka font kullanma" | Poppins + Outfit |
+| Phosphor / Radix ikon | `kit.jsx` → `Icon` | kendi kiti (yeni bağımlılık yok) |
+| "diffusion shadow" ile yükseklik | koyu zeminde yüksekliği GÖLGE anlatmaz | yüzey merdiveni |
+| GSAP / ThreeJS | Motion zaten var | Motion |
+| Framer Motion | `motion/react` — aynı motor | olduğu gibi |
+
+Uygulananlar:
+
+**Yüzey merdiveni + yarıçap ölçeği** (`YUZ`, `RAD`). Panodaki ALTI bloğun
+altısı da aynı kutuydu: `rgba(255,255,255,0.04)` + 1px kenarlık + 20
+yarıçap. Hepsi aynı ağırlıkta olunca hiçbiri öne çıkmıyordu. Artık taban
+kart / öne çıkan kart / parça için üç yüzey ve dış kap 26 · kart 18 ·
+parça 12 için üç yarıçap var. Tek bir `PanoKart` bileşeni altı ayrı elle
+yazılmış kutunun yerine geçti.
+
+**Bento ızgarası.** Pano tek sütunluk bir yığındı; masaüstünde ekranın
+yarısını harcıyor ve "önce neye bakayım" sorusunu cevapsız bırakıyordu.
+Dört sütun, satır satır değişen bölünme: **2+1+1 · 1+3 · 4 · 2+2 · 2+2**.
+Dar ekranda ızgara ikiye düşüyor ve sıra ESKİSİNİN AYNISI.
+
+İki kural ızgaranın içinde ölçümle oturdu:
+- **`alignItems: "start"`.** `stretch` ile kısa kart satırdaki en uzun
+  kartın boyuna çekiliyordu: "Masa talebi" grafiğin yanında 260 px boş
+  kalıyor, ısı haritası takvimin boyuna uzayıp altında kocaman bir
+  boşluk bırakıyordu. Şişmiş bir kart bozuk görünür, satır altında kalan
+  boşluk görünmez.
+- **KPI satırının üçü `stretch`.** Genel kural `start` ama aynı satırdaki
+  üç KPI'nın altı 10 px kaymış dursa bu tasarım değil hizasızlık okunur.
+  Ölçüldü: üçünün alt kenarı da 297 px.
+- Satır ATLAMA (`grid-row span`) bilerek yok: bir kart iki satıra
+  yayılınca komşusunun boyu onu geriyor ve içerik uzadıkça ızgara
+  öngörülemez hâle geliyor.
+
+**Sayılar mono + `tabular-nums`** (`NUM`). Oransal rakamlar basamak
+başına farklı genişlikte; dönem değişince KPI değeri yerinde zıplıyordu.
+Yönetici panelinde bu zaten böyleydi.
+
+**Dokunsal geri bildirim** (`.gur-press`). Haplar basılınca içeriden
+doluyordu ama kart büyüklüğündeki tıklanabilir yüzeylerde (pano satırı,
+takvim günü, kenar çubuğu sekmesi) hiçbir şey yoktu. Nesne kâğıda
+yaklaşıyor: 1px aşağı + hafif küçülme.
+
+**Tek bir sürekli hareket** (`.gur-breathe` + `CanliNokta`). "YAYINDA"
+rozetinin yanında nefes alan bir nokta — yalnızca orada. Her şey
+kıpırdarsa hiçbiri dikkat çekmez. Halka CSS'te, bileşen `React.memo`lu:
+sürekli dönen bir animasyonun ata bileşeni yeniden çizmesi panonun
+tamamını her karede yeniden çizdirirdi.
+
+**Sıralı giriş** (`SIRA` / `PARCA`). Kartlar aynı anda değil dalga
+hâlinde beliriyor. Azaltılmış hareketi kökteki
+`MotionConfig reducedMotion="user"` zaten kapatıyor.
+
+**Emoji kaldırıldı.** Selamlamadaki el emojisi yazı tipinin kontrol
+etmediği bir görsel: platforma göre değişiyor ve başlığın ağırlığını
+dağıtıyor.
+
+**İSKELET EKLENMEDİ** — kılavuz yükleme durumu istiyor ama panoda
+BEKLENECEK BİR ŞEY YOK: seri senkron üretiliyor, depolar localStorage.
+Olmayan bir yüklemeyi iskeletle göstermek, splash'a sahte çark takmakla
+aynı yalan olurdu (bkz. "Neden 2.6 ve neden gösterge yok").
+
+**Ölçüm.** Panelin kontrast uyarısı **39'dan 16'ya** düştü ve kalanların
+tamamı iki bilinen kategoride: GUR kelime markası, beyaz-üstü-turuncu
+kararı ve SVG metninin yanlış okunması. Yol boyunca çıkan gerçek kusur:
+ısı haritasında **düşük değerli hücrenin yazısı daha KOYU zeminde daha
+SOLUKTU** (`rgba(255,255,255,0.45)`, `rgb(84,42,14)` üstünde 3.74:1) —
+okunurluğu ters yönde bozuyordu; değer farkını zaten zeminin tonu
+anlatıyor. Takvim günleri de 620 px'lik kartta 85 px'lik karelere
+büyüyordu, ızgara 392 px'te sabitlendi (hedef hâlâ 44'ün üstünde).
+
+**Referans site açılamadı.** `tgoyemek.com` bu ortamın çıkış kapısında
+engelli (CONNECT'e 403); oradan ölçüm alınmadı.
+
 ### Yönetici panosu: One düzeni
 Panel açık gri kâğıt (`C.bg`) üzerinde beyaz kartlar. Üç imza parçası
 `GurAdmin.jsx` içinde:
