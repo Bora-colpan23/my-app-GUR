@@ -25,7 +25,12 @@ import {
   GRAD, BackBtn, haptic, keepVisible, toMediaFiles, usePrefersReducedMotion,
   SocialAuthRow, StepProgress, useMediaQuery, GENIS,
 } from '../ui/kit.jsx';
-import { SiteHeader, SiteFooter, Landing, FormKap } from './site.jsx';
+import { Landing, FormKap } from './site.jsx';
+// TEK SİTE: başlık ve alt bilgi tanıtım tarafıyla ORTAK. İşletme sitesinin
+// kendi kabuğu vardı ve ziyaretçi `/` ile `/isletme` arasında geçince
+// başka bir ürüne geçmiş gibi oluyordu (bkz. app/site.jsx → "TEK SİTE,
+// İKİ İZLEK"). Kabuk izleği yoldan okuyor, prop olarak geçmiyoruz.
+import { WebHeader, WebFooter, Grain } from '../app/site.jsx';
 import {
   submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles,
   saveOwnerProfile, saveOwnerLogo, clearOwnerLogo, ownerLogo, OVERRIDABLE,
@@ -3819,10 +3824,16 @@ export default function GurBusiness() {
       <GlossDefs />
 
       {/* Panelde site başlığı yok: panelin kendi başlığı ve gezinmesi var,
-          iki gezinme şeridi üst üste hangisinin ana olduğunu sildirir. */}
-      {!panelde && <SiteHeader onGo={git} girisli={girisli} onLogout={cikis} aktif={ekran} />}
+          iki gezinme şeridi üst üste hangisinin ana olduğunu sildirir.
+          Film greni de yalnızca site tarafında — panel koyu ve kendi
+          dokusu var. */}
+      {!panelde && <Grain />}
+      {!panelde && <WebHeader isletme={{ girisli, onCikis: cikis }} />}
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      {/* YÜZEN ADA SABİT, YER KAPLAMIYOR. Eski işletme başlığı `sticky`
+          idi ve akışta yer tutuyordu; ortak başlık `fixed`, o yüzden üst
+          payı sayfa veriyor. Panelde pay yok — orada başlık da yok. */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingTop: panelde ? 0 : (genis ? 94 : 78) }}>
         <AnimatePresence mode="wait">
           <motion.div
             key={ekran}
@@ -3834,7 +3845,7 @@ export default function GurBusiness() {
         </AnimatePresence>
       </div>
 
-      {!panelde && <SiteFooter onGo={git} />}
+      {!panelde && <WebFooter />}
     </div>
   );
 }

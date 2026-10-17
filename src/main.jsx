@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import { TuketiciLanding } from './app/site.jsx';
-import GurApp from './app/GurApp.jsx';
 
 // ═══════════════════════════════════════════════════════════════════════
 // GUR DÖRT PARÇADAN OLUŞUR — üçü burada, biri ayrı depo klasöründe:
@@ -27,8 +26,14 @@ import GurApp from './app/GurApp.jsx';
 // Ortak olan ekranlar değil VERİ: `src/lib/*` depoları, `src/data/
 // restaurants.js` ve `shared/*` dört parçayı birbirine bağlıyor.
 // ═══════════════════════════════════════════════════════════════════════
+// Üçü de AYRI PARÇADA. Tanıtım sayfasını açan ziyaretçi ne paneli ne de
+// tüketici uygulamasını indirsin: `/` yalnızca mağazaya yollayan bir
+// sayfa, uygulamanın 4.476 satırı orada boşuna iner. Artifact derlemesi
+// bunun TERSİNİ yapıyor (`scripts/artifact-main.jsx`): tek dosyalık
+// önizleme ayrı bir parça yükleyemez, orada üçü de statik.
 const GurAdmin = lazy(() => import('./admin/GurAdmin.jsx'));
 const GurBusiness = lazy(() => import('./business/GurBusiness.jsx'));
+const GurApp = lazy(() => import('./app/GurApp.jsx'));
 
 // Panel indirilirken beyaz ekran kalmasın diye paneli anımsatan koyu bir zemin
 const AdminFallback = () => (
@@ -39,7 +44,7 @@ const AdminFallback = () => (
 
 const router = createBrowserRouter([
   { path: '/', element: <TuketiciLanding /> },
-  { path: '/uygulama', element: <GurApp /> },
+  { path: '/uygulama', element: <Suspense fallback={<AdminFallback />}><GurApp /></Suspense> },
   // Doyurucu'nun kendi alt yolları var (/isletme/kayit, /isletme/giris,
   // /isletme/panel …). Splat olmadan bu adresler "*" kuralına düşüp ana
   // sayfaya yönleniyordu.

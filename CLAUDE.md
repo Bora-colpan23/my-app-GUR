@@ -35,11 +35,17 @@ veremeyiz. Kapı hem arayüzde hem sunucuda (`POST /api/reservations`).
 
 | # | Yüzey | Nerede | Kim kullanır |
 |---|---|---|---|
-| 1 | **Tanıtım web sitesi** | `/` (`src/app/site.jsx`) | tüketici (indirmeye gider) |
+| 1 | **WEB SİTESİ — tüketici izleği** | `/` (`src/app/site.jsx`) | tüketici (indirmeye gider) |
+| 1 | **WEB SİTESİ — işletme izleği** | `/isletme/*` (Doyurucu) | restoran sahibi |
 | 2 | **Tüketici uygulaması** | `/uygulama` (`src/app/GurApp.jsx`, telefon çerçevesinde) | tüketici |
-| 3 | **Restoran kayıt web sitesi** | `/isletme/*` (Doyurucu) | restoran sahibi |
-| 4 | **Yönetici paneli** | `/admin` | GUR ekibi |
+| 3 | **Yönetici paneli** | `/admin` | GUR ekibi |
 | — | **Mağaza paketi** | `mobile/` (Expo, App Store + Google Play) | tüketici |
+
+**TANITIM VE İŞLETME TEK SİTE.** İkisi bir dönem iki ayrı siteydi: iki
+başlık, iki alt bilgi, iki gezinme, iki ayrı GUR logosu. Ziyaretçi `/`
+ile `/isletme` arasında geçince başka bir ürüne geçmiş gibi oluyordu.
+Artık aynı kabuk (`WebHeader` + `WebFooter`), yalnızca içeriği izleğe
+göre değişiyor — ayrıntı "TEK SİTE, İKİ İZLEK" başlığında.
 
 Dördü de önizlemede EŞİT AĞIRLIKTA, aynı şeritte.
 
@@ -73,9 +79,9 @@ npm run dev:all                       # API (8787) + arayüz (5173)
 
 Yalnız arayüz: `npm run dev`. Yalnız API: `npm run dev:api`.
 
-- `/`          → **tanıtım web sitesi** (her genişlikte aynı; mağazaya yollar)
+- `/`          → **web sitesi, tüketici izleği** (mağazaya yollar)
+- `/isletme`   → **web sitesi, işletme izleği** (tanıtım + kayıt + panel) — AYNI başlık ve alt bilgi
 - `/uygulama`  → **tüketici uygulaması** (telefon çerçevesinde; gerçek telefonda çerçeve kalkar)
-- `/isletme`   → **restoran kayıt web sitesi** (tanıtım + kayıt + panel)
 - `/admin`     → **yönetici paneli** (tam ekran masaüstü)
 
 Doyurucu'nun alt yolları: `/isletme/kayit`, `/isletme/sahiplen`,
@@ -88,6 +94,12 @@ Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
 `demo@gur.app` / `gur1234`.
 
 Derleme: `npm run build` → `dist/`. Lint: `npm run lint` (src + server + shared).
+
+**Üç parça da TEMBEL yükleniyor** (`src/main.jsx`): yönetici paneli,
+işletme uygulaması ve tüketici uygulaması. `/` yalnızca mağazaya yollayan
+bir sayfa; uygulamanın 181 kB'ı orada boşuna inerdi. Artifact derlemesi
+bunun TERSİNİ yapıyor (`scripts/artifact-main.jsx`) — tek dosyalık
+önizleme ayrı parça yükleyemez, orada üçü de statik.
 
 **Mağaza uygulaması:** `cd mobile && npm install && npx expo start`.
 Ayrıntı ve mağazaya çıkarma adımları `mobile/README.md` içinde.
@@ -595,6 +607,44 @@ gösterilmiyor): Google/Apple ile giriş (ikisi de anahtar istiyor ve App
 Store kuralı gereği biri varsa diğeri de olmalı), konum doğrulamalı
 yorum YAZMA adımı, push bildirimi, ödüllü video ve GUR Plus.
 
+### TEK SİTE, İKİ İZLEK — ortak başlık ve alt bilgi
+
+`src/app/site.jsx` → `WebHeader` ve `WebFooter` **iki izlekte de** çiziliyor;
+işletme sitesinin kendi `SiteHeader` / `SiteFooter`i KALDIRILDI.
+
+**Karar tek satırda ve YOLDAN okunuyor**: `yer.pathname.startsWith("/isletme")`.
+Prop olarak geçirilseydi bir sayfada yanlış vermeyi unutmak iki gezinmenin
+birbirine yalan söylemesi demekti.
+
+| | Tüketici izleği (`/`) | İşletme izleği (`/isletme*`) |
+|---|---|---|
+| Gezinme | `MENU` — İndir · Nasıl çalışır · Uygulamada ne var · Gizlilik · SSS | `ISLETME_MENU` — Nasıl çalışır · Ne kazanırsınız · Ücretlendirme · SSS |
+| Turuncu eylem | Uygulamayı indir | Ücretsiz kayıt ol (girişliyse **Panele dön**) |
+| İkincil eylem | İşletmeler | Giriş yap (girişliyse **Çıkış**) |
+| Logo yanı | — | `İŞLETME` etiketi |
+
+**Logo her iki izlekte de `/`ye gider** — site kökü orası. İşletme
+izleğinde logonun yanında "İŞLETME" yazıyor: aynı başlık iki yerde
+kullanılınca kullanıcının hangi bölümde olduğunu bilmesi gerekiyor.
+
+**Oturum durumu prop ile geliyor** (`isletme={{ girisli, onCikis }}`):
+başlık `localStorage`ı kendi okumuyor, `GurBusiness` zaten tutuyor ve iki
+yerde okumak iki ayrı doğruluk kaynağı demekti.
+
+**Dar ekranda pilde yalnız BİRİNCİL eylem var**, ikincisi menünün içinde:
+ikisi de sığmıyor ve sıkıştırmak ikisini de 44 px'in altına düşürüyordu.
+
+**Yüzen ada SABİT ve yer kaplamıyor.** Eski işletme başlığı `sticky` idi ve
+akışta yer tutuyordu; ortak başlık `fixed`, o yüzden üst payı
+`GurBusiness` veriyor (94 / 78 px). Panelde pay da yok, başlık da.
+
+**PANEL BU KABUĞUN DIŞINDA** (`/isletme/panel`): kendi başlığı ve koyu
+teması var, iki gezinme şeridi üst üste hangisinin ana olduğunu sildirir.
+
+Alt bilgi tek ve espresso: marka künyesi + **İndir** (mağazalar) +
+**İşletmeler** (ne sunuyoruz / kayıt / sahiplen / giriş). İşletme alt
+bilgisindeki satırların hepsi buraya taşındı, hiçbiri kaybolmadı.
+
 ### Tanıtım web sitesi (`/`) — işi İNDİRTMEK
 
 Site tek genişlikte tek şey yapıyor: GUR'un ne olduğunu anlatıp
@@ -738,12 +788,10 @@ geniş ekrandaki kenar çubuğu aynı diziyi çiziyor, gövde de aynı
 (`panelIcerik`). İki kopya olsaydı biri katalogda açılan yeni sekmeyi
 göstermeyi unuturdu.
 
-**Alt bilgideki "Tüketici uygulaması" bağlantısı MAĞAZAYA gider.**
-Eskiden `href="/"` ile tanıtım sayfasına gidiyordu. İki sorun: restoran
-sahibinin müşterisi bir web sayfası değil mağaza uygulaması indiriyor
-(ana ürün o), ve o mutlak yol hash yönlendiricili önizlemede kabuğun
-kendisini iframe'in içine açıyordu. Adres boşken bağlantı üretilmiyor —
-eylemi olmayan satır düğme değil düz metin ("App Store · yakında").
+**Başlık ve alt bilgi ARTIK ORTAK.** `SiteHeader` / `SiteFooter` bu
+dosyadan kaldırıldı; `/isletme` tanıtım sitesiyle aynı kabuğu çiziyor
+(bkz. "TEK SİTE, İKİ İZLEK"). Burada kalanlar İÇERİK: `Section`,
+`SectionTitle`, `Card`, `FormKap`, `Landing`.
 
 **Panelde site başlığı yok.** Panelin kendi başlığı ve gezinmesi var; iki
 gezinme şeridi üst üste hangisinin ana olduğunu sildirir. Siteye dönüş

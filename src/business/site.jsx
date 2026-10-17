@@ -23,8 +23,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import React, { useState } from 'react';
-import { GurLogo, Icon, Btn, useMediaQuery, GENIS, ELEV } from '../ui/kit.jsx';
-import { MAGAZA } from '../lib/magaza.js';
+import { Icon, Btn, useMediaQuery, GENIS, ELEV } from '../ui/kit.jsx';
 
 const KAP = 1120;          // içerik kabının en büyük genişliği
 
@@ -71,165 +70,17 @@ export function Card({ children, pad = 22, style }) {
 // Sitenin gezinmesi. Dar ekranda bağlantılar bir açılır panele iniyor:
 // sıkıştırmak yerine gizlemek — altı bağlantıyı 390 px'e dizmek hepsini
 // okunmaz yapardı.
-export function SiteHeader({ onGo, girisli, onLogout, aktif }) {
-  const genis = useMediaQuery(GENIS);
-  const [acik, setAcik] = useState(false);
+// ─── BAŞLIK VE ALT BİLGİ ARTIK ORTAK ────────────────────────────────
+// `SiteHeader` ve `SiteFooter` buradan KALDIRILDI. Tanıtım ve işletme tek
+// bir web sitesi oldu: ikisi de `src/app/site.jsx` içindeki `WebHeader` ve
+// `WebFooter`i çiziyor, içerik izleğe göre değişiyor (bkz. "TEK SİTE, İKİ
+// İZLEK"). İki ayrı kabuk olduğu dönemde ziyaretçi `/` ile `/isletme`
+// arasında geçince başka bir ürüne geçmiş gibi oluyordu — iki logo, iki
+// gezinme, iki alt bilgi.
+//
+// Buradaki parçalar (Section / SectionTitle / Card / FormKap / Landing)
+// İÇERİK: işletme sayfalarının gövdesi. Onlar kaldı.
 
-  const baglantilar = [
-    { id: "nasil", label: "Nasıl çalışır" },
-    { id: "kazanc", label: "Ne kazanırsınız" },
-    { id: "ucret", label: "Ücretlendirme" },
-    { id: "sss", label: "Sık sorulanlar" },
-  ];
-
-  const git = (id) => {
-    setAcik(false);
-    if (aktif !== "landing") { onGo("landing", id); return; }
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const eylemler = (
-    <>
-      {girisli ? (
-        <>
-          <Btn text="Panele dön" onClick={() => { setAcik(false); onGo("panel"); }} variant="filled" size="md" fullWidth={!genis} />
-          <Btn text="Çıkış" onClick={() => { setAcik(false); onLogout(); }} variant="outlineDark" size="md" fullWidth={!genis} />
-        </>
-      ) : (
-        <>
-          <Btn text="Giriş yap" onClick={() => { setAcik(false); onGo("giris"); }} variant="outlineDark" size="md" fullWidth={!genis} />
-          <Btn text="Ücretsiz kayıt ol" onClick={() => { setAcik(false); onGo("kayit"); }} variant="filled" size="md" fullWidth={!genis} />
-        </>
-      )}
-    </>
-  );
-
-  return (
-    <header style={{
-      position: "sticky", top: 0, zIndex: 50,
-      background: "rgba(253,251,247,0.86)", backdropFilter: "blur(14px)",
-      borderBottom: "1px solid var(--c-border)",
-    }}>
-      <div style={{
-        maxWidth: KAP, margin: "0 auto", padding: "12px 20px",
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
-      }}>
-        <button type="button" onClick={() => onGo("landing")} className="gur-tap"
-          style={{ display: "inline-flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-          <GurLogo size={38} pill />
-          <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, letterSpacing: "0.06em", color: "var(--c-ink-2)" }}>DOYURUCU</span>
-        </button>
-
-        {genis ? (
-          <>
-            <nav style={{ display: "flex", gap: 4 }}>
-              {baglantilar.map(b => (
-                <button key={b.id} type="button" onClick={() => git(b.id)} className="gur-tap"
-                  style={{
-                    background: "none", border: "none", cursor: "pointer", borderRadius: 999,
-                    padding: "10px 13px", fontFamily: "var(--f-body)", fontSize: 14,
-                    fontWeight: 600, color: "var(--c-ink-2)", whiteSpace: "nowrap",
-                  }}>{b.label}</button>
-              ))}
-            </nav>
-            <div style={{ display: "flex", gap: 8 }}>{eylemler}</div>
-          </>
-        ) : (
-          <button type="button" onClick={() => setAcik(a => !a)}
-            aria-expanded={acik} aria-label={acik ? "Menüyü kapat" : "Menüyü aç"}
-            className="gur-icon-btn"
-            style={{
-              width: 42, height: 42, borderRadius: 14, border: "1px solid var(--c-border)",
-              background: "var(--c-card)", cursor: "pointer", display: "flex",
-              alignItems: "center", justifyContent: "center", padding: 0, outline: "none",
-            }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.2" strokeLinecap="round">
-              {acik ? <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>
-                    : <><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>}
-            </svg>
-          </button>
-        )}
-      </div>
-
-      {!genis && acik && (
-        <div style={{ borderTop: "1px solid var(--c-border)", background: "var(--c-card)", padding: "12px 20px 18px" }}>
-          <nav style={{ display: "flex", flexDirection: "column", marginBottom: 12 }}>
-            {baglantilar.map(b => (
-              <button key={b.id} type="button" onClick={() => git(b.id)}
-                style={{
-                  background: "none", border: "none", cursor: "pointer", textAlign: "left",
-                  padding: "13px 2px", minHeight: 44, fontFamily: "var(--f-body)",
-                  fontSize: 15, fontWeight: 600, color: "var(--c-ink)",
-                  borderBottom: "1px solid var(--c-subtle)",
-                }}>{b.label}</button>
-            ))}
-          </nav>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{eylemler}</div>
-        </div>
-      )}
-    </header>
-  );
-}
-
-// ─── Alt bilgi ───────────────────────────────────────────────────────
-export function SiteFooter({ onGo }) {
-  const genis = useMediaQuery(GENIS);
-  return (
-    <footer style={{ background: "var(--c-warm-1)", borderTop: "1px solid var(--c-border)", padding: "40px 20px 28px" }}>
-      <div style={{
-        maxWidth: KAP, margin: "0 auto",
-        display: "flex", flexDirection: genis ? "row" : "column", gap: 28,
-        justifyContent: "space-between", alignItems: genis ? "flex-start" : "stretch",
-      }}>
-        <div style={{ maxWidth: 320 }}>
-          <GurLogo size={40} pill />
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)", margin: "12px 0 0", lineHeight: 1.6 }}>
-            Doyurucu, GUR'un işletme tarafıdır. Restoranınızın GUR'daki kaydını
-            buradan yönetirsiniz.
-          </p>
-        </div>
-
-        <div style={{ display: "flex", gap: genis ? 56 : 28, flexWrap: "wrap" }}>
-          <div>
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, letterSpacing: "0.06em", color: "var(--c-ink)", margin: "0 0 10px" }}>İŞLETME</p>
-            {[["kayit", "Kayıt ol"], ["sahiplen", "Kaydını sahiplen"], ["giris", "Giriş yap"]].map(([id, t]) => (
-              <button key={id} type="button" onClick={() => onGo(id)} className="gur-tap"
-                style={{ display: "block", background: "none", border: "none", cursor: "pointer", padding: "5px 0", fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink-2)" }}>{t}</button>
-            ))}
-          </div>
-          <div>
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, letterSpacing: "0.06em", color: "var(--c-ink)", margin: "0 0 10px" }}>GUR</p>
-            {/* TÜKETİCİ ÜRÜNÜ MOBİL UYGULAMA — burada eskiden href="/" ile
-                tanıtım sayfasına giden bir bağlantı vardı. İki sorun: restoran
-                sahibinin müşterisi bir web sayfası değil mağaza uygulaması
-                indiriyor, ve o mutlak yol hash yönlendiricili önizlemede
-                kabuğun kendisini iframe'in içine açıyordu.
-                Adres boşken bağlantı ÜRETİLMİYOR (bkz. lib/magaza.js): eylemi
-                olmayan satır düğme değil düz metin. */}
-            {[["ios", "App Store"], ["android", "Google Play"]].map(([tur, ad]) => (
-              MAGAZA[tur]
-                ? <a key={tur} href={MAGAZA[tur]} target="_blank" rel="noopener noreferrer" className="gur-tap"
-                     style={{ display: "block", padding: "5px 0", fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink-2)", textDecoration: "none" }}>{ad}</a>
-                : <span key={tur} style={{ display: "block", padding: "5px 0", fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)" }}>{ad} · yakında</span>
-            ))}
-            <span style={{ display: "block", padding: "5px 0", fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)" }}>İstanbul</span>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: KAP, margin: "26px auto 0", paddingTop: 18, borderTop: "1px solid var(--c-border)" }}>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: 0 }}>
-          © {new Date().getFullYear()} GUR · Kayıt ve panel kullanımı ücretsizdir, işletme aboneliği yoktur.
-        </p>
-      </div>
-    </footer>
-  );
-}
-
-// ─── Form sayfaları için dar kap ─────────────────────────────────────
-// Kayıt, sahiplenme ve giriş ekranları telefon için yazılmıştı; web'de
-// ekranın tamamına yayılsalardı satır uzunluğu okunmaz olurdu. Ortada
-// sabit genişlikte bir sütunda duruyorlar — matbaanın kendi kuralı.
 export function FormKap({ children, en = 560 }) {
   return (
     <div style={{ background: "var(--c-warm-1)", minHeight: "70vh", padding: "32px 20px 56px" }}>

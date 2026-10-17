@@ -265,6 +265,25 @@ const OK = (
 // yeniden boyar.
 // ═══════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════
+// TEK SİTE, İKİ İZLEK
+//
+// Tanıtım (`/`) ve işletme (`/isletme/*`) bir dönem İKİ AYRI SİTEYDİ: iki
+// başlık, iki alt bilgi, iki gezinme, iki ayrı "GUR" logosu. Ziyaretçi
+// aralarında geçince başka bir ürüne geçmiş gibi oluyordu — oysa ikisi de
+// aynı ürünün iki kitlesi.
+//
+// Şimdi tek kabuk: AYNI yüzen ada başlığı ve AYNI espresso alt bilgi iki
+// izlekte de çiziliyor, yalnızca İÇERİĞİ izleğe göre değişiyor. Karar tek
+// satırda: yol `/isletme` ile başlıyorsa işletme izleği.
+//
+// Logo her iki izlekte de `/`ye gider — site kökü orası. İşletme izleğinde
+// logonun yanında "İŞLETME" etiketi duruyor: aynı başlık iki yerde
+// kullanılınca kullanıcının hangi bölümde olduğunu bilmesi gerekiyor.
+//
+// PANEL BU KABUĞUN DIŞINDA (`/isletme/panel`): kendi başlığı ve koyu teması
+// var, iki gezinme şeridi üst üste hangisinin ana olduğunu sildirir.
+// ═══════════════════════════════════════════════════════════════════════
 const MENU = [
   { id: "indir", label: "İndir" },
   { id: "kaydir", label: "Nasıl çalışır" },
@@ -273,12 +292,25 @@ const MENU = [
   { id: "sss", label: "Sık sorulanlar" },
 ];
 
-export function WebHeader({ koyu = false }) {
-  const bolumler = MENU;
+const ISLETME_MENU = [
+  { id: "nasil", label: "Nasıl çalışır" },
+  { id: "kazanc", label: "Ne kazanırsınız" },
+  { id: "ucret", label: "Ücretlendirme" },
+  { id: "sss", label: "Sık sorulanlar" },
+];
+
+export function WebHeader({ koyu = false, isletme = null }) {
   const genis = useMediaQuery(GENIS);
   const [acik, setAcik] = useState(false);
   const nav = useNavigate();
   const yer = useLocation();
+
+  // TEK KARAR NOKTASI. Başlık hangi izlekte olduğunu yoldan okuyor; prop
+  // olarak geçirilseydi bir sayfada yanlış vermeyi unutmak iki gezinmenin
+  // birbirine yalan söylemesi demekti.
+  const isIzlek = yer.pathname.startsWith("/isletme");
+  const kok = isIzlek ? "/isletme" : "/";
+  const bolumler = isIzlek ? ISLETME_MENU : MENU;
 
   // Menü açıkken Escape kapatır ve arkadaki sayfa kaymaz.
   useEffect(() => {
@@ -290,10 +322,13 @@ export function WebHeader({ koyu = false }) {
     return () => { window.removeEventListener("keydown", esc); document.body.style.overflow = eski; };
   }, [acik]);
 
+  // Bölüme gitmek önce o izleğin kökünde olmayı gerektiriyor; sayfa
+  // çizilmeden önce id aranırsa hiçbir şey bulunmuyor, o yüzden bir kare
+  // bekleniyor.
   const git = (id) => {
     setAcik(false);
-    if (yer.pathname !== "/") {
-      nav("/");
+    if (yer.pathname !== kok) {
+      nav(kok);
       setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
       return;
     }
@@ -304,12 +339,21 @@ export function WebHeader({ koyu = false }) {
     ? { bg: "rgba(24,18,14,0.72)", kenar: "1px solid rgba(255,255,255,0.1)", ink: "rgba(253,251,247,0.78)", inkGuclu: "var(--c-bg)" }
     : { bg: "rgba(253,251,247,0.78)", kenar: "1px solid var(--c-border)", ink: "var(--c-ink-2)", inkGuclu: "var(--c-ink)" };
 
-  // SİTENİN TEK İŞİ İNDİRTMEK: ada gezinmesindeki tek turuncu hap
-  // mağaza bölümüne götürüyor. İkinci bir turuncu eylem koymak
-  // hangisinin ana yol olduğunu sildirirdi (bkz. "Renkle hiyerarşi").
-  const uygulamaHapi = (
-    <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="md" fullWidth={false} trailing={OK} />
-  );
+  // HER İZLEKTE TEK TURUNCU EYLEM. Tüketicide indirme, işletmede kayıt
+  // (girişliyse panele dönüş). İkinci bir turuncu hap hangisinin ana yol
+  // olduğunu sildirirdi (bkz. "Renkle hiyerarşi").
+  const ikincil = koyu ? "plain" : "plainDark";
+  const birincil = isIzlek
+    ? (isletme?.girisli
+        ? <Btn text="Panele dön" onClick={() => { setAcik(false); nav("/isletme/panel"); }} variant="filled" size="md" fullWidth={!genis} trailing={OK} />
+        : <Btn text="Ücretsiz kayıt ol" onClick={() => { setAcik(false); nav("/isletme/kayit"); }} variant="filled" size="md" fullWidth={!genis} trailing={OK} />)
+    : <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="md" fullWidth={!genis} trailing={OK} />;
+
+  const yanEylem = isIzlek
+    ? (isletme?.girisli
+        ? <Btn text="Çıkış" onClick={() => { setAcik(false); isletme.onCikis?.(); }} variant={ikincil} size="md" fullWidth={!genis} />
+        : <Btn text="Giriş yap" onClick={() => { setAcik(false); nav("/isletme/giris"); }} variant={ikincil} size="md" fullWidth={!genis} />)
+    : <Btn text="İşletmeler" onClick={() => { setAcik(false); nav("/isletme"); }} variant={ikincil} size="md" fullWidth={!genis} />;
 
   return (
     <>
@@ -330,6 +374,15 @@ export function WebHeader({ koyu = false }) {
             style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
             <GurLogo size={34} pill />
           </button>
+          {/* Aynı başlık iki izlekte de çiziliyor; kullanıcının hangi
+              bölümde olduğunu bilmesi gerekiyor. Tüketici izleğinde etiket
+              yok — orası sitenin kendisi. */}
+          {isIzlek && (
+            <span style={{
+              fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em",
+              color: cam.ink, whiteSpace: "nowrap", flexShrink: 0,
+            }}>İŞLETME</span>
+          )}
 
           {genis ? (
             <>
@@ -343,13 +396,16 @@ export function WebHeader({ koyu = false }) {
                     }}>{m.label}</button>
                 ))}
               </nav>
-              <Btn text="Doyurucu" onClick={() => nav("/isletme")} variant={koyu ? "plain" : "plainDark"} size="md" fullWidth={false} />
-              {uygulamaHapi}
+              {yanEylem}
+              {birincil}
             </>
           ) : (
             <>
               <span style={{ flex: 1, minWidth: 4 }} />
-              {uygulamaHapi}
+              {/* Dar ekranda pilde yalnız BİRİNCİL eylem; ikincisi menünün
+                  içinde. İkisi de sığmıyor ve sıkıştırmak ikisini de
+                  44 px'in altına düşürüyordu. */}
+              <div style={{ flexShrink: 0 }}>{birincil}</div>
               <button type="button" onClick={() => setAcik(true)}
                 aria-expanded={acik} aria-label="Menüyü aç" className="gur-icon-btn"
                 style={{
@@ -411,8 +467,21 @@ export function WebHeader({ koyu = false }) {
                 initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.06 + bolumler.length * 0.05, ease: EGRI }}
                 style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 26 }}>
-                <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="lg" trailing={OK} />
-                <Btn text="Restoran mısınız? Doyurucu'ya geçin" onClick={() => { setAcik(false); nav("/isletme"); }} variant="outlineDark" size="lg" />
+                {isIzlek ? (
+                  <>
+                    {isletme?.girisli
+                      ? <><Btn text="Panele dön" onClick={() => { setAcik(false); nav("/isletme/panel"); }} variant="filled" size="lg" trailing={OK} />
+                          <Btn text="Çıkış" onClick={() => { setAcik(false); isletme.onCikis?.(); }} variant="outlineDark" size="lg" /></>
+                      : <><Btn text="Ücretsiz kayıt ol" onClick={() => { setAcik(false); nav("/isletme/kayit"); }} variant="filled" size="lg" trailing={OK} />
+                          <Btn text="Giriş yap" onClick={() => { setAcik(false); nav("/isletme/giris"); }} variant="outlineDark" size="lg" /></>}
+                    <Btn text="Tüketici tarafına geç" onClick={() => { setAcik(false); nav("/"); }} variant="plainDark" size="lg" />
+                  </>
+                ) : (
+                  <>
+                    <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="lg" trailing={OK} />
+                    <Btn text="Restoran mısınız? İşletme tarafına geçin" onClick={() => { setAcik(false); nav("/isletme"); }} variant="outlineDark" size="lg" />
+                  </>
+                )}
               </motion.div>
             </nav>
           </motion.div>
@@ -457,13 +526,22 @@ export function WebFooter() {
             [MAGAZA.ios ? "App Store" : "App Store · yakında", MAGAZA.ios ? () => window.open(MAGAZA.ios, "_blank", "noopener") : null],
             [MAGAZA.android ? "Google Play" : "Google Play · yakında", MAGAZA.android ? () => window.open(MAGAZA.android, "_blank", "noopener") : null],
           ])}
-          {sutun("Restoranlar", [["Doyurucu'ya git", () => nav("/isletme")], ["Kaydını sahiplen", () => nav("/isletme/sahiplen")]])}
+          {/* İŞLETME SÜTUNU BURAYA TAŞINDI. İşletme sitesinin kendi alt
+              bilgisi vardı (`SiteFooter`); iki alt bilgi iki ayrı site
+              demekti. Satırlar o alt bilgiden geldi, hiçbiri kaybolmadı. */}
+          {sutun("İşletmeler", [
+            ["Ne sunuyoruz", () => nav("/isletme")],
+            ["Ücretsiz kayıt ol", () => nav("/isletme/kayit")],
+            ["Kaydını sahiplen", () => nav("/isletme/sahiplen")],
+            ["Giriş yap", () => nav("/isletme/giris")],
+            ["Kayıt ve panel ücretsiz", null],
+          ])}
         </div>
       </div>
       <div style={{ maxWidth: KAP, margin: "40px auto 0", paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(253,251,247,0.5)", margin: 0, lineHeight: 1.6 }}>
           © {new Date().getFullYear()} GUR · İstanbul · Konum verisi cihazında kalır,
-          ham koordinat hiçbir yere gönderilmez.
+          ham koordinat hiçbir yere gönderilmez · İşletme aboneliği yoktur.
         </p>
       </div>
     </footer>
