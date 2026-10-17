@@ -276,8 +276,16 @@ function OneCount({ value, bg, ink, d }) {
 
 export function Btn({
   text, onClick, disabled, loading, variant = "onColor", size = "lg",
-  fullWidth = true, icon, trailing, count,
+  fullWidth = true, icon, trailing, count, tap = false,
 }) {
+  // `tap`: hapı 44 px'e tamamlar. `sm` dolgusu 9 px ve yazısı 12.5 px —
+  // toplam 35 px, dokunma hedefi kuralının altında. Görünmez hedef
+  // büyütücüsü (`.gur-tap::after`) burada ÇALIŞMIYOR: `.gur-btn`
+  // basınca içeriden dolan daireyi kırpmak için `overflow: hidden`
+  // taşıyor ve taşan sözde öğe de kırpılıyor. Bu yüzden kutunun
+  // kendisi büyüyor.
+  // Opt-in, çünkü bütün `sm` hapları 44'e çekmek yönetici panelindeki
+  // yoğun tablo satırlarını da uzatırdı — orası ayrı bir karar.
   // lg'nin yatay dolgusu ESKİDEN 0'dı. Tam genişlikte fark etmiyordu
   // (hap zaten satırı kaplıyor, yazı ortalı) ama `fullWidth={false}` bir
   // lg hapta genişlik yazıya göre hesaplanıyor ve hap metnin harflerine
@@ -364,6 +372,7 @@ export function Btn({
         width: fullWidth ? "100%" : "auto",
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9,
         padding: paddings[size], borderRadius: 999,
+        minHeight: tap ? 44 : undefined,
         border: p.border || "1px solid transparent", color: p.color,
         // One'ın hapları kalın yazar: 600 bu ölçekte cılız kalıyordu.
         fontFamily: "var(--f-body)", fontWeight: 700, fontSize: fontSizes[size],

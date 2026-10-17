@@ -31,35 +31,27 @@ tek yerden yönetiliyor (restoran bazlı görünürlük anahtarı).
 kaydını **sahiplenmiş** işletmelerde açık: sahipsiz bir mekan adına söz
 veremeyiz. Kapı hem arayüzde hem sunucuda (`POST /api/reservations`).
 
-## ÜRÜN: BİR ANA UYGULAMA + İKİ BAĞLI WEB YÜZEYİ
-
-**GUR bir mobil uygulamadır.** Ürün odur; web tarafındaki yüzeyler ona
-bağlı — biri restoranı sisteme sokar, biri sistemi yönetir.
+## ÜRÜN DÖRT PARÇA — başka parça yok
 
 | # | Parça | Nerede | Kim kullanır |
 |---|---|---|---|
-| **1** | **GUR uygulaması — ANA ÜRÜN** | `mobile/` (Expo, App Store + Google Play) | tüketici |
-| 2 | **Restoran kayıt web sitesi** | `/isletme/*` (Doyurucu) | restoran sahibi |
-| 3 | **Yönetici panosu (web dashboard)** | `/admin` | GUR ekibi |
+| 1 | **Mobil uygulama** | `mobile/` (Expo, App Store + Google Play) | tüketici |
+| 2 | **Tanıtım web sitesi** | `/` (`src/app/site.jsx`) | tüketici (indirmeye gider) |
+| 3 | **Restoran kayıt web sitesi** | `/isletme/*` (Doyurucu) | restoran sahibi |
+| 4 | **Yönetici paneli** | `/admin` | GUR ekibi |
 
-Üçü eşit değil ve arayüz bunu söylemek zorunda: önizleme kabuğunda
-uygulama ilk sırada, "ANA" rozetiyle ve açılışta seçili; ikisi
-"BAĞLI WEB YÜZEYLERİ" başlığı altında. Üçünü eşit ağırlıkta yan yana
-dizmek hangisinin ürün olduğunu okunmaz kılıyordu.
+Dördü de önizleme kabuğunda EŞİT AĞIRLIKTA, aynı şeritte. Bir dönem
+uygulama "ANA" rozetiyle öne çıkarılmış ve tanıtım sekmesi şeritten
+çıkarılmıştı; geri alındı — dört yüzey arasında geçiş eşit haplarla
+oluyor.
 
-**Tanıtım sayfası (`/`, `src/app/site.jsx`) bir parça DEĞİL.** Depoda
-duruyor ve işini yapıyor — ana uygulamanın mağaza hunisi, ziyaretçiyi
-App Store / Google Play'e yollar — ama ürünün bir bileşeni olarak
-sayılmıyor ve birleşik önizlemede sekmesi yok. Kaldırılmadı: mağaza
-bağlantılarının bir yerden verilmesi gerekiyor.
-
-Dördüncü bir parça YOK. Özellikle: **tarayıcıda tüketici uygulaması
-yok.** Bir dönem vardı (`src/app/GurApp.jsx`) ve kök yol genişliğe göre
+Beşinci bir parça YOK. Özellikle: **tarayıcıda tüketici uygulaması yok.**
+Bir dönem vardı (`src/app/GurApp.jsx`) ve kök yol genişliğe göre
 dallanıyordu — telefonda uygulama, masaüstünde site. İki kabuk aynı işi
 yapınca hangisinin gerçek ürün olduğu okunmuyordu. Kaldırıldı; git
 geçmişinde duruyor (`git show 8b17fa0:src/app/GurApp.jsx`).
 
-Bunların altında bir de **sunucu** var ama o bir arayüz değil, üçünün
+Bunların altında bir de **sunucu** var ama o bir arayüz değil, dördünün
 ortak zemini: mekan beslemesi, swipe motoru, bildirim cron'ları,
 analitik toplama (`server/`).
 
@@ -97,22 +89,18 @@ yükleniyor, tek dosyalık artifact o ayrı chunk'ı bulamaz ve panel açılmaz.
 Betik `GUR_ARTIFACT=1` ile tek parça derliyor ve çıktıda birden fazla JS
 dosyası kalırsa hata veriyor.
 
-**ÜÇ PARÇA TEK ÖNİZLEME:** `npm run onizleme` → `dist/onizleme/`.
+**DÖRT PARÇA TEK ÖNİZLEME:** `npm run onizleme` → `dist/onizleme/`.
 
 ```bash
 cd mobile && npx expo export --platform web --output-dir dist-web && cd ..
-npm run artifact      # web yüzeyleri → dist/gur-preview.html
-npm run onizleme      # üçünü tek kabukta toplar
+npm run artifact      # üç web yüzeyi → dist/gur-preview.html
+npm run onizleme      # dördünü tek kabukta toplar
 ```
 
-Kabuk `scripts/onizleme-kabuk.html`: üstte üç sekme (ana uygulama +
-bağlı iki web yüzeyi), altında iki iframe. Web yüzeyleri TEK derlemenin
-içinde (hash yönlendiricisi), mobil uygulama ayrı bir Expo paketi ve
-393×852'lik bir cihaz çerçevesinde duruyor. Bilinmesi gereken beş şey:
-
-- **AÇILIŞ ANA ÜRÜNDE.** Kabuk mobil sekmesiyle açılıyor, web iframe'i
-  ilk gerekince yükleniyor. Sıra bir tercih değil ifade: GUR bir mobil
-  uygulama, web yüzeyleri ona bağlı.
+Kabuk `scripts/onizleme-kabuk.html`: üstte dört sekme, altında iki
+iframe. Üç web yüzeyi TEK derlemenin içinde (hash yönlendiricisi),
+mobil uygulama ayrı bir Expo paketi ve 393×852'lik bir cihaz
+çerçevesinde duruyor. Bilinmesi gereken dört şey:
 
 - **İki ayrı iframe, çünkü iki ayrı paket.** Vite + React DOM ile
   Expo + React Native Web'i aynı belgeye koymak iki react kopyası ve
@@ -136,10 +124,9 @@ Telefon çerçevesi burada ürünün içinde değil ÖNİZLEMENİN dışında: w
 tarafındaki telefon maketi tam da bu yüzden kaldırılmıştı (bkz. "TELEFON
 MAKETİ KALDIRILDI"). Burada taklit edilen ürün değil cihaz.
 
-Ölçüldü (`uc-parca.mjs`): açılış ana üründe, üç sekmenin üçü de kendi
-yüzeyini açıyor, iframe'ler yeniden yüklenmiyor, içeriden `/admin`e
-geçince şerit "Yönetici panosu"na düşüyor, 44 px altında sekme yok,
-393 px'te yatay taşma 0 px, istek/JS hatası yok.
+Ölçüldü (`birlesik-test.mjs`): dört sekmenin dördü de kendi yüzeyini
+açıyor, iframe'ler yeniden yüklenmiyor, içeriden `/admin`e geçince şerit
+"Yönetici"ye düşüyor, 44 px altında sekme yok, 393 px'te yatay taşma 0 px.
 
 ### Base44'te çalıştırma — dört parça tek origin
 
@@ -704,10 +691,11 @@ uyarısı veriyor: ikisi GUR kelime markası (logotype, kural dışı), biri
 "GASTRO ONAYLI" çipinde beyaz-üstü-turuncu (bilinen ürün kararı). Yeni
 kaynaklı sıfır. Yatay taşma iki genişlikte de 0 px; 44 px altında dokunma
 hedefi yok. Dar ekran menüsü `role="dialog" aria-modal="true"` ve üç
-kapatma yolu var (çarpı, perde, Escape). Tanıtım sayfası ürünün bir
-parçası değil (bkz. başlık): birleşik önizlemede sekmesi yok, tek
-dosyalık artifact derlemesinde hâlâ `#/` yolunda duruyor
-(`dort-yuzey.mjs`).
+kapatma yolu var (çarpı, perde, Escape). Tek dosyalık artifact
+derlemesinde üç sekme (Tanıtım · İşletme · Yönetici) kendi yüzeyini
+açıyor (`dort-yuzey.mjs`); dördüncü parça olan mobil uygulama O
+derlemenin içinde değil — dördü birden `npm run onizleme` kabuğunda
+(bkz. "DÖRT PARÇA TEK ÖNİZLEME").
 
 ### Doyurucu artık bir WEB SİTESİ
 
@@ -949,7 +937,82 @@ anlatıyor. Takvim günleri de 620 px'lik kartta 85 px'lik karelere
 büyüyordu, ızgara 392 px'te sabitlendi (hedef hâlâ 44'ün üstünde).
 
 **Referans site açılamadı.** `tgoyemek.com` bu ortamın çıkış kapısında
-engelli (CONNECT'e 403); oradan ölçüm alınmadı.
+engelli (CONNECT'e 403); oradan ölçüm alınmadı. İkinci kez denendi, aynı
+sonuç — tasarım dili kılavuzlardan ve projenin kendi jetonlarından
+kuruldu.
+
+### Panelin geri kalanı: ölçü, asimetri, hedef
+
+Pano bento ızgarasına geçmişti; **geri kalan yedi sekme tek sütunda
+kalmıştı** ve o sütun içerik alanının tamamını kaplıyordu. 1440 px'te
+ölçülenler: 1126 px genişliğinde metin satırı, etiketinden ~900 px
+uzakta duran kaynak rozeti, ekranı boydan boya geçen turuncu "kaydet"
+çubuğu, beş yorumun altında 350 px boşluk, 44 px'in altında 19 dokunma
+hedefi.
+
+Üç ilkel eklendi (`GurBusiness.jsx`, panonun ilkelleriyle aynı yerde):
+
+| İlkel | İşi |
+|---|---|
+| `Olcu` | okunur genişlik (varsayılan 680 px ≈ 68 karakter) |
+| `PanelIkili` | 1120 px üstünde asimetrik iki sütun: **sol iş, sağ karar** |
+| `YanKart` / `BosDurum` / `SuzgecHap` / `Yildizlar` | sağ sütun kutusu, boş durum, süzgeç hapı, yıldız sırası |
+
+Sekiz sekmenin yedisi bu ikiliden geçiyor (Pano kendi bentosunu
+koruyor). Sağ sütun **yapışkan**, çünkü taşıdığı şey (kaydet, özet,
+kural) sayfanın her yerinden gerekli.
+
+**`yanOnce`: dar ekranda sağ sütun önce.** Yorumlarda dağılım,
+Büyüme'de kural metni, Masalar/Teklifler'de özet listeden önce
+okunmalı — telefonda zaten eskiden de oradaydılar. Bilgiler'de TERSİ:
+kaydet düğmesi formdan önce gelirse doldurmadan basılacak bir düğme
+olur. Sıralama CSS `order` ile DEĞİL DOM'da yapılıyor; `order` görsel
+sırayla sekme sırasını ayırıyor ve klavyeyle gezen kullanıcı listeyi
+atlayıp özete düşüyordu.
+
+Sekme sekme ne değişti:
+
+- **Bilgiler** — kısa alanlar (saat, fiyat, telefon, adres) yan yana;
+  ad ve tanıtım yazısı tam genişlikte. Kaynak rozeti ETİKETİN YANINDA:
+  `space-between` ile satırın öbür ucuna atılıyor ve hangi alanı
+  anlattığı okunmuyordu. Sağda "Yayın durumu": doldurulan alan sayısı,
+  ilerleme çubuğu, bekleyen inceleme uyarısı ve kaydet düğmesi.
+- **Yorumlar** — kutular yerine ince ayırıcı, metin 720 px ölçüde, üç
+  süzgeç hapı (Tümü / 4-5 yıldız / **Düşük puan**) ve boş durum. Sağda
+  puan dağılımı. Dağılımın altında **kaynağı yazılı**: çubuklar
+  yüklenen 5 yorumdan sayılıyor, künyedeki 38 ise toplam — etiketsiz
+  bırakılsaydı aynı kartta iki farklı gerçek yazardı.
+- **Masalar / Teklifler** — özet + sayaç sağda, liste okunur ölçüde,
+  kesik çizgili "yok" kutusu yerine gerçek boş durum.
+- **Menü / Fotoğraflar** — yükleme alanı artık 1100 px değil; kural ve
+  öneri metni sağ sütunda.
+- **Büyüme** — "hiçbiri doğrudan satın alınmaz" şeridi sağ sütunda
+  yapışkan; fiyatlar mono + `tabular-nums`.
+
+**Dokunma hedefi: 19 → 0.** `Btn`in `sm` boyu 35 px veriyordu ve
+görünmez hedef büyütücüsü (`.gur-tap::after`) burada ÇALIŞMIYOR:
+`.gur-btn` basınca içeriden dolan daireyi kırpmak için
+`overflow: hidden` taşıyor, taşan sözde öğeyi de kırpıyor. Kite
+**opt-in `tap` bayrağı** eklendi (`minHeight: 44`) ve paneldeki 17
+`sm` hapına verildi; bütün `sm` hapları 44'e çekmek yönetici
+panelindeki yoğun tablo satırlarını da uzatırdı, orası ayrı bir karar.
+`DarkChip` 31 → 44, kenar çubuğundaki logo 42 → 44.
+
+**Koyu zeminde opaklık tabanı 0.5 uygulandı** (panoda ölçülmüş kural,
+panelin eski ekranlarında tutulmamıştı): 20 yerde 0.25–0.48 arası metin
+0.5–0.58 bandına çekildi, hiyerarşi korunarak.
+
+**Ölçüm.** Sekiz sekme × iki genişlik: yatay taşma 0 px, 44 px altında
+hedef yok (kalan üçü artifact önizlemesinin kendi şeridi, ürün değil),
+en geniş metin satırı 1126 → 717 px, JS hatası yok (`panel-olcu.mjs`,
+`panel-kontrast.mjs`). Kontrast uyarısı **33 → 19** ve kalan 19'un
+tamamı iki bilinen kategoride: GUR kelime markası ve beyaz-üstü-turuncu
+kararı. Yol boyunca kapatılan gerçek kusurlar: yükleme kutusunun
+başlığı kâğıt jetonunu (`--c-brand-ink`) koyu zeminde kullanıyordu
+(3.72:1 → koyu zemin jetonu `--c-brand-light`), dar düzendeki sekme
+şeridi 0.4 opaklıkta (3.82:1), turuncu başlıktaki ikincil metinler
+0.6/0.7 yerine `--c-on-brand-2`, beyaz kart üstündeki "Beğeni oranı"
+`rgba(255,102,0,0.75)` ile 2.31:1.
 
 ### Yönetici panosu: One düzeni
 Panel açık gri kâğıt (`C.bg`) üzerinde beyaz kartlar. Üç imza parçası

@@ -115,12 +115,12 @@ function OwnerServices({ restaurant }) {
               <span style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 600, color: "#fff" }}>
                 {c.label} kartı
               </span>
-              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, color: "rgba(255,255,255,0.45)", letterSpacing: 0.3 }}>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, color: "rgba(255,255,255,0.58)", letterSpacing: 0.3 }}>
                 {String(c.pricing || "").toLocaleUpperCase("tr")}
               </span>
             </div>
           ))}
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.5, margin: "2px 0 0" }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.55)", lineHeight: 1.5, margin: "2px 0 0" }}>
             Bu hizmetler restoran sayfanda kullanıcıya da açıkça gösteriliyor.
           </p>
         </div>
@@ -152,66 +152,118 @@ function OwnerInfoTab({ restaurant }) {
   // Bekleyen değişiklik: girilen alan yayında değil, yöneticide.
   const bekleyen = pendingChangeFor(restaurant?.id, modState);
 
-  return (
-    <div>
-      {/* İşletmenin aldığı hizmetler — panelin en üstünde, hangi ürünün
-          açık olduğu tek bakışta görünsün. */}
-      <OwnerServices restaurant={restaurant} />
+  // KISA ALANLAR YAN YANA. Altı alanın dördü tek satırlık (saat, fiyat,
+  // telefon, adres) ve her biri 1100 px genişliğinde bir kutuda
+  // duruyordu — "11:00 - 23:00" yazısı kutunun yüzde dördünü dolduruyor,
+  // gerisi boş. Ad ve tanıtım yazısı tam genişlikte kalıyor: biri
+  // uzayabilir, öbürü çok satırlı.
+  const tamGenislik = (f) => f.key === "name" || f.multiline;
 
-      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "14px 16px", marginBottom: 16 }}>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.55 }}>
-          Kaydın harita servislerinden otomatik oluşturuldu. Doldurduğun alanlar bu veriyi
-          ezer; boş bıraktıkların API'den gelmeye devam eder.
-          <br />Girdiğin bilgiler <b>yayına girmeden önce GUR ekibince incelenir</b>.
-        </p>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "var(--c-warn)", margin: "9px 0 0" }}>
-          {filled}/{OVERRIDABLE.length} alan işletmeden
-        </p>
+  const alanCiz = (f) => {
+    const incelemede = !!bekleyen && Object.prototype.hasOwnProperty.call(bekleyen.fields, f.key);
+    const fromOwner = !incelemede && !!own[f.key]?.trim();
+    const id = "bilgi-" + f.key;
+    const kutu = {
+      width: "100%", borderRadius: 14, padding: "11px 13px",
+      border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)",
+      color: "#fff", fontFamily: "var(--f-body)", fontSize: 16, outline: "none", boxSizing: "border-box",
+    };
+    return (
+      <div key={f.key} style={{ gridColumn: tamGenislik(f) ? "1 / -1" : "auto", minWidth: 0 }}>
+        {/* ROZET ETİKETİN YANINDA. Eskiden `justify-content: space-between`
+            ile satırın öbür ucuna atılıyordu: 1100 px'lik bir satırda
+            "Telefon" ile "API'DEN" arasında 900 px kalıyor ve rozetin
+            hangi alanı anlattığı okunmuyordu. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <label htmlFor={id} style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "rgba(255,255,255,0.78)" }}>{f.label}</label>
+          {/* Rozetin üçüncü hâli: İNCELEMEDE. Onaylanmamış bir değere
+              "İŞLETMEDEN" demek yalan olurdu — o değer henüz yayında
+              değil, yöneticinin önünde. */}
+          <span style={{
+            fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4,
+            padding: "2px 8px", borderRadius: 6,
+            color: incelemede ? "var(--c-warn-light)" : fromOwner ? "var(--c-ok-light)" : "rgba(255,255,255,0.6)",
+            background: incelemede ? "rgba(245,158,11,0.16)" : fromOwner ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.07)",
+          }}>{incelemede ? "İNCELEMEDE" : fromOwner ? "İŞLETMEDEN" : "API'DEN"}</span>
+        </div>
+        {f.multiline ? (
+          <textarea
+            id={id} value={draft[f.key]} rows={3} onFocus={keepVisible}
+            onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
+            placeholder={restaurant[f.key] || f.placeholder}
+            style={{ ...kutu, resize: "vertical", lineHeight: 1.5 }}
+          />
+        ) : (
+          <input
+            id={id} value={draft[f.key]} onFocus={keepVisible}
+            onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
+            placeholder={restaurant[f.key] || f.placeholder}
+            style={{ ...kutu, WebkitTextFillColor: "#fff" }}
+          />
+        )}
+        {!fromOwner && restaurant[f.key] && (
+          // Opaklık tabanı 0.5: 0.32 koyu zeminde 2.4:1 veriyordu ve
+          // "şu an gösterilen" satırı okunmuyordu (panoda ölçülmüş kural).
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.52)", margin: "5px 0 0" }}>
+            Şu an gösterilen: {String(restaurant[f.key]).slice(0, 70)}
+          </p>
+        )}
       </div>
+    );
+  };
 
-      {INFO_FIELDS.map(f => {
-        const incelemede = !!bekleyen && Object.prototype.hasOwnProperty.call(bekleyen.fields, f.key);
-        const fromOwner = !incelemede && !!own[f.key]?.trim();
-        return (
-          <div key={f.key} style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <label style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>{f.label}</label>
-              {/* Rozetin üçüncü hâli: İNCELEMEDE. Onaylanmamış bir değere
-                  "İŞLETMEDEN" demek yalan olurdu — o değer henüz yayında
-                  değil, yöneticinin önünde. */}
-              <span style={{
-                fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4,
-                padding: "2px 8px", borderRadius: 6,
-                color: incelemede ? "var(--c-warn-light)" : fromOwner ? "var(--c-ok-light)" : "rgba(255,255,255,0.45)",
-                background: incelemede ? "rgba(245,158,11,0.16)" : fromOwner ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.07)",
-              }}>{incelemede ? "İNCELEMEDE" : fromOwner ? "İŞLETMEDEN" : "API'DEN"}</span>
+  const yuzde = Math.round((filled / OVERRIDABLE.length) * 100);
+
+  return (
+    <PanelIkili
+      yan={
+        <>
+          {/* KARAR SAĞDA. Kaydet düğmesi formun 900 px altındaydı ve
+              ekranı boydan boya geçiyordu; şimdi doldurulan alan
+              sayısıyla aynı kartta ve sayfa kaysa da yerinde duruyor. */}
+          <YanKart baslik="Yayın durumu" one>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 8 }}>
+              <span style={{ ...NUM, fontSize: 26, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{filled}</span>
+              <span style={{ ...NUM, fontSize: 13, color: "rgba(255,255,255,0.55)" }}>/ {OVERRIDABLE.length}</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.6)", marginLeft: "auto" }}>alan işletmeden</span>
             </div>
-            {f.multiline ? (
-              <textarea
-                value={draft[f.key]} rows={3} onFocus={keepVisible}
-                onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
-                placeholder={restaurant[f.key] || f.placeholder}
-                style={{ width: "100%", resize: "vertical", borderRadius: 14, padding: "11px 13px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#fff", fontFamily: "var(--f-body)", fontSize: 16, lineHeight: 1.5, outline: "none", boxSizing: "border-box" }}
-              />
-            ) : (
-              <input
-                value={draft[f.key]} onFocus={keepVisible}
-                onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
-                placeholder={restaurant[f.key] || f.placeholder}
-                style={{ width: "100%", borderRadius: 14, padding: "11px 13px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#fff", WebkitTextFillColor: "#fff", fontFamily: "var(--f-body)", fontSize: 16, outline: "none", boxSizing: "border-box" }}
-              />
-            )}
-            {!fromOwner && restaurant[f.key] && (
-              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.32)", margin: "5px 0 0" }}>
-                Şu an gösterilen: {String(restaurant[f.key]).slice(0, 70)}
+            <div aria-hidden="true" style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,0.09)", overflow: "hidden", marginBottom: 12 }}>
+              <div style={{ width: yuzde + "%", height: "100%", borderRadius: 999, background: "#FF6600" }} />
+            </div>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.6)", margin: "0 0 14px", lineHeight: 1.55 }}>
+              Doldurduğun alanlar harita servisinden geleni ezer; boş bıraktıkların
+              API'den gelmeye devam eder. Girdiğin bilgiler <b style={{ color: "rgba(255,255,255,0.85)" }}>yayına
+              girmeden önce GUR ekibince incelenir</b>.
+            </p>
+            {bekleyen && (
+              <p role="status" style={{
+                fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "var(--c-warn-light)",
+                background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.22)",
+                borderRadius: 10, padding: "8px 10px", margin: "0 0 12px", lineHeight: 1.5,
+              }}>
+                {Object.keys(bekleyen.fields).length} alan incelemede. Onaylanana kadar eski değer yayında kalır.
               </p>
             )}
-          </div>
-        );
-      })}
+            <Btn text={saved ? "Kaydedildi" : "Bilgileri kaydet"} onClick={save} variant="filled" />
+            <p aria-live="polite" style={{
+              fontFamily: "var(--f-body)", fontSize: 11, color: saved ? "var(--c-ok-light)" : "rgba(255,255,255,0.52)",
+              margin: "8px 0 0", textAlign: "center", minHeight: 15,
+            }}>{saved ? "Değişiklik onay kuyruğuna düştü." : "Kaydetmeden sayfadan ayrılma."}</p>
+          </YanKart>
 
-      <Btn text={saved ? "Kaydedildi" : "Bilgileri kaydet"} onClick={save} variant="filled" />
-    </div>
+          {/* İşletmenin aldığı hizmetler. Formun üstünde tam genişlikte
+              bir şeritti ve forma başlamadan önce okunması gereken bir
+              blok gibi duruyordu; burada künye olarak duruyor. */}
+          <OwnerServices restaurant={restaurant} />
+        </>
+      }
+    >
+      <Olcu en={760}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 16 }}>
+          {INFO_FIELDS.map(alanCiz)}
+        </div>
+      </Olcu>
+    </PanelIkili>
   );
 }
 
@@ -339,7 +391,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "#1C1917", margin: 0 }}>{picked.name}</p>
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: 0 }}>{picked.addr}</p>
                 </div>
-                <Btn text="Değiştir" onClick={() => setPicked(null)} variant="plainDark" size="sm" fullWidth={false} />
+                <Btn text="Değiştir" onClick={() => setPicked(null)} variant="plainDark" size="sm" tap fullWidth={false} />
               </div>
 
               <InputField label="Ticaret unvanı" value={form.legalName} onChange={set("legalName")} placeholder="ör: Çiya Gıda San. Tic. Ltd. Şti." />
@@ -761,7 +813,7 @@ function DarkChip({ label, active, onClick }) {
         border: `1.5px solid ${active ? "var(--c-ok)" : "rgba(255,255,255,0.14)"}`,
         background: active ? "rgba(34,197,94,0.14)" : "transparent",
         color: active ? "var(--c-ok-light)" : "rgba(255,255,255,0.6)",
-        borderRadius: 11, padding: "7px 13px", cursor: "pointer", outline: "none",
+        borderRadius: 11, padding: "0 14px", minHeight: 44, cursor: "pointer", outline: "none",
         fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700,
       }}>{label}</motion.button>
   );
@@ -803,7 +855,7 @@ function LockedCard({ text }) {
   return (
     <div style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 18, padding: "18px", marginBottom: 12, display: "flex", alignItems: "center", gap: 11 }}>
       <Icon n="shield" size={16} color="rgba(255,255,255,0.3)" />
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.4)", margin: 0 }}>{text}</p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.55)", margin: 0 }}>{text}</p>
     </div>
   );
 }
@@ -876,7 +928,7 @@ function SecondChanceCard({ restaurant }) {
           <div style={{ height: 7, borderRadius: 4, background: "rgba(255,255,255,0.09)", overflow: "hidden", marginBottom: 12 }}>
             <div style={{ width: `${oran * 100}%`, height: "100%", background: "linear-gradient(90deg,#FF7A1A,#F04E00)", borderRadius: 4 }} />
           </div>
-          <Btn text="Paketi durdur" variant="outlineDark" size="sm"
+          <Btn text="Paketi durdur" variant="outlineDark" size="sm" tap
             onClick={() => secondChance.cancel(aktif.id)} />
         </>
       ) : (
@@ -888,7 +940,7 @@ function SecondChanceCard({ restaurant }) {
             <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-warn-light)" }}>
               {talep.status === "quoted" ? "Fiyatlandırılıyor" : "Teklif istendi"}
             </span>
-            <Btn text="Vazgeç" onClick={() => withdraw(talep.id)} variant="plainOnDark" size="sm" fullWidth={false} />
+            <Btn text="Vazgeç" onClick={() => withdraw(talep.id)} variant="plainOnDark" size="sm" tap fullWidth={false} />
           </div>
         ) : (
           <Btn text="Teklif iste" variant="filled" size="md"
@@ -981,7 +1033,7 @@ function AdCreativeSlot({ kind, restaurant }) {
           {tanim.accept.startsWith("video") ? "video" : "görsel"}
         </span>
       </div>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: "0 0 10px", lineHeight: 1.5 }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.58)", margin: "0 0 10px", lineHeight: 1.5 }}>
         {tanim.slot}
       </p>
 
@@ -995,7 +1047,7 @@ function AdCreativeSlot({ kind, restaurant }) {
               background: i <= adim ? durumRenk : "rgba(255,255,255,0.18)",
             }} />
             <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700,
-              color: i <= adim ? durumRenk : "rgba(255,255,255,0.32)" }}>{etiket}</span>
+              color: i <= adim ? durumRenk : "rgba(255,255,255,0.55)" }}>{etiket}</span>
             {i < 3 && <span style={{ flex: 1, height: 1, background: i < adim ? durumRenk : "rgba(255,255,255,0.12)" }} />}
           </div>
         ))}
@@ -1065,7 +1117,7 @@ function SlotBooking({ streamKey, restaurant }) {
       {/* Kural her zaman görünür: "neden alamıyorum" sorusu sorulmadan cevaplanır. */}
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
         <Icon n="clock" size={13} color="rgba(255,255,255,0.35)" />
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.45 }}>{p.rule}</p>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.58)", margin: 0, lineHeight: 1.45 }}>{p.rule}</p>
       </div>
 
       {onayli.map(b => (
@@ -1083,11 +1135,11 @@ function SlotBooking({ streamKey, restaurant }) {
           <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-warn-light)" }}>
             {prettyDay(bekleyen.start)}{bekleyen.end !== bekleyen.start ? ` – ${prettyDay(bekleyen.end)}` : ""} · {(bekleyen.days ?? gunFarki(bekleyen.start, bekleyen.end) + 1)} gün · onay bekliyor
           </span>
-          <Btn text="Vazgeç" onClick={() => cancelBooking(bekleyen.id)} variant="plainOnDark" size="sm" fullWidth={false} />
+          <Btn text="Vazgeç" onClick={() => cancelBooking(bekleyen.id)} variant="plainOnDark" size="sm" tap fullWidth={false} />
         </div>
       ) : !acik ? (
         <Btn text="Tarih seç" onClick={() => { setAcik(true); setHata(""); }}
-          variant="filled" size="sm" fullWidth={false} />
+          variant="filled" size="sm" tap fullWidth={false} />
       ) : (
         <div style={{ background: "rgba(0,0,0,0.22)", borderRadius: 14, padding: 12 }}>
           {/* Ay gezinmesi */}
@@ -1105,7 +1157,7 @@ function SlotBooking({ streamKey, restaurant }) {
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 4 }}>
             {WEEKDAYS_TR.map(g => (
-              <div key={g} style={{ textAlign: "center", fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.3)" }}>{g}</div>
+              <div key={g} style={{ textAlign: "center", fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.52)" }}>{g}</div>
             ))}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
@@ -1141,7 +1193,7 @@ function SlotBooking({ streamKey, restaurant }) {
             {[["rgba(255,255,255,0.04)", "müsait"], ["rgba(255,180,84,0.18)", "tutuluyor"], ["rgba(255,122,112,0.22)", "dolu"]].map(([c, t]) => (
               <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <span style={{ width: 9, height: 9, borderRadius: 3, background: c, border: "1px solid rgba(255,255,255,0.1)" }} />
-                <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.4)" }}>{t}</span>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{t}</span>
               </span>
             ))}
           </div>
@@ -1178,7 +1230,7 @@ function SlotBooking({ streamKey, restaurant }) {
               {kontrol && !kontrol.ok && (
                 <p role="status" style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-bad-light)", margin: "0 0 10px", lineHeight: 1.45 }}>{kontrol.reason}</p>
               )}
-              <Btn text="Talep gönder" onClick={gonder} variant="filled" size="sm" fullWidth={false}
+              <Btn text="Talep gönder" onClick={gonder} variant="filled" size="sm" tap fullWidth={false}
                 disabled={!kontrol?.ok} />
             </div>
           )}
@@ -1188,7 +1240,7 @@ function SlotBooking({ streamKey, restaurant }) {
           )}
 
           <div style={{ marginTop: 10 }}>
-            <Btn text="Kapat" onClick={() => { setAcik(false); setSecili(null); setGun(1); }} variant="plainOnDark" size="sm" fullWidth={false} />
+            <Btn text="Kapat" onClick={() => { setAcik(false); setSecili(null); setGun(1); }} variant="plainOnDark" size="sm" tap fullWidth={false} />
           </div>
         </div>
       )}
@@ -1236,7 +1288,10 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
       {gold && <span className="gur-gold-sheen" aria-hidden="true" />}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: gold ? "#F6E6A8" : "#fff", margin: 0 }}>{title}</p>
-        <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: gold ? "#E9C456" : "#FF9A4D", flexShrink: 0 }}>
+        {/* Rakam mono + tabular-nums: kart kart değişen fiyatlar oransal
+            rakamlarda her basamakta farklı genişlikte ve sütun hâlinde
+            okunmuyordu (panoda alınan karar). */}
+        <span style={{ ...NUM, fontSize: 11.5, fontWeight: 700, color: gold ? "#E9C456" : "#FF9A4D", flexShrink: 0 }}>
           {!satista ? "" : sabit
             ? `₺${priceOf(streamKey, slotDurum).toLocaleString("tr")} / gün`
             : pricing.isNegotiated(streamKey)
@@ -1273,11 +1328,11 @@ function GrowthCard({ title, price, desc, active, locked, streamKey, streamName,
           <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-warn-light)" }}>
             {talep.status === "quoted" ? "Fiyatlandırılıyor" : "Teklif istendi"}
           </span>
-          <Btn text="Vazgeç" onClick={() => withdraw(talep.id)} variant="plainOnDark" size="sm" fullWidth={false} />
+          <Btn text="Vazgeç" onClick={() => withdraw(talep.id)} variant="plainOnDark" size="sm" tap fullWidth={false} />
         </div>
       ) : (
         <Btn text="Teklif iste" onClick={iste}
-          variant={gold ? "outlineDark" : "filled"} size="sm" fullWidth={false} />
+          variant={gold ? "outlineDark" : "filled"} size="sm" tap fullWidth={false} />
       )}
     </div>
   );
@@ -1375,7 +1430,7 @@ function MediaManager({ restaurant, kind, grid = false }) {
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 600, color: "#fff", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</p>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
                   <MediaStatus file={f} />
-                  <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.3)" }}>{mediaSize(f.sizeMB)}</span>
+                  <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.52)" }}>{mediaSize(f.sizeMB)}</span>
                 </div>
                 {f.status === "rejected" && f.reason && (
                   <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-bad-light)", margin: "5px 0 0", lineHeight: 1.4 }}>{f.reason}</p>
@@ -1395,10 +1450,13 @@ function MediaManager({ restaurant, kind, grid = false }) {
         <div style={{ width: 46, height: 46, borderRadius: 16, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
         </div>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 600, color: "var(--c-brand-ink)", margin: 0 }}>
+        {/* KOYU ZEMİN TONU. `--c-brand-ink` kâğıt üstü için (#B4530A,
+            beyazla 5.02:1); panelin koyu kâğıdında 3.72'ye düşüyordu.
+            Koyu zeminin kendi jetonu `--c-brand-light`. */}
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 600, color: "var(--c-brand-light)", margin: 0 }}>
           {mesgul ? "Yükleniyor…" : `${k.tekil} yükle`}
         </p>
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0, textAlign: "center", lineHeight: 1.45 }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.52)", margin: 0, textAlign: "center", lineHeight: 1.45 }}>
           {k.hint} · en fazla {k.maxMB} MB
         </p>
       </label>
@@ -1411,7 +1469,7 @@ function MediaManager({ restaurant, kind, grid = false }) {
 
       <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 12, padding: "11px 14px", borderRadius: 14, background: "rgba(255,255,255,0.04)" }}>
         <Icon n="shield" size={14} color="rgba(255,255,255,0.4)" />
-        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.5 }}>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.58)", margin: 0, lineHeight: 1.5 }}>
           Yüklediğiniz dosya <b>GUR ekibinin onayından sonra</b> yayına girer.
           Onaylanana kadar yalnızca siz görürsünüz.
         </p>
@@ -1865,6 +1923,149 @@ const PARCA = {
   hidden: { opacity: 0, y: 12 },
   show: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0, duration: 0.45 } },
 };
+
+// ═══════════════════════════════════════════════════════════════════
+// PANELİN DÜZEN İLKELLERİ — ölçü ve asimetri
+//
+// Pano bento ızgarasına geçmişti; GERİ KALAN YEDİ SEKME tek sütunda
+// kalmıştı ve o sütun içerik alanının tamamını kaplıyordu. 1440 px'lik
+// ekranda ölçüldü: 1100 px genişliğinde bir metin alanı, etiketinden
+// 800 px uzakta duran bir kaynak rozeti, ekranı boydan boya geçen
+// turuncu bir "kaydet" çubuğu, beş yorumun altında 350 px boşluk.
+// Ölçü yoksa hiyerarşi de yok — her şey aynı genişlikte olunca hiçbiri
+// birincil olmuyor (panoda öğrenilen kuralın aynısı).
+//
+// İki ilkel, iki iş:
+//   Olcu        — okunur genişlik. Metin ve form alanı bundan geçiyor.
+//   PanelIkili  — geniş ekranda asimetrik iki sütun: SOL iş, SAĞ karar.
+//                 Sağ sütun yapışkan, çünkü taşıdığı şey (kaydet, özet,
+//                 kural) sayfanın her yerinden gerekli.
+//
+// Kırılma 1120 px: kenar çubuğu 258 px alıyor, iki sütunun ikisi de
+// 1120'nin altında okunur genişliğin altına düşüyordu.
+// ═══════════════════════════════════════════════════════════════════
+const ICERIK_IKI = "(min-width: 1120px)";
+
+// Okunur ölçü. Varsayılan 680 px ≈ 68 karakter: daha geniş satırda göz
+// satır başını kaybediyor.
+function Olcu({ en = 680, children, style }) {
+  return <div style={{ maxWidth: en, minWidth: 0, ...style }}>{children}</div>;
+}
+
+// `yanOnce`: dar ekranda sağ sütun listenin ÜSTÜNE çıkar. Yorumlarda
+// dağılım, Büyüme'de kural metni önce okunmalı — zaten telefonda
+// eskiden de oradaydılar. Bilgiler'de tersi: kaydet düğmesi formdan
+// ÖNCE gelirse doldurmadan basılacak bir düğme olur.
+// Sıralama CSS `order` ile DEĞİL, DOM'da yapılıyor: `order` görsel sıra
+// ile sekme sırasını ayırıyor ve klavyeyle gezen kullanıcı listeyi
+// atlayıp özete düşüyordu.
+function PanelIkili({ children, yan, yanOnce = false }) {
+  const iki = useMediaQuery(ICERIK_IKI);
+  const govde = <div key="govde" style={{ minWidth: 0 }}>{children}</div>;
+  const kenar = (
+    <aside key="kenar" style={{
+      minWidth: 0, display: "grid", gap: 12,
+      position: iki ? "sticky" : "static", top: 20,
+    }}>{yan}</aside>
+  );
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: iki ? "minmax(0, 1.85fr) minmax(290px, 1fr)" : "minmax(0, 1fr)",
+      gap: iki ? 22 : 16,
+      // `start` — panoda ölçülmüştü: `stretch` ile kısa kart satırdaki
+      // en uzun kartın boyuna çekiliyor ve altında görünmeyen bir
+      // boşluk bırakıyor.
+      alignItems: "start",
+    }}>
+      {!iki && yanOnce ? [kenar, govde] : [govde, kenar]}
+    </div>
+  );
+}
+
+// Sağ sütunun kutusu. PanoKart'tan ayrı: orada başlık içeride ve kutu
+// `height: 100%` (ızgara hücresini dolduruyor), burada kutu içeriği
+// kadar.
+function YanKart({ baslik, children, one = false }) {
+  return (
+    <section style={{
+      background: one ? YUZ.s2 : YUZ.s1,
+      border: one ? YUZ.kenarGuclu : YUZ.kenar,
+      borderRadius: RAD.kart, padding: 16, minWidth: 0,
+    }}>
+      {baslik && (
+        <h3 style={{
+          fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 800,
+          letterSpacing: "0.08em", color: "rgba(255,255,255,0.55)",
+          margin: "0 0 10px", textTransform: "uppercase",
+        }}>{baslik}</h3>
+      )}
+      {children}
+    </section>
+  );
+}
+
+// Yorum süzgeçleri. "Düşük puan" ayrı bir hap: işletmenin ilk bakacağı
+// yer şikâyet ve onu beş yorumun arasında aramak gerekiyordu.
+const YORUM_SUZGEC = [
+  { id: "hepsi", label: "Tümü", esle: () => true },
+  { id: "iyi", label: "4-5 yıldız", esle: r => r.stars >= 4 },
+  { id: "dusuk", label: "Düşük puan", esle: r => r.stars <= 3 },
+];
+
+// Süzgeç hapı. `DarkChip` YEŞİL ve bir SEÇİM taşıyor (indirim oranı,
+// süre); süzgeç bir seçim değil bir bakış açısı, rengi de marka.
+// 44 px: ilk ölçümde 31 px'ti ve dokunma hedefi kuralının altındaydı.
+function SuzgecHap({ label, sayi, aktif, onClick }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={aktif} className="gur-press"
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 7, flex: "none",
+        minHeight: 44, padding: "0 14px", borderRadius: 999, cursor: "pointer",
+        border: aktif ? "1px solid transparent" : YUZ.kenarGuclu,
+        background: aktif ? "#FF6600" : "transparent",
+        color: aktif ? "#fff" : "rgba(255,255,255,0.68)",
+        fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, outline: "none",
+      }}>
+      {label}
+      {sayi != null && (
+        <span style={{
+          ...NUM, fontSize: 11, fontWeight: 700,
+          color: aktif ? "rgba(255,255,255,0.86)" : "rgba(255,255,255,0.55)",
+        }}>{sayi}</span>
+      )}
+    </button>
+  );
+}
+
+// Yıldız sırası. Yorumda da dağılımda da aynı çizim: iki kopya olsaydı
+// biri dolu yıldızın rengini değiştirir, aynı ekranda iki ayrı sarı
+// olurdu.
+function Yildizlar({ n, size = 11 }) {
+  return (
+    <span aria-label={n + " yıldız"} style={{ display: "inline-flex", gap: 2 }}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <span key={i} aria-hidden="true" style={{ fontSize: size, lineHeight: 1, color: i <= n ? "var(--c-warn)" : "rgba(255,255,255,0.18)" }}>★</span>
+      ))}
+    </span>
+  );
+}
+
+// Boş durum. Kesik çizgili kutu DEĞİL: "buraya dosya bırak" diyen bir
+// yükleme alanıyla "burada henüz bir şey yok" diyen bir durum aynı
+// görünmemeli.
+function BosDurum({ baslik, metin, eylem }) {
+  return (
+    <div style={{
+      border: YUZ.kenar, borderRadius: RAD.kart, background: YUZ.s1,
+      padding: "28px 20px", textAlign: "center",
+    }}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.82)", margin: "0 0 6px" }}>{baslik}</p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.55)", margin: "0 auto", lineHeight: 1.55, maxWidth: 380 }}>{metin}</p>
+      {eylem && <div style={{ marginTop: 14, display: "flex", justifyContent: "center" }}>{eylem}</div>}
+    </div>
+  );
+}
 
 function PanoSegmented({ options, value, onChange, label }) {
   return (
@@ -2598,7 +2799,7 @@ function TableRequests({ restaurant }) {
           <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>
             {x.day} · {x.time} · {x.people} kişi
           </p>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.58)", margin: 0 }}>
             {x.guestName}{x.dealPct ? ` · %${x.dealPct} fırsatla` : ""}
           </p>
         </div>
@@ -2612,34 +2813,46 @@ function TableRequests({ restaurant }) {
       </div>
       {actionable && (
         <div style={{ display: "flex", gap: 9 }}>
-          <Btn text="Onayla" onClick={() => reservations.decideReservation(x.id, "confirmed")} variant="filled" size="sm" />
-          <Btn text="Reddet" onClick={() => reservations.decideReservation(x.id, "declined")} variant="destructiveSoft" size="sm" />
+          <Btn text="Onayla" onClick={() => reservations.decideReservation(x.id, "confirmed")} variant="filled" size="sm" tap />
+          <Btn text="Reddet" onClick={() => reservations.decideReservation(x.id, "declined")} variant="destructiveSoft" size="sm" tap />
         </div>
       )}
     </div>
   );
 
   return (
-    <div>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Bekleyen talepler</p>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 12px", lineHeight: 1.5 }}>
-        Uygulamadan gelen masa talepleri. Onaylayana kadar misafire "iletildi"
-        görünür — masayı veren taraf sizsiniz.
-      </p>
-      {pending.length === 0 && (
-        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.1)", borderRadius: 18, padding: "22px 16px", textAlign: "center", marginBottom: 16 }}>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.38)", margin: 0 }}>Bekleyen talep yok</p>
-        </div>
-      )}
-      {pending.map(x => row(x, true))}
+    <PanelIkili
+      yanOnce
+      yan={
+        <YanKart baslik="Masa talebi" one>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+            <span style={{ ...NUM, fontSize: 26, fontWeight: 700, color: pending.length ? "#FF9A4D" : "#fff", lineHeight: 1 }}>{pending.length}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.62)" }}>bekliyor</span>
+            <span style={{ ...NUM, fontSize: 12, color: "rgba(255,255,255,0.55)", marginLeft: "auto" }}>{past.length} geçmiş</span>
+          </div>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.65)", margin: 0, lineHeight: 1.6 }}>
+            Uygulamadan gelen masa talepleri. Onaylayana kadar misafire
+            "iletildi" görünür — masayı veren taraf sizsiniz.
+          </p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.55)", margin: "10px 0 0", lineHeight: 1.5, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            Masa ayırtma ücretsiz: GUR bu işlemden komisyon almıyor.
+          </p>
+        </YanKart>
+      }
+    >
+      <Olcu en={640}>
+        {pending.length === 0
+          ? <BosDurum baslik="Bekleyen talep yok" metin="Uygulamadan masa talebi geldiğinde burada görünür ve kenar çubuğundaki sayaç yanar." />
+          : pending.map(x => row(x, true))}
 
-      {past.length > 0 && (
-        <>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "18px 0 10px" }}>Geçmiş</p>
-          {past.map(x => row(x, false))}
-        </>
-      )}
-    </div>
+        {past.length > 0 && (
+          <>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)", margin: "22px 0 10px" }}>Geçmiş</p>
+            {past.map(x => row(x, false))}
+          </>
+        )}
+      </Olcu>
+    </PanelIkili>
   );
 }
 
@@ -2669,7 +2882,7 @@ function PriceOffers({ restaurant }) {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 2px" }}>{o.streamName}</p>
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0 }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.58)", margin: 0 }}>
               GUR'dan fiyat teklifi
             </p>
           </div>
@@ -2685,13 +2898,13 @@ function PriceOffers({ restaurant }) {
         {/* Eski ve yeni fiyat yan yana: teklif tek başına bir sayı değil, bir değişiklik */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(0,0,0,0.22)", borderRadius: 14, padding: "11px 14px", marginBottom: actionable ? 12 : 0 }}>
           <div>
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Şu anki</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.55)", margin: "0 0 2px" }}>Şu anki</p>
             <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: 0, textDecoration: "line-through" }}>{fmt(o.currentMonthly)}</p>
           </div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.4" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="13 6 19 12 13 18" /></svg>
           <div>
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Teklif</p>
-            <p style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 800, color: cheaper ? "var(--c-ok-light)" : "var(--c-warn)", margin: 0 }}>{fmt(o.offerMonthly)}<span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}> /ay</span></p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.55)", margin: "0 0 2px" }}>Teklif</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 800, color: cheaper ? "var(--c-ok-light)" : "var(--c-warn)", margin: 0 }}>{fmt(o.offerMonthly)}<span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.55)" }}> /ay</span></p>
           </div>
           {diff !== null && diff !== 0 && (
             <span style={{ marginLeft: "auto", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: cheaper ? "var(--c-ok-light)" : "var(--c-warn)" }}>
@@ -2706,8 +2919,8 @@ function PriceOffers({ restaurant }) {
 
         {actionable && (
           <div style={{ display: "flex", gap: 9 }}>
-            <Btn text="Kabul et" onClick={() => pricing.decideOffer(o.id, "accepted")} variant="filled" size="sm" />
-            <Btn text="Reddet" onClick={() => pricing.decideOffer(o.id, "declined")} variant="destructiveSoft" size="sm" />
+            <Btn text="Kabul et" onClick={() => pricing.decideOffer(o.id, "accepted")} variant="filled" size="sm" tap />
+            <Btn text="Reddet" onClick={() => pricing.decideOffer(o.id, "declined")} variant="destructiveSoft" size="sm" tap />
           </div>
         )}
       </div>
@@ -2715,26 +2928,38 @@ function PriceOffers({ restaurant }) {
   };
 
   return (
-    <div>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>Size gelen teklifler</p>
-      <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 12px", lineHeight: 1.5 }}>
-        Kullandığınız hizmetlerin fiyatına dair GUR'dan gelen teklifler.
-        Kabul etmediğiniz sürece mevcut fiyatınız değişmez.
-      </p>
-      {open.length === 0 && (
-        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.1)", borderRadius: 18, padding: "22px 16px", textAlign: "center", marginBottom: 16 }}>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.38)", margin: 0 }}>Bekleyen teklif yok</p>
-        </div>
-      )}
-      {open.map(o => card(o, true))}
+    <PanelIkili
+      yanOnce
+      yan={
+        <YanKart baslik="Teklif durumu" one>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+            <span style={{ ...NUM, fontSize: 26, fontWeight: 700, color: open.length ? "#FF9A4D" : "#fff", lineHeight: 1 }}>{open.length}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.62)" }}>karar bekliyor</span>
+            <span style={{ ...NUM, fontSize: 12, color: "rgba(255,255,255,0.55)", marginLeft: "auto" }}>{past.length} geçmiş</span>
+          </div>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.65)", margin: 0, lineHeight: 1.6 }}>
+            Kullandığın hizmetlerin fiyatına dair GUR'dan gelen teklifler.
+            <b style={{ color: "#fff" }}> Kabul etmediğin sürece mevcut fiyatın değişmez.</b>
+          </p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.55)", margin: "10px 0 0", lineHeight: 1.5, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            Reddettiğin bir teklifin yerine ikincisi gelebilir; talebin kapanmıyor.
+          </p>
+        </YanKart>
+      }
+    >
+      <Olcu en={640}>
+        {open.length === 0
+          ? <BosDurum baslik="Bekleyen teklif yok" metin="Büyüme sekmesinden teklif istediğinde GUR ekibinin gönderdiği fiyat burada karar için bekler." />
+          : open.map(o => card(o, true))}
 
-      {past.length > 0 && (
-        <>
-          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "18px 0 10px" }}>Geçmiş</p>
-          {past.map(o => card(o, false))}
-        </>
-      )}
-    </div>
+        {past.length > 0 && (
+          <>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)", margin: "22px 0 10px" }}>Geçmiş</p>
+            {past.map(o => card(o, false))}
+          </>
+        )}
+      </Olcu>
+    </PanelIkili>
   );
 }
 
@@ -2754,6 +2979,9 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
   // `buy` KALDIRILDI: işletme kendi kendine hizmet açamıyor. Paketler
   // yalnızca yöneticinin gönderdiği teklif kabul edilince açılıyor;
   // `bought` artık yalnızca "şu an aktif mi" göstergesi olarak okunuyor.
+  // Yorum süzgeci: seçim sekme değişince sıfırlanmıyor, işletme
+  // "düşük puan"da kalıp başka sekmeye bakıp dönebilmeli.
+  const [yorumSuzgec, setYorumSuzgec] = useState("hepsi");
   const [dealPct, setDealPct] = useState(20);
   const [dealHours, setDealHours] = useState(2);
   const [dealLive, setDealLive] = useState(false);
@@ -2785,6 +3013,16 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
       { user: "Can B.", stars: 5, text: "Arkadaşlarımla harika bir akşam geçirdik. Tatlılar enfes!", date: "5 gün önce" },
     ],
   };
+
+  // Puan dağılımı yorumların KENDİSİNDEN sayılıyor, ayrı bir demo
+  // diziden değil: iki kaynak olsaydı listede üç tane 5 yıldız görünüp
+  // dağılımda beş yazabilirdi.
+  const yorumDagilim = stats.reviews.reduce((d, r) => {
+    d[r.stars] = (d[r.stars] || 0) + 1;
+    return d;
+  }, {});
+  const gorunenYorumlar = stats.reviews.filter(
+    (YORUM_SUZGEC.find(sz => sz.id === yorumSuzgec) || YORUM_SUZGEC[0]).esle);
 
   // ── Sekmeler TEK LİSTEDEN ──
   // Dar ekranda yatay şerit, geniş ekranda sol kenar çubuğu aynı diziyi
@@ -2838,61 +3076,159 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
               onGo={setActiveTab} reviewCount={stats.totalReviews} genis={genis} />
           )}
 
-          {/* ─── TAB: Yorumlar ─── */}
+          {/* ─── TAB: Yorumlar ───
+              Beş yorum, beş ayrı kutu ve altında 350 px boşluk vardı:
+              her satır aynı ağırlıkta bir kart olunca liste okunmuyor,
+              üstelik 1100 px'lik satırda göz satır başını kaybediyordu.
+              Şimdi kutular yerine ince ayırıcılar, metin okunur ölçüde,
+              puan dağılımı sağda — hangi yorumun neden geldiği orada
+              okunuyor. */}
           {activeTab === "reviews" && (
-            <div>
-              {stats.reviews.map((rev, i) => (
-                <div key={i} style={{
-                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)",
-                  borderRadius: 20, padding: "16px 18px", marginBottom: 12,
-                  animation: `fadeInUp 0.4s ease-out ${i * 0.07}s both`,
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 12, background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 800 }}>
-                        {rev.user.charAt(0)}
-                      </div>
-                      <div>
-                        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{rev.user}</p>
-                        <div style={{ display: "flex", gap: 2, marginTop: 2 }}>
-                          {[1, 2, 3, 4, 5].map(s => (
-                            <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "var(--c-warn)" : "rgba(255,255,255,0.12)" }}>★</span>
-                          ))}
-                        </div>
-                      </div>
+            <PanelIkili
+              yanOnce
+              yan={
+                <YanKart baslik="Puan dağılımı" one>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 12 }}>
+                    <span style={{ ...NUM, fontSize: 32, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{stats.avgRating}</span>
+                    <div>
+                      <Yildizlar n={Math.round(stats.avgRating)} size={12} />
+                      <p style={{ ...NUM, fontSize: 11, color: "rgba(255,255,255,0.55)", margin: "3px 0 0" }}>{stats.totalReviews} yorum</p>
                     </div>
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.25)" }}>{rev.date}</span>
                   </div>
-                  <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>{rev.text}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ─── TAB: Menü Yönetimi ─── */}
-          {activeTab === "menu" && (
-            <div>
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>Menü sayfalarınızı buradan yükleyin. GUR ekibi onayladıktan sonra kullanıcılar menünüzü bu görseller üzerinden görür.</p>
+                  {[5, 4, 3, 2, 1].map(y => {
+                    const n = yorumDagilim[y] || 0;
+                    const oran = stats.reviews.length ? (n / stats.reviews.length) * 100 : 0;
+                    return (
+                      <div key={y} style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 6 }}>
+                        <span style={{ ...NUM, fontSize: 11, color: "rgba(255,255,255,0.6)", width: 10, textAlign: "right" }}>{y}</span>
+                        <span aria-hidden="true" style={{ fontSize: 10, color: "var(--c-warn)" }}>★</span>
+                        <span style={{ flex: 1, height: 5, borderRadius: 999, background: "rgba(255,255,255,0.09)", overflow: "hidden" }}>
+                          <span style={{ display: "block", width: oran + "%", height: "100%", borderRadius: 999, background: "var(--c-warn)" }} />
+                        </span>
+                        {/* Renk tek başına bilgi taşımaz: çubuğun yanında sayı da yazıyor. */}
+                        <span style={{ ...NUM, fontSize: 11, color: "rgba(255,255,255,0.55)", width: 14, textAlign: "right" }}>{n}</span>
+                      </div>
+                    );
+                  })}
+                  {/* İKİ AYRI SAYI, KARIŞTIRMAYIN. Çubuklar YÜKLENEN
+                      yorumlardan sayılıyor (şu an 5), üstteki künye ise
+                      toplamı yazıyor. Etiketsiz bırakılsaydı aynı kartta
+                      "38 yorum" ile toplamı 5 eden bir dağılım yan yana
+                      durur ve hangisinin doğru olduğu sorulurdu. */}
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.55)", margin: "10px 0 0", lineHeight: 1.5, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                    Dağılım <b style={{ color: "rgba(255,255,255,0.8)", fontWeight: 700 }}>yüklenen son {stats.reviews.length} yorumdan</b> sayılıyor;
+                    toplam {stats.totalReviews} yorumun tamamı sunucuda.
+                  </p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.55)", margin: "10px 0 0", lineHeight: 1.5 }}>
+                    Konumla doğrulanmış yorumlar rozet alır: mekânda yeterince kalan
+                    kullanıcıya bildirim gider ve yorum kilidi açılır.
+                  </p>
+                </YanKart>
+              }
+            >
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                {YORUM_SUZGEC.map(sz => (
+                  <SuzgecHap
+                    key={sz.id} label={sz.label} aktif={yorumSuzgec === sz.id}
+                    sayi={stats.reviews.filter(sz.esle).length}
+                    onClick={() => setYorumSuzgec(sz.id)}
+                  />
+                ))}
               </div>
 
-              <MediaManager restaurant={ownerRestaurant} kind="menu" />
-            </div>
+              {gorunenYorumlar.length === 0 ? (
+                <BosDurum
+                  baslik="Bu süzgeçte yorum yok"
+                  metin="Seçtiğin puan aralığında henüz yorum gelmemiş. Tümünü görmek için süzgeci kaldır."
+                  eylem={<Btn text="Tüm yorumlar" onClick={() => setYorumSuzgec("hepsi")} variant="plainOnDark" size="sm" tap fullWidth={false} />}
+                />
+              ) : (
+                <Olcu en={720}>
+                  {gorunenYorumlar.map((rev, i) => (
+                    <article key={rev.user} style={{
+                      padding: "16px 0",
+                      // Kutu yerine ayırıcı: altı kutu altı ayrı yükseklik
+                      // anlatıyordu, oysa yorumların hepsi aynı ağırlıkta.
+                      borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.08)",
+                      animation: `fadeInUp 0.4s ease-out ${i * 0.06}s both`,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+                        <span aria-hidden="true" style={{
+                          width: 34, height: 34, borderRadius: 11, flexShrink: 0,
+                          background: "rgba(255,102,0,0.16)", color: "#FF9A4D",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800,
+                        }}>{rev.user.charAt(0)}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "#fff", margin: 0 }}>{rev.user}</p>
+                          <Yildizlar n={rev.stars} />
+                        </div>
+                        <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.52)", marginLeft: "auto", flexShrink: 0 }}>{rev.date}</span>
+                      </div>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "rgba(255,255,255,0.72)", margin: 0, lineHeight: 1.6 }}>{rev.text}</p>
+                    </article>
+                  ))}
+                </Olcu>
+              )}
+            </PanelIkili>
+          )}
+
+          {/* ─── TAB: Menü Yönetimi ───
+              Yükleme alanı 1100 px genişliğinde bir kesik çizgili kutuydu
+              ve üstünde iki tam genişlikte açıklama şeridi duruyordu:
+              asıl iş (dosya bırak) ile kural metni aynı ağırlıktaydı.
+              Kural sağa geçti, iş solda ve okunur ölçüde. */}
+          {activeTab === "menu" && (
+            <PanelIkili
+              yanOnce
+              yan={
+                <YanKart baslik="Menü nasıl yayınlanır">
+                  {[
+                    "Sayfaların fotoğrafını ya da taramasını yükle.",
+                    "GUR ekibi inceler; onaylanana kadar yalnızca sen görürsün.",
+                    "Onaylanan sayfalar kullanıcıya galeri olarak açılır, metin listesi olarak değil.",
+                  ].map((t, i) => (
+                    <div key={i} style={{ display: "flex", gap: 9, marginBottom: i < 2 ? 9 : 0 }}>
+                      <span style={{ ...NUM, fontSize: 11, fontWeight: 700, color: "#FF9A4D", flexShrink: 0, lineHeight: 1.6 }}>{i + 1}</span>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.68)", margin: 0, lineHeight: 1.6 }}>{t}</p>
+                    </div>
+                  ))}
+                </YanKart>
+              }
+            >
+              <Olcu en={620}>
+                <MediaManager restaurant={ownerRestaurant} kind="menu" />
+              </Olcu>
+            </PanelIkili>
           )}
 
           {/* ─── TAB: Büyüme (gelir ürünleri) ─── */}
           {activeTab === "growth" && (
-            <div>
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>
-                  Görünürlüğünüzü artıran paketler. <b>Hiçbiri doğrudan satın alınmaz</b> —
-                  GUR ekibi onaylamadan hiçbiri yayına girmez. Reklam kalemlerinin
-                  (banner, ödüllü video, push) <b>fiyatı sabittir</b>: takvimden müsait
-                  tarihi seçip talep gönderirsiniz. Diğer paketlerde fiyat size özel
-                  belirlenir, teklif istersiniz. Rezervasyon ve menü ücretsizdir.
-                </p>
-              </div>
-
+            <PanelIkili
+              yanOnce
+              yan={
+                /* "Hiçbiri doğrudan satın alınmaz" kuralı tam genişlikte
+                   bir şeritti ve altı kartın hepsinden önce okunuyordu;
+                   oysa kullanıcı kartlara bakarken hatırlaması gereken
+                   bir şey. Sağ sütunda yapışkan duruyor. */
+                <YanKart baslik="Nasıl işliyor" one>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.68)", margin: "0 0 10px", lineHeight: 1.6 }}>
+                    <b style={{ color: "#fff" }}>Hiçbiri doğrudan satın alınmaz.</b> GUR ekibi
+                    onaylamadan hiçbiri yayına girmez.
+                  </p>
+                  {[
+                    ["Sabit fiyatlı", "Banner, ödüllü video, push: takvimden müsait tarihi seçip talep gönderirsin."],
+                    ["Pazarlıklı", "Gastro paketi, İkinci Şans, anlık fırsat: fiyat mekâna göre konuşulur, teklif istersin."],
+                    ["Ücretsiz", "Masa ayırtma ve menü yayını para istemiyor."],
+                  ].map(([ad, aciklama], i) => (
+                    <div key={ad} style={{ paddingTop: 10, marginTop: i === 0 ? 0 : 0, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, letterSpacing: "0.04em", color: "#FF9A4D", margin: "0 0 3px", textTransform: "uppercase" }}>{ad}</p>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.62)", margin: "0 0 9px", lineHeight: 1.55 }}>{aciklama}</p>
+                    </div>
+                  ))}
+                </YanKart>
+              }
+            >
               {/* Faz 1 — reklam / sponsorluk */}
               <GrowthSection title="Reklam ve Sponsorluk">
                 <GrowthCard
@@ -2955,7 +3291,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
                         <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-ok-light)", margin: 0, flex: 1 }}>
                           %{dealPct} indirim {dealHours} saat boyunca yayında
                         </p>
-                        <Btn text="Durdur" onClick={() => setDealLive(false)} variant="destructiveSoft" size="sm" fullWidth={false} />
+                        <Btn text="Durdur" onClick={() => setDealLive(false)} variant="destructiveSoft" size="sm" tap fullWidth={false} />
                       </div>
                     ) : (
                       <Btn text={`%${dealPct} indirimi ${dealHours} saat yayınla`} onClick={() => { setDealLive(true); setNotice("Fırsat yayında — yakındaki kullanıcılara bildirim gitti"); setTimeout(() => setNotice(null), 2200); }} variant="filled" />
@@ -2972,7 +3308,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                       {[["Bu ay", "38"], ["Ciro", "₺52.400"], ["Onaylanan", "31"]].map(([k, v]) => (
                         <div key={k} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "11px 12px" }}>
-                          <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.4)", margin: "0 0 3px" }}>{k}</p>
+                          <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.55)", margin: "0 0 3px" }}>{k}</p>
                           <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "#fff", margin: 0 }}>{v}</p>
                         </div>
                       ))}
@@ -3028,30 +3364,35 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
                   <AdCreativeSlot key={k} kind={k} restaurant={ownerRestaurant} />
                 ))}
               </GrowthSection>
-            </div>
+            </PanelIkili>
           )}
 
           {/* ─── TAB: Fotoğraf Yönetimi ─── */}
           {activeTab === "photos" && (
-            <div>
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>Mekan ve yemek fotoğraflarınızı yükleyin. Onaylananlar keşif kartınızda ilk sırada gösterilir.</p>
-              </div>
-
+            <PanelIkili
+              yanOnce
+              yan={
+                <YanKart baslik="Ne çekilmeli">
+                  {[
+                    ["Mekân içi", "Ambiyans: kullanıcı oturduğu yeri görmek istiyor."],
+                    ["Dış cephe", "Bulunabilirlik: kapıyı tanıyan kullanıcı tereddüt etmiyor."],
+                    ["En çok satan 2-3 yemek", "Kartta ilk gösterilen bu kare oluyor."],
+                    ["Servis ve sunum", "Tabağın geldiği hâl, fiyat beklentisini oturtuyor."],
+                  ].map(([ad, neden], i) => (
+                    <div key={ad} style={{ marginBottom: i < 3 ? 10 : 0 }}>
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "rgba(255,255,255,0.86)", margin: "0 0 2px" }}>{ad}</p>
+                      {/* Opaklık tabanı 0.5 — eski 0.35 koyu zeminde 2.6:1. */}
+                      <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.58)", margin: 0, lineHeight: 1.5 }}>{neden}</p>
+                    </div>
+                  ))}
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.55)", margin: "12px 0 0", lineHeight: 1.5, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                    Onaylananlar keşif kartında ilk sırada gösterilir.
+                  </p>
+                </YanKart>
+              }
+            >
               <MediaManager restaurant={ownerRestaurant} kind="photos" grid />
-
-              {/* İpuçları */}
-              <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "14px 16px", marginTop: 16 }}>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", margin: "0 0 8px" }}>Fotoğraf Önerileri</p>
-                {["Mekan iç görünümü (ambiyans)", "Dış cephe (bulunabilirlik)", "En popüler 2-3 yemek", "Servis ve sunum detayları"].map((tip, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < 3 ? 5 : 0 }}>
-                    <div style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(255,255,255,0.25)", flexShrink: 0 }} />
-                    <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.35)", margin: 0 }}>{tip}</p>
-                  </div>
-                ))}
-              </div>
-
-            </div>
+            </PanelIkili>
           )}
     </>
   );
@@ -3086,7 +3427,11 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
               display: "flex", alignItems: "center", gap: 11, padding: 11,
               background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16,
             }}>
-              <LogoUpload restaurant={ownerRestaurant} size={42} />
+              {/* 44 px: 42'de dokunma hedefi kuralının altında kalıyordu ve
+                  görünmez hedef büyütücüsü burada çalışmıyor —
+                  `.gur-btn` basınca içeriden dolan daireyi kırpmak için
+                  `overflow: hidden` taşıyor, taşan sözde öğeyi de kırpar. */}
+              <LogoUpload restaurant={ownerRestaurant} size={44} />
               <div style={{ minWidth: 0 }}>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "#fff", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ownerRestaurant?.name || "Restoranınız"}</p>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.5)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ownerRestaurant?.addr || "Kadıköy, İstanbul"}</p>
@@ -3118,8 +3463,8 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
             </nav>
 
             <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.07)" }}>
-              <Btn text="Siteye dön" onClick={() => onSite?.()} variant="plainOnDark" size="sm" />
-              <Btn text="Çıkış" onClick={() => setShowLogout(true)} variant="outline" size="sm" />
+              <Btn text="Siteye dön" onClick={() => onSite?.()} variant="plainOnDark" size="sm" tap />
+              <Btn text="Çıkış" onClick={() => setShowLogout(true)} variant="outline" size="sm" tap />
             </div>
           </aside>
 
@@ -3177,7 +3522,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
             <LogoUpload restaurant={ownerRestaurant} />
             <div>
               <h2 style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>{ownerRestaurant?.name || "Restoranınız"}</h2>
-              <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.7)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{ownerRestaurant?.addr || "Kadıköy, İstanbul"} • Aktif</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-on-brand-2)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{ownerRestaurant?.addr || "Kadıköy, İstanbul"} • Aktif</p>
             </div>
           </div>
 
@@ -3187,14 +3532,14 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
 <Icon n="star" color="#fff" size={18} />
               <div>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.avgRating}</p>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Ortalama Puan</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-on-brand-2)", margin: 0 }}>Ortalama Puan</p>
               </div>
             </div>
             <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)" }}>
 <Icon n="chat" color="#fff" size={18} />
               <div>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.totalReviews}</p>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Toplam Yorum</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-on-brand-2)", margin: 0 }}>Toplam Yorum</p>
               </div>
             </div>
             {/* Turuncu zeminde yeşil-üstüne-yeşil okunmuyordu: beyaz kart,
@@ -3203,7 +3548,9 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
 <Icon n="flame" color="#FF6600" size={18} />
               <div>
                 <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-brand-ink)", margin: 0, lineHeight: 1 }}>%{ozet30.oran.toFixed(1)}</p>
-                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "rgba(255,102,0,0.75)", margin: 0 }}>Beğeni oranı · 30 gün</p>
+                {/* Beyaz kartın üstünde turuncunun %75'i 2.31:1 veriyordu; kâğıdın
+                    kendi jetonu `--c-brand-ink` 5.02:1. */}
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-brand-ink)", margin: 0 }}>Beğeni oranı · 30 gün</p>
               </div>
             </div>
           </div>
@@ -3221,7 +3568,7 @@ function RestaurantDashboard({ onLogout, ownerRestaurant, genis = false, onSite 
                 borderBottom: activeTab === tab.id ? "2px solid #FF6600" : "2px solid transparent",
                 transition: "all 0.25s",
               }}>
-                <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 500, color: activeTab === tab.id ? "#FF6600" : "rgba(255,255,255,0.4)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 500, color: activeTab === tab.id ? "#FF9A4D" : "rgba(255,255,255,0.62)", display: "inline-flex", alignItems: "center", gap: 4 }}>
                   {tab.label}
                   {/* Bekleyen talep sayısı: işletmenin ilk bakacağı yer */}
                   {tab.badge > 0 && (
