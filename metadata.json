@@ -1,0 +1,5 @@
+{
+  "name": "GUR — Restoran Keşif Platformu",
+  "description": "GUR — İstanbul için Tinder-tarzı restoran keşif platformu",
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
