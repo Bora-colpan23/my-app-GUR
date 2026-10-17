@@ -193,6 +193,53 @@ gösterir:
 Dallanma tek yerde: `src/lib/backend.js`. Ekranlar "sunucu var mı" diye
 sormaz, bu cepheyi çağırır.
 
+### `main` dalı AYRI BİR SOY — birleştirilmedi (17 Ekim)
+
+GitHub'da `main` ile çalışma dalı (`claude/app-runnable-version-3vkqoa`)
+**aynı soydan değil**: ortak ata 27 Ağustos'taki `9755473` ("Add files via
+upload"), çalışma dalı o noktadan 78 commit ilerledi. `main`'e 17 Ekim'de
+başka bir araçla (Google AI Studio benzeri; `metadata.json`, solution id
+`gmp_mcp_codeassist_v1_aistudio`) iki commit eklendi: kökte `server.ts`
+(Express 5 + JSON dosyası) ve Google Maps bağlantısı.
+
+**KARAR: birleştirilmedi, kendi `server/` backend'imiz geçerli.** Deneme
+birleştirmesi 7 dosyada çatışma verdi (`GurApp.jsx` 72, `GurAdmin.jsx` 33
+blok; `package.json` `dev` komutunu `tsx server.ts` yapıyor ve PostgreSQL
+düzenini bozuyor). Çalışma dalındaki backend'de Places beslemesi zaten var
+(`server/src/ingestion/providers.js`): kimlik `(provider, external_id)`
+ile sabit, alan maskesi yazılı, Gastro otomatik atanmıyor.
+
+**Gerçek restoran verisi nasıl gelir:** `.env`'e **yeni ve kısıtlı** bir
+`GOOGLE_PLACES_API_KEY` yazılır, `npm run db:seed` ya da sunucunun açılış
+beslemesi çalışır. Anahtar yokken sağlayıcı sessizce `[]` döner ve tohum
+listesi (15 mekân) kalır — ölçüldü: `fromApi: 0`, `/api/health`
+`{"ok":true,"restaurants":15}`.
+
+`main`'deki `server.ts` çalıştırıldı ve doğrulandı (4 sorgu, 32 gerçek
+İstanbul restoranı geldi), ama **olduğu gibi alınmamalı**:
+
+| Sorun | Neden önemli |
+|---|---|
+| `NODE_ENV=production` ile açılışta çöküyor (`app.get('*')`, Express 5'te geçersiz) | canlıya alınamaz; denendi |
+| Puanı ≥ 4.7 olan her mekâna **"Gastro Onaylı"** etiketi basıyor | rozet şef değerlendirmesine dayanır, puanla verilemez; gerçek işletmeler hakkında yanlış iddia |
+| `dist` sahte: 6 değerlik listeden sırayla dağıtılıyor | koordinat gerçekken yanlış mesafe yazılıyor |
+| `menu` rastgele stok fotoğraf (`generateProbableMenu`) | gerçek menü değil |
+| `id: index + 1` | sıra değişirse favori/rezervasyon yanlış mekâna bağlanır; 1–15 tohum kimlikleriyle çakışır |
+| `rating`, `userRatingCount`, yorum metni, koordinat için uydurma yedek değerler | veri yokken sayı üretiyor |
+| `hours` yalnızca Pazartesi satırı | diğer günler yanlış |
+| `POST /api/restaurants/sync` kimlik doğrulamasız, `cors()` açık | herkes anahtarla faturalı istek tetikler |
+| `/api/places/photo` gelen `name`'i doğrulamadan Google adresine ekliyor | anahtarla açık vekil (kod okunarak; denenmedi) |
+
+**API ANAHTARI `main`'in git geçmişinde** (`server.ts` 21. satır, yedek
+değer olarak). Anahtarı Google Cloud'dan yenileyin ve kısıtlayın; bu
+dosyaya ya da başka bir yere elle yazmayın. Eski anahtar bu depodaki hiçbir
+yolda kullanılmadı.
+
+**Google Places koşulları:** genelde yalnızca `place_id`'nin süresiz,
+koordinatların 30 güne kadar saklanmasına izin veriliyor; ad, puan, yorum ve
+fotoğrafın kalıcı saklanması kısıtlı. Yayına almadan resmi koşullardan teyit
+edin — `restaurant_sources.payload` saklaması da bu kapsama girebilir.
+
 ## Proje yapısı
 
 ```
