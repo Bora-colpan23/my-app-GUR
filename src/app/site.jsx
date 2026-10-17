@@ -299,7 +299,7 @@ const ISLETME_MENU = [
   { id: "sss", label: "Sık sorulanlar" },
 ];
 
-export function WebHeader({ koyu = false, isletme = null }) {
+export function WebHeader({ koyu = false }) {
   const genis = useMediaQuery(GENIS);
   const [acik, setAcik] = useState(false);
   const nav = useNavigate();
@@ -339,20 +339,24 @@ export function WebHeader({ koyu = false, isletme = null }) {
     ? { bg: "rgba(24,18,14,0.72)", kenar: "1px solid rgba(255,255,255,0.1)", ink: "rgba(253,251,247,0.78)", inkGuclu: "var(--c-bg)" }
     : { bg: "rgba(253,251,247,0.78)", kenar: "1px solid var(--c-border)", ink: "var(--c-ink-2)", inkGuclu: "var(--c-ink)" };
 
-  // HER İZLEKTE TEK TURUNCU EYLEM. Tüketicide indirme, işletmede kayıt
-  // (girişliyse panele dönüş). İkinci bir turuncu hap hangisinin ana yol
-  // olduğunu sildirirdi (bkz. "Renkle hiyerarşi").
+  // HER İZLEKTE TEK TURUNCU EYLEM. Tüketicide indirme, işletmede kayıt.
+  // İkinci bir turuncu hap hangisinin ana yol olduğunu sildirirdi
+  // (bkz. "Renkle hiyerarşi").
+  //
+  // "GİRİŞ YAP" TEK KAPI VE OTURUMA GÖRE DEĞİŞMİYOR. Bir dönem oturum
+  // açıkken yerine "Panele dön", yanına da "Çıkış" geliyordu: üç ayrı
+  // etiket aynı düğmede dönüyor, giriş kapısı oturumu olanda hiç
+  // görünmüyordu. Şimdi düğme hep aynı şeyi diyor ve hep aynı yere
+  // götürüyor — oturum varsa `/isletme/giris` kullanıcıyı doğrudan panele
+  // alıyor (bkz. GurBusiness). Çıkış panelin kendi kenar çubuğunda:
+  // oturumu kapatmak sitede değil üründe yapılan bir iş.
   const ikincil = koyu ? "plain" : "plainDark";
   const birincil = isIzlek
-    ? (isletme?.girisli
-        ? <Btn text="Panele dön" onClick={() => { setAcik(false); nav("/isletme/panel"); }} variant="filled" size="md" fullWidth={!genis} trailing={OK} />
-        : <Btn text="Ücretsiz kayıt ol" onClick={() => { setAcik(false); nav("/isletme/kayit"); }} variant="filled" size="md" fullWidth={!genis} trailing={OK} />)
+    ? <Btn text="Ücretsiz kayıt ol" onClick={() => { setAcik(false); nav("/isletme/kayit"); }} variant="filled" size="md" fullWidth={!genis} trailing={OK} />
     : <Btn text="Uygulamayı indir" onClick={() => git("indir")} variant="filled" size="md" fullWidth={!genis} trailing={OK} />;
 
   const yanEylem = isIzlek
-    ? (isletme?.girisli
-        ? <Btn text="Çıkış" onClick={() => { setAcik(false); isletme.onCikis?.(); }} variant={ikincil} size="md" fullWidth={!genis} />
-        : <Btn text="Giriş yap" onClick={() => { setAcik(false); nav("/isletme/giris"); }} variant={ikincil} size="md" fullWidth={!genis} />)
+    ? <Btn text="Giriş yap" onClick={() => { setAcik(false); nav("/isletme/giris"); }} variant={ikincil} size="md" fullWidth={!genis} />
     : <Btn text="İşletmeler" onClick={() => { setAcik(false); nav("/isletme"); }} variant={ikincil} size="md" fullWidth={!genis} />;
 
   return (
@@ -469,11 +473,8 @@ export function WebHeader({ koyu = false, isletme = null }) {
                 style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 26 }}>
                 {isIzlek ? (
                   <>
-                    {isletme?.girisli
-                      ? <><Btn text="Panele dön" onClick={() => { setAcik(false); nav("/isletme/panel"); }} variant="filled" size="lg" trailing={OK} />
-                          <Btn text="Çıkış" onClick={() => { setAcik(false); isletme.onCikis?.(); }} variant="outlineDark" size="lg" /></>
-                      : <><Btn text="Ücretsiz kayıt ol" onClick={() => { setAcik(false); nav("/isletme/kayit"); }} variant="filled" size="lg" trailing={OK} />
-                          <Btn text="Giriş yap" onClick={() => { setAcik(false); nav("/isletme/giris"); }} variant="outlineDark" size="lg" /></>}
+                    <Btn text="Ücretsiz kayıt ol" onClick={() => { setAcik(false); nav("/isletme/kayit"); }} variant="filled" size="lg" trailing={OK} />
+                    <Btn text="Giriş yap" onClick={() => { setAcik(false); nav("/isletme/giris"); }} variant="outlineDark" size="lg" />
                     <Btn text="Tüketici tarafına geç" onClick={() => { setAcik(false); nav("/"); }} variant="plainDark" size="lg" />
                   </>
                 ) : (

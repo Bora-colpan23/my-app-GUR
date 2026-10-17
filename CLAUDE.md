@@ -619,17 +619,43 @@ birbirine yalan söylemesi demekti.
 | | Tüketici izleği (`/`) | İşletme izleği (`/isletme*`) |
 |---|---|---|
 | Gezinme | `MENU` — İndir · Nasıl çalışır · Uygulamada ne var · Gizlilik · SSS | `ISLETME_MENU` — Nasıl çalışır · Ne kazanırsınız · Ücretlendirme · SSS |
-| Turuncu eylem | Uygulamayı indir | Ücretsiz kayıt ol (girişliyse **Panele dön**) |
-| İkincil eylem | İşletmeler | Giriş yap (girişliyse **Çıkış**) |
+| Turuncu eylem | Uygulamayı indir | Ücretsiz kayıt ol |
+| İkincil eylem | İşletmeler | Giriş yap |
 | Logo yanı | — | `İŞLETME` etiketi |
 
 **Logo her iki izlekte de `/`ye gider** — site kökü orası. İşletme
 izleğinde logonun yanında "İŞLETME" yazıyor: aynı başlık iki yerde
 kullanılınca kullanıcının hangi bölümde olduğunu bilmesi gerekiyor.
 
-**Oturum durumu prop ile geliyor** (`isletme={{ girisli, onCikis }}`):
-başlık `localStorage`ı kendi okumuyor, `GurBusiness` zaten tutuyor ve iki
-yerde okumak iki ayrı doğruluk kaynağı demekti.
+**"GİRİŞ YAP" TEK KAPI VE OTURUMA GÖRE DEĞİŞMİYOR.** Bir dönem oturum
+açıkken yerine **"Panele dön"**, yanına da **"Çıkış"** geliyordu: aynı
+düğmede üç ayrı etiket dönüyor, giriş kapısı oturumu olanda hiç
+görünmüyordu ve "panel" kelimesi kapıdan önce geliyordu. Şimdi düğme hep
+aynı şeyi diyor ve hep `/isletme/giris`e götürüyor.
+
+**Kapı iki yönlü** (`GurBusiness` → `useEffect`):
+
+| Durum | Nereye |
+|---|---|
+| oturum yok + `/isletme/panel` | `/isletme/giris` |
+| oturum **var** + `/isletme/giris` | `/isletme/panel` |
+
+İkincisi olmasaydı oturumu olan kullanıcı "Giriş yap"a basınca boş bir
+form doldururdu. İkisi de `replace`: geri tuşu aynı kapıya tekrar
+çarpmasın.
+
+**Çıkış panelin kendi kenar çubuğunda**, site başlığında değil: oturumu
+kapatmak sitede değil üründe yapılan bir iş. Başlık da bu yüzden oturum
+durumunu hiç bilmiyor — prop almıyor, `localStorage` okumuyor.
+
+**Giriş formunda DEMO künyesi var** (`DEMO_ISLETME`, yönetici
+girişindekinin aynısı): `sahip@ciyasofrasi.com` · `gur1234`, dokununca
+alanları dolduruyor. Önceden form boştu, ne yazılacağını söylemiyordu ve
+her şeyi kabul ediyordu — kullanıcı yazdığının bir yere gittiğini
+sanıyordu. YEREL modda gerçek hesap kaydı yok, bu yüzden başka bir
+e-posta da reddedilmiyor (siteden kayıt olan kendi yazdığıyla
+girebilmeli); doğrulama CANLI modda sunucuda. Boş ya da geçersiz formla
+giriş hâlâ engelli ve sebebi `role="alert"` ile yazılı.
 
 **Dar ekranda pilde yalnız BİRİNCİL eylem var**, ikincisi menünün içinde:
 ikisi de sığmıyor ve sıkıştırmak ikisini de 44 px'in altına düşürüyordu.

@@ -427,6 +427,15 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
 // ═══════════════════════════════════════════════
 // DOYURUCU LOGIN — Mevcut hesapla giriş
 // ═══════════════════════════════════════════════
+// DEMO HESABI. Yönetici girişinde bu zaten vardı, işletme girişinde
+// yoktu: kullanıcı boş bir forma bakıp ne yazacağını bilmiyordu ve form
+// her şeyi kabul ettiği için yazdığının bir yere gittiğini sanıyordu.
+// YEREL modda gerçek bir hesap kaydı yok — bu yüzden ipucu veriliyor ama
+// başka bir e-posta da reddedilmiyor: siteden kayıt olan kullanıcı kendi
+// yazdığıyla girebilmeli (o kayıt da sunucusuz ortamda bir oturumdan
+// ibaret). CANLI modda doğrulama sunucuda.
+const DEMO_ISLETME = { eposta: "sahip@ciyasofrasi.com", sifre: "gur1234" };
+
 function DoyurucuLoginScreen({ onBack, onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -477,6 +486,29 @@ function DoyurucuLoginScreen({ onBack, onLogin }) {
           </div>
 
           <Btn text="İşletme Paneline Gir" onClick={gir} />
+
+          {/* DEMO KÜNYESİ. Yönetici girişindeki rozetin aynısı: ne
+              yazacağını söylemeyen bir giriş formu, kapalı bir kapıdır.
+              Dokununca alanları dolduruyor — kullanıcı on sekiz karakter
+              yazmak zorunda kalmasın. */}
+          <button type="button" onClick={() => { setHata(null); setEmail(DEMO_ISLETME.eposta); setPassword(DEMO_ISLETME.sifre); }}
+            className="gur-press"
+            style={{
+              display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 44,
+              margin: "12px 0 0", padding: "9px 13px", borderRadius: 14, cursor: "pointer",
+              background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.3)",
+              fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-on-brand)", textAlign: "left",
+            }}>
+            <span style={{
+              fontSize: 9.5, fontWeight: 800, letterSpacing: 1, flexShrink: 0,
+              background: "rgba(255,255,255,0.9)", color: "var(--c-brand-ink)",
+              borderRadius: 5, padding: "2px 6px",
+            }}>DEMO</span>
+            <span style={{ lineHeight: 1.45 }}>
+              {DEMO_ISLETME.eposta} · {DEMO_ISLETME.sifre}
+              <span style={{ color: "var(--c-on-brand-2)" }}> — dokun, alanları doldursun</span>
+            </span>
+          </button>
           {hata && (
             <p role="alert" style={{
               fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff",
@@ -3768,10 +3800,17 @@ export default function GurBusiness() {
     navigate(YOL.landing);
   };
 
-  // Panelin kapısı: oturum yoksa girişe. `replace` — kullanıcı geri
-  // tuşuyla tekrar kapalı kapıya çarpmasın.
+  // KAPI İKİ YÖNLÜ ÇALIŞIYOR.
+  //   oturum yok + panel  → girişe
+  //   oturum var + giriş   → panele
+  // İkincisi "Giriş yap" düğmesinin tek kapı olmasını sağlıyor: başlık
+  // oturuma göre etiket değiştirmiyor, hep "Giriş yap" diyor ve hep
+  // `/isletme/giris`e götürüyor; oturumu olan kullanıcı o kapıdan
+  // doğrudan panele giriyor, boş bir form doldurmuyor.
+  // `replace` — kullanıcı geri tuşuyla aynı kapıya tekrar çarpmasın.
   useEffect(() => {
     if (ekran === "panel" && !girisli) navigate(YOL.giris, { replace: true });
+    else if (ekran === "giris" && girisli) navigate(YOL.panel, { replace: true });
   }, [ekran, girisli, navigate]);
 
   // Sayfa değişince başa dön. Tek sayfalık uygulamada tarayıcı bunu
@@ -3828,7 +3867,7 @@ export default function GurBusiness() {
           Film greni de yalnızca site tarafında — panel koyu ve kendi
           dokusu var. */}
       {!panelde && <Grain />}
-      {!panelde && <WebHeader isletme={{ girisli, onCikis: cikis }} />}
+      {!panelde && <WebHeader />}
 
       {/* YÜZEN ADA SABİT, YER KAPLAMIYOR. Eski işletme başlığı `sticky`
           idi ve akışta yer tutuyordu; ortak başlık `fixed`, o yüzden üst
