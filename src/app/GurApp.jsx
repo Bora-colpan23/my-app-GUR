@@ -111,6 +111,8 @@ function Icon({ n, size = 18, color = "currentColor", strokeWidth = 2 }) {
     brokenHeart: <><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /><line x1="10" y1="9" x2="14" y2="14" /><line x1="14" y1="9" x2="10" y2="14" /></>,
     bank: <><line x1="3" y1="21" x2="21" y2="21" /><line x1="5" y1="21" x2="5" y2="10" /><line x1="19" y1="21" x2="19" y2="10" /><polygon points="12 2 20 8 4 8" /></>,
     photo: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>,
+    undo: <><path d="M3 7v6h6" /><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13" /></>,
+    refresh: <><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></>,
   };
   return <svg {...p}>{paths[n] || null}</svg>;
 }
@@ -189,52 +191,273 @@ function Screen({ children, grad = true }) {
 }
 
 // ═══════════════════════════════════════════════
-// SWIPE CARD — Eski Tinder stili, tam ekran fotoğraf
+// SWIPE CARD — Gelişmiş Tinder stili jest & buton etkileşimi
 // ═══════════════════════════════════════════════
-function SwipeCard({ r, onLeft, onRight, isTop, onTap }) {
+function SwipeCard({ r, onSwiped, isTop, onTap, triggerDir, dragOffset, setDragOffset }) {
   const ref = useRef(null);
-  const sx = useRef(0); const cx = useRef(0); const drag = useRef(false); const moved = useRef(false);
-  const [off, setOff] = useState(0); const [rot, setRot] = useState(0); const [opa, setOpa] = useState(1); const [ex, setEx] = useState(null); const [ii, setIi] = useState(0);
-  const start = (x) => { if (!isTop) return; drag.current = true; sx.current = x; cx.current = 0; moved.current = false; };
-  const move = (x) => { if (!drag.current) return; const d = x - sx.current; cx.current = d; if (Math.abs(d) > 5) moved.current = true; setOff(d); setRot(d * 0.07); setOpa(Math.max(0.6, 1 - Math.abs(d) / 500)); };
-  const end = () => { if (!drag.current) return; drag.current = false; const d = cx.current;
-    if (Math.abs(d) > 100) { setEx(d > 0 ? "r" : "l"); setOff(d > 0 ? 500 : -500); setRot(d > 0 ? 25 : -25); setOpa(0); setTimeout(() => d > 0 ? onRight() : onLeft(), 300); }
-    else { setOff(0); setRot(0); setOpa(1); }
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const currentX = useRef(0);
+  const isDragging = useRef(false);
+  const hasMoved = useRef(false);
+  const [offset, setOffset] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+  const [rotation, setRotation] = useState(0);
+  const [opacity, setOpacity] = useState(1);
+  const [exitDirection, setExitDirection] = useState(null);
+  const [imgIndex, setImgIndex] = useState(0);
+
+  // Buton tetikleyicisi (Like / Dislike butonu tıklandığında yumuşak uçuş animasyonu)
+  useEffect(() => {
+    if (triggerDir && isTop && !exitDirection) {
+      setExitDirection(triggerDir);
+      const targetX = triggerDir === "right" ? 520 : -520;
+      setOffset(targetX);
+      setRotation(triggerDir === "right" ? 22 : -22);
+      setOpacity(0);
+      const timer = setTimeout(() => {
+        onSwiped?.(triggerDir);
+      }, 320);
+      return () => clearTimeout(timer);
+    }
+  }, [triggerDir, isTop, exitDirection, onSwiped]);
+
+  // Pointer event'leri: Mouse, dokunmatik ekran ve trackpad ile uyumlu swipe jesti
+  const handlePointerDown = (e) => {
+    if (!isTop || exitDirection) return;
+    if (e.currentTarget.setPointerCapture) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    isDragging.current = true;
+    hasMoved.current = false;
+    startX.current = e.clientX;
+    startY.current = e.clientY;
+    currentX.current = 0;
   };
-  const tap = (e) => { if (moved.current) return; const rect = ref.current?.getBoundingClientRect(); if (!rect) return; const tx = (e.clientX || e.changedTouches?.[0]?.clientX) - rect.left;
-    if (tx > rect.width * 0.6) setIi(i => Math.min(i + 1, r.imgs.length - 1));
-    else if (tx < rect.width * 0.4) setIi(i => Math.max(i - 1, 0));
-    else onTap?.();
+
+  const handlePointerMove = (e) => {
+    if (!isDragging.current || !isTop || exitDirection) return;
+    const dx = e.clientX - startX.current;
+    const dy = e.clientY - startY.current;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      hasMoved.current = true;
+    }
+    currentX.current = dx;
+    setOffset(dx);
+    setOffsetY(dy * 0.18);
+    setRotation(dx * 0.07);
+    setOpacity(Math.max(0.6, 1 - Math.abs(dx) / 600));
+    if (setDragOffset) setDragOffset(dx);
   };
-  const label = off > 50 ? "FAV" : off < -50 ? "NOPE" : null;
+
+  const handlePointerUp = (e) => {
+    if (!isDragging.current || !isTop || exitDirection) return;
+    isDragging.current = false;
+    if (e.currentTarget.releasePointerCapture) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+
+    const dx = currentX.current;
+    const swipeThreshold = 85;
+
+    if (Math.abs(dx) > swipeThreshold) {
+      const dir = dx > 0 ? "right" : "left";
+      setExitDirection(dir);
+      setOffset(dir === "right" ? 520 : -520);
+      setRotation(dir === "right" ? 22 : -22);
+      setOpacity(0);
+      if (setDragOffset) setDragOffset(0);
+      setTimeout(() => {
+        onSwiped?.(dir);
+      }, 300);
+    } else {
+      setOffset(0);
+      setOffsetY(0);
+      setRotation(0);
+      setOpacity(1);
+      if (setDragOffset) setDragOffset(0);
+
+      // Sürükleme yapılmadıysa fotoğraf değiştir veya detayı aç
+      if (!hasMoved.current) {
+        const rect = ref.current?.getBoundingClientRect();
+        if (rect) {
+          const clickX = e.clientX - rect.left;
+          const totalImgs = r.imgs?.length || 1;
+          if (clickX > rect.width * 0.65) {
+            setImgIndex(i => Math.min(i + 1, totalImgs - 1));
+          } else if (clickX < rect.width * 0.35) {
+            setImgIndex(i => Math.max(i - 1, 0));
+          } else {
+            onTap?.();
+          }
+        }
+      }
+    }
+  };
+
+  const handlePointerCancel = () => {
+    if (isDragging.current) {
+      isDragging.current = false;
+      setOffset(0);
+      setOffsetY(0);
+      setRotation(0);
+      setOpacity(1);
+      if (setDragOffset) setDragOffset(0);
+    }
+  };
+
+  const isFavStamp = exitDirection === "right" || (offset > 25 && isTop);
+  const isNopeStamp = exitDirection === "left" || (offset < -25 && isTop);
+  const favStampOpacity = exitDirection === "right" ? 1 : Math.min(1, Math.max(0, (offset - 25) / 55));
+  const nopeStampOpacity = exitDirection === "left" ? 1 : Math.min(1, Math.max(0, (-offset - 25) / 55));
+
+  const totalImgs = r.imgs?.length || 1;
+  const currentImg = (r.imgs && r.imgs[imgIndex]) || r.imgs?.[0] || I.hero;
+
   return (
-    <div ref={ref} onMouseDown={e => start(e.clientX)} onMouseMove={e => move(e.clientX)} onMouseUp={e => { end(); tap(e); }} onMouseLeave={end}
-      onTouchStart={e => start(e.touches[0].clientX)} onTouchMove={e => move(e.touches[0].clientX)} onTouchEnd={e => { end(); tap(e); }}
-      style={{ position: "absolute", inset: 0, transform: isTop ? `translateX(${off}px) rotate(${rot}deg)` : "scale(0.96) translateY(10px)", opacity: opa, transition: ex ? "all 0.35s cubic-bezier(.4,0,.2,1)" : (drag.current ? "none" : "all 0.3s"), cursor: isTop ? "grab" : "default", userSelect: "none", pointerEvents: isTop ? "auto" : "none", zIndex: isTop ? 2 : 1, borderRadius: 24, overflow: "hidden", boxShadow: isTop ? "0 12px 48px rgba(0,0,0,0.35)" : "0 4px 16px rgba(0,0,0,0.1)" }}>
-      <Img src={r.imgs[ii]} style={{ position: "absolute", inset: 0, borderRadius: 24 }} bg="linear-gradient(135deg, #1a1008, #2a1a0a, #1a1008)" />
-      {isTop && <>
-      {/* Photo indicators */}
-      <div style={{ position: "absolute", top: 40, left: 14, right: 14, display: "flex", gap: 4, zIndex: 5 }}>
-        {r.imgs.map((_, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === ii ? "#fff" : "rgba(255,255,255,0.3)", transition: "background 0.2s" }} />)}
-      </div>
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 30%, transparent 55%)", borderRadius: 24 }} />
-      {/* Swipe labels */}
-      {label === "FAV" && <div style={{ position: "absolute", top: 90, left: 24, zIndex: 10, border: "4px solid #4CAF50", borderRadius: 14, padding: "8px 22px", transform: "rotate(-15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}><span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#4CAF50" }}>FAV!</span></div>}
-      {label === "NOPE" && <div style={{ position: "absolute", top: 90, right: 24, zIndex: 10, border: "4px solid #FF3B30", borderRadius: 14, padding: "8px 22px", transform: "rotate(15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}><span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#FF3B30" }}>NOPE</span></div>}
-      {/* Content */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
-        <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{r.name}</h3>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
-          <span style={{ background: "#fff", borderRadius: 10, padding: "4px 12px", fontSize: 13, fontWeight: 700, color: "#1C1917", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="#F59E0B" size={12} />{r.rating}</span>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "'Outfit', sans-serif" }}>{r.dist}</span>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "'Outfit', sans-serif" }}>•  {r.price}</span>
+    <div
+      ref={ref}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      style={{
+        position: "absolute",
+        inset: 0,
+        transform: isTop
+          ? `translate3d(${offset}px, ${offsetY}px, 0) rotate(${rotation}deg)`
+          : `scale(${0.96 + Math.min(0.04, Math.abs(dragOffset || 0) / 1200)}) translateY(8px)`,
+        opacity: isTop ? opacity : (0.85 + Math.min(0.15, Math.abs(dragOffset || 0) / 900)),
+        transition: exitDirection
+          ? "all 0.32s cubic-bezier(0.2, 0.8, 0.3, 1)"
+          : isDragging.current
+            ? "none"
+            : "all 0.28s cubic-bezier(0.34, 1.25, 0.64, 1)",
+        cursor: isTop ? (isDragging.current ? "grabbing" : "grab") : "default",
+        userSelect: "none",
+        touchAction: "none",
+        pointerEvents: isTop ? "auto" : "none",
+        zIndex: isTop ? 2 : 1,
+        borderRadius: 24,
+        overflow: "hidden",
+        boxShadow: isTop ? "0 14px 44px rgba(0,0,0,0.4)" : "0 4px 16px rgba(0,0,0,0.12)",
+      }}
+    >
+      <Img
+        src={currentImg}
+        style={{ position: "absolute", inset: 0, borderRadius: 24, pointerEvents: "none" }}
+        bg="linear-gradient(135deg, #1a1008, #2a1a0a, #1a1008)"
+      />
+
+      {/* Karartma gradyanı */}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.4) 35%, transparent 60%)", borderRadius: 24, pointerEvents: "none" }} />
+
+      {/* Fotoğraf göstergeleri (yalnızca üst kartta) */}
+      {isTop && totalImgs > 1 && (
+        <div style={{ position: "absolute", top: 14, left: 14, right: 14, display: "flex", gap: 4, zIndex: 12, pointerEvents: "none" }}>
+          {r.imgs.map((_, i) => (
+            <div
+              key={i}
+              style={{
+                flex: 1,
+                height: 3,
+                borderRadius: 2,
+                background: i === imgIndex ? "#fff" : "rgba(255,255,255,0.35)",
+                transition: "background 0.2s",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+              }}
+            />
+          ))}
         </div>
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(255,255,255,0.85)", margin: "0 0 12px", lineHeight: 1.45 }}>{r.desc}</p>
+      )}
+
+      {/* FAV damgası */}
+      {isFavStamp && (
+        <div
+          style={{
+            position: "absolute",
+            top: 60,
+            left: 20,
+            zIndex: 20,
+            border: "3.5px solid #22C55E",
+            borderRadius: 14,
+            padding: "6px 18px",
+            transform: "rotate(-14deg)",
+            background: "rgba(0,0,0,0.45)",
+            backdropFilter: "blur(6px)",
+            opacity: favStampOpacity,
+            transition: exitDirection ? "none" : "opacity 0.1s ease",
+            boxShadow: "0 4px 24px rgba(34,197,94,0.35)",
+            pointerEvents: "none",
+          }}
+        >
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 900, color: "#22C55E", letterSpacing: 1.5 }}>
+            BEĞENİLDİ ❤️
+          </span>
+        </div>
+      )}
+
+      {/* NOPE damgası */}
+      {isNopeStamp && (
+        <div
+          style={{
+            position: "absolute",
+            top: 60,
+            right: 20,
+            zIndex: 20,
+            border: "3.5px solid #EF4444",
+            borderRadius: 14,
+            padding: "6px 18px",
+            transform: "rotate(14deg)",
+            background: "rgba(0,0,0,0.45)",
+            backdropFilter: "blur(6px)",
+            opacity: nopeStampOpacity,
+            transition: exitDirection ? "none" : "opacity 0.1s ease",
+            boxShadow: "0 4px 24px rgba(239,68,68,0.35)",
+            pointerEvents: "none",
+          }}
+        >
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 900, color: "#EF4444", letterSpacing: 1.5 }}>
+            PAS ✕
+          </span>
+        </div>
+      )}
+
+      {/* Kart İçeriği */}
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "20px 20px 24px", zIndex: 10, pointerEvents: "none" }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 21, fontWeight: 800, color: "#fff", margin: 0, textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>
+            {r.name}
+          </h3>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+          <span style={{ background: "#fff", borderRadius: 10, padding: "3px 10px", fontSize: 12, fontWeight: 700, color: "#1C1917", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <Icon n="star" color="#F59E0B" size={12} />
+            {r.rating}
+          </span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.9)", fontFamily: "'Outfit', sans-serif" }}>{r.dist}</span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.9)", fontFamily: "'Outfit', sans-serif" }}>• {r.price}</span>
+          <span style={{ fontSize: 12, color: "#FFA500", fontFamily: "'Outfit', sans-serif", fontWeight: 700 }}>• {r.cat}</span>
+        </div>
+
+        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.85)", margin: "0 0 10px", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {r.desc}
+        </p>
+
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {r.tags.map(t => <span key={t} style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 14px", fontSize: 12, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>{t}</span>)}
+          {(r.tags || []).slice(0, 3).map(t => (
+            <span key={t} style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", borderRadius: 16, padding: "3px 10px", fontSize: 11, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>
+              {t}
+            </span>
+          ))}
+          {isTop && (
+            <span style={{ marginLeft: "auto", fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 3 }}>
+              Fotoğraflar için dokun <Icon n="photo" size={12} color="rgba(255,255,255,0.5)" />
+            </span>
+          )}
         </div>
       </div>
-      </>}
     </div>
   );
 }
@@ -1347,139 +1570,487 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile }) {
 }
 
 // ═══════════════════════════════════════════════
-// KAYDIRMA (Swipe) SAYFASI — Temiz, profesyonel
+// KAYDIRMA (Swipe) SAYFASI — Jestler ve Buton Karar Sistemi
 // ═══════════════════════════════════════════════
-function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites, filterCat, restaurants = RESTAURANTS, dataSource = "demo" }) {
-  const allCards = filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants;
+function SwipeScreen({
+  onDetail,
+  onExplore,
+  onFavorites,
+  favorites,
+  setFavorites,
+  filterCat,
+  restaurants = RESTAURANTS,
+  dataSource = "google_maps",
+  syncMetadata = null,
+  isSyncing = false,
+  onSyncGoogleMaps = null
+}) {
+  // Varsayılan olarak Google Maps backend verisini kullan
+  const [selectedSource, setSelectedSource] = useState("google_maps"); // "google_maps" | "mock"
+  const activeRestaurants = (selectedSource === "google_maps" && restaurants && restaurants.length > 0)
+    ? restaurants
+    : RESTAURANTS;
+
+  const allCards = filterCat
+    ? activeRestaurants.filter(r => r.cat === filterCat || (r.tags && r.tags.includes(filterCat)))
+    : activeRestaurants;
+
   const [idx, setIdx] = useState(0);
   const [toast, setToast] = useState(null);
   const [done, setDone] = useState(false);
-  useEffect(() => { setIdx(0); setDone(false); }, [filterCat, restaurants]);
-  const visible = allCards.slice(idx, idx + 2).reverse();
-  const show = (m, t) => { setToast({ m, t }); setTimeout(() => setToast(null), 1200); };
-  const next = () => { if (idx >= allCards.length - 1) setDone(true); else setIdx(i => i + 1); };
-  const right = () => { const r = allCards[idx]; if (r && !favorites.find(f => f.id === r.id)) setFavorites(p => [...p, r]); show(r?.name + " favorilere eklendi!", "fav"); next(); };
-  const left = () => { show("Geçildi", "nope"); next(); };
+  const [animatingDir, setAnimatingDir] = useState(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [historyStack, setHistoryStack] = useState([]); // [{ index, action: 'like' | 'dislike', restaurant }]
 
+  // Kategori veya veri kaynağı değiştiğinde sıfırla
+  useEffect(() => {
+    setIdx(0);
+    setDone(false);
+    setHistoryStack([]);
+    setAnimatingDir(null);
+  }, [filterCat, selectedSource, restaurants]);
+
+  const showToast = (m, t) => {
+    setToast({ m, t });
+    setTimeout(() => setToast(null), 1200);
+  };
+
+  // Karttan tamamlanan karar (jestle veya buton animasyonuyla)
+  const handleCardSwiped = (direction) => {
+    const currentR = allCards[idx];
+    if (!currentR) {
+      setAnimatingDir(null);
+      return;
+    }
+
+    if (direction === "right") {
+      if (!favorites.some(f => f.id === currentR.id)) {
+        setFavorites(p => [...p, currentR]);
+      }
+      showToast(`${currentR.name} favorilere eklendi!`, "fav");
+      setHistoryStack(prev => [...prev, { index: idx, action: "like", restaurant: currentR }]);
+    } else {
+      showToast("Geçildi", "nope");
+      setHistoryStack(prev => [...prev, { index: idx, action: "dislike", restaurant: currentR }]);
+    }
+
+    setAnimatingDir(null);
+    setDragOffset(0);
+
+    if (idx >= allCards.length - 1) {
+      setDone(true);
+    } else {
+      setIdx(i => i + 1);
+    }
+  };
+
+  // Buton kararları (kartın uçuş animasyonunu tetikler)
+  const handleButtonLike = () => {
+    if (animatingDir || done || idx >= allCards.length) return;
+    setAnimatingDir("right");
+  };
+
+  const handleButtonDislike = () => {
+    if (animatingDir || done || idx >= allCards.length) return;
+    setAnimatingDir("left");
+  };
+
+  // Geri Al (Undo): Önceki restorana geri dön
+  const handleUndo = () => {
+    if (historyStack.length === 0 || animatingDir) return;
+    const last = historyStack[historyStack.length - 1];
+    setHistoryStack(prev => prev.slice(0, -1));
+
+    if (last.action === "like" && last.restaurant) {
+      setFavorites(p => p.filter(f => f.id !== last.restaurant.id));
+    }
+
+    setIdx(last.index);
+    setDone(false);
+    setAnimatingDir(null);
+    setDragOffset(0);
+    showToast("Önceki restorana dönüldü", "undo");
+  };
+
+  // Döngüyü başa sar
+  const handleResetCycle = () => {
+    setIdx(0);
+    setDone(false);
+    setHistoryStack([]);
+    setAnimatingDir(null);
+    setDragOffset(0);
+    showToast("Restoran listesi başa sarıldı!", "fav");
+  };
+
+  // Klavye kısayolları (← Sol ok: Geç, → Sağ ok: Beğen, Boşluk/↑: Detay, Z: Geri Al)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (done || idx >= allCards.length) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        handleButtonLike();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        handleButtonDislike();
+      } else if (e.key === "ArrowUp" || e.key === " ") {
+        e.preventDefault();
+        if (allCards[idx]) onDetail(allCards[idx]);
+      } else if ((e.key === "z" || e.key === "Z") && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [idx, done, animatingDir, allCards, historyStack]);
+
+  const visibleCards = allCards.slice(idx, idx + 2).reverse();
   const progress = allCards.length > 0 ? ((idx + (done ? 1 : 0)) / allCards.length) * 100 : 0;
 
   return (
     <Screen grad={false}>
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#000" }}>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#0a0a12", position: "relative" }}>
 
-        {/* Header — sadece logo ortada + kategori filtresi */}
-        <div style={{ padding: "44px 18px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-          <GurLogo size={42} pill />
-          {dataSource === "live" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(76,175,80,0.12)", border: "1px solid rgba(76,175,80,0.25)", borderRadius: 12, padding: "3px 12px" }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4CAF50", animation: "pulse 1.5s ease-in-out infinite" }} />
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "#4CAF50", fontWeight: 600 }}>Canlı Veri • OpenStreetMap</span>
+        {/* Üst Bar: Logo, Sayaç, Veri Kaynağı ve İlerleme Çubuğu */}
+        <div style={{ padding: "40px 18px 4px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            {/* Geri Al / Sayfa Geri */}
+            <button
+              onClick={handleUndo}
+              disabled={historyStack.length === 0 || animatingDir !== null}
+              style={{
+                background: historyStack.length > 0 ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.03)",
+                border: "none", borderRadius: 12, padding: "8px 12px",
+                cursor: historyStack.length > 0 ? "pointer" : "default",
+                display: "flex", alignItems: "center", gap: 5,
+                color: historyStack.length > 0 ? "#FFA500" : "rgba(255,255,255,0.2)",
+                fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700,
+                transition: "all 0.2s"
+              }}
+            >
+              <Icon n="undo" size={14} color={historyStack.length > 0 ? "#FFA500" : "rgba(255,255,255,0.2)"} />
+              Geri
+            </button>
+
+            <GurLogo size={38} pill />
+
+            {/* Restoran Sayaç Rozeti */}
+            <div style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: "5px 10px", display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#FFA500" }}>
+                {Math.min(idx + 1, allCards.length)}
+              </span>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                / {allCards.length}
+              </span>
             </div>
-          )}
+          </div>
+
+          {/* Google Maps İstanbul & Haftalık Güncelleme Rozeti */}
+          <div style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 14,
+            padding: "6px 12px",
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E", animation: "pulse 1.8s ease-in-out infinite" }} />
+              <div>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#fff", fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
+                  Google Maps • İstanbul
+                </p>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "rgba(255,255,255,0.45)", margin: 0 }}>
+                  {syncMetadata?.lastSyncedAt ? "Backend Datasında Haftalık Güncel" : "Canlı Google Maps Datası"}
+                </p>
+              </div>
+            </div>
+
+            {onSyncGoogleMaps && (
+              <button
+                onClick={onSyncGoogleMaps}
+                disabled={isSyncing}
+                title="Google Maps üzerinden İstanbul restoranlarını haftalık güncelle"
+                style={{
+                  background: "rgba(255,102,0,0.2)",
+                  border: "1px solid rgba(255,102,0,0.4)",
+                  borderRadius: 10,
+                  padding: "4px 9px",
+                  cursor: isSyncing ? "default" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  color: "#FFA500",
+                  fontFamily: "'Outfit', sans-serif",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  transition: "all 0.2s"
+                }}
+              >
+                <div style={{ display: "inline-block", animation: isSyncing ? "spin 0.8s linear infinite" : "none" }}>
+                  <Icon n="refresh" size={12} color="#FFA500" />
+                </div>
+                {isSyncing ? "Güncelleniyor..." : "Haftalık Güncelle"}
+              </button>
+            )}
+          </div>
+
+          {/* Veri Kaynağı Seçici: Google Maps Backend vs Örnek Liste */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "center" }}>
+            <button
+              onClick={() => setSelectedSource("google_maps")}
+              style={{
+                background: selectedSource === "google_maps" ? "rgba(34,197,94,0.22)" : "rgba(255,255,255,0.05)",
+                border: selectedSource === "google_maps" ? "1px solid #22C55E" : "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 10, padding: "3px 10px", cursor: "pointer",
+                color: selectedSource === "google_maps" ? "#22C55E" : "rgba(255,255,255,0.5)",
+                fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 700
+              }}
+            >
+              Google Maps Backend ({restaurants.length})
+            </button>
+            <button
+              onClick={() => setSelectedSource("mock")}
+              style={{
+                background: selectedSource === "mock" ? "rgba(255,102,0,0.25)" : "rgba(255,255,255,0.05)",
+                border: selectedSource === "mock" ? "1px solid #FF6600" : "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 10, padding: "3px 10px", cursor: "pointer",
+                color: selectedSource === "mock" ? "#fff" : "rgba(255,255,255,0.5)",
+                fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 700
+              }}
+            >
+              Örnek Liste ({RESTAURANTS.length})
+            </button>
+          </div>
+
+          {/* Aktif Kategori Filtresi */}
           {filterCat && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#fff", background: "rgba(255,102,0,0.2)", borderRadius: 14, padding: "5px 16px", fontWeight: 600, border: "1px solid rgba(255,102,0,0.25)" }}>{filterCat}</span>
-              <button onClick={onExplore} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#fff", background: "rgba(255,102,0,0.2)", borderRadius: 12, padding: "4px 14px", fontWeight: 600, border: "1px solid rgba(255,102,0,0.3)" }}>
+                {filterCat}
+              </span>
+              <button onClick={onExplore} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, padding: "4px 7px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
           )}
-          {/* Progress bar */}
+
+          {/* İlerleme Çubuğu */}
           {allCards.length > 0 && !done && (
-            <div style={{ width: "60%", height: 3, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-              <div style={{ width: `${progress}%`, height: "100%", borderRadius: 2, background: "#FF6600", transition: "width 0.4s ease-out" }} />
+            <div style={{ width: "80%", height: 3, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+              <div style={{ width: `${progress}%`, height: "100%", borderRadius: 2, background: "linear-gradient(90deg, #FFA500, #FF3B30)", transition: "width 0.3s ease-out" }} />
             </div>
           )}
         </div>
 
-        {/* Swipe alanı */}
-        <div style={{ flex: 1, position: "relative", margin: "0 16px 8px", minHeight: 0 }}>
+        {/* Kart Swipe Alanı */}
+        <div style={{ flex: 1, position: "relative", margin: "4px 14px 4px", minHeight: 0 }}>
           {allCards.length === 0 ? (
             <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
-<div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon n="search" color="rgba(255,255,255,0.4)" size={20} />
+              <div style={{ width: 70, height: 70, borderRadius: "50%", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon n="search" color="rgba(255,255,255,0.4)" size={24} />
               </div>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>Restoran bulunamadı</p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.25)" }}>Bu kategoride henüz restoran yok</p>
-              <button onClick={onExplore} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: "10px 24px", cursor: "pointer", marginTop: 8 }}>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.5)" }}>← Keşfete Dön</span>
+              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: 0 }}>Restoran bulunamadı</p>
+              <button onClick={onExplore} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 14, padding: "10px 22px", cursor: "pointer", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600 }}>
+                ← Kategorilere Dön
               </button>
             </div>
           ) : done ? (
-            <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
-<div style={{ width: 90, height: 90, borderRadius: "50%", background: "rgba(255,102,0,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon n="plate" color="#FF6600" size={30} />
+            <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "20px 16px" }}>
+              <div style={{ width: 84, height: 84, borderRadius: "50%", background: "linear-gradient(135deg, rgba(255,102,0,0.2), rgba(255,0,0,0.1))", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 30px rgba(255,102,0,0.2)" }}>
+                <Icon n="plate" color="#FF6600" size={36} />
               </div>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "#fff", textAlign: "center" }}>Hepsini gördün!</p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(255,255,255,0.35)" }}>
-                {favorites.length > 0 ? `${favorites.length} favori eklendi` : "Henüz favori eklemedin"}
-              </p>
-              <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                <button onClick={() => { setIdx(0); setDone(false); }} style={{ background: GRAD, border: "none", borderRadius: 20, padding: "13px 28px", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 20px rgba(255,69,0,0.3)" }}>Tekrar Keşfet</button>
-                <button onClick={onExplore} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: "13px 24px", cursor: "pointer" }}>
-                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.5)" }}>Kategoriler</span>
+              <div style={{ textAlign: "center" }}>
+                <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>
+                  Tüm Restoranları İncelediniz!
+                </h3>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.5)", margin: 0 }}>
+                  Bu turda {favorites.length} restoran favorilerinize kaydedildi.
+                </p>
+              </div>
+
+              {/* Özet Kartı */}
+              <div style={{ display: "flex", gap: 12, width: "100%", maxWidth: 300, margin: "6px 0" }}>
+                <div style={{ flex: 1, background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 16, padding: "12px 10px", textAlign: "center" }}>
+                  <span style={{ display: "block", fontSize: 18, fontWeight: 900, color: "#22C55E", fontFamily: "'Outfit', sans-serif" }}>
+                    {favorites.length}
+                  </span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", fontFamily: "'Outfit', sans-serif" }}>Beğenilen</span>
+                </div>
+                <div style={{ flex: 1, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 16, padding: "12px 10px", textAlign: "center" }}>
+                  <span style={{ display: "block", fontSize: 18, fontWeight: 900, color: "#EF4444", fontFamily: "'Outfit', sans-serif" }}>
+                    {Math.max(0, allCards.length - favorites.length)}
+                  </span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", fontFamily: "'Outfit', sans-serif" }}>Geçilen</span>
+                </div>
+              </div>
+
+              {/* Aksiyon butonları */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 280, marginTop: 4 }}>
+                <button
+                  onClick={handleResetCycle}
+                  style={{
+                    background: GRAD, border: "none", borderRadius: 18, padding: "13px 20px",
+                    color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800,
+                    cursor: "pointer", boxShadow: "0 6px 20px rgba(255,102,0,0.35)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8
+                  }}
+                >
+                  <Icon n="refresh" size={16} color="#fff" />
+                  Döngüyü Baştan Başlat
+                </button>
+
+                <button
+                  onClick={onFavorites}
+                  style={{
+                    background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 18, padding: "12px 20px",
+                    color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700,
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8
+                  }}
+                >
+                  <Icon n="heart" size={16} color="#FF3B30" />
+                  Favorilere Git ({favorites.length})
+                </button>
+
+                <button
+                  onClick={onExplore}
+                  style={{
+                    background: "transparent", border: "none", padding: "8px 0",
+                    color: "rgba(255,255,255,0.45)", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 600,
+                    cursor: "pointer"
+                  }}
+                >
+                  Farklı Kategori Seç
                 </button>
               </div>
             </div>
-          ) : visible.map((r, i) => (
-            <SwipeCard key={r.id} r={r} isTop={i === visible.length - 1} onRight={right} onLeft={left} onTap={() => onDetail(allCards[idx])} />
-          ))}
+          ) : (
+            visibleCards.map((r, i) => (
+              <SwipeCard
+                key={r.id}
+                r={r}
+                isTop={i === visibleCards.length - 1}
+                onSwiped={handleCardSwiped}
+                onTap={() => onDetail(allCards[idx])}
+                triggerDir={i === visibleCards.length - 1 ? animatingDir : null}
+                dragOffset={dragOffset}
+                setDragOffset={setDragOffset}
+              />
+            ))
+          )}
         </div>
 
-        {/* Aksiyon butonları */}
+        {/* Karar Butonları Sistemi (Pas, Detay, Beğen, Başa Sar) */}
         {!done && allCards.length > 0 && (
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 18, padding: "10px 16px 16px", zIndex: 10 }}>
-            <button onClick={left} style={{
-              width: 56, height: 56, borderRadius: "50%",
-              border: "none", background: "#fff",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "all 0.15s", boxShadow: "0 6px 18px rgba(0,0,0,0.18)",
-            }}
-              onMouseDown={e => e.currentTarget.style.transform = "scale(0.85)"}
-              onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-            </button>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 16px 8px", zIndex: 10 }}>
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 14 }}>
+              {/* Başa Sar / Sıfırla Butonu */}
+              <button
+                onClick={handleResetCycle}
+                title="Döngüyü Başa Sar"
+                style={{
+                  width: 44, height: 44, borderRadius: "50%",
+                  border: "none", background: "rgba(255,255,255,0.1)",
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s", boxShadow: "0 2px 10px rgba(0,0,0,0.2)"
+                }}
+                onMouseDown={e => e.currentTarget.style.transform = "scale(0.88)"}
+                onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+              >
+                <Icon n="refresh" size={18} color="rgba(255,255,255,0.8)" />
+              </button>
 
-            <button onClick={() => onDetail(allCards[idx])} style={{
-              width: 40, height: 40, borderRadius: "50%",
-              border: "none", background: "#fff",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 4px 14px rgba(0,0,0,0.14)",
-            }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4FC3F7" strokeWidth="2.4" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-            </button>
+              {/* PAS / GEÇ (Dislike) Butonu */}
+              <button
+                onClick={handleButtonDislike}
+                disabled={animatingDir !== null}
+                title="Pas Geç (Sol Ok)"
+                style={{
+                  width: 58, height: 58, borderRadius: "50%",
+                  border: "none", background: "#fff",
+                  cursor: animatingDir ? "default" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s", boxShadow: "0 6px 20px rgba(239,68,68,0.25)"
+                }}
+                onMouseDown={e => !animatingDir && (e.currentTarget.style.transform = "scale(0.88)")}
+                onMouseUp={e => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
 
-            <button onClick={right} style={{
-              width: 68, height: 68, borderRadius: "50%",
-              border: "none", background: "#fff",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "all 0.15s", boxShadow: "0 8px 22px rgba(0,0,0,0.2)",
-            }}
-              onMouseDown={e => e.currentTarget.style.transform = "scale(0.85)"}
-              onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}>
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            </button>
+              {/* DETAY / BİLGİ Butonu */}
+              <button
+                onClick={() => onDetail(allCards[idx])}
+                title="Restoran Detayları"
+                style={{
+                  width: 44, height: 44, borderRadius: "50%",
+                  border: "none", background: "rgba(255,255,255,0.9)",
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.18)"
+                }}
+                onMouseDown={e => e.currentTarget.style.transform = "scale(0.88)"}
+                onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0284C7" strokeWidth="2.5" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+              </button>
+
+              {/* BEĞEN / FAVORİ (Like) Butonu */}
+              <button
+                onClick={handleButtonLike}
+                disabled={animatingDir !== null}
+                title="Favorilere Ekle (Sağ Ok)"
+                style={{
+                  width: 66, height: 66, borderRadius: "50%",
+                  border: "none", background: "#fff",
+                  cursor: animatingDir ? "default" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s", boxShadow: "0 8px 24px rgba(34,197,94,0.3)"
+                }}
+                onMouseDown={e => !animatingDir && (e.currentTarget.style.transform = "scale(0.88)")}
+                onMouseUp={e => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              </button>
+            </div>
+
+            {/* İpucu: Jest & Klavye */}
+            <div style={{ marginTop: 8, textAlign: "center" }}>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+                ← Pas | Beğen → • Sürükleyin veya butonları kullanın
+              </span>
+            </div>
           </div>
         )}
 
-        {/* Toast */}
+        {/* Toast Bildirimi */}
         {toast && (
-          <div style={{
-            position: "absolute", top: 120, left: "50%", transform: "translateX(-50%)",
-            background: toast.t === "fav" ? "#4CAF50" : "#FF3B30",
-            color: "#fff", padding: "10px 22px", borderRadius: 16,
-            fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700,
-            zIndex: 100, boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
-            animation: "fadeInUp 0.3s ease-out",
-            display: "flex", alignItems: "center", gap: 8,
-          }}>
-{toast.t === "fav" ? <Icon n="heart" color="#fff" size={16} /> : <Icon n="cross" color="#fff" size={16} />}
+          <div
+            style={{
+              position: "absolute", top: 110, left: "50%", transform: "translateX(-50%)",
+              background: toast.t === "fav" ? "#22C55E" : toast.t === "undo" ? "#F59E0B" : "#EF4444",
+              color: "#fff", padding: "10px 22px", borderRadius: 16,
+              fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700,
+              zIndex: 100, boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
+              animation: "fadeInUp 0.25s ease-out",
+              display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap"
+            }}
+          >
+            {toast.t === "fav" ? <Icon n="heart" color="#fff" size={16} /> : toast.t === "undo" ? <Icon n="undo" color="#fff" size={16} /> : <Icon n="cross" color="#fff" size={16} />}
             {toast.m}
           </div>
         )}
 
-        {/* Alt bar — beyaz, keşfet sayfası ile aynı */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", flexShrink: 0 }}>
+        {/* Alt Navigasyon Barı */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", margin: "0 16px 14px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", flexShrink: 0 }}>
           <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
@@ -1487,7 +2058,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
           <div style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
           <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler ({favorites.length})</span>
           </div>
         </div>
       </div>
@@ -1531,20 +2102,24 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
   // Google Maps aç
   const openMaps = () => {
-    // OSM'den gelen gerçek koordinat varsa doğrudan pin, yoksa isim+adres araması
-    const url = r.lat && r.lng
-      ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + " " + r.addr)}`;
-    window.open(url, "_blank");
+    if (r.googleMapsUri) {
+      window.open(r.googleMapsUri, "_blank");
+    } else {
+      const url = r.lat && r.lng
+        ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + " " + r.addr)}`;
+      window.open(url, "_blank");
+    }
   };
 
-  // Örnek yorumlar (fotoğraflı)
-  const reviews = [
+  // Google Maps üzerinden gelen gerçek yorumlar veya fallback
+  const defaultReviews = [
     { user: "A.O.", stars: 5, text: "Taze malzemeler, hızlı servis ve harika sunum! Kesinlikle tavsiye ederim. Özellikle ana yemekler muhteşemdi.", date: "2 saat önce", photos: [r.imgs[0], r.imgs[1] || r.imgs[0]] },
     { user: "Elif K.", stars: 4, text: "Ambiyans çok güzel, servis hızlı. Fiyatlar biraz yüksek ama kalite var. Tatlıları da denemenizi öneririm.", date: "1 gün önce", photos: [r.imgs[1] || r.imgs[0]] },
     { user: "Mert S.", stars: 5, text: "Şehirdeki en iyi mekan! Personel çok ilgili ve yemekler şahane. Arkadaşlarımla harika vakit geçirdik.", date: "3 gün önce", photos: [r.imgs[2] || r.imgs[0], r.imgs[0]] },
     { user: "Zeynep A.", stars: 3, text: "Yemekler güzeldi ama bekleme süresi uzundu. Genel olarak fena değil ama iyileştirme gerekli.", date: "1 hafta önce", photos: [] },
   ];
+  const reviews = (r.reviews && r.reviews.length > 0) ? r.reviews : defaultReviews;
 
   const [selectedReview, setSelectedReview] = useState(null);
 
@@ -2196,16 +2771,53 @@ export default function GurApp(props = {}) {
   const [favorites, setFavorites] = useState([]);
   const [selected, setSelected] = useState(null);
   const [filterCat, setFilterCat] = useState(null);
-  const [restaurants, setRestaurants] = useState(RESTAURANTS); // mock ile başla
-  const [dataSource, setDataSource] = useState("demo"); // "demo" | "live"
+  const [restaurants, setRestaurants] = useState(RESTAURANTS);
+  const [syncMetadata, setSyncMetadata] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [dataSource, setDataSource] = useState("google_maps");
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
 
-  // Canlı veri dene — başarısızsa sessizce mock ile devam
+  // Google Maps Platform Quota Defense Listener
   useEffect(() => {
-    let cancelled = false;
-    fetchLiveRestaurants()
-      .then(list => { if (!cancelled) { setRestaurants(list); setDataSource("live"); } })
-      .catch(() => { /* mock veri zaten yüklü */ });
-    return () => { cancelled = true; };
+    const handleQuota = () => setQuotaExceeded(true);
+    window.addEventListener('gmp-quota-exceeded', handleQuota);
+    return () => window.removeEventListener('gmp-quota-exceeded', handleQuota);
+  }, []);
+
+  // Backend'de saklanan Google Maps İstanbul restoranlarını yükle
+  const fetchBackendRestaurants = async () => {
+    try {
+      const res = await fetch('/api/restaurants');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.restaurants && data.restaurants.length > 0) {
+          setRestaurants(data.restaurants);
+          setSyncMetadata(data.metadata || null);
+          setDataSource("google_maps");
+        }
+      }
+    } catch (err) {
+      console.warn("Backend restoran verisi alınamadı, yerel mock kullanılıyor:", err);
+    }
+  };
+
+  // Google Maps üzerinden haftalık güncelleme tetikle
+  const handleSyncGoogleMaps = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/restaurants/sync', { method: 'POST' });
+      if (res.ok) {
+        await fetchBackendRestaurants();
+      }
+    } catch (err) {
+      console.error("Haftalık senkronizasyon hatası:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackendRestaurants();
   }, []);
 
   const nav = (to) => { setHistory(p => [...p, screen]); setScreen(to); };
@@ -2232,7 +2844,7 @@ export default function GurApp(props = {}) {
       case "rest3": return <RestRegStep3 onBack={back} onDone={() => nav("rest-dashboard")} />;
       case "rest-dashboard": return <RestaurantDashboard onLogout={() => { setHistory([]); setScreen("welcome"); }} />;
       case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} />;
-      case "swipe": return <SwipeScreen onDetail={openDetail} onExplore={goExplore} onFavorites={goFav} favorites={favorites} setFavorites={setFavorites} filterCat={filterCat} restaurants={restaurants} dataSource={dataSource} />;
+      case "swipe": return <SwipeScreen onDetail={openDetail} onExplore={goExplore} onFavorites={goFav} favorites={favorites} setFavorites={setFavorites} filterCat={filterCat} restaurants={restaurants} dataSource={dataSource} syncMetadata={syncMetadata} isSyncing={isSyncing} onSyncGoogleMaps={handleSyncGoogleMaps} />;
       case "detail": return <DetailScreen r={selected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} />;
       case "fav": return <FavScreen onExplore={goExplore} onSwipe={goSwipe} onDetail={openDetail} favorites={favorites} setFavorites={setFavorites} onProfile={goProfile} />;
       case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} />;
@@ -2241,7 +2853,23 @@ export default function GurApp(props = {}) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 0" }}>
+      {quotaExceeded && (
+        <div style={{ background: "#fffbeb", borderBottom: "1px solid #fde68a", color: "#78350f", padding: "10px 16px", fontSize: 13, textAlign: "center", width: "100%", maxWidth: 600, borderRadius: 12, marginBottom: 16, zIndex: 9999, boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}>
+          <span>
+            Google Maps Platform quota reached. If you are the app owner, visit{' '}
+            <a
+              href="https://developers.google.com/maps/ai/ai-studio?utm_campaign=gmp_mcp_codeassist_v1_aistudio#quota_exceeded_errors"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "underline", fontWeight: 700, color: "#451a03" }}
+            >
+              maps developer site
+            </a>{' '}
+            for instructions to update your account.
+          </span>
+        </div>
+      )}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');

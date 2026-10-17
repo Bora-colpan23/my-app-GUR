@@ -4,6 +4,19 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import GurApp from './app/GurApp.jsx';
 import GurAdmin from './admin/GurAdmin.jsx';
 
+// Google Maps Platform quota defense listener
+window.gm_authFailure = () => {
+  window.dispatchEvent(new CustomEvent('gmp-quota-exceeded'));
+};
+const origError = console.error;
+console.error = (...args) => {
+  origError.apply(console, args);
+  const msg = args.map((a) => String(a)).join(' ');
+  if (msg.includes('OverQuotaMapError') || msg.includes('QuotaExceededError')) {
+    window.dispatchEvent(new CustomEvent('gmp-quota-exceeded'));
+  }
+};
+
 // İki ayrı arayüz:
 //   /          → Tüketici mobil uygulaması (telefon çerçevesi içinde)
 //   /admin     → Yönetici paneli (tam ekran masaüstü)
