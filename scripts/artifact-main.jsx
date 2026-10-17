@@ -17,45 +17,35 @@ import ReactDOM from 'react-dom/client';
 import { createHashRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import { TuketiciLanding } from '../src/app/site.jsx';
+import GurApp from '../src/app/GurApp.jsx';
 import GurAdmin from '../src/admin/GurAdmin.jsx';
 import GurBusiness from '../src/business/GurBusiness.jsx';
 
 const router = createHashRouter([
   { path: '/', element: <TuketiciLanding /> },
+  { path: '/uygulama', element: <GurApp /> },
   { path: '/isletme/*', element: <GurBusiness /> },
   { path: '/admin', element: <GurAdmin /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
 
-// BİRLEŞİK ÖNİZLEMEDE KENDİ ŞERİDİNİ ÇİZMEZ. Dört parçayı tek yerde
-// toplayan kabuk bu derlemeyi bir iframe içine koyuyor ve kendi sekme
-// şeridini zaten çiziyor; iki şerit üst üste hangisinin ana olduğunu
-// sildirirdi (panelde öğrenilen kural).
-const GOMULU = typeof window !== 'undefined' && window.self !== window.top;
-
-// Gömülüyken şerit DIŞARIDA kalıyor ama bağ iki yönlü olmak zorunda:
-// kabuk sekmeye basınca buraya gelmeli, kullanıcı tanıtım sayfasından
-// "İşletme girişi"ne geçince de kabuğun şeridi takip etmeli. Tek yön
-// bağlansaydı iki gezinme birbirine yalan söylerdi.
-if (GOMULU) {
-  window.__gurGit = (yol) => router.navigate(yol);
-  const bildir = (yol) => window.parent.postMessage({ gur: 'yol', yol }, '*');
-  router.subscribe((state) => bildir(state.location.pathname));
-  bildir(router.state.location.pathname);
-}
+// DÖRT YÜZEY TEK DERLEMEDE. Bir dönem mağaza paketinin web dışa
+// aktarımı ayrı bir iframe'de duruyordu ve dışarıda ikinci bir sekme
+// şeridi vardı; tüketici uygulaması bu derlemeye geri gelince o kabuğa
+// gerek kalmadı (scripts/onizleme-kabuk.html kaldırıldı).
 
 function ArtifactSwitcher() {
-  if (GOMULU) return null;
   // Yönlendiriciye abone oluruz, hash'e değil: React Router hash'i
   // pushState ile değiştirdiği için 'hashchange' olayı çıkmaz ve
   // uygulama içinden gelen geçişlerde sekme yanlış yerde kalırdı.
   const [path, setPath] = useState(() => router.state.location.pathname);
   useEffect(() => router.subscribe((state) => setPath(state.location.pathname)), []);
-  // ÜÇ WEB YÜZEYİ, ÜÇ SEKME. Dördüncü parça olan MOBİL UYGULAMA bu
-  // derlemenin içinde değil: o ayrı bir paket (mobile/, Expo) ve App
-  // Store / Google Play'e çıkıyor.
+  // Dört yüzey, dört sekme. Mağaza paketi (mobile/, Expo) bu derlemenin
+  // içinde değil; "Uygulama" sekmesi tarayıcıdaki tüketici uygulamasını
+  // açıyor (bkz. src/main.jsx başlığı).
   const sekmeler = [
     ['Tanıtım', '/', (y) => y === '/'],
+    ['Uygulama', '/uygulama', (y) => y.startsWith('/uygulama')],
     ['İşletme', '/isletme', (y) => y.startsWith('/isletme')],
     ['Yönetici', '/admin', (y) => y.startsWith('/admin')],
   ];

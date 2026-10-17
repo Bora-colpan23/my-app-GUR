@@ -696,11 +696,22 @@ export function SocialAuthRow({ onDone, tone = "light" }) {
   );
 }
 
-// TELEFON MAKETİ KALDIRILDI. 390×844'lük çerçeve, tarayıcıda çalışan
-// tüketici uygulamasının önizleme kabuğuydu; o uygulama artık gerçek bir
-// mağaza paketi (mobile/) ve web tarafında telefon taklidi eden hiçbir
-// yüzey kalmadı. Maketi "belki lazım olur" diye tutmak, kullanılmayan
-// bir kabuğu projenin ortasında bırakmak demekti.
+// TELEFON MAKETİ — tarayıcıdaki tüketici uygulamasının kabuğu.
+//
+// Bir dönem kaldırılmıştı: o sırada tarayıcıda tüketici uygulaması yoktu
+// ve kullanılmayan bir kabuk kalıyordu. `src/app/GurApp.jsx` 5 Ekim'deki
+// hâliyle geri geldiği için maket de geri geldi — başka hiçbir yüzey
+// telefon taklidi etmiyor, bu çerçeve yalnızca O uygulamanın kabuğu.
+//
+// GERÇEK TELEFONDA ÇERÇEVE YOK: dar ya da dokunmatik-kısa ekranda
+// aşağıdaki medya kuralı maketi kaldırıyor (ekranda ikinci bir telefon
+// çizilmesin diye). Ayrıntı GurStyles içindeki kuralın yanında.
+export function PhoneFrame({ children }) {
+  return <div className="gur-frame" style={{ width: 390, maxWidth: "100%", height: 844, borderRadius: 44, overflow: "hidden", boxShadow: "var(--sh-d4), inset 0 0 0 1px rgba(255,255,255,0.05)", position: "relative", background: "var(--c-bg)", margin: "0 auto" }}>
+    <div className="gur-notch" style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 126, height: 30, background: "#000", borderBottomLeftRadius: 18, borderBottomRightRadius: 18, zIndex: 999 }} />
+    {children}
+  </div>;
+}
 
 export function Screen({ children, grad = true }) {
   // main: yardımcı teknolojiler doğrudan içeriğe atlayabilsin
@@ -1408,11 +1419,49 @@ export function GurStyles() {
            NOT: bu blok bir şablon dizgisinin içinde; yorumlara TERS TIRNAK
            yazmayın, dizgiyi orada bitirir. */
 
+        /* Çentik / ev çubuğu payı. Önizleme çerçevesinde env() 0 döner, tam
+           ekran cihazda ekranın kenarlarına taşan içerik olmaz. Ekranların
+           üst dolgusu zaten 44px; yalnızca bunu aşan çentikler için ek pay. */
+        .gur-frame {
+          padding-top: max(0px, calc(env(safe-area-inset-top, 0px) - 44px));
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+          padding-left: env(safe-area-inset-left, 0px);
+          padding-right: env(safe-area-inset-right, 0px);
+        }
+
         /* Klavye açıkken kaydırma alanı klavye yüksekliği kadar uzar */
         .gur-screen {
           padding-bottom: var(--gur-kb, 0px);
           /* Ekran sonuna gelince kaydırma sayfaya zincirlenmesin */
           overscroll-behavior-y: contain;
+        }
+
+        /* ── GERÇEK TELEFON: ÇERÇEVE YOK ──────────────────────────────
+           390×844'lük telefon maketi masaüstü önizlemesi içindir. Gerçek
+           bir telefonda ise ekranda ikinci bir telefon çiziliyordu: sahte
+           çentik gerçek çentiğin altına düşüyor, 844px'lik kutu 667px'lik
+           ekranı taşırıp sayfayı kaydırıyor ve alt bar ekran dışında
+           kalıyordu. Dar ya da dokunmatik-kısa ekranlarda maket kalkar,
+           uygulama ekranı kaplar.
+
+           Kurallar !important: uygulama satır içi stille yazılı ve satır
+           içi stil sınıf kuralını yener — tersi değil. */
+        @media (max-width: 439.98px), (pointer: coarse) and (max-height: 883px) {
+          .gur-stage {
+            padding: 0 !important;
+            background: var(--c-bg) !important;
+            min-height: 100dvh !important;
+            align-items: stretch !important;
+          }
+          .gur-frame {
+            width: 100% !important;
+            height: 100dvh !important;
+            max-width: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+          }
+          /* Sahte çentik: cihazın kendi çentiği zaten orada */
+          .gur-notch { display: none !important; }
         }
 
         /* Erişilebilirlik tercihleri. Uygulama tamamen inline stille yazıldığı

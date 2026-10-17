@@ -31,27 +31,35 @@ tek yerden yönetiliyor (restoran bazlı görünürlük anahtarı).
 kaydını **sahiplenmiş** işletmelerde açık: sahipsiz bir mekan adına söz
 veremeyiz. Kapı hem arayüzde hem sunucuda (`POST /api/reservations`).
 
-## ÜRÜN DÖRT PARÇA — başka parça yok
+## ÜRÜN DÖRT YÜZEY + BİR MAĞAZA PAKETİ
 
-| # | Parça | Nerede | Kim kullanır |
+| # | Yüzey | Nerede | Kim kullanır |
 |---|---|---|---|
-| 1 | **Mobil uygulama** | `mobile/` (Expo, App Store + Google Play) | tüketici |
-| 2 | **Tanıtım web sitesi** | `/` (`src/app/site.jsx`) | tüketici (indirmeye gider) |
+| 1 | **Tanıtım web sitesi** | `/` (`src/app/site.jsx`) | tüketici (indirmeye gider) |
+| 2 | **Tüketici uygulaması** | `/uygulama` (`src/app/GurApp.jsx`, telefon çerçevesinde) | tüketici |
 | 3 | **Restoran kayıt web sitesi** | `/isletme/*` (Doyurucu) | restoran sahibi |
 | 4 | **Yönetici paneli** | `/admin` | GUR ekibi |
+| — | **Mağaza paketi** | `mobile/` (Expo, App Store + Google Play) | tüketici |
 
-Dördü de önizleme kabuğunda EŞİT AĞIRLIKTA, aynı şeritte. Bir dönem
-uygulama "ANA" rozetiyle öne çıkarılmış ve tanıtım sekmesi şeritten
-çıkarılmıştı; geri alındı — dört yüzey arasında geçiş eşit haplarla
-oluyor.
+Dördü de önizlemede EŞİT AĞIRLIKTA, aynı şeritte.
 
-Beşinci bir parça YOK. Özellikle: **tarayıcıda tüketici uygulaması yok.**
-Bir dönem vardı (`src/app/GurApp.jsx`) ve kök yol genişliğe göre
-dallanıyordu — telefonda uygulama, masaüstünde site. İki kabuk aynı işi
-yapınca hangisinin gerçek ürün olduğu okunmuyordu. Kaldırıldı; git
-geçmişinde duruyor (`git show 8b17fa0:src/app/GurApp.jsx`).
+**TÜKETİCİ UYGULAMASI GERİ GELDİ (5 Ekim sürümü).** Bir dönem
+kaldırılmış, yerine `mobile/` Expo paketi geçmişti. Ama Expo'ya yalnızca
+on ekran taşınmıştı; **22 bileşen taşınmadı** — GUR Match (üç ekran),
+ödüllü reklam, GUR Plus / paywall, masa ayırtma + onay, yorum yazma,
+ziyaret doğrulama, şef videosu, dış yorumlar, ilçe seçici, yasal
+metinler, hero karusel. 4.476 satır 1.816'ya düşmüştü. Tam sürüm
+`git checkout 533f4ed -- src/app/GurApp.jsx` ile geri alındı.
 
-Bunların altında bir de **sunucu** var ama o bir arayüz değil, dördünün
+**KÖK YOL GENİŞLİĞE GÖRE DALLANMIYOR.** Eskiden `/` telefonda
+uygulamayı, masaüstünde siteyi açıyordu ve hangisinin gerçek ürün olduğu
+okunmuyordu. Artık iki ayrı adres: `/` anlatır, `/uygulama` çalışır.
+
+**`mobile/` SİLİNMEDİ.** Mağazaya çıkacak paket o; tarayıcıdaki uygulama
+onun yerine geçmiyor, önündeki eksik iş hâlâ yukarıdaki 22 bileşeni
+React Native'e taşımak.
+
+Bunların altında bir de **sunucu** var ama o bir arayüz değil, hepsinin
 ortak zemini: mekan beslemesi, swipe motoru, bildirim cron'ları,
 analitik toplama (`server/`).
 
@@ -66,14 +74,15 @@ npm run dev:all                       # API (8787) + arayüz (5173)
 Yalnız arayüz: `npm run dev`. Yalnız API: `npm run dev:api`.
 
 - `/`          → **tanıtım web sitesi** (her genişlikte aynı; mağazaya yollar)
+- `/uygulama`  → **tüketici uygulaması** (telefon çerçevesinde; gerçek telefonda çerçeve kalkar)
 - `/isletme`   → **restoran kayıt web sitesi** (tanıtım + kayıt + panel)
 - `/admin`     → **yönetici paneli** (tam ekran masaüstü)
 
 Doyurucu'nun alt yolları: `/isletme/kayit`, `/isletme/sahiplen`,
 `/isletme/giris`, `/isletme/panel`.
 
-Başka yol yok. Eski `/uygulama` ve `/site` yer imleri `*` kuralıyla
-tanıtım sayfasına düşüyor.
+Başka yol yok. Eski `/site` yer imleri `*` kuralıyla tanıtım sayfasına
+düşüyor.
 
 Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
 `demo@gur.app` / `gur1234`.
@@ -89,44 +98,14 @@ yükleniyor, tek dosyalık artifact o ayrı chunk'ı bulamaz ve panel açılmaz.
 Betik `GUR_ARTIFACT=1` ile tek parça derliyor ve çıktıda birden fazla JS
 dosyası kalırsa hata veriyor.
 
-**DÖRT PARÇA TEK ÖNİZLEME:** `npm run onizleme` → `dist/onizleme/`.
-
-```bash
-cd mobile && npx expo export --platform web --output-dir dist-web && cd ..
-npm run artifact      # üç web yüzeyi → dist/gur-preview.html
-npm run onizleme      # dördünü tek kabukta toplar
-```
-
-Kabuk `scripts/onizleme-kabuk.html`: üstte dört sekme, altında iki
-iframe. Üç web yüzeyi TEK derlemenin içinde (hash yönlendiricisi),
-mobil uygulama ayrı bir Expo paketi ve 393×852'lik bir cihaz
-çerçevesinde duruyor. Bilinmesi gereken dört şey:
-
-- **İki ayrı iframe, çünkü iki ayrı paket.** Vite + React DOM ile
-  Expo + React Native Web'i aynı belgeye koymak iki react kopyası ve
-  çakışan global stil demekti.
-- **Sekme değişince iframe YENİDEN YÜKLENMİYOR.** Web tarafında
-  yalnızca yönlendirici çağrılıyor (`window.__gurGit`), mobil çerçeve
-  gizlenip gösteriliyor. `src`yi her seferinde yazsaydık kullanıcı iki
-  sekme arasında gidip gelirken yazdığı her şeyi kaybederdi.
-- **Bağ İKİ YÖNLÜ.** Derleme gömülüyken kendi şeridini çizmiyor
-  (`GOMULU`) ama her yol değişiminde kabuğa `postMessage` atıyor:
-  kullanıcı tanıtım sayfasından "İşletme girişi"ne geçtiğinde kabuğun
-  sekmesi takip ediyor. Tek yön bağlansaydı iki gezinme birbirine yalan
-  söylerdi.
-- **Expo dışa aktarımı MUTLAK yol yazıyor** (`/assets/…`, `/_expo/…`) ve
-  artifact alt yolda servis ediliyor; üstelik servis `_` ile başlayan
-  yolları ayırıyor. Betik ikisini de düzeltiyor (`expo/`, bağıl yollar)
-  ve tek bir mutlak yol kalırsa hata veriyor — kalsaydı uygulama sessizce
-  beyaz ekran açardı.
-
-Telefon çerçevesi burada ürünün içinde değil ÖNİZLEMENİN dışında: web
-tarafındaki telefon maketi tam da bu yüzden kaldırılmıştı (bkz. "TELEFON
-MAKETİ KALDIRILDI"). Burada taklit edilen ürün değil cihaz.
-
-Ölçüldü (`birlesik-test.mjs`): dört sekmenin dördü de kendi yüzeyini
-açıyor, iframe'ler yeniden yüklenmiyor, içeriden `/admin`e geçince şerit
-"Yönetici"ye düşüyor, 44 px altında sekme yok, 393 px'te yatay taşma 0 px.
+**Dört yüzeyin dördü de bu tek dosyanın içinde** ve sol üstteki hap
+şeridiyle geçiliyor (`scripts/artifact-main.jsx` → `ArtifactSwitcher`).
+Bir dönem mağaza paketinin web dışa aktarımı ayrı bir iframe'de duruyor
+ve dışarıda ikinci bir sekme şeridi çizen bir kabuk vardı
+(`scripts/onizleme-kabuk.html` + `npm run onizleme`); tüketici
+uygulaması bu derlemeye geri gelince gereksiz kaldı ve kaldırıldı. Expo
+paketini önizlemek gerekirse: `cd mobile && npx expo export --platform
+web` ve çıktıyı ayrı yayınlayın.
 
 ### Base44'te çalıştırma — dört parça tek origin
 
@@ -252,7 +231,9 @@ gur/
     │   ├── import-restaurants.js  # Excel/CSV ile toplu restoran yükleme
     │   ├── second-chance.js   # haftalık yeniden gösterim paketi + geçilenler
     │   └── social-auth.js     # Google / Apple ile giriş
-    ├── app/site.jsx           # TANITIM SİTESİ: anlatır + mağazaya yollar
+    ├── app/
+    │   ├── site.jsx           # TANITIM SİTESİ: anlatır + mağazaya yollar
+    │   └── GurApp.jsx         # TÜKETİCİ UYGULAMASI (/uygulama, telefon çerçevesinde)
     ├── business/
     │   ├── site.jsx           # İŞLETME WEB SİTESİ: başlık, tanıtım, alt bilgi
     │   └── GurBusiness.jsx    # Doyurucu: yönlendirme, kayıt akışı, panel
@@ -298,13 +279,21 @@ zaten paylaşılamaz. CANLI modda dördü de aynı PostgreSQL'i okur.
 `gur.claims`e düşüyor, yönetici panelinde adıyla görünüyor ve yöneticinin
 görünürlük anahtarı gerçekten yazıyor (GİZLİ rozeti).
 
-### TELEFON MAKETİ KALDIRILDI
+### TELEFON MAKETİ — yalnızca `/uygulama` için
 390×844'lük `PhoneFrame` ve `.gur-stage` / `.gur-frame` / `.gur-notch`
-kuralları, tarayıcıda çalışan tüketici uygulamasının önizleme kabuğuydu.
-O uygulama artık gerçek bir mağaza paketi (`mobile/`) ve web tarafında
-telefon taklidi eden hiçbir yüzey kalmadı — maket de kaldırıldı.
-Kullanılmayan bir kabuğu "belki lazım olur" diye bırakmak, bir sonraki
-okuyana hâlâ bir telefon ekranı varmış gibi görünürdü.
+kuralları tarayıcıdaki tüketici uygulamasının kabuğu. Bir dönem
+kaldırılmıştı — o sırada tarayıcıda tüketici uygulaması yoktu ve
+kullanılmayan bir kabuk kalıyordu; uygulama geri gelince maket de geri
+geldi. **Başka hiçbir yüzey telefon taklidi etmiyor**: tanıtım sitesi,
+işletme sitesi ve yönetici paneli tam genişlikte.
+
+**GERÇEK TELEFONDA ÇERÇEVE YOK.** Dar (< 440 px) ya da dokunmatik-kısa
+ekranda medya kuralı maketi kaldırıyor: sahte çentik gerçek çentiğin
+altına düşüyor, 844 px'lik kutu 667 px'lik ekranı taşırıp sayfayı
+kaydırıyor ve alt bar ekran dışında kalıyordu. Kurallar `!important`,
+çünkü uygulama satır içi stille yazılı ve satır içi stil sınıf kuralını
+yener. Ölçüldü: 393×852'de çerçeve 393×852'ye açılıyor, masaüstünde
+390×844 kalıyor.
 
 ### Yazı tipi: jetondan oku
 `--f-display` (Poppins) ve `--f-body` (Outfit) `GurStyles` içinde tanımlı;
@@ -692,10 +681,8 @@ uyarısı veriyor: ikisi GUR kelime markası (logotype, kural dışı), biri
 kaynaklı sıfır. Yatay taşma iki genişlikte de 0 px; 44 px altında dokunma
 hedefi yok. Dar ekran menüsü `role="dialog" aria-modal="true"` ve üç
 kapatma yolu var (çarpı, perde, Escape). Tek dosyalık artifact
-derlemesinde üç sekme (Tanıtım · İşletme · Yönetici) kendi yüzeyini
-açıyor (`dort-yuzey.mjs`); dördüncü parça olan mobil uygulama O
-derlemenin içinde değil — dördü birden `npm run onizleme` kabuğunda
-(bkz. "DÖRT PARÇA TEK ÖNİZLEME").
+derlemesinde dört sekmenin dördü de kendi yüzeyini açıyor
+(`dort-sekme.mjs`): Tanıtım · Uygulama · İşletme · Yönetici.
 
 ### Doyurucu artık bir WEB SİTESİ
 
@@ -1296,19 +1283,29 @@ sınıra yaklaşınca sıcak bir vinyet, dolunca `PremiumOffer` açılır.
 etmez, yalnızca küçük bir rozet çizer. Aralık 5-7 arasında rastgeledir —
 sabit aralık kullanıcı tarafından fark ediliyor.
 
-### Tüketici ekranları artık `mobile/` içinde
+### Tüketici ekranları İKİ YERDE
 
-Keşfet, Kaydır, Favoriler, Profil, Detay, açılış, rıza, giriş ve konum
-ekranları **mobil uygulamada** (`mobile/src/ekran/`). Aşağıdaki bölümlerin
-bir kısmı (konum üç yolu, rıza modalı, açılış süreleri, rozetler, kota,
-sponsorlu kart, İkinci Şans, ödüllü video) o ekranların ÜRÜN KURALLARINI
-anlatıyor — kural geçerli, kodun yeri değişti.
+| | Nerede | Kaç ekran |
+|---|---|---|
+| **Tam sürüm** | `src/app/GurApp.jsx` (`/uygulama`) | 32 bileşen, 4.476 satır |
+| **Mağaza paketi** | `mobile/src/ekran/` | 10 ekran, 1.816 satır |
+
+Aşağıdaki bölümlerin tamamı (konum üç yolu, rıza modalı, açılış
+süreleri, rozetler, kota, sponsorlu kart, İkinci Şans, ödüllü video,
+GUR Match, masa ayırtma) **tam sürümün** ürün kurallarını anlatıyor ve
+hepsi `GurApp.jsx` içinde çalışıyor.
+
+**Expo tarafının eksiği yukarıda listeli** (bkz. başlıktaki tablo):
+GUR Match, ödüllü reklam, GUR Plus, masa ayırtma, yorum yazma, yasal
+metinler ve altı bileşen daha taşınmadı. İki kopyanın ayrışma riski
+gerçek — kural değişirse ikisinde de değişmeli. Saf kurgu zaten ortak
+(`shared/deck.js`, `shared/deeplink.js`, `shared/second-chance.js`);
+ayrışabilecek olan EKRAN davranışı.
 
 `src/lib/` altındaki tüketici modülleri (`visits`, `rewarded`,
-`ad-frequency`, `analytics`, `campaigns`, `geo`) web derlemesine artık
-GİRMİYOR: mobil tarafın port edeceği ve sunucunun aynadan uyguladığı
-kural kümesi olarak duruyorlar. Silinmediler çünkü içlerindeki eşikler
-(120 m / 15 dk, 15 km, günde 1 kez…) ürün kararı.
+`ad-frequency`, `analytics`, `campaigns`, `geo`) web derlemesine yeniden
+GİRİYOR — `GurApp.jsx` onları doğrudan çağırıyor. Sunucu aynı eşikleri
+aynadan uyguluyor (120 m / 15 dk, 15 km, günde 1 kez…).
 
 ### Konum: giriş biter bitmez sorulur
 Kimlik akışı (`login` / `register`) bittiğinde ekran **doğrudan Keşfet'e

@@ -3,20 +3,26 @@ import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import { TuketiciLanding } from './app/site.jsx';
+import GurApp from './app/GurApp.jsx';
 
 // ═══════════════════════════════════════════════════════════════════════
 // GUR DÖRT PARÇADAN OLUŞUR — üçü burada, biri ayrı depo klasöründe:
 //
 //   /          → TANITIM WEB SİTESİ (tüketici; mağazaya yönlendirir)
+//   /uygulama  → TÜKETİCİ UYGULAMASI (telefon çerçevesi içinde)
 //   /isletme/* → RESTORAN KAYIT WEB SİTESİ (Doyurucu: tanıtım + kayıt + panel)
 //   /admin     → YÖNETİCİ PANELİ
-//   mobile/    → MOBİL UYGULAMA (Expo/React Native, App Store + Google Play)
+//   mobile/    → MAĞAZA PAKETİ (Expo/React Native, App Store + Google Play)
 //
-// Tüketicinin kullandığı uygulama MOBİL UYGULAMADIR. Tarayıcıda ikinci
-// bir tüketici uygulaması YOK: iki kabuk aynı işi yapınca hangisinin
-// gerçek ürün olduğu okunmuyordu ve genişliğe göre dallanan bir kök yol
-// (`/`) bunu iyice karıştırıyordu. Şimdi tek bir cevap var — site
-// anlatır, mağaza indirtir, uygulama çalışır.
+// `/uygulama` 5 Ekim'deki tüketici uygulaması (`app/GurApp.jsx`), 15 Ekim
+// sürümüyle birebir aynı. Bir dönem kaldırılmıştı ve yerine Expo paketi
+// geçmişti; Expo'ya yalnızca on ekran taşınmıştı (GUR Match, ödüllü
+// reklam, GUR Plus, masa ayırtma, yorum yazma ve yasal metinler
+// taşınmamıştı), bu yüzden tam sürüm geri getirildi.
+//
+// KÖK YOL GENİŞLİĞE GÖRE DALLANMIYOR. Eskiden `/` telefonda uygulamayı,
+// masaüstünde siteyi açıyordu ve hangisinin gerçek ürün olduğu
+// okunmuyordu. Artık iki ayrı adres: `/` anlatır, `/uygulama` çalışır.
 //
 // Ortak olan ekranlar değil VERİ: `src/lib/*` depoları, `src/data/
 // restaurants.js` ve `shared/*` dört parçayı birbirine bağlıyor.
@@ -33,6 +39,7 @@ const AdminFallback = () => (
 
 const router = createBrowserRouter([
   { path: '/', element: <TuketiciLanding /> },
+  { path: '/uygulama', element: <GurApp /> },
   // Doyurucu'nun kendi alt yolları var (/isletme/kayit, /isletme/giris,
   // /isletme/panel …). Splat olmadan bu adresler "*" kuralına düşüp ana
   // sayfaya yönleniyordu.
