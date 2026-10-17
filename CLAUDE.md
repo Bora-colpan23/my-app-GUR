@@ -193,7 +193,7 @@ gösterir:
 Dallanma tek yerde: `src/lib/backend.js`. Ekranlar "sunucu var mı" diye
 sormaz, bu cepheyi çağırır.
 
-### `main` dalı AYRI BİR SOY — birleştirilmedi (17 Ekim)
+### `main` dalı AYRI BİR SOY — geçmişe katıldı, içeriği alınmadı (17 Ekim)
 
 GitHub'da `main` ile çalışma dalı (`claude/app-runnable-version-3vkqoa`)
 **aynı soydan değil**: ortak ata 27 Ağustos'taki `9755473` ("Add files via
@@ -202,10 +202,18 @@ başka bir araçla (Google AI Studio benzeri; `metadata.json`, solution id
 `gmp_mcp_codeassist_v1_aistudio`) iki commit eklendi: kökte `server.ts`
 (Express 5 + JSON dosyası) ve Google Maps bağlantısı.
 
-**KARAR: birleştirilmedi, kendi `server/` backend'imiz geçerli.** Deneme
-birleştirmesi 7 dosyada çatışma verdi (`GurApp.jsx` 72, `GurAdmin.jsx` 33
-blok; `package.json` `dev` komutunu `tsx server.ts` yapıyor ve PostgreSQL
-düzenini bozuyor). Çalışma dalındaki backend'de Places beslemesi zaten var
+**KARAR: kendi `server/` backend'imiz geçerli; `main` geçmişe katıldı ama
+çatışan her dosyada BİZİM sürüm kaldı.** Birleştirme 7 dosyada çatıştı
+(`GurApp.jsx`, `GurAdmin.jsx`, `main.jsx` kökten `src/` altına taşınmış;
+`package.json`, `vite.config.js`, `.env.example`, `index.html`). Hepsi
+çalışma dalı lehine çözüldü: `package.json` `dev` komutu `vite` kaldı
+(`main` onu `tsx server.ts` yapıyordu ve PostgreSQL düzenini bozuyordu),
+`vite.config.js` proxy'li kaldı. `index.html`de yalnızca `og:title` /
+`og:description` etiketleri `main`'den alındı. `main`'in Google Maps rozeti
+ve veri kaynağı anahtarı `GurApp.jsx`te YOK; `main` geçmişinde duruyor.
+`server.ts` ve `bun.lock` bilerek alınmadı (aşağıdaki tablo + anahtar
+uyarısı); `.gmp_cache/` ve `metadata.json` kayıtsız bir şekilde geldi, hiçbir
+kod bunları okumuyor. Çalışma dalındaki backend'de Places beslemesi zaten var
 (`server/src/ingestion/providers.js`): kimlik `(provider, external_id)`
 ile sabit, alan maskesi yazılı, Gastro otomatik atanmıyor.
 
