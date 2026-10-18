@@ -58,11 +58,12 @@ Sağlık kontrolü:
 
 ```bash
 curl localhost:8787/api/health
-# {"ok":true,"restaurants":15,"users":2,"active_campaigns":3}
+# {"ok":true,"restaurants":218,"users":0,"active_campaigns":0}
 ```
 
-Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
-`demo@gur.app` / `gur1234`. İkisi de `.env` ile değiştirilebilir.
+Demo hesap YOK. Yönetici hesabı yalnızca `ADMIN_PASSWORD` (en az 8 karakter,
+`ADMIN_USER` varsayılanı `admin`) ortamdan verilirse tohumda kurulur; verilmezse
+tohum uyarı yazar ve hesap açmaz. Tüketici kendi hesabını uygulamadan açar.
 
 Ortam değişkenleri:
 

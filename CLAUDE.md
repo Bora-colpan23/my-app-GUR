@@ -90,8 +90,13 @@ Doyurucu'nun alt yolları: `/isletme/kayit`, `/isletme/sahiplen`,
 Başka yol yok. Eski `/site` yer imleri `*` kuralıyla tanıtım sayfasına
 düşüyor.
 
-Tohumlanan hesaplar: yönetici `admin` / `gur2026`, tüketici
-`demo@gur.app` / `gur1234`.
+**DEMO HESAP YOK.** Yönetici hesabı yalnızca `ADMIN_PASSWORD` (en az 8
+karakter; `ADMIN_USER` varsayılanı `admin`) ortamdan verilirse tohumda kurulur,
+verilmezse tohum uyarı yazar ve hesap açmaz — varsayılan parola yok. Sunucu
+yokken (YEREL mod, artifact önizlemesi) yönetici girişi de YOK: tarayıcıda
+doğrulanan sabit bir parola gerçek koruma sağlamaz, yalnızca herkesin bildiği bir
+kapı olurdu; panel sunucuya bağlıyken açılır. Tüketici kendi hesabını uygulamadan
+açar, işletme kaydını sahiplenerek girer.
 
 Derleme: `npm run build` → `dist/`. Lint: `npm run lint` (src + server + shared).
 
@@ -260,16 +265,26 @@ yalnızca bu 218 kaydı içeriyor. YEREL modda Overpass'ten Kadıköy mekânı
 ama çağrılmıyor); varsayılan başlangıç noktası Bakırköy merkezi
 (`geo.DEFAULT_ORIGIN`).
 
-**DEMO ROLLERİ (`shared/demo.js`).** Yönetici paneli, kampanya envanteri ve
-Doyurucu demo girişi örnek müşteri gerektiriyor; gerçek müşterimiz yok. Roller
-listedeki kayıtlara bağlı: demo işletme sahibi Pizza Krema Bakırköy
-(`demo.isletme@gur.app`), altı demo müşteri (yöneticide `account: true`, satın
-alımlar `STORE_SERVICES`te), üç kampanya + bir askıda kayıt, üç anlık fırsat.
-**Kayıtlar gerçek işletmeler, aralarındaki ticari ilişki UYDURMA** — gerçek bir
-müşteri gelmeden önce `shared/demo.js`, `STORE_SERVICES`, `CAMPAIGN_SEED`,
-`DEMO_CAMPAIGNS`, `DEALS` ve `seedCampaigns` silinmeli (kampanya org unvanları
-"(demo)" yazıyor; `seedCampaigns` ayrıca `claimed_by_org` yazıp doğrulama
-yıldızı çıkarıyor).
+**DEMO YOK.** Yönetici panelindeki uydurma müşteriler, satın alımlar
+(`STORE_SERVICES`), kampanyalar (`CAMPAIGN_SEED`), kullanıcılar (`USERS`) ve
+sahiplenme başvuruları (`APPLICATIONS`); tüketici uygulamasındaki anlık
+fırsatlar (`DEALS`), yerel kampanyalar (`LOCAL_CAMPAIGNS`), uydurma yorumlar;
+sunucu tohumundaki kampanyalar, demo tüketici ve varsayılan yönetici parolası
+KALDIRILDI. Gerçek işletmeler adına uydurma ticari ilişki, indirim ya da yorum
+göstermek yanlıştı. Tüketici destesi YEREL modda yalnızca organik kartlardan
+oluşur; sponsorlu kart ve fırsat gerçek bir reklamveren olunca sunucudan gelir.
+Gastro Onaylı da yok (yönetici panelinden elle verilebilir).
+
+**İşletme paneli yönettiği mekânı sahiplenmeden açılmaz.** Eskiden oturum
+sahiplenme olmadan da açılıyor, `findOwnerRestaurant` bir demo işletmenin
+panelini gösteriyordu. Artık o fallback yok: sahiplenmemiş oturum girişten
+sonra `/isletme/sahiplen`e yönleniyor, doğrudan `/isletme/panel`e gelen "Henüz
+yönettiğiniz bir mekân yok" boş durumunu görüyor. (Not: `/isletme/kayit` ile
+havuzda olmayan yeni bir işletme kaydı henüz bir mekâna bağlanmıyor — kayıt
+akışı mekân kaydı üretmiyor, o da sahiplenmeye yönlenir.)
+
+**Artifact önizlemesinde yönetici sekmesi giriş ekranında kalır** (sunucu yok);
+işletme sekmesinde sahiplen → panel yolu çalışır.
 
 Dış kaynaktan çekilen **Bakırköy kafe/restoran tablosu** (`.xlsx`, Google
 Maps taraması, 4 km yarıçap) havuza alındı. Tek kaynak `shared/bakirkoy.js`
@@ -284,7 +299,7 @@ Aynı 218 kaydı dört yer okuyor ve **kimlik hepsinde `bkr-<anahtar>`**:
 tüketici uygulaması + işletme sahiplenme listesi (`data/restaurants.js` →
 `HAVUZ`), yönetici paneli Mekan Havuzu (`GurAdmin.jsx` → `RESTAURANTS`),
 sunucu (`server/db/seed.js` → `seedBakirkoy`, kaynak `(manual, bakirkoy:<anahtar>)`).
-Hepsi **dış kaynaklı, sahiplenilmemiş, Gastro'suz** (rozet puanla verilmez).
+Hepsi **dış kaynaklı, sahiplenilmemiş, Gastro'suz** (rozet puanla verilmez). Yönetici panelinde hepsi Mekan Havuzu'nda (`account: false`).
 
 **TABLODA OLMAYAN HİÇBİR ŞEY UYDURULMADI.** Koordinat, çalışma saati, fiyat
 düzeyi, fotoğraf, menü ve açıklama tabloda yok. Sonuçları:
@@ -810,14 +825,13 @@ form doldururdu. İkisi de `replace`: geri tuşu aynı kapıya tekrar
 kapatmak sitede değil üründe yapılan bir iş. Başlık da bu yüzden oturum
 durumunu hiç bilmiyor — prop almıyor, `localStorage` okumuyor.
 
-**Giriş formunda DEMO künyesi var** (`DEMO_ISLETME`, yönetici
-girişindekinin aynısı): `demo.isletme@gur.app` · `gur1234`, dokununca
-alanları dolduruyor. Önceden form boştu, ne yazılacağını söylemiyordu ve
-her şeyi kabul ediyordu — kullanıcı yazdığının bir yere gittiğini
-sanıyordu. YEREL modda gerçek hesap kaydı yok, bu yüzden başka bir
-e-posta da reddedilmiyor (siteden kayıt olan kendi yazdığıyla
-girebilmeli); doğrulama CANLI modda sunucuda. Boş ya da geçersiz formla
-giriş hâlâ engelli ve sebebi `role="alert"` ile yazılı.
+**Giriş formunda DEMO künyesi YOK** (eskiden `DEMO_ISLETME` rozeti vardı,
+kaldırıldı). Form HER İKİ MODDA doğrulanıyor: geçerli e-posta + en az 6
+karakter parola, aksi hâlde `role="alert"` ile sebep yazılı. YEREL modda
+gerçek hesap kaydı yok, bu yüzden geçerli biçimli her e-posta kabul ediliyor
+(siteden kayıt olan kendi yazdığıyla girebilmeli); gerçek doğrulama CANLI
+modda sunucuda. Giriş sonrası yönetilecek mekân yoksa sahiplenme sayfasına
+gidiliyor (bkz. "DEMO YOK").
 
 **Dar ekranda pilde yalnız BİRİNCİL eylem var**, ikincisi menünün içinde:
 ikisi de sığmıyor ve sıkıştırmak ikisini de 44 px'in altına düşürüyordu.

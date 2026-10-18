@@ -12,7 +12,6 @@ import { useRequests, openRequests, requestFor, markQuoted, close as closeReques
 import { useCreatives, SLOTS, listFor, addCreative, removeCreative, toggleLive, liveCount } from '../lib/creatives.js';
 import { TEMPLATE_COLUMNS, templateHeaderLine, downloadTemplate, parseRestaurantFile } from '../lib/import-restaurants.js';
 import { BAKIRKOY } from '../../shared/bakirkoy.js';
-import { DEMO_ROLLER, demoId } from '../data/restaurants.js';
 import {
   AD_PRODUCTS, AD_KEYS, useAdSlots, priceOf, setPrice, adminBook, decideBooking,
   pendingBookings, pendingBookingCount, dayState, monthGrid, endOf, prettyDay, gunFarki,
@@ -356,41 +355,22 @@ const CAT_DIST = [
 
 // Mekan havuzu = Bakırköy listesi (shared/bakirkoy.js): tüketici uygulamasındaki
 // kayıtlarla AYNI kayıtlar ve aynı kimlikler (`bkr-…`) — yönetici panelinde
-// gizlenen mekân uygulamada da aynı mekân. Eskiden burada elle yazılmış 12
-// demo mekân (Nusr-Et, Mikla, Çiya…) vardı.
-//
-// DEMO: yönetici paneli örnek müşteri gerektiriyor; gerçek müşterimiz yok.
-// `DEMO_ROLLER`deki kayıtlar müşteri (`account: true`) gibi işaretlenir.
-// Kayıtlar gerçek işletmeler, ilişki UYDURMA — bkz. data/restaurants.js.
-// Gastro Onaylı yok: rozet gerçek bir işletmeye uydurma şef adıyla verilmez;
-// panelden `toggleGastro` ile elle verilebilir.
+// gizlenen mekân uygulamada da aynı mekân.
 //
 // account: işletme kaydını sahiplenmiş, panel girişi olan müşterimiz mi.
 // false olanlar yalnızca dış kaynaktan gelen mekanlar: bize ödeme yapmıyorlar,
 // fiyatlandırma panelinde görünmezler (teklif gönderilecek muhatap yok).
-const DEMO_MUSTERI = {
-  [DEMO_ROLLER.sahip]:                  '2024-04-05',   // Doyurucu demo girişinin yönettiği işletme
-  [DEMO_ROLLER.musteriler.steak]:       '2024-03-12',
-  [DEMO_ROLLER.musteriler.lokanta]:     '2024-01-08',
-  [DEMO_ROLLER.musteriler.turk]:        '2024-02-20',
-  [DEMO_ROLLER.musteriler.burger]:      '2024-04-18',
-  [DEMO_ROLLER.musteriler.pastane]:     '2023-12-01',
-  [DEMO_ROLLER.musteriler.meyhane]:     '2024-07-22',
-};
-const RESTAURANTS = BAKIRKOY.map(k => {
-  const musteri = DEMO_MUSTERI[k.anahtar];
-  return {
-    id: demoId(k.anahtar), name: k.ad, cat: k.kategori, district: 'Bakırköy',
-    rating: k.puan, reviews: k.yorum,
-    status: k.anahtar === DEMO_ROLLER.askida ? 'suspended' : 'active',
-    gastro: false, plan: 'Ücretsiz',
-    joined: musteri || '2026-10-18',
-    account: !!musteri, source: musteri ? 'owner' : 'api',
-    addr: k.adres, phone: k.telefon, email: k.eposta, website: k.web,
-    instagram: k.instagram, tur: k.tur,
-    imgs: [], menu: [], popular: [], tags: [k.tur, k.mahalle].filter(Boolean),
-  };
-});
+// Şu an HEPSİ false: gerçek müşterimiz yok, demo müşteri de yok. Sahiplenme
+// onaylandıkça (`gur.claims`) kayıt müşteriye döner.
+const RESTAURANTS = BAKIRKOY.map(k => ({
+  id: `bkr-${k.anahtar}`, name: k.ad, cat: k.kategori, district: 'Bakırköy',
+  rating: k.puan, reviews: k.yorum, status: 'active',
+  gastro: false, plan: 'Ücretsiz', joined: '2026-10-18',
+  account: false, source: 'api',
+  addr: k.adres, phone: k.telefon, email: k.eposta, website: k.web,
+  instagram: k.instagram, tur: k.tur,
+  imgs: [], menu: [], popular: [], tags: [k.tur, k.mahalle].filter(Boolean),
+}));
 
 // ═══════════════════════════════════════════════════════════════════════
 // GELİR KALEMLERİ VE MÜŞTERİ BAZLI SATIN ALIMLAR
@@ -438,37 +418,9 @@ const STREAM_BY_KEY = Object.fromEntries(REVENUE_STREAMS.map(x => [x.key, x]));
 // Hangi müşteri hangi ücretli özelliği almış. monthly: o işletmenin o kalem
 // için ödediği aylık tutar (kampanyalarda harcanan bütçenin aylık karşılığı).
 const STORE_SERVICES = {
-  // DEMO satın alımlar (bkz. DEMO_MUSTERI). Gastro paketi YOK: şef çekimi
-  // gerçek bir işletme için uydurulmaz.
-  [demoId(DEMO_ROLLER.musteriler.steak)]: [
-    { key: 'bannerAds', monthly: 14000, since: '2025-11-04' },
-    { key: 'pushAds', monthly: 6500, since: '2026-02-11' },
-  ],
-  [demoId(DEMO_ROLLER.musteriler.lokanta)]: [
-    { key: 'bannerAds', monthly: 11000, since: '2025-09-15' },
-  ],
-  [demoId(DEMO_ROLLER.musteriler.turk)]: [
-    { key: 'rewardedAds', monthly: 5200, since: '2026-03-02' },
-    { key: 'instantDeals', monthly: 3100, since: '2026-04-19' },
-  ],
-  [demoId(DEMO_ROLLER.sahip)]: [ // Doyurucu demo girişinin yönettiği işletme
-    { key: 'instantDeals', monthly: 2400, since: '2026-03-08' },
-    { key: 'secondChance', monthly: 1450, since: '2026-01-16' },
-  ],
-  [demoId(DEMO_ROLLER.musteriler.burger)]: [
-    { key: 'rewardedAds', monthly: 4300, since: '2026-02-27' },
-    { key: 'instantDeals', monthly: 2600, since: '2026-05-14' },
-    { key: 'secondChance', monthly: 1450, since: '2026-02-27' },
-  ],
-  [demoId(DEMO_ROLLER.musteriler.pastane)]: [
-    { key: 'bannerAds', monthly: 9800, since: '2025-08-22' },
-    { key: 'pushAds', monthly: 5200, since: '2026-03-30' },
-  ],
-  [demoId(DEMO_ROLLER.musteriler.meyhane)]: [
-    { key: 'pushAds', monthly: 4100, since: '2026-04-06' },
-    { key: 'instantDeals', monthly: 3400, since: '2026-05-02' },
-    { key: 'secondChance', monthly: 1450, since: '2026-04-06' },
-  ],
+  // Boş: henüz hizmet satın almış müşteri yok. Müşteri kimliği (restoran id)
+  // → [{ key, monthly, since }] biçiminde dolacak; sunucudaki karşılığı
+  // campaign_orders'ın işletme kırılımı.
 };
 
 /** Bir mağazanın satın aldığı ücretli özellikler, katalog bilgisiyle birlikte. */
@@ -498,21 +450,13 @@ const STREAM_TOTAL = REVENUE_STREAMS.reduce((a, x) => a + x.monthly, 0);
 // Abonelik kalemi kaldırıldı: platform cirosunun tamamı ücretli özelliklerden.
 const PLATFORM_TOTAL = STREAM_TOTAL;
 
-const APPLICATIONS = [
-  { id: 101, name: 'Balıkçı Deniz', cat: 'Deniz Ürünleri', district: 'Sarıyer', owner: 'Deniz Yılmaz', taxNo: '4820193756', taxOffice: 'Sarıyer VD', submitted: '2 saat önce', docStatus: 'yüklendi' },
-  { id: 102, name: 'Pizza Napoli', cat: 'İtalyan', district: 'Kadıköy', owner: 'Marco Bianchi', taxNo: '7291048365', taxOffice: 'Kadıköy VD', submitted: '5 saat önce', docStatus: 'yüklendi' },
-  { id: 103, name: 'Sushi Zen', cat: 'Uzak Doğu', district: 'Beşiktaş', owner: 'Ayşe Kaya', taxNo: '1938475620', taxOffice: 'Beşiktaş VD', submitted: '1 gün önce', docStatus: 'yüklendi' },
-  { id: 104, name: 'Kahve Durağı', cat: 'Kafe', district: 'Üsküdar', owner: 'Mehmet Demir', taxNo: '5647382910', taxOffice: 'Üsküdar VD', submitted: '1 gün önce', docStatus: 'inceleniyor' },
-  { id: 105, name: 'Vegan Garden', cat: 'Sağlıklı', district: 'Cihangir', owner: 'Zeynep Ak', taxNo: '8273649150', taxOffice: 'Beyoğlu VD', submitted: '2 gün önce', docStatus: 'yüklendi' },
-];
+// Sahiplenme başvuruları: yerel modda `gur.claims` deposundan (siteden gelenler)
+// ve sunucu bağlıyken API'den. Eskiden burada beş uydurma başvuru vardı.
+const APPLICATIONS = [];
 
-const USERS = [
-  { id: 1, name: 'Bora Çolpan', email: 'bora@mail.com', joined: '2024-08-01', swipes: 340, favs: 28, status: 'active' },
-  { id: 2, name: 'Elif Kara', email: 'elif@mail.com', joined: '2024-07-15', swipes: 890, favs: 54, status: 'active' },
-  { id: 3, name: 'Mert Şen', email: 'mert@mail.com', joined: '2024-06-20', swipes: 120, favs: 9, status: 'active' },
-  { id: 4, name: 'Ahmet Yıldız', email: 'ahmet@mail.com', joined: '2024-09-02', swipes: 45, favs: 3, status: 'active' },
-  { id: 5, name: 'Zeynep Ateş', email: 'zeynep@mail.com', joined: '2024-05-11', swipes: 1200, favs: 87, status: 'banned' },
-];
+// Kullanıcı listesi sunucudan gelir (users tablosu); yerelde boş. Eskiden burada
+// uydurma kişiler vardı.
+const USERS = [];
 
 // ─── Restoran detayları (mock) ────────────────────────────────────────────
 // Her restoran için menü ve yorum listesi id'den deterministik üretilir:
@@ -957,8 +901,6 @@ function IconBtn({ onClick, icon, size = 38, title, danger, disabled }) {
 // Demo seviyesi koruma: doğrulama tarayıcıda yapılır, dolayısıyla gerçek bir
 // güvenlik sınırı değildir — panel verisi zaten mock. Gerçek yetkilendirme
 // için sunucu tarafı oturum/rol denetimi gerekir (bkz. CLAUDE.md, backend adımı).
-const DEMO_USER = 'admin';
-const DEMO_PASS = 'gur2026';
 
 function AdminField({ label, value, onChange, type = 'text', autoFocus, onEnter }) {
   return (
@@ -1000,8 +942,10 @@ function AdminLogin({ onLogin, theme, onTheme }) {
       finally { setBusy(false); }
       return;
     }
-    if (user.trim() === DEMO_USER && pass === DEMO_PASS) onLogin();
-    else setError('Kullanıcı adı veya parola hatalı.');
+    // Sunucu yokken giriş YOK: tarayıcıda doğrulanan bir parola (eskiden
+    // sabit demo parolası) gerçek bir koruma sağlamaz, yalnızca herkesin
+    // bildiği bir kapı olur. Yönetici hesabı sunucuda (ADMIN_PASSWORD) kurulur.
+    setError('Yönetici girişi için sunucu gerekir: sunucuya bağlı değilsiniz.');
   };
 
   return (
@@ -1047,15 +991,10 @@ function AdminLogin({ onLogin, theme, onTheme }) {
           <Btn label={busy ? 'Bağlanıyor…' : 'Giriş yap'} onClick={submit} variant="filled" tone="orange" size="md" fullWidth />
 
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: C.yellowSoft, border: `1px solid ${C.yellow}33`, borderRadius: 6, padding: '3px 8px', marginBottom: 8 }}>
-              <span style={{ fontSize: 9.5, fontWeight: 800, color: C.yellowInk, letterSpacing: 1 }}>DEMO</span>
-            </div>
             <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
-              Kullanıcı adı <code style={{ color: C.dim, background: C.panel2, padding: '1px 5px', borderRadius: 4 }}>{DEMO_USER}</code>
-              {' · '}Parola <code style={{ color: C.dim, background: C.panel2, padding: '1px 5px', borderRadius: 4 }}>{DEMO_PASS}</code>
-              <br />{live
+              {live
                 ? 'Sunucuya bağlı: parola scrypt özetiyle sunucuda doğrulanıyor.'
-                : 'Sunucu yok — doğrulama tarayıcıda, gerçek koruma sağlamaz.'}
+                : 'Sunucu yok — yönetici girişi yalnızca sunucuya bağlıyken çalışır.'}
             </div>
           </div>
         </div>
@@ -3029,17 +2968,8 @@ function TableShell({ headers, children }) {
 // paraya bakan bir sıralama deneyimi bozarak uzun vadede geliri düşürür,
 // bu yüzden kalite çarpanı burada da görünür.
 // ═══════════════════════════════════════════════════════════════════════
-// DEMO kampanyalar: kayıtlar gerçek işletmeler (Bakırköy listesi), kampanya
-// ve işletme unvanı UYDURMA — unvan sütununda "demo" yazıyor (bkz.
-// data/restaurants.js → DEMO_ROLLER). Sunucu bağlıyken buraya sunucudaki
-// campaigns tablosu gelir.
-const kayitAdi = (anahtar) => BAKIRKOY.find(k => k.anahtar === anahtar)?.ad || anahtar;
-const CAMPAIGN_SEED = [
-  { id: 'cmp-1', restaurant: kayitAdi(DEMO_ROLLER.kampanyalar.turk),    org: '(demo)', label: 'Öne Çıkan', pricing: 'cpe', bid: 240, daily: 180000, spent: 96400, impressions: 18420, clicks: 1120, engagements: 742, status: 'active' },
-  { id: 'cmp-2', restaurant: kayitAdi(DEMO_ROLLER.kampanyalar.balik),   org: '(demo)', label: 'Öne Çıkan', pricing: 'cpc', bid: 180, daily: 90000,  spent: 41300, impressions: 11250, clicks: 690,  engagements: 318, status: 'active' },
-  { id: 'cmp-3', restaurant: kayitAdi(DEMO_ROLLER.kampanyalar.italyan), org: '(demo)', label: 'Öne Çıkan', pricing: 'cpe', bid: 310, daily: 42000,  spent: 42000, impressions: 7600,  clicks: 512,  engagements: 401, status: 'exhausted' },
-  { id: 'cmp-4', restaurant: kayitAdi(DEMO_ROLLER.kampanyalar.kafe),    org: '(demo)', label: 'Öne Çıkan', pricing: 'cpe', bid: 120, daily: 60000,  spent: 0,     impressions: 0,     clicks: 0,    engagements: 0,   status: 'paused' },
-];
+// Kampanya yok: sunucu bağlıyken buraya campaigns tablosu gelir, yerelde boş.
+const CAMPAIGN_SEED = [];
 
 // Sunucudan gelen kampanya satırını tablonun beklediği şekle indirger.
 function fromApi(c) {

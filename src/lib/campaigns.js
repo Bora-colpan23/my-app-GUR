@@ -1,39 +1,20 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Demo kampanya envanteri.
+// Yerel kampanya envanteri.
 //
-// Sunucu bunları campaigns tablosundan okur; istemci demo modunda buradan.
+// Sunucu kampanyaları campaigns tablosundan okur; istemci YEREL modda buradan.
 // İkisi de shared/deck.js'teki aynı buildDeck/rankCampaigns'i çağırır ki
 // yerleşim hissi birebir aynı olsun.
+//
+// BOŞ. Eskiden üç uydurma kampanya vardı; gerçek bir reklamveren olmadan
+// sponsorlu kart göstermek, gerçek işletmelere ödemediği bir reklamı
+// atfetmek olurdu. YEREL modda deste yalnızca organik kartlardan oluşur.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { DEMO_ROLLER, demoId } from "../data/restaurants.js";
-
-// DEMO: gerçek işletme kayıtları (Bakırköy listesi), uydurma kampanya —
-// bkz. data/restaurants.js → DEMO_ROLLER.
-export const DEMO_CAMPAIGNS = [
-  {
-    id: "cmp-1", label: "Öne Çıkan", pricing: "cpe",
-    bidMinor: 240, remainingBudgetMinor: 180000, status: "active",
-    engagementRate: 0.62, category: "Türk Mutfağı",
-    restaurantId: demoId(DEMO_ROLLER.kampanyalar.turk),
-  },
-  {
-    id: "cmp-2", label: "Öne Çıkan", pricing: "cpc",
-    bidMinor: 180, remainingBudgetMinor: 90000, status: "active",
-    engagementRate: 0.48, category: "Deniz Ürünleri",
-    restaurantId: demoId(DEMO_ROLLER.kampanyalar.balik),
-  },
-  {
-    id: "cmp-3", label: "Öne Çıkan", pricing: "cpe",
-    bidMinor: 310, remainingBudgetMinor: 42000, status: "active",
-    engagementRate: 0.71, category: "İtalyan",
-    restaurantId: demoId(DEMO_ROLLER.kampanyalar.italyan),
-  },
-];
+export const LOCAL_CAMPAIGNS = [];
 
 /** Kampanyaları gerçek restoran kayıtlarına bağlar. */
 export function hydrateCampaigns(restaurants) {
-  return DEMO_CAMPAIGNS
+  return LOCAL_CAMPAIGNS
     .map(c => {
       const restaurant = restaurants.find(r => String(r.id) === String(c.restaurantId));
       return restaurant ? { ...c, restaurant } : null;

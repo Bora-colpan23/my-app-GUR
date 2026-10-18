@@ -17,7 +17,7 @@ Fullstack monorepo (single `package.json`):
 ## Key env vars
 - `DATABASE_URL` — set inline in compose (local infra, not a secret).
 - `SESSION_SECRET` — HMAC key for session tokens. Generated as a dev placeholder; optional (app auto-generates if absent but sessions won't survive restart).
-- `ADMIN_USER` / `ADMIN_PASSWORD` — admin account created by seed (defaults: `admin` / `gur2026`).
+- `ADMIN_USER` / `ADMIN_PASSWORD` — admin account created by seed ONLY when `ADMIN_PASSWORD` (min 8 chars) is set. No default password, no demo accounts.
 - External API keys (Google Places, Foursquare, TripAdvisor, OAuth) are all **optional** — the app falls back to OpenStreetMap Overpass API and mock/demo data.
 
 ## Routes
@@ -30,7 +30,7 @@ Fullstack monorepo (single `package.json`):
 - Check: `docker compose ps` — all services should be up/healthy.
 - Web: `curl -s http://localhost:3000 | head -5` — should return HTML.
 - API: `curl -s http://localhost:3000/api/restaurants | head -c 200` — should return JSON.
-- Admin login: `admin` / `gur2026`.
+- Admin login: `ADMIN_USER` / `ADMIN_PASSWORD` from the environment (no default; if unset the admin account is not created).
 
 ## Fixes applied after the initial Base44 setup
 

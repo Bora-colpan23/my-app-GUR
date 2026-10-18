@@ -17,7 +17,7 @@ import {
   BadgeChips, BadgeMarks, GlossDefs, GLOSS, DinnerBell, SplitText, Orb, Skeleton,
   scrim, SocialAuthRow, StepProgress,
 } from '../ui/kit.jsx';
-import { I, RESTAURANTS, DEMO_ROLLER, demoId, CATEGORIES, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
+import { I, RESTAURANTS, CATEGORIES, withOwnerMedia } from '../data/restaurants.js';
 import { Sheet, DangerConfirm, Chip } from '../ui/sheets.jsx';
 import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
@@ -114,12 +114,9 @@ const BANNER_ADS = [
 // Restoran ölü saatini doldurmak için süreli indirim yayınlar; platform
 // bunu konum bazlı bildirim reklamı olarak satar. Bitiş saati sabit bir
 // referanstan türetilir ki geri sayım demo boyunca tutarlı kalsın.
-const DEALS = [
-  // DEMO: gerçek işletme kayıtları, uydurma fırsat (bkz. data/restaurants.js → DEMO_ROLLER).
-  { restaurantId: demoId(DEMO_ROLLER.musteriler.turk), pct: 20, note: "15:00-17:00 arası tüm ana yemeklerde", minutesLeft: 96 },
-  { restaurantId: demoId(DEMO_ROLLER.sahip), pct: 25, note: "Öğle menüsünde, sınırlı sayıda", minutesLeft: 42 },
-  { restaurantId: demoId(DEMO_ROLLER.musteriler.burger), pct: 15, note: "Akşam 18:00 sonrası menülerde", minutesLeft: 158 },
-];
+// Anlık fırsat yok: gerçek bir işletme fırsat yayınlayana kadar boş. Eskiden
+// üç uydurma fırsat vardı (gerçek işletmeler adına yazılmış indirimler).
+const DEALS = [];
 function dealFor(restaurantId) {
   return DEALS.find(d => d.restaurantId === restaurantId) || null;
 }
@@ -4140,7 +4137,7 @@ export default function GurApp(props = {}) {
   const ownerProfiles = useOwnerProfiles();
   const [claimedRestaurant, setClaimedRestaurant] = useState(null);
   const ownerRestaurant = useMemo(
-    () => claimedRestaurant || findOwnerRestaurant(restaurants),
+    () => claimedRestaurant || null,
     [restaurants, claimedRestaurant]
   );
   // Tüketici tarafındaki her ekran bu türetilmiş listeden beslenir.

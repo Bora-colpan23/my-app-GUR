@@ -28,7 +28,7 @@ services:
       - DATABASE_URL=postgres://gur:gur_dev@postgres:5432/gur
       - DISABLE_CRON=1
       - ADMIN_USER=admin
-      - ADMIN_PASSWORD=gur2026
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,7 +45,7 @@ services:
       - PORT=8787
       - CORS_ORIGIN=*
       - ADMIN_USER=admin
-      - ADMIN_PASSWORD=gur2026
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
     # SAĞLIK KONTROLÜ ŞART. `web` yalnızca `depends_on: api` diyordu ve bu
     # konteynerin BAŞLAMASINI bekler, HAZIR olmasını beklemez. İki konteyner

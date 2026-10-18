@@ -8,7 +8,6 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { BAKIRKOY, BAKIRKOY_ILCE } from '../../shared/bakirkoy.js';
-import { DEMO_ROLLER, demoId } from '../../shared/demo.js';
 
 // ═══════════════════════════════════════════════
 // IMAGES
@@ -99,14 +98,12 @@ export function bakirkoyToCard(k) {
 
 /**
  * MEKAN HAVUZU = Bakırköy listesi. Eskiden burada 15 elle yazılmış demo mekân
- * (Nusr-Et, Mikla, Çiya Sofrası…) vardı; ana data artık tablodan gelen 218
- * kayıt. Tüketici uygulaması, işletme sahiplenme listesi, mobil paket ve
- * sunucu tohumu aynı listeyi okur.
+ * vardı; ana data artık tablodan gelen 218 kayıt. Tüketici uygulaması, işletme
+ * sahiplenme listesi, mobil paket ve sunucu tohumu aynı listeyi okur.
+ * Demo müşteri / kampanya / fırsat YOK: gerçek müşterimiz gelene kadar boş.
  */
 export const RESTAURANTS = BAKIRKOY.map(bakirkoyToCard);
 
-// Demo rolleri shared/demo.js'te (sunucu tohumu da okuyor); eski içe aktarmalar kırılmasın diye buradan da.
-export { DEMO_ROLLER, demoId };
 
 // Doyurucu panelinden yüklenen görselleri, sahibi olduğu restoranın kendi
 // dizilerine karıştırır. Tüm ekranlar (swipe kartı, detay galerisi, menü
@@ -126,11 +123,6 @@ export function withOwnerMedia(list, ownerId, media) {
   });
 }
 
-// Doyurucu'nun yönettiği (demo) restoran: DEMO_ROLLER.sahip. Listede yoksa
-// (başka bir kaynaktan gelen havuz) ilk kayıt.
-export function findOwnerRestaurant(list) {
-  return list.find(r => r.id === demoId(DEMO_ROLLER.sahip)) || list[0] || null;
-}
 
 export const CATEGORIES = [
   { name:"Türk Mutfağı", img:I.turkish1 }, { name:"Uzak Doğu", img:I.sushi1 },

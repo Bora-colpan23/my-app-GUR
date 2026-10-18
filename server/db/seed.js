@@ -18,7 +18,6 @@ import { runIngestion } from "../src/ingestion/worker.js";
 import { upsertPlace } from "../src/ingestion/worker.js";
 import { hashPassword } from "../src/auth/password.js";
 import { BAKIRKOY, BAKIRKOY_ILCE } from "../../shared/bakirkoy.js";
-import { DEMO_ROLLER } from "../../shared/demo.js";
 
 /**
  * Bakırköy listesi (shared/bakirkoy.js): tablodan gelen 218 kayıt.
@@ -65,8 +64,15 @@ async function seedBakirkoy(db) {
 }
 
 async function seedPlatformAdmin(db) {
+  // Yönetici hesabı YALNIZCA parola ortamdan verilirse kurulur. Eskiden
+  // varsayılan "admin" / "gur2026" vardı: herkesin bildiği bir parola, her
+  // kurulumda açık bir yönetici kapısı demekti.
   const username = process.env.ADMIN_USER || "admin";
-  const password = process.env.ADMIN_PASSWORD || "gur2026";
+  const password = process.env.ADMIN_PASSWORD || "";
+  if (password.length < 8) {
+    console.warn("[seed] yönetici hesabı kurulmadı: ADMIN_PASSWORD (en az 8 karakter) tanımlı değil");
+    return { orgId: null, userId: null, created: false };
+  }
 
   const { rows: [org] } = await db.query(
     `INSERT INTO organizations (legal_name, plan) VALUES ('GUR Platform','pro')
@@ -89,68 +95,6 @@ async function seedPlatformAdmin(db) {
   return { orgId, userId: user.id, created: true };
 }
 
-async function seedCampaigns(db) {
-  // DEMO: üç kampanya. Kayıtlar gerçek işletmeler (Bakırköy listesi), kampanya
-  // ve işletme unvanı UYDURMA — unvanda "(demo)" yazıyor (bkz. shared/demo.js).
-  // `claimed_by_org` bu üç kayıtta doğrulama yıldızı çıkarır: gerçek bir
-  // müşteriden önce bu fonksiyon ve tohumu silinmeli.
-  const K = DEMO_ROLLER.kampanyalar;
-  const wanted = [
-    { anahtar: K.turk,    org: "Abdülkadir Restaurant (demo)", label: "Öne Çıkan", pricing: "cpe", bid: 240, daily: 180000, offer: "%10 ikram" },
-    { anahtar: K.balik,   org: "Meşhur Balıkçınız Bayram (demo)", label: "Öne Çıkan", pricing: "cpc", bid: 180, daily: 90000,  offer: "%15 indirim" },
-    { anahtar: K.italyan, org: "Gusto Napoletano (demo)",      label: "Öne Çıkan", pricing: "cpe", bid: 310, daily: 42000,  offer: "ikram tatlı" },
-  ];
-  let n = 0;
-  for (const w of wanted) {
-    const { rows: [r] } = await db.query(
-      `SELECT restaurant_id AS id FROM restaurant_sources
-        WHERE provider = 'manual' AND external_id = $1`, [`bakirkoy:${w.anahtar}`]);
-    if (!r) continue;
-    // Tekrar çalıştırmada kampanya çoğaltma: aynı mekân için zaten bir
-    // kampanya varsa atla.
-    const { rows: [dupe] } = await db.query(
-      `SELECT 1 FROM campaigns WHERE restaurant_id = $1 LIMIT 1`, [r.id]);
-    if (dupe) continue;
-    const { rows: [org] } = await db.query(
-      `INSERT INTO organizations (legal_name, plan) VALUES ($1,'pro') RETURNING id`, [w.org]);
-    await db.query(`UPDATE restaurants SET claimed_by_org = $2 WHERE id = $1`, [r.id, org.id]);
-    await db.query(
-      `INSERT INTO campaigns (org_id, restaurant_id, label, status, pricing, bid_minor, daily_budget_minor, target)
-       VALUES ($1,$2,$3,'active',$4::pricing_model,$5,$6,$7)`,
-      [org.id, r.id, w.label, w.pricing, w.bid, w.daily, JSON.stringify({ offer: w.offer })]);
-    n++;
-  }
-  return n;
-}
-
-async function seedDemoUser(db) {
-  const email = "demo@gur.app";
-  // Kimlik satırı yoksa kullanıcı satırı da yarım kalmış olabilir (önceki
-  // koşu ortada patlarsa): e-postadan da bakıp varsa onu kullanıyoruz.
-  const { rows: [existing] } = await db.query(
-    `SELECT ai.user_id FROM auth_identities ai
-      WHERE ai.provider='password' AND ai.subject=$1`, [email]);
-  if (existing) return { userId: existing.user_id, created: false };
-
-  const { rows: [orphan] } = await db.query(
-    `SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL`, [email]);
-  const { rows: [u] } = orphan
-    ? { rows: [orphan] }
-    : await db.query(
-        `INSERT INTO users (email, display_name, analytics_optin, marketing_optin)
-         VALUES ($1,'Bora Çolpan',true,true) RETURNING id`, [email]);
-  await db.query(
-    // subject text, email_at_login citext: aynı parametreyi iki farklı tipe
-    // bağlamak Postgres'te "inconsistent types" veriyor, açıkça cast ediyoruz.
-    `INSERT INTO auth_identities (user_id, provider, subject, email_at_login, password_hash)
-     VALUES ($1,'password',$2::text,$2::citext,$3)
-     ON CONFLICT (provider, subject) DO NOTHING`, [u.id, email, await hashPassword("gur1234")]);
-  await db.query(
-    `INSERT INTO user_devices (user_id, platform, push_token) VALUES ($1,'web','demo-token')
-     ON CONFLICT DO NOTHING`, [u.id]);
-  return { userId: u.id, created: true };
-}
-
 export async function seed(db, { reset = false, tryIngestion = process.env.GUR_SEED_INGEST === "1" } = {}) {
   if (reset) {
     console.log("› mevcut veri siliniyor");
@@ -169,13 +113,10 @@ export async function seed(db, { reset = false, tryIngestion = process.env.GUR_S
     }
   }
 
-  // Sıra önemli: kampanyalar mekânların yazılmış olmasını bekler.
   const bakirkoy = await seedBakirkoy(db);
   const admin = await seedPlatformAdmin(db);
-  const campaigns = await seedCampaigns(db);
-  const demo = await seedDemoUser(db);
 
-  return { fromApi, bakirkoy, campaigns, adminCreated: admin.created, demoCreated: demo.created };
+  return { fromApi, bakirkoy, adminCreated: admin.created };
 }
 
 // Doğrudan çalıştırıldığında

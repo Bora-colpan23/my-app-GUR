@@ -54,7 +54,7 @@ import {
   cancelBooking, bookingsOfRestaurant, dayState, monthGrid, today, endOf,
   addDays, prettyDay, gunFarki, slotsOf, WEEKDAYS_TR, MONTHS_TR as AY_ADLARI,
 } from '../lib/adslots.js';
-import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
+import { RESTAURANTS, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
 
 // ═══════════════════════════════════════════════
@@ -434,7 +434,6 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
 // başka bir e-posta da reddedilmiyor: siteden kayıt olan kullanıcı kendi
 // yazdığıyla girebilmeli (o kayıt da sunucusuz ortamda bir oturumdan
 // ibaret). CANLI modda doğrulama sunucuda.
-const DEMO_ISLETME = { eposta: "demo.isletme@gur.app", sifre: "gur1234" };
 
 function DoyurucuLoginScreen({ onBack, onLogin }) {
   const [email, setEmail] = useState("");
@@ -487,28 +486,6 @@ function DoyurucuLoginScreen({ onBack, onLogin }) {
 
           <Btn text="İşletme Paneline Gir" onClick={gir} />
 
-          {/* DEMO KÜNYESİ. Yönetici girişindeki rozetin aynısı: ne
-              yazacağını söylemeyen bir giriş formu, kapalı bir kapıdır.
-              Dokununca alanları dolduruyor — kullanıcı on sekiz karakter
-              yazmak zorunda kalmasın. */}
-          <button type="button" onClick={() => { setHata(null); setEmail(DEMO_ISLETME.eposta); setPassword(DEMO_ISLETME.sifre); }}
-            className="gur-press"
-            style={{
-              display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 44,
-              margin: "12px 0 0", padding: "9px 13px", borderRadius: 14, cursor: "pointer",
-              background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.3)",
-              fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-on-brand)", textAlign: "left",
-            }}>
-            <span style={{
-              fontSize: 9.5, fontWeight: 800, letterSpacing: 1, flexShrink: 0,
-              background: "rgba(255,255,255,0.9)", color: "var(--c-brand-ink)",
-              borderRadius: 5, padding: "2px 6px",
-            }}>DEMO</span>
-            <span style={{ lineHeight: 1.45 }}>
-              {DEMO_ISLETME.eposta} · {DEMO_ISLETME.sifre}
-              <span style={{ color: "var(--c-on-brand-2)" }}> — dokun, alanları doldursun</span>
-            </span>
-          </button>
           {hata && (
             <p role="alert" style={{
               fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff",
@@ -3759,15 +3736,12 @@ export default function GurBusiness() {
     [ownerProfiles]
   );
   // Yönetilen mekan: sahiplenilen kayıt (bu oturumda ya da önceki
-  // oturumdan hatırlanan), yoksa demo işletmesi.
+  // oturumdan hatırlanan). Sahiplenilmemişse YOK: eskiden burada bir demo
+  // işletmesi devreye giriyordu ve her giriş onun panelini açıyordu.
   const baseOwner = useMemo(() => {
     const id = claimedRestaurant?.id ?? oturum?.claimedId;
-    if (id != null) {
-      return basePool.find(r => String(r.id) === String(id))
-        || claimedRestaurant
-        || findOwnerRestaurant(basePool);
-    }
-    return findOwnerRestaurant(basePool);
+    if (id == null) return null;
+    return basePool.find(r => String(r.id) === String(id)) || claimedRestaurant || null;
   }, [basePool, claimedRestaurant, oturum]);
   const pool = useMemo(
     () => withOwnerMedia(basePool, baseOwner?.id, ownerMediaFor(baseOwner?.id, mediaState)),
@@ -3790,7 +3764,9 @@ export default function GurBusiness() {
     try { localStorage.setItem(OTURUM_ANAHTARI, JSON.stringify(s)); } catch { /* depolama kapalı */ }
     setOturum(s);
     if (claimed) setClaimedRestaurant(claimed);
-    navigate(YOL.panel);
+    // Yönetilecek bir mekân yoksa (oturum var ama sahiplenme yok) panel
+    // boş açılmaz: önce kaydı sahiplenmek gerekiyor.
+    navigate(claimed || oturum?.claimedId != null ? YOL.panel : YOL.sahiplen);
   };
 
   const cikis = () => {
@@ -3842,15 +3818,29 @@ export default function GurBusiness() {
         return <FormKap en={640}>{kayitAkisi()}</FormKap>;
       case "panel":
         // Kapı yukarıdaki effect'te; o çalışana kadar bir kare boş kalıyor.
-        return girisli
-          ? <RestaurantDashboard onLogout={cikis} ownerRestaurant={ownerRestaurant} genis={genis} onSite={() => git("landing")} />
-          : null;
+        if (!girisli) return null;
+        if (!ownerRestaurant) {
+          return (
+            <FormKap en={560}>
+              <div style={{ padding: "40px 28px", textAlign: "center" }}>
+                <h2 style={{ fontFamily: "var(--f-body)", fontSize: 20, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 8px" }}>Henüz yönettiğiniz bir mekân yok</h2>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-muted)", margin: "0 0 22px", lineHeight: 1.5 }}>
+                  Paneli açmak için önce havuzdaki kaydınızı sahiplenin.
+                </p>
+                <Btn text="Kaydımı sahiplen" onClick={() => git("sahiplen")} />
+                <div style={{ height: 10 }} />
+                <Btn text="Çıkış" onClick={cikis} variant="plain" />
+              </div>
+            </FormKap>
+          );
+        }
+        return <RestaurantDashboard onLogout={cikis} ownerRestaurant={ownerRestaurant} genis={genis} onSite={() => git("landing")} />;
       default:
         return <Landing onGo={git} />;
     }
   };
 
-  const panelde = ekran === "panel" && girisli;
+  const panelde = ekran === "panel" && girisli && !!ownerRestaurant;
 
   return (
     <div className="gur-site" style={{

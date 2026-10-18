@@ -11,7 +11,7 @@ import * as api from "./api.js";
 import * as visits from "./visits.js";
 import * as b2b from "./b2b.js";
 import * as moderation from "./moderation.js";
-import { DEMO_CAMPAIGNS } from "./campaigns.js";
+import { LOCAL_CAMPAIGNS } from "./campaigns.js";
 
 export const { subscribeApi, apiMode, isLive } = api;
 
@@ -101,19 +101,6 @@ function hydrate(r) {
   };
 }
 
-// Yerel modda dış kaynak yorumları örnek: sunucu yokken bölüm boş kalmasın.
-// Arayüz bunları "ÖRNEK" etiketiyle gösteriyor, Google yorumu gibi sunmuyor.
-const SAMPLE_EXTERNAL = [
-  { provider: "manual", author_name: "Ahmet Y.", rating: 5, relative_time: "2 hafta önce",
-    body: "Porsiyonlar bol, fiyat performans çok iyi. Garsonlar ilgili." },
-  { provider: "manual", author_name: "Selin K.", rating: 4, relative_time: "1 ay önce",
-    body: "Lezzet güzel ama akşamüstü kalabalık oluyor, rezervasyon şart." },
-  { provider: "manual", author_name: "Murat D.", rating: 5, relative_time: "1 ay önce",
-    body: "Yıllardır geliyoruz, kalite hiç düşmedi. Tatlıları ayrı güzel." },
-  { provider: "manual", author_name: "Elif A.", rating: 3, relative_time: "2 ay önce",
-    body: "Yemek iyiydi fakat servis biraz yavaştı. Yine de tavsiye ederim." },
-];
-
 /**
  * Restoran detayının kart verisinde olmayan kısmı: işletmenin aldığı
  * hizmetler, dış kaynak yorumları ve DIŞ KAYNAK GÖRSELLERİ.
@@ -135,12 +122,12 @@ export async function loadRestaurantDetail(restaurant) {
     } catch { /* yerele düş */ }
   }
   const claimed = !!(restaurant.claimed || restaurant.ownerClaimed);
-  const campaigns = DEMO_CAMPAIGNS
+  const campaigns = LOCAL_CAMPAIGNS
     .filter(c => String(c.restaurantId) === String(restaurant.id))
     .map(c => ({ label: c.label, pricing: c.pricing }));
   return {
     services: { claimed, plan: claimed ? (campaigns.length ? "pro" : "premium") : null, campaigns },
-    externalReviews: claimed || restaurant.gastro ? SAMPLE_EXTERNAL : [],
+    externalReviews: [],
     // YEREL modda sunucu yok: mekânın kendi görselleri dış kaynak
     // karşılığı olarak gösteriliyor ki galeri boş kalmasın.
     externalPhotos: normalizePhotos((restaurant.imgs || []).map(url => ({ url, provider: "seed" }))),
