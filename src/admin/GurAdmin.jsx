@@ -3,7 +3,7 @@ import { useClaims, decideClaim, useOwnerProfiles, ownerLogo } from '../lib/b2b.
 
 import * as api from '../lib/api.js';
 import { motion, AnimatePresence } from 'motion/react';
-import { isServiceOpen, setServiceOpen, setServiceOpenFor, serviceGateReason, closedServiceCount, usePlatformSettings, toggleSetting, setStoreFeature, setRestaurantHidden, isRestaurantHidden, FEATURES, PER_STORE_FEATURES, SERVICE_GATES } from '../lib/platform.js';
+import { isServiceOpen, setServiceOpen, setServiceOpenFor, serviceGateReason, closedServiceCount, usePlatformSettings, toggleSetting, setStoreFeature, setRestaurantHidden, isRestaurantHidden, isDistrictOpen, setDistrictOpen, districtVenueCount, FEATURES, PER_STORE_FEATURES, SERVICE_GATES } from '../lib/platform.js';
 import * as pricing from '../lib/pricing.js';
 import { ASSIGNABLE, badgesOf, toggleBadge, useBadgeMap } from '../lib/badges.js';
 import { channelOf, inviteOf, sendInvite, useInvites } from '../lib/invites.js';
@@ -12,6 +12,7 @@ import { useRequests, openRequests, requestFor, markQuoted, close as closeReques
 import { useCreatives, SLOTS, listFor, addCreative, removeCreative, toggleLive, liveCount } from '../lib/creatives.js';
 import { TEMPLATE_COLUMNS, templateHeaderLine, downloadTemplate, parseRestaurantFile } from '../lib/import-restaurants.js';
 import { BAKIRKOY } from '../../shared/bakirkoy.js';
+import { DISTRICTS } from '../lib/geo.js';
 import {
   AD_PRODUCTS, AD_KEYS, useAdSlots, priceOf, setPrice, adminBook, decideBooking,
   pendingBookings, pendingBookingCount, dayState, monthGrid, endOf, prettyDay, gunFarki,
@@ -5166,6 +5167,48 @@ function SettingsPage() {
 
   return (
     <div style={{ animation: 'fadeIn 0.2s', maxWidth: 760 }}>
+      {/* BÖLGELER: tüketici uygulamasındaki ilçe seçici bu listeden besleniyor
+          (src/lib/platform.js → BÖLGELER). Kapalı bölge uygulamada "Çok
+          yakında" yazar, seçtirilmez ve o bölgenin mekânları destede görünmez. */}
+      <section style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
+        <SectionHead
+          title="Bölgeler"
+          right={`${DISTRICTS.filter(d => isDistrictOpen(d.name, settings)).length} / ${DISTRICTS.length} açık`} />
+        <div style={{ padding: '12px 20px 4px', fontFamily: FB, fontSize: 12.5, color: C.dim, lineHeight: 1.55, borderTop: `1px solid ${C.border}` }}>
+          Açık bölgeler uygulamada seçilebilir. Kapattığınız bölge "Çok yakında" yazısıyla
+          parlayarak görünür; o bölgedeki mekânlar da kullanıcı listesinden kalkar.
+        </div>
+        {DISTRICTS.map(d => {
+          const open = isDistrictOpen(d.name, settings);
+          const n = districtVenueCount(d.name);
+          return (
+            <SettingsRow key={d.name} item={{
+              label: d.name,
+              desc: n > 0 ? `${n} mekân` : 'Henüz mekân verisi yok',
+            }} on={open} onChange={() => setDistrictOpen(d.name, !open)}>
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: open ? C.greenSoft : C.orangeSoft, borderRadius: R.pill, padding: '4px 10px' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: open ? C.green : C.orange }} />
+                  <span style={{ fontFamily: FB, fontSize: 11.5, fontWeight: 700, color: open ? C.greenInk : C.orangeInk }}>
+                    {open ? 'Uygulamada açık' : 'Uygulamada "Çok yakında"'}
+                  </span>
+                </span>
+                {open && n === 0 && (
+                  <span style={{ fontFamily: FB, fontSize: 11, fontWeight: 700, color: C.yellowInk, background: C.yellowSoft, borderRadius: R.pill, padding: '4px 10px' }}>
+                    Mekân yok: kullanıcı boş deste görür
+                  </span>
+                )}
+                {!open && n > 0 && (
+                  <span style={{ fontFamily: FB, fontSize: 11, color: C.faint }}>
+                    {n} mekân kullanıcıdan gizli
+                  </span>
+                )}
+              </div>
+            </SettingsRow>
+          );
+        })}
+      </section>
+
       {groups.map(g => (
         <section key={g.title} style={{ ...CARD, overflow: 'hidden', marginBottom: 16 }}>
           <SectionHead title={g.title} right={g.note} />

@@ -1734,6 +1734,28 @@ sahiplenme akışını atlar ve doğrudan yayınlanır: yönetici zaten onaylaya
 merci, kendi kaydını kendi kuyruğuna atmak boş bir tur olurdu. Kayıt
 **sahiplenilmemiş** açılır (havuza düşer, müşteri listesine değil).
 
+### Bölgeler: açık / "Çok yakında" (`platform.js` → BÖLGELER)
+Tüketici uygulamasının ilçe seçicisi (`DistrictGrid`, kurulum ekranı ve konum
+sayfasında aynı bileşen) iki grup çiziyor: **AÇIK BÖLGELER** (seçilebilir) ve
+altında **ÇOK YAKINDA** (seçilemez, marka turuncusunda parlayan çerçeve ve
+etiket). Yönetici **Ayarlar → Bölgeler**'den her ilçeyi açıp kapatıyor
+(`setDistrictOpen`); iki yüz aynı depoyu (`districtOverrides`) okuyor, kapatınca
+açık uygulama sayfa yenilenmeden değişiyor (ölçüldü).
+
+- **Varsayılan: mekân verisi olan ilçe AÇIK**, olmayan kapalı (bugün yalnızca
+  Bakırköy). Yalnızca varsayılandan AYRILAN kararlar saklanıyor — `servicesOff`
+  ile aynı mantık. Verisi olmayan ilçeyi açmak mümkün, panel "boş deste görür"
+  uyarısı yazıyor.
+- **Kapalı bölgenin mekânları da tüketici listesinden düşüyor**
+  (`visibleRestaurants`). Bakırköy'ü kapatmak bugün uygulamayı boş bırakır.
+- **Parıltı sabit gölge + opaklık animasyonu** (`.gur-soon`, `GurStyles`):
+  gölgeyi animasyonlamak yeniden boyatır. Azaltılmış harekette parıltı durur,
+  çerçeve kalır. Pasif durum `opacity` ile kurulmuyor: kart soluk değil.
+- **AÇIK EKSİKLER:** depo localStorage (tüm platform kapıları gibi) — CANLI
+  modda cihazlar arası paylaşılmıyor, sunucuda `platform_settings` karşılığı yok.
+  Mobil paket (`mobile/src/konum.js` → `ILCELER`) bu kapıyı okumuyor. Kullanıcının
+  daha önce seçip sonradan kapatılan ilçesi kayıtlı kalıyor.
+
 ### Restoran bazlı görünürlük anahtarı
 Tek bir mekanı tüketici uygulamasından **tamamen** gizler
 (`platform.js` → `setRestaurantHidden`). Özellik kapılarından ayrı bir kart:

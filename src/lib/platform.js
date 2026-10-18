@@ -11,6 +11,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { useSyncExternalStore } from "react";
+import { RESTAURANTS } from "../data/restaurants.js";
 
 const KEY = "gur.platform";
 
@@ -89,6 +90,9 @@ export const DEFAULTS = {
   // soruyor ("bu mekanda menü çalışıyor mu"); ikisini tek haritada tutmak
   // "özellik yok" ile "satmıyoruz" durumlarını karıştırırdı.
   servicesOffFor: {},
+  // BÖLGE kapıları: { "Kadıköy": true } → açık, { "Bakırköy": false } → kapalı.
+  // Yalnızca VARSAYILANDAN AYRILANLAR yazılıyor (bkz. "BÖLGELER").
+  districtOverrides: {},
 };
 
 const listeners = new Set();
@@ -143,6 +147,46 @@ export function usePlatformSettings() {
   return useSyncExternalStore(subscribe, getSettings, () => DEFAULTS);
 }
 
+// ─── BÖLGELER ────────────────────────────────────────────────────────
+//
+// Hangi ilçelerde hizmet verdiğimiz. Tüketici uygulamasındaki ilçe seçici
+// açık bölgeleri ayrı gösterir, kapalı olanlara "Çok yakında" yazar ve
+// seçtirmez; yönetici Ayarlar → Bölgeler'den açıp kapatır.
+//
+// VARSAYILAN: mekân verisi olan ilçe AÇIK, olmayan KAPALI. Bugün veri yalnızca
+// Bakırköy'de (shared/bakirkoy.js); verisi olmayan bir ilçeyi açık göstermek,
+// kullanıcıyı boş bir desteye göndermek olurdu. Yönetici yine de elle
+// açabilir (panel "henüz mekân yok" uyarısı yazar).
+//
+// Yalnızca varsayılandan AYRILAN kararlar saklanıyor: listeye yeni bir ilçe
+// ya da veri eklendiğinde eski kurulumlar doğru varsayılanı kendiliğinden alır.
+//
+// Kapalı bölgedeki mekânlar da tüketici listesinden düşer
+// (`visibleRestaurants`): seçtirmediğimiz bölgenin mekânını destede göstermek
+// "çok yakında" sözüyle çelişirdi.
+
+/** Bir ilçedeki mekân sayısı (havuzdan). */
+export function districtVenueCount(name) {
+  return RESTAURANTS.filter(r => r.district === name).length;
+}
+
+/** Yönetici dokunmadıysa ilçe açık mı: mekân verisi varsa açık. */
+export function districtDefaultOpen(name) {
+  return districtVenueCount(name) > 0;
+}
+
+export function isDistrictOpen(name, settings = getSettings()) {
+  const ov = settings.districtOverrides?.[name];
+  return typeof ov === "boolean" ? ov : districtDefaultOpen(name);
+}
+
+export function setDistrictOpen(name, open) {
+  const all = { ...(getSettings().districtOverrides || {}) };
+  if (open === districtDefaultOpen(name)) delete all[name];   // varsayılana dönüldü
+  else all[name] = open;
+  return setSettings({ districtOverrides: all });
+}
+
 // ─── Restoran bazlı kapatmalar ───────────────────────────────────────
 
 /** Bir restoranın kapatılmış özellikleri (yalnızca override'lar). */
@@ -181,7 +225,10 @@ export function setRestaurantHidden(storeId, hidden) {
 /** Listeyi süz: gizlenen mekanlar tüketici tarafında hiç görünmez. */
 export function visibleRestaurants(list = [], settings = getSettings()) {
   const ov = settings.storeOverrides || {};
-  return list.filter(r => (ov[String(r.id)] || {})[HIDDEN] !== true);
+  return list.filter(r =>
+    (ov[String(r.id)] || {})[HIDDEN] !== true &&
+    // Kapalı bölgenin mekânı da görünmez. İlçesi bilinmeyen kayıt açık sayılır.
+    (!r.district || isDistrictOpen(r.district, settings)));
 }
 
 export function setStoreFeature(storeId, key, enabled) {

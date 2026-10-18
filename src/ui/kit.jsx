@@ -1302,6 +1302,27 @@ export function GurStyles() {
           background: inherit; animation: gur-breathe 2.4s ease-out infinite;
           pointer-events: none; will-change: transform, opacity;
         }
+        /* ── "ÇOK YAKINDA" PARLAMASI ──────────────────────────────────
+           Henüz açılmamış bölge: marka turuncusunda yumuşak bir parıltı.
+           Parıltı SABİT bir gölge, nefes alan şey yalnızca onun opaklığı:
+           gölgeyi animasyonlamak her karede yeniden boyatır, opaklık
+           bileşik katmanda kalır. Tek kaynağı bu sınıf; satır içine
+           gölge yazılmıyor. */
+        @keyframes gur-soon {
+          0%, 100% { opacity: 0.25; }
+          50%      { opacity: 0.9; }
+        }
+        .gur-soon { position: relative; }
+        .gur-soon::after {
+          content: ""; position: absolute; inset: -1px; border-radius: inherit;
+          box-shadow: 0 0 0 1px rgba(255,102,0,0.55), 0 0 16px 2px rgba(255,102,0,0.45);
+          animation: gur-soon 2.8s ease-in-out infinite;
+          pointer-events: none; will-change: opacity;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          /* Parıltı durur, çerçeve kalır: durum hareketten gelmiyor. */
+          .gur-soon::after { animation: none; opacity: 0.6; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .gur-press { transition: none; }
           .gur-press:active { transform: none; }

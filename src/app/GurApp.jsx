@@ -21,7 +21,7 @@ import { I, RESTAURANTS, CATEGORIES, withOwnerMedia } from '../data/restaurants.
 import { Sheet, DangerConfirm, Chip } from '../ui/sheets.jsx';
 import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
-import { usePlatformSettings, useFeature, visibleRestaurants } from '../lib/platform.js';
+import { usePlatformSettings, useFeature, visibleRestaurants, isDistrictOpen } from '../lib/platform.js';
 import { useModeration, publishedOnly } from '../lib/moderation.js';
 import { useMedia, ownerMediaFor, approvedMedia } from '../lib/media.js';
 import { useAdSlots, activeBookings } from '../lib/adslots.js';
@@ -1323,26 +1323,74 @@ function PremiumSheet({ onClose }) {
 // istediğimizi söyleyen bir adım var; reddedilirse akış tıkanmıyor,
 // kullanıcı ilçesini elle seçip devam edebiliyor.
 // ═══════════════════════════════════════════════
+// İlçe seçici: AÇIK bölgeler üstte ve seçilebilir, henüz açılmamış olanlar
+// altta "ÇOK YAKINDA" parıltısıyla ve seçilemez. Hangi bölgenin açık olduğu
+// yönetici panelinden geliyor (platform.js → isDistrictOpen); iki yerde
+// (kurulum ekranı ve konum sayfası) aynı bileşen çiziliyor.
 function DistrictGrid({ onPick, selected }) {
+  const platform = usePlatformSettings();
+  const acik = geo.DISTRICTS.filter(d => isDistrictOpen(d.name, platform));
+  const yakinda = geo.DISTRICTS.filter(d => !isDistrictOpen(d.name, platform));
+  const baslik = (t, n) => (
+    <p style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-muted)", margin: "0 0 8px", letterSpacing: 0.6 }}>
+      {t} · {n}
+    </p>
+  );
+  const izgara = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 8 };
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 8 }}>
-      {geo.DISTRICTS.map(d => {
-        const on = selected === d.name;
-        return (
-          <button
-            key={d.name} type="button" className="gur-btn"
-            onClick={() => onPick(d)} aria-pressed={on}
-            style={{
-              "--btn-bg": on ? "var(--c-brand-soft)" : "var(--c-subtle)",
-              "--btn-bg-hover": "var(--c-brand-soft)",
-              "--btn-bg-press": "rgba(255,102,0,0.18)",
-              border: `1px solid ${on ? "rgba(255,102,0,0.4)" : "var(--c-line)"}`,
-              borderRadius: 14, padding: "11px 8px", outline: "none",
-              fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700,
-              color: on ? "var(--c-brand-ink)" : "var(--c-ink)",
-            }}>{d.name}</button>
-        );
-      })}
+    <div>
+      {acik.length > 0 && (
+        <>
+          {baslik("AÇIK BÖLGELER", acik.length)}
+          <div style={{ ...izgara, marginBottom: yakinda.length ? 18 : 0 }}>
+            {acik.map(d => {
+              const on = selected === d.name;
+              return (
+                <button
+                  key={d.name} type="button" className="gur-btn"
+                  onClick={() => onPick(d)} aria-pressed={on}
+                  style={{
+                    "--btn-bg": on ? "var(--c-brand-soft)" : "var(--c-subtle)",
+                    "--btn-bg-hover": "var(--c-brand-soft)",
+                    "--btn-bg-press": "rgba(255,102,0,0.18)",
+                    border: `1px solid ${on ? "rgba(255,102,0,0.4)" : "var(--c-line)"}`,
+                    borderRadius: 14, padding: "11px 8px", outline: "none", minHeight: 44,
+                    fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700,
+                    color: on ? "var(--c-brand-ink)" : "var(--c-ink)",
+                  }}>{d.name}</button>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {acik.length === 0 && (
+        <p role="status" style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: "0 0 16px", lineHeight: 1.5 }}>
+          Şu an hizmet verdiğimiz bir bölge yok. Çok yakında.
+        </p>
+      )}
+      {yakinda.length > 0 && (
+        <>
+          {baslik("ÇOK YAKINDA", yakinda.length)}
+          <div style={izgara}>
+            {yakinda.map(d => (
+              // Seçilemez ama SOLUK DEĞİL: pasif durum opacity ile kurulmuyor,
+              // fark çerçevedeki parıltı ve etiketle.
+              <div
+                key={d.name} className="gur-soon" role="button" aria-disabled="true"
+                aria-label={`${d.name}: çok yakında açılacak`}
+                style={{
+                  background: "var(--c-brand-soft)", borderRadius: 14, padding: "9px 8px 8px",
+                  minHeight: 44, textAlign: "center", boxSizing: "border-box",
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
+                  cursor: "default",
+                }}>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)" }}>{d.name}</span>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.9, color: "var(--c-brand-ink-soft)" }}>ÇOK YAKINDA</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
