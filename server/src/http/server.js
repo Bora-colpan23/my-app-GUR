@@ -8,6 +8,7 @@
 
 import http from "node:http";
 import { userFromRequest } from "../auth/session.js";
+import { createStaticHandler } from "./static.js";
 
 const MAX_BODY = 1_000_000;   // 1 MB — yorum fotoğrafı URL listesi bile bunun altında
 
@@ -75,7 +76,8 @@ function send(res, status, payload) {
   res.end(body);
 }
 
-export function createServer(router, { db, origin = "*" } = {}) {
+export function createServer(router, { db, origin = "*", staticDir = null } = {}) {
+  const serveStatic = staticDir ? createStaticHandler(staticDir) : null;
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
@@ -93,7 +95,12 @@ export function createServer(router, { db, origin = "*" } = {}) {
     }
 
     const hit = router.match(req.method, url.pathname);
-    if (!hit) return send(res, 404, { error: "Bulunamadı" });
+    if (!hit) {
+      // /api dışındaki yollar derlenmiş arayüze (varsa) gider; /api altında
+      // bilinmeyen uç JSON 404 döner, index.html DEĞİL.
+      if (serveStatic && !url.pathname.startsWith("/api/") && serveStatic(req, res, url.pathname)) return;
+      return send(res, 404, { error: "Bulunamadı" });
+    }
 
     const claims = userFromRequest(req);
     if (hit.route.auth && !claims) return send(res, 401, { error: "Oturum gerekli" });

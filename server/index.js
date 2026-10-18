@@ -10,6 +10,8 @@ import pg from "pg";
 import { createServer } from "./src/http/server.js";
 import { buildRouter } from "./src/http/routes.js";
 import { registerJobs, bootstrap } from "./src/cron.js";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const PORT = Number(process.env.PORT) || 8787;
 const ORIGIN = process.env.CORS_ORIGIN || "*";
@@ -39,7 +41,10 @@ try {
   process.exit(1);
 }
 
-const server = createServer(buildRouter(), { db, origin: ORIGIN });
+// dist/ varsa (npm run build) arayüz de bu süreçten servis edilir: tek servis,
+// tek origin → uygulama CANLI moda geçer. Yoksa yalnızca API (geliştirme).
+const staticDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
+const server = createServer(buildRouter(), { db, origin: ORIGIN, staticDir });
 
 server.listen(PORT, () => {
   console.log(`[http] http://localhost:${PORT} dinleniyor (CORS: ${ORIGIN})`);

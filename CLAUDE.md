@@ -185,6 +185,34 @@ başlatıldığında **sayfa yenilenmeden ~6 saniyede** CANLI'ya geçiyor
 `DATABASE_URL=… node server/index.js` → `VITE_API_TARGET=http://127.0.0.1:8787
 npx vite`. Tek origin yine Vite proxy'sinden gelir.
 
+### Railway'de yayın — TEK servis + PostgreSQL
+
+`npm start` = `node server/db/init.js && node server/index.js`. Sunucu
+`dist/` varsa derlenmiş arayüzü de servis ediyor (`server/src/http/static.js`):
+SPA düşüşü (`/isletme/panel`, `/admin`, `/uygulama` → `index.html`), hash'li
+`assets/` bir yıl önbellekte, HTML ve `sw.js` ASLA; `/api` altında bilinmeyen
+uç JSON 404, uzantılı eksik dosya 404 (HTML ile maskelenmez). Böylece Caddy /
+nginx gerekmeden tek origin → uygulama CANLI.
+
+`init.js` setup.sh'in barındırma karşılığı (`su postgres` yok): şema yoksa
+`schema.sql`, Bakırköy listesi boşsa tohum, `ADMIN_PASSWORD` verilmiş ama
+yönetici yoksa o da. Var olan veriye dokunmaz, her açılışta güvenle tekrarlanır.
+`railway.json`: derleme `npm install --include=dev && npm run build` (vite
+devDependency; `NODE_ENV=production` DEĞİŞKENİ yazmayın, yoksa derleme aracı
+kurulmaz), sağlık yolu `/api/health`.
+
+Gerekli değişkenler: `DATABASE_URL` (Postgres eklentisinden `${{Postgres.DATABASE_URL}}`
+referansı), `ADMIN_PASSWORD` (≥ 8), `SESSION_SECRET` (uzun rastgele; yoksa her
+yeniden başlatmada herkes oturumdan düşer). Eklentiler (`cube`, `earthdistance`,
+`pgcrypto`, `citext`) bağlanan rolün kurabilmesini ister — Railway'in Postgres'inde
+kurabiliyor; başka yönetilen veritabanında rol yetkisi gerekir.
+
+Ölçüldü (yerel, süper kullanıcı rolüyle, taze veritabanı): şema + 218 kayıt +
+yönetici kuruldu, `/api/health` 200, `/`, `/admin`, `/isletme/panel` HTML,
+yönetici paneline giriş çalıştı; ikinci açılış "veri hazır". **Railway'in
+kendisinde denenmedi.** Dosya deposu yok: yüklemeler tarayıcı deposunda
+(bkz. "Bilinen kısıtlar"); Railway disk'i geçici, sunucuya dosya yazmıyoruz.
+
 ### İki mod: canlı ve yerel
 
 Uygulama açılışta `/api/health` yoklar ve sağ üstte hangi modda olduğunu

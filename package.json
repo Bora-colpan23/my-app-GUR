@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "start": "node server/db/init.js && node server/index.js",
     "preview": "vite preview",
     "lint": "eslint src server shared --ext .js,.jsx",
     "dev:api": "node server/index.js",
