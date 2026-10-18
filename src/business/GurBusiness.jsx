@@ -54,7 +54,7 @@ import {
   cancelBooking, bookingsOfRestaurant, dayState, monthGrid, today, endOf,
   addDays, prettyDay, gunFarki, slotsOf, WEEKDAYS_TR, MONTHS_TR as AY_ADLARI,
 } from '../lib/adslots.js';
-import { HAVUZ, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
+import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
 
 // ═══════════════════════════════════════════════
@@ -434,7 +434,7 @@ function ClaimScreen({ onBack, onDone, restaurants = [] }) {
 // başka bir e-posta da reddedilmiyor: siteden kayıt olan kullanıcı kendi
 // yazdığıyla girebilmeli (o kayıt da sunucusuz ortamda bir oturumdan
 // ibaret). CANLI modda doğrulama sunucuda.
-const DEMO_ISLETME = { eposta: "sahip@ciyasofrasi.com", sifre: "gur1234" };
+const DEMO_ISLETME = { eposta: "demo.isletme@gur.app", sifre: "gur1234" };
 
 function DoyurucuLoginScreen({ onBack, onLogin }) {
   const [email, setEmail] = useState("");
@@ -3755,7 +3755,7 @@ export default function GurBusiness() {
   const genis = useMediaQuery(GENIS);
 
   const basePool = useMemo(
-    () => HAVUZ.map(r => applyOwnerProfile(r, ownerProfiles)),
+    () => RESTAURANTS.map(r => applyOwnerProfile(r, ownerProfiles)),
     [ownerProfiles]
   );
   // Yönetilen mekan: sahiplenilen kayıt (bu oturumda ya da önceki

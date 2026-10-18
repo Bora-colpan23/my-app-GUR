@@ -12,14 +12,12 @@
 import { PROVIDERS, googlePlaces } from "./providers.js";
 import { normalize, dedupe } from "./normalize.js";
 
-// Kadıköy'den başlayan, genişletilebilir kapsama ızgarası.
+// Kapsama ızgarası. Ana data Bakırköy listesi olduğu için YALNIZCA Bakırköy:
+// diğer ilçeleri açmak tek satır (hücre eklemek), ama tablodaki mekânlar
+// `manual` kaynaklı — beslemeden gelen aynı mekân ikinci kopya olarak yazılır
+// (bkz. CLAUDE.md "Bakırköy listesi → Bilinen eksikler").
 export const COVERAGE = [
-  { name: "Kadıköy",    lat: 40.9903, lng: 29.0275, radiusM: 1800 },
-  { name: "Beşiktaş",   lat: 41.0430, lng: 29.0060, radiusM: 1800 },
-  { name: "Beyoğlu",    lat: 41.0330, lng: 28.9770, radiusM: 1800 },
-  { name: "Şişli",      lat: 41.0600, lng: 28.9870, radiusM: 1800 },
-  { name: "Üsküdar",    lat: 41.0250, lng: 29.0150, radiusM: 1800 },
-  { name: "Bakırköy",   lat: 40.9780, lng: 28.8720, radiusM: 1800 },
+  { name: "Bakırköy",   lat: 40.9819, lng: 28.8772, radiusM: 1800 },
 ];
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));

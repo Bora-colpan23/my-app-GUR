@@ -6,24 +6,28 @@
 // yerleşim hissi birebir aynı olsun.
 // ═══════════════════════════════════════════════════════════════════════
 
+import { DEMO_ROLLER, demoId } from "../data/restaurants.js";
+
+// DEMO: gerçek işletme kayıtları (Bakırköy listesi), uydurma kampanya —
+// bkz. data/restaurants.js → DEMO_ROLLER.
 export const DEMO_CAMPAIGNS = [
   {
     id: "cmp-1", label: "Öne Çıkan", pricing: "cpe",
     bidMinor: 240, remainingBudgetMinor: 180000, status: "active",
     engagementRate: 0.62, category: "Türk Mutfağı",
-    restaurantId: 3,
+    restaurantId: demoId(DEMO_ROLLER.kampanyalar.turk),
   },
   {
-    id: "cmp-2", label: "Şefin Önerisi", pricing: "cpc",
+    id: "cmp-2", label: "Öne Çıkan", pricing: "cpc",
     bidMinor: 180, remainingBudgetMinor: 90000, status: "active",
     engagementRate: 0.48, category: "Deniz Ürünleri",
-    restaurantId: 6,
+    restaurantId: demoId(DEMO_ROLLER.kampanyalar.balik),
   },
   {
     id: "cmp-3", label: "Öne Çıkan", pricing: "cpe",
     bidMinor: 310, remainingBudgetMinor: 42000, status: "active",
     engagementRate: 0.71, category: "İtalyan",
-    restaurantId: 11,
+    restaurantId: demoId(DEMO_ROLLER.kampanyalar.italyan),
   },
 ];
 

@@ -12,9 +12,12 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { useSyncExternalStore } from "react";
+import { BAKIRKOY_ILCE } from "../../shared/bakirkoy.js";
 
-/** İzin yokken kullanılan varsayılan başlangıç: İstanbul merkezi. */
-export const DEFAULT_ORIGIN = { lat: 41.0082, lng: 28.9784, label: "İstanbul merkezi" };
+/** İzin yokken kullanılan varsayılan başlangıç: Bakırköy merkezi. Ana data
+ *  Bakırköy listesi (shared/bakirkoy.js); İstanbul merkezinden bakınca hepsi
+ *  ~9 km uzakta, aynı halkada ve konum seçilmeden deste anlamsız sıralanıyordu. */
+export const DEFAULT_ORIGIN = { lat: BAKIRKOY_ILCE.lat, lng: BAKIRKOY_ILCE.lng, label: "Bakırköy merkezi" };
 
 // ── İSTANBUL İLÇELERİ ────────────────────────────────────────────────────
 // İzin vermeyen kullanıcı da "yakınımdakiler" görebilmeli. Ters coğrafi

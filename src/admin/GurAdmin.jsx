@@ -12,6 +12,7 @@ import { useRequests, openRequests, requestFor, markQuoted, close as closeReques
 import { useCreatives, SLOTS, listFor, addCreative, removeCreative, toggleLive, liveCount } from '../lib/creatives.js';
 import { TEMPLATE_COLUMNS, templateHeaderLine, downloadTemplate, parseRestaurantFile } from '../lib/import-restaurants.js';
 import { BAKIRKOY } from '../../shared/bakirkoy.js';
+import { DEMO_ROLLER, demoId } from '../data/restaurants.js';
 import {
   AD_PRODUCTS, AD_KEYS, useAdSlots, priceOf, setPrice, adminBook, decideBooking,
   pendingBookings, pendingBookingCount, dayState, monthGrid, endOf, prettyDay, gunFarki,
@@ -353,37 +354,43 @@ const CAT_DIST = [
   { name: 'Diğer', count: 73, color: '#9AA3B0' },
 ];
 
+// Mekan havuzu = Bakırköy listesi (shared/bakirkoy.js): tüketici uygulamasındaki
+// kayıtlarla AYNI kayıtlar ve aynı kimlikler (`bkr-…`) — yönetici panelinde
+// gizlenen mekân uygulamada da aynı mekân. Eskiden burada elle yazılmış 12
+// demo mekân (Nusr-Et, Mikla, Çiya…) vardı.
+//
+// DEMO: yönetici paneli örnek müşteri gerektiriyor; gerçek müşterimiz yok.
+// `DEMO_ROLLER`deki kayıtlar müşteri (`account: true`) gibi işaretlenir.
+// Kayıtlar gerçek işletmeler, ilişki UYDURMA — bkz. data/restaurants.js.
+// Gastro Onaylı yok: rozet gerçek bir işletmeye uydurma şef adıyla verilmez;
+// panelden `toggleGastro` ile elle verilebilir.
+//
 // account: işletme kaydını sahiplenmiş, panel girişi olan müşterimiz mi.
-// false olanlar yalnızca dış besleme (Google Places / OSM) üzerinden gelen
-// mekanlar: kullanıcı adları yok, bize ödeme yapmıyorlar — fiyatlandırma
-// panelinde görünmezler, çünkü teklif gönderilecek bir muhatap yok.
-const RESTAURANTS = [
-  { id: 1, name: 'Nusr-Et Steakhouse', cat: 'Türk Mutfağı', district: 'Beşiktaş', rating: 4.8, reviews: 1240, status: 'active', gastro: true, plan: 'Premium', joined: '2024-03-12', account: true, source: 'owner' },
-  { id: 2, name: 'Mikla Restaurant', cat: 'Fine Dining', district: 'Beyoğlu', rating: 4.9, reviews: 890, status: 'active', gastro: true, plan: 'Premium', joined: '2024-01-08', account: true, source: 'owner' },
-  { id: 9, name: 'Çiya Sofrası', cat: 'Türk Mutfağı', district: 'Kadıköy', rating: 4.7, reviews: 2100, status: 'active', gastro: true, plan: 'Pro', joined: '2024-02-20', account: true, source: 'owner' },
-  { id: 3, name: 'La Sagrata Famila', cat: 'Uzak Doğu', district: 'Kadıköy', rating: 4.6, reviews: 620, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-05', account: true, source: 'owner' },
-  { id: 4, name: 'Green Bowl', cat: 'Sağlıklı', district: 'Şişli', rating: 4.5, reviews: 340, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2024-06-15', account: false, source: 'api', email: 'merhaba@greenbowl.com.tr', website: 'greenbowl.com.tr' },
-  { id: 6, name: 'Klein Bistro', cat: 'Kafe', district: 'Beyoğlu', rating: 4.4, reviews: 560, status: 'suspended', gastro: false, plan: 'Ücretsiz', joined: '2024-05-02', account: false, source: 'api', email: null, website: 'kleinbistro.co' },
-  { id: 11, name: 'The Burger Joint', cat: 'Fast Food', district: 'Nişantaşı', rating: 4.2, reviews: 780, status: 'active', gastro: false, plan: 'Pro', joined: '2024-04-18', account: true, source: 'owner' },
-  { id: 12, name: 'Karaköy Güllüoğlu', cat: 'Tatlıcı', district: 'Karaköy', rating: 4.9, reviews: 3200, status: 'active', gastro: true, plan: 'Premium', joined: '2023-12-01', account: true, source: 'owner' },
-  // Dış beslemeden gelen, henüz sahiplenilmemiş mekanlar
-  { id: 5, name: 'Ateş Mangal', cat: 'Mangal', district: 'Beykoz', rating: 4.7, reviews: 210, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-02-14', account: false, source: 'api', email: 'iletisim@atesmangal.com', website: null },
-  { id: 13, name: 'Balıkçı Sabahattin', cat: 'Deniz Ürünleri', district: 'Fatih', rating: 4.6, reviews: 980, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-01-22', account: false, source: 'api', email: 'rezervasyon@balikcisabahattin.com', website: 'balikcisabahattin.com' },
-  { id: 14, name: 'Spice Market', cat: 'Uzak Doğu', district: 'Şişli', rating: 4.4, reviews: 150, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-03-30', account: false, source: 'api', email: null, website: null },
-  { id: 7, name: 'Lucca Lounge', cat: 'Gece Hayatı', district: 'Bebek', rating: 4.3, reviews: 450, status: 'active', gastro: false, plan: 'Pro', joined: '2024-07-22', account: true, source: 'owner' },
-  // Bakırköy listesi (shared/bakirkoy.js) — tüketici uygulamasındaki havuzla
-  // AYNI kayıtlar, aynı kimlikler (`bkr-…`): yönetici panelinde gizlenen
-  // ya da rozet verilen mekan, uygulamada da aynı mekân. Hepsi dış kaynaklı
-  // ve sahiplenilmemiş (`account: false`), yani Mekan Havuzu'nda görünürler.
-  ...BAKIRKOY.map(k => ({
-    id: `bkr-${k.anahtar}`, name: k.ad, cat: k.kategori, district: 'Bakırköy',
-    rating: k.puan, reviews: k.yorum, status: 'active', gastro: false,
-    plan: 'Ücretsiz', joined: '2026-10-18', account: false, source: 'api',
+// false olanlar yalnızca dış kaynaktan gelen mekanlar: bize ödeme yapmıyorlar,
+// fiyatlandırma panelinde görünmezler (teklif gönderilecek muhatap yok).
+const DEMO_MUSTERI = {
+  [DEMO_ROLLER.sahip]:                  '2024-04-05',   // Doyurucu demo girişinin yönettiği işletme
+  [DEMO_ROLLER.musteriler.steak]:       '2024-03-12',
+  [DEMO_ROLLER.musteriler.lokanta]:     '2024-01-08',
+  [DEMO_ROLLER.musteriler.turk]:        '2024-02-20',
+  [DEMO_ROLLER.musteriler.burger]:      '2024-04-18',
+  [DEMO_ROLLER.musteriler.pastane]:     '2023-12-01',
+  [DEMO_ROLLER.musteriler.meyhane]:     '2024-07-22',
+};
+const RESTAURANTS = BAKIRKOY.map(k => {
+  const musteri = DEMO_MUSTERI[k.anahtar];
+  return {
+    id: demoId(k.anahtar), name: k.ad, cat: k.kategori, district: 'Bakırköy',
+    rating: k.puan, reviews: k.yorum,
+    status: k.anahtar === DEMO_ROLLER.askida ? 'suspended' : 'active',
+    gastro: false, plan: 'Ücretsiz',
+    joined: musteri || '2026-10-18',
+    account: !!musteri, source: musteri ? 'owner' : 'api',
     addr: k.adres, phone: k.telefon, email: k.eposta, website: k.web,
     instagram: k.instagram, tur: k.tur,
     imgs: [], menu: [], popular: [], tags: [k.tur, k.mahalle].filter(Boolean),
-  })),
-];
+  };
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 // GELİR KALEMLERİ VE MÜŞTERİ BAZLI SATIN ALIMLAR
@@ -431,37 +438,33 @@ const STREAM_BY_KEY = Object.fromEntries(REVENUE_STREAMS.map(x => [x.key, x]));
 // Hangi müşteri hangi ücretli özelliği almış. monthly: o işletmenin o kalem
 // için ödediği aylık tutar (kampanyalarda harcanan bütçenin aylık karşılığı).
 const STORE_SERVICES = {
-  1: [ // Nusr-Et Steakhouse
+  // DEMO satın alımlar (bkz. DEMO_MUSTERI). Gastro paketi YOK: şef çekimi
+  // gerçek bir işletme için uydurulmaz.
+  [demoId(DEMO_ROLLER.musteriler.steak)]: [
     { key: 'bannerAds', monthly: 14000, since: '2025-11-04' },
     { key: 'pushAds', monthly: 6500, since: '2026-02-11' },
-    { key: 'gastroPackage', monthly: 13200, since: '2025-12-20' },
   ],
-  2: [ // Mikla
+  [demoId(DEMO_ROLLER.musteriler.lokanta)]: [
     { key: 'bannerAds', monthly: 11000, since: '2025-09-15' },
-    { key: 'gastroPackage', monthly: 13200, since: '2026-01-08' },
   ],
-  9: [ // Çiya Sofrası
+  [demoId(DEMO_ROLLER.musteriler.turk)]: [
     { key: 'rewardedAds', monthly: 5200, since: '2026-03-02' },
     { key: 'instantDeals', monthly: 3100, since: '2026-04-19' },
-    { key: 'gastroPackage', monthly: 13200, since: '2026-02-10' },
   ],
-  3: [ // La Sagrata Famila — Doyurucu panelinden yönetilen işletme
+  [demoId(DEMO_ROLLER.sahip)]: [ // Doyurucu demo girişinin yönettiği işletme
     { key: 'instantDeals', monthly: 2400, since: '2026-03-08' },
     { key: 'secondChance', monthly: 1450, since: '2026-01-16' },
   ],
-  4: [],  // Green Bowl — sahiplenilmemiş kayıt, satın alım yok
-  6: [], // Klein Bistro — askıda, satın alım yok
-  11: [ // The Burger Joint
+  [demoId(DEMO_ROLLER.musteriler.burger)]: [
     { key: 'rewardedAds', monthly: 4300, since: '2026-02-27' },
     { key: 'instantDeals', monthly: 2600, since: '2026-05-14' },
     { key: 'secondChance', monthly: 1450, since: '2026-02-27' },
   ],
-  12: [ // Karaköy Güllüoğlu
+  [demoId(DEMO_ROLLER.musteriler.pastane)]: [
     { key: 'bannerAds', monthly: 9800, since: '2025-08-22' },
     { key: 'pushAds', monthly: 5200, since: '2026-03-30' },
-    { key: 'gastroPackage', monthly: 13200, since: '2025-12-05' },
   ],
-  7: [ // Lucca Lounge
+  [demoId(DEMO_ROLLER.musteriler.meyhane)]: [
     { key: 'pushAds', monthly: 4100, since: '2026-04-06' },
     { key: 'instantDeals', monthly: 3400, since: '2026-05-02' },
     { key: 'secondChance', monthly: 1450, since: '2026-04-06' },
@@ -3026,11 +3029,16 @@ function TableShell({ headers, children }) {
 // paraya bakan bir sıralama deneyimi bozarak uzun vadede geliri düşürür,
 // bu yüzden kalite çarpanı burada da görünür.
 // ═══════════════════════════════════════════════════════════════════════
+// DEMO kampanyalar: kayıtlar gerçek işletmeler (Bakırköy listesi), kampanya
+// ve işletme unvanı UYDURMA — unvan sütununda "demo" yazıyor (bkz.
+// data/restaurants.js → DEMO_ROLLER). Sunucu bağlıyken buraya sunucudaki
+// campaigns tablosu gelir.
+const kayitAdi = (anahtar) => BAKIRKOY.find(k => k.anahtar === anahtar)?.ad || anahtar;
 const CAMPAIGN_SEED = [
-  { id: 'cmp-1', restaurant: 'Çiya Sofrası',      org: 'Çiya Gıda Ltd.',      label: 'Öne Çıkan',     pricing: 'cpe', bid: 240, daily: 180000, spent: 96400, impressions: 18420, clicks: 1120, engagements: 742, status: 'active' },
-  { id: 'cmp-2', restaurant: 'Balıkçı Sabahattin', org: 'Sabahattin Turizm',  label: 'Şefin Önerisi', pricing: 'cpc', bid: 180, daily: 90000,  spent: 41300, impressions: 11250, clicks: 690,  engagements: 318, status: 'active' },
-  { id: 'cmp-3', restaurant: "Nonna's Trattoria",  org: 'Nonna Gastro A.Ş.',   label: 'Öne Çıkan',     pricing: 'cpe', bid: 310, daily: 42000,  spent: 42000, impressions: 7600,  clicks: 512,  engagements: 401, status: 'exhausted' },
-  { id: 'cmp-4', restaurant: 'Klein Bistro',       org: 'Klein Kahve',         label: 'Öne Çıkan',     pricing: 'cpe', bid: 120, daily: 60000,  spent: 0,     impressions: 0,     clicks: 0,    engagements: 0,   status: 'paused' },
+  { id: 'cmp-1', restaurant: kayitAdi(DEMO_ROLLER.kampanyalar.turk),    org: '(demo)', label: 'Öne Çıkan', pricing: 'cpe', bid: 240, daily: 180000, spent: 96400, impressions: 18420, clicks: 1120, engagements: 742, status: 'active' },
+  { id: 'cmp-2', restaurant: kayitAdi(DEMO_ROLLER.kampanyalar.balik),   org: '(demo)', label: 'Öne Çıkan', pricing: 'cpc', bid: 180, daily: 90000,  spent: 41300, impressions: 11250, clicks: 690,  engagements: 318, status: 'active' },
+  { id: 'cmp-3', restaurant: kayitAdi(DEMO_ROLLER.kampanyalar.italyan), org: '(demo)', label: 'Öne Çıkan', pricing: 'cpe', bid: 310, daily: 42000,  spent: 42000, impressions: 7600,  clicks: 512,  engagements: 401, status: 'exhausted' },
+  { id: 'cmp-4', restaurant: kayitAdi(DEMO_ROLLER.kampanyalar.kafe),    org: '(demo)', label: 'Öne Çıkan', pricing: 'cpe', bid: 120, daily: 60000,  spent: 0,     impressions: 0,     clicks: 0,    engagements: 0,   status: 'paused' },
 ];
 
 // Sunucudan gelen kampanya satırını tablonun beklediği şekle indirger.

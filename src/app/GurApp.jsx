@@ -17,12 +17,12 @@ import {
   BadgeChips, BadgeMarks, GlossDefs, GLOSS, DinnerBell, SplitText, Orb, Skeleton,
   scrim, SocialAuthRow, StepProgress,
 } from '../ui/kit.jsx';
-import { I, HAVUZ, BAKIRKOY_MEKANLAR, CATEGORIES, fetchLiveRestaurants, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
+import { I, RESTAURANTS, DEMO_ROLLER, demoId, CATEGORIES, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { Sheet, DangerConfirm, Chip } from '../ui/sheets.jsx';
 import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
 import { usePlatformSettings, useFeature, visibleRestaurants } from '../lib/platform.js';
-import { useModeration, publishedOnly, markVenuePending } from '../lib/moderation.js';
+import { useModeration, publishedOnly } from '../lib/moderation.js';
 import { useMedia, ownerMediaFor, approvedMedia } from '../lib/media.js';
 import { useAdSlots, activeBookings } from '../lib/adslots.js';
 import { pickRewardedAd, markWatched, useRewardedSeen } from '../lib/rewarded.js';
@@ -115,9 +115,10 @@ const BANNER_ADS = [
 // bunu konum bazlı bildirim reklamı olarak satar. Bitiş saati sabit bir
 // referanstan türetilir ki geri sayım demo boyunca tutarlı kalsın.
 const DEALS = [
-  { restaurantId: 9, pct: 20, note: "15:00-17:00 arası tüm ana yemeklerde", minutesLeft: 96 },
-  { restaurantId: 3, pct: 25, note: "Öğle menüsünde, sınırlı sayıda", minutesLeft: 42 },
-  { restaurantId: 6, pct: 15, note: "Brunch saatleri dışında", minutesLeft: 158 },
+  // DEMO: gerçek işletme kayıtları, uydurma fırsat (bkz. data/restaurants.js → DEMO_ROLLER).
+  { restaurantId: demoId(DEMO_ROLLER.musteriler.turk), pct: 20, note: "15:00-17:00 arası tüm ana yemeklerde", minutesLeft: 96 },
+  { restaurantId: demoId(DEMO_ROLLER.sahip), pct: 25, note: "Öğle menüsünde, sınırlı sayıda", minutesLeft: 42 },
+  { restaurantId: demoId(DEMO_ROLLER.musteriler.burger), pct: 15, note: "Akşam 18:00 sonrası menülerde", minutesLeft: 158 },
 ];
 function dealFor(restaurantId) {
   return DEALS.find(d => d.restaurantId === restaurantId) || null;
@@ -705,8 +706,8 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
   // Başlıkta gösterilen semt: koordinattan değil, en yakın kaydın adresinden
   // türetiliyor — ters coğrafi kodlama için ağa çıkmaya değmez.
   const districtLabel = useMemo(() => {
-    if (loc.source === "manual") return loc.label || "İstanbul merkezi";
-    if (!precise) return "İstanbul merkezi";
+    if (loc.source === "manual") return loc.label || "Bakırköy merkezi";
+    if (!precise) return geo.DEFAULT_ORIGIN.label;
     const closest = nearby.find(r => Number.isFinite(r.distanceKm));
     const part = closest?.addr?.split(",").map(x => x.trim()).filter(Boolean);
     return part?.[part.length - 2] || part?.[0] || "Yakınındakiler";
@@ -2153,7 +2154,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
   );
 }
 
-function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites, filterCat, restaurants = HAVUZ, dataSource = "demo", onPremium, onAddReview, onVerifyLocation }) {
+function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites, filterCat, restaurants = RESTAURANTS, dataSource = "demo", onPremium, onAddReview, onVerifyLocation }) {
   // Bumble kalıbı: detay ayrı bir ekrana gitmez, kartın üstünde açılan
   // genişleyebilir bir sayfa olarak gelir.
   const [sheetCard, setSheetCard] = useState(null);
@@ -2423,7 +2424,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
             <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "3px 12px" }}>
               <Icon n="pin" size={11} color={precise ? "#FF9A4D" : "rgba(255,255,255,0.45)"} />
               <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,0.72)" }}>
-                {precise ? ringLabel(ringNow) : `${ringLabel(ringNow)} · İstanbul merkezine göre`}
+                {precise ? ringLabel(ringNow) : `${ringLabel(ringNow)} · ${geo.DEFAULT_ORIGIN.label}ne göre`}
               </span>
               {!precise && (
                 <button type="button" className="gur-btn" onClick={() => geo.requestLocation()}
@@ -3100,14 +3101,12 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
   };
   const openMaps = () => setMapSheet(true);
 
-  // Kullanıcının bu restorana yazdığı yorumlar en üstte, örnek yorunlar altında
-  const sampleReviews = [
-    { user: "A.O.", stars: 5, text: "Taze malzemeler, hızlı servis ve harika sunum! Kesinlikle tavsiye ederim. Özellikle ana yemekler muhteşemdi.", date: "2 saat önce", photos: [r.imgs[0], r.imgs[1] || r.imgs[0]] },
-    { user: "Elif K.", stars: 4, text: "Ambiyans çok güzel, servis hızlı. Fiyatlar biraz yüksek ama kalite var. Tatlıları da denemenizi öneririm.", date: "1 gün önce", photos: [r.imgs[1] || r.imgs[0]] },
-    { user: "Mert S.", stars: 5, text: "Şehirdeki en iyi mekan! Personel çok ilgili ve yemekler şahane. Arkadaşlarımla harika vakit geçirdik.", date: "3 gün önce", photos: [r.imgs[2] || r.imgs[0], r.imgs[0]] },
-    { user: "Zeynep A.", stars: 3, text: "Yemekler güzeldi ama bekleme süresi uzundu. Genel olarak fena değil ama iyileştirme gerekli.", date: "1 hafta önce", photos: [] },
-  ];
-  const reviews = [...userReviews, ...sampleReviews];
+  // Yalnızca kullanıcının bu restorana yazdıkları. Eskiden her restoranın
+  // altına dört UYDURMA yorum ("A.O.", "Elif K.", "Mert S.", "Zeynep A.")
+  // ekleniyordu; havuz gerçek işletmelerden oluşunca bu, onlar adına
+  // yazılmamış yorumlar göstermek olurdu. Dış kaynak yorumları ayrı blokta,
+  // kaynağı yazılı.
+  const reviews = [...userReviews];
 
   const [selectedReview, setSelectedReview] = useState(null);
   const [composing, setComposing] = useState(false);
@@ -3204,78 +3203,80 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
             <ReviewGate restaurant={r} onReview={() => setComposing(true)} onVerifyLocation={onVerifyLocation} />
           </div>
 
-          {/* Yorumlar — tek tek gösterim */}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
-<p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "var(--c-warm-ink)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icon n="chat" color="var(--c-warm-ink)" size={16} />Yorumlar</p>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-warm-4)" }}>{revIdx + 1} / {reviews.length}</span>
+          {/* Yorumlar — tek tek gösterim. Kullanıcının yazdığı yorum yoksa blok hiç çizilmiyor. */}
+          {reviews.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
+  <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "var(--c-warm-ink)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icon n="chat" color="var(--c-warm-ink)" size={16} />Yorumlar</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-warm-4)" }}>{revIdx + 1} / {reviews.length}</span>
+                </div>
               </div>
-            </div>
 
-            <div
-              onTouchStart={handleRevStart}
-              onTouchEnd={handleRevEnd}
-              onMouseDown={handleRevStart}
-              onMouseUp={handleRevEnd}
-              style={{ overflow: "hidden", margin: "0 16px", cursor: "grab" }}>
-              <div style={{
-                transition: "transform 0.4s cubic-bezier(.25,.8,.25,1)",
-                transform: `translateX(-${revIdx * 100}%)`,
-                display: "flex",
-              }}>
-                {reviews.map((rev, i) => (
-                  <div key={i} style={{ minWidth: "100%", width: "100%", flexShrink: 0, padding: "0 2px", boxSizing: "border-box" }}>
-                    <div
-                      onClick={() => { if (!revTouch.current.moved) setSelectedReview(rev); }}
-                      style={{
-                        background: "#FFF8F4", border: "2px solid #FF6600",
-                        borderRadius: 20, padding: "16px 18px",
-                        boxShadow: "var(--sh-1)",
-                        cursor: "pointer",
-                      }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 34, height: 34, borderRadius: 12, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 800 }}>{rev.user.charAt(0)}</div>
-                          <div>
-                            <p style={{ fontFamily: "var(--f-body)", fontWeight: 800, fontSize: 14, color: "var(--c-brand-ink)", margin: 0 }}>{rev.user}</p>
-                            <div style={{ display: "flex", gap: 2 }}>
-                              {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "var(--c-warn)" : "var(--c-warm-2)" }}>★</span>)}
+              <div
+                onTouchStart={handleRevStart}
+                onTouchEnd={handleRevEnd}
+                onMouseDown={handleRevStart}
+                onMouseUp={handleRevEnd}
+                style={{ overflow: "hidden", margin: "0 16px", cursor: "grab" }}>
+                <div style={{
+                  transition: "transform 0.4s cubic-bezier(.25,.8,.25,1)",
+                  transform: `translateX(-${revIdx * 100}%)`,
+                  display: "flex",
+                }}>
+                  {reviews.map((rev, i) => (
+                    <div key={i} style={{ minWidth: "100%", width: "100%", flexShrink: 0, padding: "0 2px", boxSizing: "border-box" }}>
+                      <div
+                        onClick={() => { if (!revTouch.current.moved) setSelectedReview(rev); }}
+                        style={{
+                          background: "#FFF8F4", border: "2px solid #FF6600",
+                          borderRadius: 20, padding: "16px 18px",
+                          boxShadow: "var(--sh-1)",
+                          cursor: "pointer",
+                        }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 34, height: 34, borderRadius: 12, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 800 }}>{rev.user.charAt(0)}</div>
+                            <div>
+                              <p style={{ fontFamily: "var(--f-body)", fontWeight: 800, fontSize: 14, color: "var(--c-brand-ink)", margin: 0 }}>{rev.user}</p>
+                              <div style={{ display: "flex", gap: 2 }}>
+                                {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "var(--c-warn)" : "var(--c-warm-2)" }}>★</span>)}
+                              </div>
                             </div>
                           </div>
+                          <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-warm-3)" }}>{rev.date}</span>
                         </div>
-                        <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-warm-3)" }}>{rev.date}</span>
+                        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)", margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{rev.text}</p>
+                        {rev.photos && rev.photos.length > 0 && (
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {rev.photos.slice(0, 3).map((p, pi) => (
+                              <div key={pi} style={{ width: 44, height: 44, borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,102,0,0.15)" }}>
+                                <Img src={p} style={{ width: 44, height: 44 }} bg="#f0e8e0" />
+                              </div>
+                            ))}
+                            <div style={{ display: "flex", alignItems: "center" }}>
+                              <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-warm-3)" }}>detay →</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)", margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{rev.text}</p>
-                      {rev.photos && rev.photos.length > 0 && (
-                        <div style={{ display: "flex", gap: 6 }}>
-                          {rev.photos.slice(0, 3).map((p, pi) => (
-                            <div key={pi} style={{ width: 44, height: 44, borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,102,0,0.15)" }}>
-                              <Img src={p} style={{ width: 44, height: 44 }} bg="#f0e8e0" />
-                            </div>
-                          ))}
-                          <div style={{ display: "flex", alignItems: "center" }}>
-                            <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-warm-3)" }}>detay →</span>
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dot indicators */}
+              <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 12 }}>
+                {reviews.map((_, i) => (
+                  <div key={i} onClick={() => setRevIdx(i)} style={{
+                    width: i === revIdx ? 20 : 7, height: 7, borderRadius: 4,
+                    background: i === revIdx ? "#FF6600" : "var(--c-warm-2)",
+                    transition: "all 0.3s", cursor: "pointer",
+                  }} />
                 ))}
               </div>
             </div>
-
-            {/* Dot indicators */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 12 }}>
-              {reviews.map((_, i) => (
-                <div key={i} onClick={() => setRevIdx(i)} style={{
-                  width: i === revIdx ? 20 : 7, height: 7, borderRadius: 4,
-                  background: i === revIdx ? "#FF6600" : "var(--c-warm-2)",
-                  transition: "all 0.3s", cursor: "pointer",
-                }} />
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* Tags */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "0 16px", marginBottom: 18 }}>
@@ -3651,12 +3652,9 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
 // ═══════════════════════════════════════════════
 // PROFİLİM
 // ═══════════════════════════════════════════════
-const MY_REVIEWS = [
-  { rid: 1, name: "Nusr-Et Steakhouse", stars: 5, text: "Etler mükemmel pişmiş, servis çok hızlıydı. Kesinlikle tekrar geleceğim.", date: "3 gün önce", img: I.steak1 },
-  { rid: 8, name: "Nonna's Trattoria", stars: 4, text: "Pizza hamuru harikaydı, sadece bekleme süresi biraz uzundu.", date: "1 hafta önce", img: I.pasta1 },
-  { rid: 12, name: "Karaköy Güllüoğlu", stars: 5, text: "1820'den beri neden efsane olduğu belli, baklava enfes.", date: "2 hafta önce", img: I.dessert1 },
-  { rid: 6, name: "Klein Bistro", stars: 4, text: "Kahve kalitesi çok iyi, brunch menüsü de doyurucu.", date: "3 hafta önce", img: I.cafe1 },
-];
+// Profildeki "Yorumlarım" örnekleri. Boş: eskiden gerçek işletmeler hakkında
+// uydurma yorum metinleri vardı; kullanıcı yorum yazınca liste dolar.
+const MY_REVIEWS = [];
 
 const BADGES = [
   { icon: "sparkle", label: "İlk Yorum" },
@@ -4068,7 +4066,7 @@ export default function GurApp(props = {}) {
   const [favorites, setFavorites] = useState([]);
   const [selected, setSelected] = useState(null);
   const [filterCat, setFilterCat] = useState(null);
-  const [restaurants, setRestaurants] = useState(HAVUZ); // mock ile başla
+  const [restaurants, setRestaurants] = useState(RESTAURANTS); // yerel havuz: Bakırköy listesi
   const [dataSource, setDataSource] = useState("demo"); // "demo" | "live"
   // Doyurucu panelinden yüklenen görseller. Eskiden burası boş bir
   // useState'ti ve hiç doldurulmuyordu: işletmenin yüklediği menü ve
@@ -4170,35 +4168,21 @@ export default function GurApp(props = {}) {
     [restaurants, ownerRestaurant, ownerMedia, ownerProfiles, platform, modState]
   );
 
-  // Veri kaynağı sırası: kendi sunucumuz → Overpass → mock.
-  // Kendi sunucumuz varsa oradaki kayıt otoritedir; sahiplenilmiş
-  // işletmelerin girdiği bilgiler yalnızca orada.
-  // Beslemeden gelen mekan doğrudan yayına girmiyor: tohum listede
-  // OLMAYAN her kayıt moderasyon kuyruğuna "bekliyor" olarak düşüyor.
-  // Tohumun kendisi onaylı sayılıyor — elle hazırlanmış kayıtlar zaten
-  // denetimden geçmiş, aksi hâlde havuz bir gecede boşalırdı.
-  const kuyrugaAl = (list) => {
-    const tohum = new Set(HAVUZ.map(r => String(r.id)));
-    for (const r of list) if (!tohum.has(String(r.id))) markVenuePending(r);
-    return list;
-  };
-
+  // Veri kaynağı: CANLI modda kendi sunucumuz (sahiplenilmiş işletmelerin
+  // girdiği bilgiler yalnızca orada), YEREL modda Bakırköy listesi
+  // (`RESTAURANTS`, açılıştan beri state'te). Eskiden YEREL modda ayrıca
+  // Overpass'ten 40 Kadıköy mekânı çekilip havuzun yerine konuyordu: ana data
+  // artık tablo, dışarıdan başka bir ilçe karışmıyor.
   useEffect(() => {
     let cancelled = false;
-    if (session.mode === "live") {
-      backend.loadRestaurants({ lat: 41.0082, lng: 28.9784, limit: 300 })
-        // CANLI modda yayın kararı SUNUCUDA (restaurants.review_status): liste
-        // yerel moderasyon kuyruğundan geçirilmiyor. Eskiden geçiyordu ve sunucu
-        // kimlikleri (UUID) tohum listede olmadığı için hepsi "bekliyor"
-        // sayılıp deste boş kalıyordu ("Burada henüz mekan yok").
-        .then(list => { if (!cancelled && list?.length) { setRestaurants(list); setDataSource("api"); } })
-        .catch(() => { /* mock veri zaten yüklü */ });
-      return () => { cancelled = true; };
-    }
-    if (session.mode !== "local") return;   // ölçüm bitmeden dış API'ye gitme
-    fetchLiveRestaurants()
-      .then(list => { if (!cancelled) { setRestaurants([...kuyrugaAl(list), ...BAKIRKOY_MEKANLAR]); setDataSource("live"); } })
-      .catch(() => { /* mock veri zaten yüklü */ });
+    if (session.mode !== "live") return undefined;
+    backend.loadRestaurants({ lat: geo.DEFAULT_ORIGIN.lat, lng: geo.DEFAULT_ORIGIN.lng, limit: 300 })
+      // CANLI modda yayın kararı SUNUCUDA (restaurants.review_status): liste
+      // yerel moderasyon kuyruğundan geçirilmiyor. Eskiden geçiyordu ve sunucu
+      // kimlikleri (UUID) tohum listede olmadığı için hepsi "bekliyor"
+      // sayılıp deste boş kalıyordu ("Burada henüz mekan yok").
+      .then(list => { if (!cancelled && list?.length) { setRestaurants(list); setDataSource("api"); } })
+      .catch(() => { /* yerel havuz zaten yüklü */ });
     return () => { cancelled = true; };
   }, [session.mode]);
 

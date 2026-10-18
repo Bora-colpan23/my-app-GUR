@@ -40,6 +40,8 @@ async function withLock(db, key, name, fn) {
   }
 }
 
+export const ingestionEnabled = () => process.env.GUR_INGESTION === "1";
+
 /**
  * Tüm zamanlanmış işleri kaydeder.
  * push: gerçek APNs/FCM göndericisi — test ortamında sahte fonksiyon verilir.
@@ -48,8 +50,10 @@ export function registerJobs(db, { push, timezone = "Europe/Istanbul" } = {}) {
   const at = (expr, name, key, fn) =>
     cron.schedule(expr, () => withLock(db, key, name, fn), { timezone });
 
-  // Mekan havuzu: gece 03:15, trafiğin en düşük olduğu saat.
-  at("15 3 * * *", "ingestion", LOCKS.ingestion, () => runIngestion(db));
+  // Mekan havuzu: gece 03:15, trafiğin en düşük olduğu saat. VARSAYILAN KAPALI
+  // (GUR_INGESTION=1 ile açılır): ana data Bakırköy listesi ve besleme aynı
+  // mekânları farklı kimlikle ikinci kez yazar (bkz. CLAUDE.md).
+  if (ingestionEnabled()) at("15 3 * * *", "ingestion", LOCKS.ingestion, () => runIngestion(db));
 
   // Ziyaret döngüsü: 10 dakikada bir açık ziyaretleri kapat, vakti gelen
   // "deneyim nasıldı" bildirimlerini kuyruğa al.
@@ -71,6 +75,7 @@ export function registerJobs(db, { push, timezone = "Europe/Istanbul" } = {}) {
 
 /** Açılışta bir kez: havuz boşsa ilk beslemeyi hemen yap. */
 export async function bootstrap(db) {
+  if (!ingestionEnabled()) return;
   const { rows: [{ count }] } = await db.query(`SELECT count(*)::int FROM restaurants`);
   if (count === 0) {
     console.log("[boot] mekan havuzu boş, ilk besleme başlıyor");

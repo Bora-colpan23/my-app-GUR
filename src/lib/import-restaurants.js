@@ -28,7 +28,7 @@
  */
 
 export const TEMPLATE_COLUMNS = [
-  { key: 'name',     header: 'Restoran adı', required: true,  example: 'Çiya Sofrası' },
+  { key: 'name',     header: 'Restoran adı', required: true,  example: 'Örnek Lokanta' },
   { key: 'cat',      header: 'Kategori',     required: true,  example: 'Anadolu' },
   { key: 'district', header: 'İlçe',         required: true,  example: 'Kadıköy' },
   { key: 'addr',     header: 'Adres',        required: false, example: 'Caferağa Mah. Güneşlibahçe Sok. 43' },

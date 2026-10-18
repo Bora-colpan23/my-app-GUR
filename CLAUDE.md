@@ -145,7 +145,7 @@ tarayıcı kendi localStorage'ında yaşar. Aradaki fark rozet dışında
 görünmediği için "bağlı çalışmıyor" şikâyeti hep buradan çıkıyor.
 
 Ölçüldü (docker olmadan, aynı topoloji): API + Postgres ayaktayken üç
-arayüzün üçü de CANLI, `/api/health` `{"ok":true,"restaurants":15}`
+arayüzün üçü de CANLI, `/api/health` `{"ok":true,"restaurants":218}`
 döndürüyor ve istekler proxy üzerinden gidiyor (`canli.mjs`).
 
 **Üç tuzak ve çözümleri:**
@@ -219,9 +219,11 @@ ile sabit, alan maskesi yazılı, Gastro otomatik atanmıyor.
 
 **Gerçek restoran verisi nasıl gelir:** `.env`'e **yeni ve kısıtlı** bir
 `GOOGLE_PLACES_API_KEY` yazılır, `npm run db:seed` ya da sunucunun açılış
-beslemesi çalışır. Anahtar yokken sağlayıcı sessizce `[]` döner ve tohum
-listesi (15 mekân) kalır — ölçüldü: `fromApi: 0`, `/api/health`
-`{"ok":true,"restaurants":15}`.
+beslemesi çalışır — **ama dış besleme artık varsayılan KAPALI**
+(`GUR_INGESTION=1` cron'u, `GUR_SEED_INGEST=1` tohumdaki turu açar): ana data
+Bakırköy listesi ve besleme aynı mekânları farklı kimlikle ikinci kez yazar.
+Anahtar yokken sağlayıcı sessizce `[]` döner ve yalnızca liste (218 mekân)
+kalır — ölçüldü: `fromApi: 0`, `/api/health` `{"ok":true,"restaurants":218}`.
 
 `main`'deki `server.ts` çalıştırıldı ve doğrulandı (4 sorgu, 32 gerçek
 İstanbul restoranı geldi), ama **olduğu gibi alınmamalı**:
@@ -248,7 +250,26 @@ koordinatların 30 güne kadar saklanmasına izin veriliyor; ad, puan, yorum ve
 fotoğrafın kalıcı saklanması kısıtlı. Yayına almadan resmi koşullardan teyit
 edin — `restaurant_sources.payload` saklaması da bu kapsama girebilir.
 
-### Bakırköy listesi: 218 kayıt, tek kaynak (18 Ekim)
+### Bakırköy listesi: ANA DATA, 218 kayıt, tek kaynak (18 Ekim)
+
+**Bu liste mekân havuzunun TAMAMI.** Eskiden elle yazılmış 15 demo mekân
+(Nusr-Et, Mikla, Çiya Sofrası…) vardı; kaldırıldı. `data/restaurants.js` →
+`RESTAURANTS`, yönetici `RESTAURANTS`i, mobil paketin tohumu ve sunucu tohumu
+yalnızca bu 218 kaydı içeriyor. YEREL modda Overpass'ten Kadıköy mekânı
+çekip havuzun yerine koyma da kaldırıldı (`fetchLiveRestaurants` hâlâ dosyada
+ama çağrılmıyor); varsayılan başlangıç noktası Bakırköy merkezi
+(`geo.DEFAULT_ORIGIN`).
+
+**DEMO ROLLERİ (`shared/demo.js`).** Yönetici paneli, kampanya envanteri ve
+Doyurucu demo girişi örnek müşteri gerektiriyor; gerçek müşterimiz yok. Roller
+listedeki kayıtlara bağlı: demo işletme sahibi Pizza Krema Bakırköy
+(`demo.isletme@gur.app`), altı demo müşteri (yöneticide `account: true`, satın
+alımlar `STORE_SERVICES`te), üç kampanya + bir askıda kayıt, üç anlık fırsat.
+**Kayıtlar gerçek işletmeler, aralarındaki ticari ilişki UYDURMA** — gerçek bir
+müşteri gelmeden önce `shared/demo.js`, `STORE_SERVICES`, `CAMPAIGN_SEED`,
+`DEMO_CAMPAIGNS`, `DEALS` ve `seedCampaigns` silinmeli (kampanya org unvanları
+"(demo)" yazıyor; `seedCampaigns` ayrıca `claimed_by_org` yazıp doğrulama
+yıldızı çıkarıyor).
 
 Dış kaynaktan çekilen **Bakırköy kafe/restoran tablosu** (`.xlsx`, Google
 Maps taraması, 4 km yarıçap) havuza alındı. Tek kaynak `shared/bakirkoy.js`
@@ -298,10 +319,15 @@ işaretleniyor. Bayrağın kuralı: API kartta `lat`/`lng`/`dist` boş gider, ya
 mekâna "Konumla doğrulandı" rozeti kazandırırdı). İşletme sahiplenip gerçek
 koordinatı girdiğinde bayrak true olmalı (henüz bağlı değil).
 
-**`seedGastro` ve örnek yorumlar yalnızca `seed:` kaynaklı tohum mekânlara.**
-Süzgeç olmadan puanı 4.9, yorumu binlerce olan Bakırköy kayıtları "Gastro
-Onaylı" olurdu — `main`'deki `server.ts`in yaptığı hatanın aynısı. Ölçüldü:
-tohum sonrası Gastro 3 (hepsi tohum), Bakırköy'de 0.
+**Gastro Onaylı YOK, uydurma yorum YOK.** Eski tohumdaki `seedGastro` ve örnek
+dış yorumlar kaldırıldı: puanı 4.9, yorumu binlerce olan Bakırköy kayıtları
+"Gastro Onaylı" olurdu (`main`'deki `server.ts`in hatasının aynısı) ve gerçek
+işletmelerin altında "örnek" yorumlar çıkardı. Aynı sebeple tüketici detay
+sayfasındaki dört sabit uydurma yorum ("A.O.", "Elif K."…) ve profildeki
+`MY_REVIEWS` kaldırıldı; yorum bloğu yalnızca kullanıcının yazdıkları varken
+çiziliyor, dış kaynak yorumları ayrı blokta ve kaynağı yazılı. Gastro rozeti
+yönetici panelinden elle verilebilir (`toggleGastro`). Ölçüm: tohum sonrası
+Gastro 0, dış yorum 0.
 
 **CANLI modda tüketici beslemesi boş kalıyordu — düzeltildi.** `GurApp`
 sunucudan gelen listeyi de yerel moderasyon kuyruğundan (`kuyrugaAl`)
@@ -785,7 +811,7 @@ kapatmak sitede değil üründe yapılan bir iş. Başlık da bu yüzden oturum
 durumunu hiç bilmiyor — prop almıyor, `localStorage` okumuyor.
 
 **Giriş formunda DEMO künyesi var** (`DEMO_ISLETME`, yönetici
-girişindekinin aynısı): `sahip@ciyasofrasi.com` · `gur1234`, dokununca
+girişindekinin aynısı): `demo.isletme@gur.app` · `gur1234`, dokununca
 alanları dolduruyor. Önceden form boştu, ne yazılacağını söylemiyordu ve
 her şeyi kabul ediyordu — kullanıcı yazdığının bir yere gittiğini
 sanıyordu. YEREL modda gerçek hesap kaydı yok, bu yüzden başka bir
@@ -1678,7 +1704,7 @@ düşüyor (`src/lib/moderation.js`, sunucuda migration 003).
 
 **Mevcut kayıtlar ONAYLI sayılır.** Varsayılanı "bekliyor" yapmak havuzu bir
 gecede boşaltırdı; yalnızca beslemenin GETİRDİĞİ yeni kayıt beklemeye düşer
-(`markVenuePending`, tohum listesiyle karşılaştırarak).
+(`markVenuePending`; YEREL modda havuz listenin kendisi olduğu için bugün çağrılmıyor, CANLI'da karar sunucuda).
 
 Yönetici onaylarken **düzenleyebilir**: gelen metni olduğu gibi kabul etmek
 zorunda değil, düzelttiği hâl yayınlanır ve kayıtta `edited` izi kalır.
@@ -2227,10 +2253,10 @@ saklanmaz — yalnızca mesafe/süre özeti. Önizlemede test edilebilmesi için
 "İŞLETMEDEN" / "API'DEN" rozeti bunu gösterir.
 
 ### Canlı veri
-`fetchLiveRestaurants()` Overpass API'den gerçek Kadıköy restoranlarını çeker
-(ücretsiz, anahtarsız, istemci tarafı iptal zaman aşımlı). Başarısız olursa
-sessizce mock `RESTAURANTS` verisine düşer. Sunucu tarafında havuz ayrıca
-Google Places + Foursquare + Tripadvisor + OSM'den cron ile beslenir.
+Havuz Bakırköy listesidir (bkz. "Bakırköy listesi: ANA DATA"). Tarayıcıdan
+Overpass'e artık gidilmiyor. Sunucu tarafında Google Places + Foursquare +
+Tripadvisor + OSM beslemesi (`server/src/ingestion`) duruyor ama VARSAYILAN
+KAPALI (`GUR_INGESTION=1`) ve kapsama ızgarası yalnızca Bakırköy.
 
 ## Görsel kurallar (bunlara uy)
 
@@ -2251,7 +2277,7 @@ Google Places + Foursquare + Tripadvisor + OSM'den cron ile beslenir.
   hazır; `VITE_GOOGLE_CLIENT_ID` / `APPLE_SERVICE_ID` tanımsızken düğmeler
   demo profiliyle tamamlanır ve bunu ekranda söyler.
 - **Besleme dış ağ ister.** Anahtarsız OSM yolu bile giden HTTPS gerektirir;
-  kapalı ağda tohum listesi devreye girer.
+  kapalı ağda yalnızca Bakırköy listesi kalır (besleme zaten varsayılan kapalı).
 - **Posta taşıması yok.** Havuz daveti `mailto:` ile yöneticinin posta
   istemcisinde taslak açıyor; sunucudan giden posta yok. Ayrıca Google
   Places API e-posta alanı döndürmüyor — adresler OSM etiketlerinden

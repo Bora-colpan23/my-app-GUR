@@ -8,6 +8,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { BAKIRKOY, BAKIRKOY_ILCE } from '../../shared/bakirkoy.js';
+import { DEMO_ROLLER, demoId } from '../../shared/demo.js';
 
 // ═══════════════════════════════════════════════
 // IMAGES
@@ -50,23 +51,6 @@ export const I = {
   taco1: "https://picsum.photos/seed/taco1/600/400",
 };
 
-export const RESTAURANTS = [
-  { id:1, name:"Nusr-Et Steakhouse", cat:"Türk Mutfağı", rating:4.8, dist:"2.3 km", price:"₺2.500+", addr:"Etiler, Nispetiye Cd. No:87, Beşiktaş", desc:"Dünyaca ünlü et restoranı. Özel kesim etler ve eşsiz sunum.", imgs:[I.steak1,I.interior1,I.kebab1], menu:["https://picsum.photos/seed/menu-nusr1/600/900","https://picsum.photos/seed/menu-nusr2/600/900"], hours:"12:00 - 00:00", tags:["Fine Dining","Et"], lat:41.081, lng:29.033, popular:["Tomahawk","Ottoman Steak","Baklava"], gastro:true, gastroChef:'Şef Mehmet Gürs', claimed:true },
-  { id:2, name:"Mikla Restaurant", cat:"Fine Dining", rating:4.9, dist:"5.1 km", price:"₺3.000+", addr:"Beyoğlu, Meşrutiyet Cd. No:15", desc:"Skandinav-Türk mutfağı füzyonu. İstanbul manzarası eşliğinde.", imgs:[I.interior2,I.bosphorus,I.wine1], menu:["https://picsum.photos/seed/menu-mikla1/600/900","https://picsum.photos/seed/menu-mikla2/600/900","https://picsum.photos/seed/menu-mikla3/600/900"], hours:"18:00 - 01:00", tags:["Manzara","Romantik"], lat:41.0315, lng:28.976, popular:["Kuzu Sırtı","Deniz Börülcesi","Sakız Dondurması"], claimed:true },
-  { id:3, name:"La Sagrata Famila", cat:"Uzak Doğu", rating:4.5, dist:"10 km", price:"₺800+", addr:"Kadıköy, Moda Cd. No:42", desc:"Geleneksel Japon lezzetini taze malzemelerle modern bir dokunuşla sunuyoruz.", imgs:[I.interior3,I.sushi1,I.sushi2], menu:["https://picsum.photos/seed/menu-sagr1/600/900","https://picsum.photos/seed/menu-sagr2/600/900"], hours:"11:00 - 23:00", tags:["Sushi","Japon"], lat:40.987, lng:29.027, popular:["Omakase","Uramaki","Miso Çorbası"], claimed:true },
-  { id:4, name:"Green Bowl", cat:"Sağlıklı", rating:4.5, dist:"1.2 km", price:"₺350+", addr:"Şişli, Halaskargazi Cd. No:12", desc:"Organik ve sağlıklı tarifler. Vegan seçenekler.", imgs:[I.healthy1,I.healthy2,I.salad1], menu:["https://picsum.photos/seed/menu-green1/600/900"], hours:"08:00 - 22:00", tags:["Vegan","Organik"], lat:41.0555, lng:28.988, popular:["Acai Bowl","Falafel Tabağı","Yeşil Detoks"] },
-  { id:5, name:"Ateş Mangal", cat:"Mangal", rating:4.7, dist:"4.5 km", price:"₺600+", addr:"Üsküdar, Bağlarbaşı Cd. No:88", desc:"Geleneksel odun ateşinde pişen lezzetler.", imgs:[I.bbq1,I.bbq2,I.kebab1], menu:["https://picsum.photos/seed/menu-ates1/600/900","https://picsum.photos/seed/menu-ates2/600/900"], hours:"11:00 - 00:00", tags:["Mangal","Aile"], lat:41.027, lng:29.018, popular:["Adana Kebap","Kuzu Şiş","Künefe"] },
-  { id:6, name:"Klein Bistro", cat:"Kafe", rating:4.4, dist:"0.8 km", price:"₺200+", addr:"Beyoğlu, İstiklal Cd. No:156", desc:"Butik kahve ve ev yapımı pastalar.", imgs:[I.cafe1,I.cafe2,I.barista1], menu:["https://picsum.photos/seed/menu-klein1/600/900"], hours:"07:30 - 23:00", tags:["Kahve","Brunch"], lat:41.0345, lng:28.978, popular:["Flat White","Cheesecake","Avokadolu Tost"] },
-  { id:7, name:"Lucca Lounge", cat:"Gece Hayatı", rating:4.3, dist:"6.2 km", price:"₺1.200+", addr:"Bebek, Cevdetpaşa Cd. No:51", desc:"Boğaz manzaralı lounge. Canlı DJ.", imgs:[I.night1,I.cocktail1,I.rooftop1], menu:["https://picsum.photos/seed/menu-lucca1/600/900","https://picsum.photos/seed/menu-lucca2/600/900"], hours:"17:00 - 04:00", tags:["Lounge","Kokteyl"], lat:41.077, lng:29.043, popular:["Espresso Martini","Tuna Tartar","Trüf Patates"], claimed:true },
-  { id:8, name:"Nonna's Trattoria", cat:"İtalyan", rating:4.6, dist:"3.1 km", price:"₺500+", addr:"Karaköy, Kemankeş Cd. No:29", desc:"Napoli usulü pizza ve makarna.", imgs:[I.pasta1,I.pizza1,I.bread1], menu:["https://picsum.photos/seed/menu-nonna1/600/900","https://picsum.photos/seed/menu-nonna2/600/900","https://picsum.photos/seed/menu-nonna3/600/900"], hours:"12:00 - 23:30", tags:["Pizza","Makarna"], lat:41.0245, lng:28.976, popular:["Margherita","Cacio e Pepe","Tiramisu"] },
-  { id:9, name:"Çiya Sofrası", cat:"Türk Mutfağı", rating:4.7, dist:"4.0 km", price:"₺400+", addr:"Kadıköy, Güneşlibahçe Sk. No:43", desc:"Anadolu'nun dört köşesinden geleneksel tarifler.", imgs:[I.turkish1,I.turkish2,I.soup1], menu:["https://picsum.photos/seed/menu-ciya1/600/900","https://picsum.photos/seed/menu-ciya2/600/900"], hours:"11:00 - 22:00", tags:["Geleneksel","Anadolu"], lat:40.9903, lng:29.0264, popular:["Kuzu Kapama","Zeytinyağlılar","İrmik Helvası"], gastro:true, gastroChef:'Şef Didem Şenol', gastroVideo:'https://picsum.photos/seed/ciya-video/900/600', claimed:true },
-  { id:10, name:"Mandarin Oriental", cat:"Uzak Doğu", rating:4.8, dist:"5.5 km", price:"₺1.500+", addr:"Kuruçeşme, Muallim Naci Cd.", desc:"Uzak Doğu'nun en rafine lezzetleri.", imgs:[I.dimsum1,I.ramen1,I.interior2], menu:["https://picsum.photos/seed/menu-mand1/600/900","https://picsum.photos/seed/menu-mand2/600/900"], hours:"12:00 - 23:00", tags:["Dim Sum","Ramen"], lat:41.057, lng:29.033, popular:["Peking Ördeği","Dim Sum Tabağı","Tonkotsu Ramen"] },
-  { id:11, name:"The Burger Joint", cat:"Fast Food", rating:4.2, dist:"1.5 km", price:"₺250+", addr:"Nişantaşı, Abdi İpekçi Cd. No:22", desc:"El yapımı burgerler ve özel soslar.", imgs:[I.burger1,I.taco1,I.icecream1], menu:["https://picsum.photos/seed/menu-burg1/600/900"], hours:"11:00 - 01:00", tags:["Burger","Casual"], lat:41.048, lng:28.994, popular:["Klasik Cheeseburger","Trüflü Patates","Milkshake"], claimed:true },
-  { id:12, name:"Karaköy Güllüoğlu", cat:"Tatlıcı", rating:4.9, dist:"2.8 km", price:"₺150+", addr:"Kemankeş, Mumhane Cd. No:171", desc:"1820'den beri efsanevi baklava.", imgs:[I.dessert1,I.bread1,I.cafe1], menu:["https://picsum.photos/seed/menu-gull1/600/900","https://picsum.photos/seed/menu-gull2/600/900"], hours:"06:00 - 01:00", tags:["Baklava","Tatlı"], lat:41.025, lng:28.977, popular:["Fıstıklı Baklava","Şöbiyet","Kaymaklı Kadayıf"], gastro:true, gastroChef:'Şef Maksut Aşkar', gastroVideo:'https://picsum.photos/seed/gulluoglu-video/900/600', claimed:true },
-  { id:13, name:"Balıkçı Sabahattin", cat:"Deniz Ürünleri", rating:4.6, dist:"6.0 km", price:"₺900+", addr:"Sultanahmet, Seyit Hasan Kuyu Sk.", desc:"1927'den beri taze deniz lezzetleri.", imgs:[I.seafood1,I.bosphorus,I.wine1], menu:["https://picsum.photos/seed/menu-bal1/600/900","https://picsum.photos/seed/menu-bal2/600/900","https://picsum.photos/seed/menu-bal3/600/900"], hours:"12:00 - 23:00", tags:["Balık","Tarihi"], lat:41.0055, lng:28.977, popular:["Levrek Buğulama","Ahtapot Izgara","Midye Dolma"] },
-  { id:14, name:"Spice Market", cat:"Hint", rating:4.4, dist:"3.8 km", price:"₺450+", addr:"Cihangir, Akarsu Cd. No:15", desc:"Otantik Hint baharat dünyası.", imgs:[I.curry1,I.interior1,I.bread1], menu:["https://picsum.photos/seed/menu-spic1/600/900","https://picsum.photos/seed/menu-spic2/600/900"], hours:"12:00 - 23:00", tags:["Hint","Curry"], lat:41.033, lng:28.983, popular:["Butter Chicken","Lamb Vindaloo","Garlic Naan"] },
-  { id:15, name:"Mövenpick Bosphorus", cat:"Fine Dining", rating:4.5, dist:"7.3 km", price:"₺1.800+", addr:"Örnektepe, İstanbul", desc:"Boğaz kenarında muhteşem manzara.", imgs:[I.bosphorus,I.interior3,I.seafood1], menu:["https://picsum.photos/seed/menu-mov1/600/900","https://picsum.photos/seed/menu-mov2/600/900"], hours:"07:00 - 00:00", tags:["Boğaz","Dünya Mutfağı"], lat:41.048, lng:29.011, popular:["Boğaz Kahvaltısı","Levrek Fileto","Çikolatalı Sufle"] },
-];
 
 // ═══════════════════════════════════════════════
 // BAKIRKÖY LİSTESİ — dış kaynaktan gelen 218 kayıt (shared/bakirkoy.js)
@@ -113,10 +97,16 @@ export function bakirkoyToCard(k) {
   };
 }
 
-export const BAKIRKOY_MEKANLAR = BAKIRKOY.map(bakirkoyToCard);
+/**
+ * MEKAN HAVUZU = Bakırköy listesi. Eskiden burada 15 elle yazılmış demo mekân
+ * (Nusr-Et, Mikla, Çiya Sofrası…) vardı; ana data artık tablodan gelen 218
+ * kayıt. Tüketici uygulaması, işletme sahiplenme listesi, mobil paket ve
+ * sunucu tohumu aynı listeyi okur.
+ */
+export const RESTAURANTS = BAKIRKOY.map(bakirkoyToCard);
 
-/** Tohum liste + Bakırköy listesi: tüketici ve işletme uygulamasının açılış havuzu. */
-export const HAVUZ = [...RESTAURANTS, ...BAKIRKOY_MEKANLAR];
+// Demo rolleri shared/demo.js'te (sunucu tohumu da okuyor); eski içe aktarmalar kırılmasın diye buradan da.
+export { DEMO_ROLLER, demoId };
 
 // Doyurucu panelinden yüklenen görselleri, sahibi olduğu restoranın kendi
 // dizilerine karıştırır. Tüm ekranlar (swipe kartı, detay galerisi, menü
@@ -136,10 +126,10 @@ export function withOwnerMedia(list, ownerId, media) {
   });
 }
 
-// Doyurucu'nun yönettiği restoran. Canlı OSM verisinde id'ler string
-// ("osm-123"), demo veride sayı — bu yüzden sabit bir id'ye bağlanmıyoruz.
+// Doyurucu'nun yönettiği (demo) restoran: DEMO_ROLLER.sahip. Listede yoksa
+// (başka bir kaynaktan gelen havuz) ilk kayıt.
 export function findOwnerRestaurant(list) {
-  return list.find(r => /Kadıköy/.test(r.addr || "")) || list[0] || null;
+  return list.find(r => r.id === demoId(DEMO_ROLLER.sahip)) || list[0] || null;
 }
 
 export const CATEGORIES = [
