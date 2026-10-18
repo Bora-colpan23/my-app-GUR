@@ -13,6 +13,7 @@ import pg from "pg";
 import { runIngestion } from "../src/ingestion/worker.js";
 import { upsertPlace } from "../src/ingestion/worker.js";
 import { hashPassword } from "../src/auth/password.js";
+import { BAKIRKOY, BAKIRKOY_ILCE } from "../../shared/bakirkoy.js";
 
 const SEED_PLACES = [
   { name: "Nusr-Et Steakhouse", category: "Türk Mutfağı", lat: 41.0810, lng: 29.0330, district: "Beşiktaş", address: "Etiler, Nispetiye Cd. No:87", rating: 4.8, ratingCount: 4210, priceLevel: 4, hours: "12:00 - 00:00", tags: ["Fine Dining", "Et"], description: "Dünyaca ünlü et restoranı. Özel kesim etler ve eşsiz sunum.", popular: ["Tomahawk", "Ottoman Steak", "Baklava"] },
@@ -66,12 +67,64 @@ async function seedRestaurants(db) {
   return written;
 }
 
+/**
+ * Bakırköy listesi (shared/bakirkoy.js): tablodan gelen 218 kayıt.
+ *
+ * Tabloda koordinat YOK. `lat`/`lng` NOT NULL olduğu için kayıtlar İLÇE
+ * MERKEZİYLE yazılıyor ve `location_exact = false` işaretleniyor (migration
+ * 005): deste onları ilçesindeki kullanıcıya yakın sıralıyor ama mesafe
+ * iddia etmiyor ve ziyaret doğrulaması hiç eşleştirmiyor.
+ *
+ * Kimlik `(manual, bakirkoy:<anahtar>)`: tekrar çalıştırmak kopya üretmez,
+ * aynı satırı günceller. Gastro / sahiplenme / kampanya YOK; saat, fiyat,
+ * fotoğraf ve açıklama tabloda olmadığı için boş.
+ */
+async function seedBakirkoy(db) {
+  let n = 0;
+  for (const k of BAKIRKOY) {
+    const id = await upsertPlace(db, {
+      name: k.ad,
+      category: k.kategori,
+      description: `${k.tur}${k.mahalle ? ` · ${k.mahalle}` : ""}, ${BAKIRKOY_ILCE.ad}.`,
+      address: k.adres,
+      district: BAKIRKOY_ILCE.ad,
+      lat: BAKIRKOY_ILCE.lat, lng: BAKIRKOY_ILCE.lng, locationExact: false,
+      phone: k.telefon, website: k.web,
+      priceLevel: null, hours: null,
+      rating: k.puan, ratingCount: k.yorum,
+      tags: [k.tur, k.mahalle].filter(Boolean),
+      provider: "manual",
+      sources: [{ provider: "manual", externalId: `bakirkoy:${k.anahtar}` }],
+      photos: [],
+      raw: { bakirkoy: k },
+    });
+    // upsertPlace var olan kaydın kategorisini ve etiketlerini güncellemez
+    // (dış besleme sahiplenilmiş kaydı ezmesin diye). Liste bu kayıtlar için
+    // kaynak: tablo düzeltilip yeniden içe aktarıldığında, sahiplenilmemiş
+    // kayıtlar yeni hâlini almalı.
+    await db.query(
+      `UPDATE restaurants SET category = $2, tags = $3, rating = $4, rating_count = $5
+        WHERE id = $1 AND claimed_by_org IS NULL`,
+      [id, k.kategori, [k.tur, k.mahalle].filter(Boolean), k.puan, k.yorum]);
+    n++;
+  }
+  return n;
+}
+
 async function seedGastro(db) {
   // Gastro rozeti: yüksek puanlı ve çok yorumlu üç mekan.
   // Video yalnızca ilk ikisinde: "rozet var ama çekim yok" durumu da
   // temsil edilsin ki arayüz doğru koşulla test edilebilsin.
+  // YALNIZCA elle hazırlanmış tohum mekânlar (`seed:` kaynağı) arasından.
+  // Rozet bağımsız şef değerlendirmesine dayanır, puanla verilemez; süzgeç
+  // olmadan Bakırköy listesindeki (puanı 4.9, yorumu binlerce) kayıtlar
+  // "Gastro Onaylı" olurdu.
   const { rows } = await db.query(
-    `SELECT id, name FROM restaurants WHERE rating >= 4.6 ORDER BY rating_count DESC LIMIT 3`);
+    `SELECT r.id, r.name FROM restaurants r
+      WHERE r.rating >= 4.6
+        AND EXISTS (SELECT 1 FROM restaurant_sources s
+                     WHERE s.restaurant_id = r.id AND s.external_id LIKE 'seed:%')
+      ORDER BY r.rating_count DESC LIMIT 3`);
   for (const [i, r] of rows.entries()) {
     await db.query(
       `UPDATE restaurants SET gastro_approved = true, gastro_chef = $2, gastro_video_url = $3
@@ -96,7 +149,13 @@ const SAMPLE_EXTERNAL = [
 ];
 
 async function seedExternalReviews(db) {
-  const { rows } = await db.query(`SELECT id, name FROM restaurants ORDER BY rating_count DESC LIMIT 6`);
+  // Örnek yorumlar yalnızca tohum mekânlara: gerçek bir işletmenin altına
+  // uydurma yorum yazmak, "örnek" etiketi olsa bile yanlış.
+  const { rows } = await db.query(
+    `SELECT r.id, r.name FROM restaurants r
+      WHERE EXISTS (SELECT 1 FROM restaurant_sources s
+                     WHERE s.restaurant_id = r.id AND s.external_id LIKE 'seed:%')
+      ORDER BY r.rating_count DESC LIMIT 6`);
   let n = 0;
   for (const r of rows) {
     for (const [i, rv] of SAMPLE_EXTERNAL.entries()) {
@@ -218,8 +277,9 @@ export async function seed(db, { reset = false, tryIngestion = true } = {}) {
   const admin = await seedPlatformAdmin(db);
   const campaigns = await seedCampaigns(db);
   const demo = await seedDemoUser(db);
+  const bakirkoy = await seedBakirkoy(db);
 
-  return { fromApi, seeded, gastro, external, campaigns, adminCreated: admin.created, demoCreated: demo.created };
+  return { fromApi, seeded, bakirkoy, gastro, external, campaigns, adminCreated: admin.created, demoCreated: demo.created };
 }
 
 // Doğrudan çalıştırıldığında

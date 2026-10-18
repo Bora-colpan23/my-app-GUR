@@ -86,6 +86,9 @@ CREATE TABLE restaurants (
   city           text NOT NULL DEFAULT 'İstanbul',
   lat            double precision NOT NULL,
   lng            double precision NOT NULL,
+  -- false: lat/lng mekânın değil İLÇE MERKEZİNİN koordinatı (bkz. migration 005).
+  -- Sıralamada kullanılır; mesafe, yol tarifi ve ziyaret doğrulamasında kullanılmaz.
+  location_exact boolean NOT NULL DEFAULT true,
   phone          text,
   website        text,
   price_level    smallint CHECK (price_level BETWEEN 1 AND 4),

@@ -248,19 +248,100 @@ koordinatların 30 güne kadar saklanmasına izin veriliyor; ad, puan, yorum ve
 fotoğrafın kalıcı saklanması kısıtlı. Yayına almadan resmi koşullardan teyit
 edin — `restaurant_sources.payload` saklaması da bu kapsama girebilir.
 
+### Bakırköy listesi: 218 kayıt, tek kaynak (18 Ekim)
+
+Dış kaynaktan çekilen **Bakırköy kafe/restoran tablosu** (`.xlsx`, Google
+Maps taraması, 4 km yarıçap) havuza alındı. Tek kaynak `shared/bakirkoy.js`
+(ÜRETİLMİŞ dosya, elle düzenlemeyin); tablo değişince:
+
+```bash
+npm run leads:import -- yeni-tablo.xlsx   # scripts/bakirkoy-iceri-al.mjs
+npm run db:seed                            # CANLI modda sunucuya yazar (kopya üretmez)
+```
+
+Aynı 218 kaydı dört yer okuyor ve **kimlik hepsinde `bkr-<anahtar>`**:
+tüketici uygulaması + işletme sahiplenme listesi (`data/restaurants.js` →
+`HAVUZ`), yönetici paneli Mekan Havuzu (`GurAdmin.jsx` → `RESTAURANTS`),
+sunucu (`server/db/seed.js` → `seedBakirkoy`, kaynak `(manual, bakirkoy:<anahtar>)`).
+Hepsi **dış kaynaklı, sahiplenilmemiş, Gastro'suz** (rozet puanla verilmez).
+
+**TABLODA OLMAYAN HİÇBİR ŞEY UYDURULMADI.** Koordinat, çalışma saati, fiyat
+düzeyi, fotoğraf, menü ve açıklama tabloda yok. Sonuçları:
+
+| Alan | Kayıtta | Ekranda |
+|---|---|---|
+| koordinat | `lat`/`lng` **null**; yalnızca `area` = Bakırköy İLÇE merkezi | mesafe yazılmıyor, `dist` yerine "Bakırköy"; yol tarifi isimle arama |
+| saat | null | "Bugün …" satırı, saat etiketi, "Açık" / "Aç" durum çipleri **çizilmiyor** (saati olmayana açık denmez) |
+| fiyat | null | fiyat çipi çizilmiyor (`hydrate` artık `"₺₺"` uydurmuyor) |
+| fotoğraf / menü | yer tutucu (picsum, diğer havuz kayıtlarıyla aynı) / boş | — |
+| açıklama | `"Pizza · Zeytinlik, Bakırköy."` (tablodaki tür + mahalle) | — |
+
+**Kategori tahmindir.** Tablonun kendi notu: "Tür isimden tahmin edilmiştir".
+`tur` ham hâliyle saklanıyor, `kategori` onun GUR kategorisine eşlemesi
+(Meyhane → Alkollü, Pastane → Tatlıcı, Kebap/Ev yemekleri/Lokanta → Türk
+Mutfağı…). Betik yalnızca varsayılana ("Restoran / Lokanta") düşmüş ve adında
+açık bir kahve/kafe sözcüğü geçenleri düzeltiyor (Espressolab). Tabloda restoran
+olmayan birkaç kayıt var (belediye parkı, AVM, "Midpoint Capacity"); silinmedi,
+ayıklamak yönetici panelinden gizleme anahtarıyla yapılır.
+
+**İLÇE MERKEZİ SIRALAMA İÇİN, KONUM DEĞİL.** `shared/deck.js` →
+`orderByProximity`: kaydın kendi koordinatı yoksa ama `area`sı varsa halka o
+noktadan hesaplanıyor (Bakırköy'deki kullanıcı onları yakın görür), ama
+`distanceKm` null kalıyor. Koordinatsız kaydı herkesin en sonuna atmak, ilçesi
+belli bir mekânı o ilçedeki kullanıcıya hiç göstermemek demekti.
+
+**Sunucuda `location_exact` (migration 005).** `restaurants.lat/lng` NOT NULL
+olduğu için kayıtlar ilçe merkeziyle yazılıp `location_exact = false`
+işaretleniyor. Bayrağın kuralı: API kartta `lat`/`lng`/`dist` boş gider, yalnızca
+`area` gider (`shapeCard`); **ziyaret doğrulaması bu kayıtları hiç eşleştirmez**
+(`visits/tracker.js` — yoksa ilçe merkezinin 120 m'sinde duran biri rastgele bir
+mekâna "Konumla doğrulandı" rozeti kazandırırdı). İşletme sahiplenip gerçek
+koordinatı girdiğinde bayrak true olmalı (henüz bağlı değil).
+
+**`seedGastro` ve örnek yorumlar yalnızca `seed:` kaynaklı tohum mekânlara.**
+Süzgeç olmadan puanı 4.9, yorumu binlerce olan Bakırköy kayıtları "Gastro
+Onaylı" olurdu — `main`'deki `server.ts`in yaptığı hatanın aynısı. Ölçüldü:
+tohum sonrası Gastro 3 (hepsi tohum), Bakırköy'de 0.
+
+**CANLI modda tüketici beslemesi boş kalıyordu — düzeltildi.** `GurApp`
+sunucudan gelen listeyi de yerel moderasyon kuyruğundan (`kuyrugaAl`)
+geçiriyordu; sunucu kimlikleri UUID olduğu için tohum listede yok, hepsi
+"bekliyor" sayılıp ekranda "Burada henüz mekan yok" çıkıyordu (5 Ekim
+sürümünden beri). CANLI'da yayın kararı sunucuda (`review_status`): liste artık
+kuyruktan geçmiyor, sunucu da deste / arama / kampanya sorgularında
+`review_status = 'approved'` süzüyor. Havuz isteği `limit: 300` (önceden 40:
+218 kayıtın büyük kısmı hiç gelmezdi). **Ölçek notu:** bu tek istekle tüm
+listeyi çekmek birkaç yüz kayıtta uygun; binlerce kayıtta sayfalama gerekir.
+
+**Bilinen eksikler.**
+- Koordinat yok → mesafe, ziyaret doğrulaması ve harita pini bu 218 kayıt için
+  çalışmıyor. Çözüm: `GOOGLE_PLACES_API_KEY` ile besleme turu ya da tabloya
+  koordinat sütunu. Besleme gelirse `upsertPlace` yalnızca `(provider,
+  external_id)` ile eşleştiği için aynı mekân **ikinci kez** yazılır (ad
+  benzerliği eşleştirmesi yalnızca tek turun içinde `dedupe`de var) — o zaman
+  önce eşleştirme yazılmalı.
+- E-posta sütunu tamamen boş; Instagram 14, Facebook 1 kayıtta dolu. Sunucuda
+  bu iki sütun yok, yalnızca ham `payload`da duruyor.
+- 7 haneli yerel numaralara alan kodu **212** eklendi (Bakırköy Avrupa yakası).
+- **Kaynak koşulları.** Tablonun notu "Google Maps (gosom scraper)" diyor. Google
+  Maps'in koşulları taramayı ve puan/yorum sayısının kalıcı saklanmasını
+  kısıtlıyor (yukarıdaki Places koşulları uyarısıyla aynı konu); yayına almadan
+  önce teyit edin. Tablodaki puan ve yorum sayısı bu yüzden en riskli alanlar.
+
 ## Proje yapısı
 
 ```
 gur/
 ├── index.html                 # Giriş; fontlar bloke etmeden yüklenir
 ├── shared/                    # İSTEMCİ VE SUNUCUNUN ORTAK KULLANDIĞI SAF MODÜLLER
-│   ├── deck.js                # buildDeck / rankCampaigns / quotaState
+│   ├── bakirkoy.js            # ÜRETİLMİŞ: Bakırköy listesi, 218 kayıt (npm run leads:import)
+│   ├── deck.js                # buildDeck / rankCampaigns / quotaState / orderByProximity
 │   ├── second-chance.js       # paket kotası ve günlük tekrar engeli
 │   └── deeplink.js            # harita derin bağlantıları, Haversine
 ├── server/                    # Node tarafı (bkz. server/README.md)
 │   ├── index.js               # giriş: HTTP + cron + ilk besleme
 │   ├── db/setup.sh            # rol + veritabanı + eklenti + şema
-│   ├── db/schema.sql          # tam şema (tek migration, 26 tablo)
+│   ├── db/schema.sql          # tam şema (tek migration, 26 tablo; migrations/ = canlı veritabanları için ekler)
 │   ├── db/seed.js             # tohum veri; önce gerçek beslemeyi dener
 │   ├── db/queries/cohorts.sql # retention / kohort / LTV toplama sorguları
 │   └── src/

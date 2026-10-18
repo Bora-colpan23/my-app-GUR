@@ -17,7 +17,7 @@ import {
   BadgeChips, BadgeMarks, GlossDefs, GLOSS, DinnerBell, SplitText, Orb, Skeleton,
   scrim, SocialAuthRow, StepProgress,
 } from '../ui/kit.jsx';
-import { I, RESTAURANTS, CATEGORIES, fetchLiveRestaurants, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
+import { I, HAVUZ, BAKIRKOY_MEKANLAR, CATEGORIES, fetchLiveRestaurants, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { Sheet, DangerConfirm, Chip } from '../ui/sheets.jsx';
 import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
@@ -310,7 +310,7 @@ const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSu
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
           <span style={{ background: "#fff", borderRadius: 10, padding: "4px 12px", fontSize: 13, fontWeight: 700, color: "#1C1917", fontFamily: "var(--f-body)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="var(--c-warn)" size={12} />{r.rating}</span>
           <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "var(--f-body)" }}>{distText(r)}</span>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "var(--f-body)" }}>•  {r.price}</span>
+          {r.price && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "var(--f-body)" }}>•  {r.price}</span>}
         </div>
         <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "rgba(255,255,255,0.85)", margin: "0 0 12px", lineHeight: 1.45 }}>{r.desc}</p>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
@@ -1024,9 +1024,12 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
                         <Icon n="pin" size={11} color="var(--c-muted)" />
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{distText(r)}</span>
                       </span>
-                      <span style={{ flexShrink: 0, fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "var(--c-ok-ink)", background: "var(--c-ok-soft)", border: "1px solid rgba(19,179,100,0.22)", borderRadius: 999, padding: "6px 13px" }}>
-                        Aç
-                      </span>
+                      {/* Saati bilinmeyen mekân için "Aç" denmez: durum çipi bir iddia. */}
+                      {r.hours && (
+                        <span style={{ flexShrink: 0, fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "var(--c-ok-ink)", background: "var(--c-ok-soft)", border: "1px solid rgba(19,179,100,0.22)", borderRadius: 999, padding: "6px 13px" }}>
+                          Aç
+                        </span>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -2040,14 +2043,18 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
             </span>
             <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)" }}>{r.cat}</span>
             <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)" }}>· {distText(r)}</span>
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)" }}>· {r.price}</span>
+            {r.price && <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)" }}>· {r.price}</span>}
           </div>
 
-          {/* Çalışma saatleri — açık/kapalı sinyali metinden okunur */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--c-subtle)", borderRadius: 14, padding: "10px 14px", marginBottom: 12 }}>
-            <Icon n="clock" size={14} color="#FF6600" />
-            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)" }}>Bugün {r.hours}</span>
-          </div>
+          {/* Çalışma saatleri — açık/kapalı sinyali metinden okunur. Saat
+              bilinmiyorsa satır hiç çizilmiyor: uydurma saat yazmak, "bilgi
+              yok"tan kötü. */}
+          {r.hours && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--c-subtle)", borderRadius: 14, padding: "10px 14px", marginBottom: 12 }}>
+              <Icon n="clock" size={14} color="#FF6600" />
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)" }}>Bugün {r.hours}</span>
+            </div>
+          )}
 
           <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink-2)", lineHeight: 1.6, margin: "0 0 16px" }}>{r.desc}</p>
 
@@ -2146,7 +2153,7 @@ function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyL
   );
 }
 
-function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites, filterCat, restaurants = RESTAURANTS, dataSource = "demo", onPremium, onAddReview, onVerifyLocation }) {
+function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites, filterCat, restaurants = HAVUZ, dataSource = "demo", onPremium, onAddReview, onVerifyLocation }) {
   // Bumble kalıbı: detay ayrı bir ekrana gitmez, kartın üstünde açılan
   // genişleyebilir bir sayfa olarak gelir.
   const [sheetCard, setSheetCard] = useState(null);
@@ -3273,7 +3280,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
           {/* Tags */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "0 16px", marginBottom: 18 }}>
             {r.tags.map(t => <span key={t} style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "var(--c-brand-ink)", fontFamily: "var(--f-body)", fontWeight: 600 }}>{t}</span>)}
-            <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "var(--c-brand-ink)", fontFamily: "var(--f-body)", fontWeight: 600 }}>🕐 {r.hours}</span>
+            {r.hours && <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "var(--c-brand-ink)", fontFamily: "var(--f-body)", fontWeight: 600 }}>🕐 {r.hours}</span>}
           </div>
 
           {/* Anlık fırsat */}
@@ -3571,7 +3578,7 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
                   </div>
 
                   {/* Fiyat */}
-                  <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", borderRadius: 10, padding: "4px 10px", fontSize: 12, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 600 }}>{r.price}</span>
+                  {r.price && <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", borderRadius: 10, padding: "4px 10px", fontSize: 12, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 600 }}>{r.price}</span>}
 
                   {/* İsim ve mesafe */}
                   <div style={{ position: "absolute", bottom: 12, left: 14, right: 14, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
@@ -3583,11 +3590,16 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
                 {/* Alt kısım — bilgiler + silme */}
                 <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-ok-light)" }} />
-                      <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-ok-light)", fontWeight: 700 }}>Açık</span>
-                    </div>
-                    <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-warm-4)" }}>{r.hours}</span>
+                    {/* "Açık" yalnızca saati bilinen mekânda: saati olmayana açık demek uydurma. */}
+                    {r.hours && (
+                      <>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-ok-light)" }} />
+                          <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-ok-light)", fontWeight: 700 }}>Açık</span>
+                        </div>
+                        <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-warm-4)" }}>{r.hours}</span>
+                      </>
+                    )}
                   </div>
 
                   {/* Silme — onaylı */}
@@ -4056,7 +4068,7 @@ export default function GurApp(props = {}) {
   const [favorites, setFavorites] = useState([]);
   const [selected, setSelected] = useState(null);
   const [filterCat, setFilterCat] = useState(null);
-  const [restaurants, setRestaurants] = useState(RESTAURANTS); // mock ile başla
+  const [restaurants, setRestaurants] = useState(HAVUZ); // mock ile başla
   const [dataSource, setDataSource] = useState("demo"); // "demo" | "live"
   // Doyurucu panelinden yüklenen görseller. Eskiden burası boş bir
   // useState'ti ve hiç doldurulmuyordu: işletmenin yüklediği menü ve
@@ -4166,7 +4178,7 @@ export default function GurApp(props = {}) {
   // Tohumun kendisi onaylı sayılıyor — elle hazırlanmış kayıtlar zaten
   // denetimden geçmiş, aksi hâlde havuz bir gecede boşalırdı.
   const kuyrugaAl = (list) => {
-    const tohum = new Set(RESTAURANTS.map(r => String(r.id)));
+    const tohum = new Set(HAVUZ.map(r => String(r.id)));
     for (const r of list) if (!tohum.has(String(r.id))) markVenuePending(r);
     return list;
   };
@@ -4174,14 +4186,18 @@ export default function GurApp(props = {}) {
   useEffect(() => {
     let cancelled = false;
     if (session.mode === "live") {
-      backend.loadRestaurants({ lat: 41.0082, lng: 28.9784 })
-        .then(list => { if (!cancelled && list?.length) { setRestaurants(kuyrugaAl(list)); setDataSource("api"); } })
+      backend.loadRestaurants({ lat: 41.0082, lng: 28.9784, limit: 300 })
+        // CANLI modda yayın kararı SUNUCUDA (restaurants.review_status): liste
+        // yerel moderasyon kuyruğundan geçirilmiyor. Eskiden geçiyordu ve sunucu
+        // kimlikleri (UUID) tohum listede olmadığı için hepsi "bekliyor"
+        // sayılıp deste boş kalıyordu ("Burada henüz mekan yok").
+        .then(list => { if (!cancelled && list?.length) { setRestaurants(list); setDataSource("api"); } })
         .catch(() => { /* mock veri zaten yüklü */ });
       return () => { cancelled = true; };
     }
     if (session.mode !== "local") return;   // ölçüm bitmeden dış API'ye gitme
     fetchLiveRestaurants()
-      .then(list => { if (!cancelled) { setRestaurants(kuyrugaAl(list)); setDataSource("live"); } })
+      .then(list => { if (!cancelled) { setRestaurants([...kuyrugaAl(list), ...BAKIRKOY_MEKANLAR]); setDataSource("live"); } })
       .catch(() => { /* mock veri zaten yüklü */ });
     return () => { cancelled = true; };
   }, [session.mode]);

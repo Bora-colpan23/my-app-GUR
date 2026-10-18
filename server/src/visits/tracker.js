@@ -44,6 +44,9 @@ export async function ingestLocationSample(db, userId, sample) {
             earth_distance(ll_to_earth($1,$2), ll_to_earth(r.lat, r.lng)) AS distance_m
        FROM restaurants r
       WHERE r.is_active
+        -- İlçe merkeziyle yazılmış kayıtlar eşleşmez (migration 005): merkezin
+        -- yakınındaki biri rastgele bir mekâna "doğrulandı" rozeti kazanırdı.
+        AND r.location_exact
         AND earth_box(ll_to_earth($1,$2), $3) @> ll_to_earth(r.lat, r.lng)
       ORDER BY distance_m ASC
       LIMIT 1`,

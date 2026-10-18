@@ -205,7 +205,15 @@ export function orderByProximity(list, origin, { seed = 1, rules = RADIUS_RULES 
     const km = Number.isFinite(r.lat) && Number.isFinite(r.lng)
       ? distanceKm(origin, { lat: r.lat, lng: r.lng })
       : null;
-    return { ...r, distanceKm: km, ring: ringOf(km, rules) };
+    // Mekânın kendi koordinatı yoksa ama ilçesi biliniyorsa (`area`, yalnızca
+    // ilçe merkezi) halka o noktadan hesaplanır: koordinatsız diye ilçesi belli
+    // bir kaydı herkesin en sonuna atmak, o ilçedeki kullanıcıya hiç
+    // göstermemek demekti. `distanceKm` yine null kalır — ilçe merkezine
+    // olan uzaklık mekâna olan uzaklık değildir, kartta gösterilmez.
+    const ringKm = km ?? (r.area && Number.isFinite(r.area.lat) && Number.isFinite(r.area.lng)
+      ? distanceKm(origin, r.area)
+      : null);
+    return { ...r, distanceKm: km, ring: ringOf(ringKm, rules) };
   });
 
   // Halka içi karıştırma: sıralama deterministik ama mesafeye göre

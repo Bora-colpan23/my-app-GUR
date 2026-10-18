@@ -29,11 +29,11 @@ async function readQuota(db, userId) {
 async function organicCandidates(db, userId, { lat, lng, category, radiusM = 8000 }) {
   const { rows } = await db.query(
     `SELECT r.id, r.name, r.category, r.description, r.address, r.district,
-            r.lat, r.lng, r.rating, r.rating_count, r.price_level, r.hours,
+            r.lat, r.lng, r.location_exact, r.rating, r.rating_count, r.price_level, r.hours,
             r.tags, r.gastro_approved, r.gastro_chef,
             earth_distance(ll_to_earth($2, $3), ll_to_earth(r.lat, r.lng)) AS distance_m
        FROM restaurants r
-      WHERE r.is_active
+      WHERE r.is_active AND r.review_status = 'approved'
         AND ($4::text IS NULL OR r.category = $4)
         AND earth_box(ll_to_earth($2, $3), $5) @> ll_to_earth(r.lat, r.lng)
         AND NOT EXISTS (SELECT 1 FROM swipes s
@@ -59,11 +59,11 @@ async function servableCampaigns(db, { lat, lng, radiusM = 8000 }) {
             (c.daily_budget_minor - coalesce(d.spent_minor, 0)) AS remaining_budget_minor,
             c.status,
             r.id AS restaurant_id, r.name, r.category, r.description, r.address,
-            r.district, r.lat, r.lng, r.rating, r.rating_count, r.price_level,
+            r.district, r.lat, r.lng, r.location_exact, r.rating, r.rating_count, r.price_level,
             r.hours, r.tags, r.gastro_approved, r.gastro_chef,
             coalesce(d.engagements::numeric / nullif(d.impressions, 0), 0.5) AS engagement_rate
        FROM campaigns c
-       JOIN restaurants r ON r.id = c.restaurant_id AND r.is_active
+       JOIN restaurants r ON r.id = c.restaurant_id AND r.is_active AND r.review_status = 'approved'
        LEFT JOIN campaign_daily_spend d
               ON d.campaign_id = c.id AND d.day = current_date
       WHERE c.status = 'active'
@@ -87,7 +87,7 @@ async function servableCampaigns(db, { lat, lng, radiusM = 8000 }) {
     restaurant: {
       id: r.restaurant_id, name: r.name, category: r.category,
       description: r.description, address: r.address, district: r.district,
-      lat: r.lat, lng: r.lng, rating: r.rating, ratingCount: r.rating_count,
+      lat: r.lat, lng: r.lng, location_exact: r.location_exact, rating: r.rating, ratingCount: r.rating_count,
       priceLevel: r.price_level, hours: r.hours, tags: r.tags,
       gastroApproved: r.gastro_approved, gastroChef: r.gastro_chef,
     },

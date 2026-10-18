@@ -63,12 +63,13 @@ export async function upsertPlace(db, place) {
     const { rows } = await db.query(
       `INSERT INTO restaurants
          (name, category, description, address, district, lat, lng, phone, website,
-          price_level, rating, rating_count, hours, tags)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          price_level, rating, rating_count, hours, tags, location_exact)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING id`,
       [place.name, place.category, place.description, place.address, place.district,
-       place.lat, place.lng, place.phone, place.website, place.priceLevel,
-       place.rating, place.ratingCount || 0, place.hours, place.tags || []]
+       place.lat, place.lng, place.phone, place.website, place.priceLevel ?? null,
+       place.rating, place.ratingCount || 0, place.hours ?? null, place.tags || [],
+       place.locationExact !== false]
     );
     restaurantId = rows[0].id;
   } else {

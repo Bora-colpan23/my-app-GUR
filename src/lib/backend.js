@@ -74,10 +74,10 @@ export async function loadDeck({ lat, lng, category } = {}) {
   } catch { return null; }
 }
 
-export async function loadRestaurants({ q, lat, lng } = {}) {
+export async function loadRestaurants({ q, lat, lng, limit } = {}) {
   if (!isLive()) return null;
   try {
-    const { restaurants } = await api.searchRestaurants(q, { lat, lng });
+    const { restaurants } = await api.searchRestaurants(q, { lat, lng, limit });
     return restaurants.map(hydrate);
   } catch { return null; }
 }
@@ -91,9 +91,12 @@ function hydrate(r) {
     imgs: r.imgs?.length ? r.imgs : [0, 1, 2].map(i => `https://picsum.photos/seed/${seed}-${i}/900/600`),
     menu: r.menu?.length ? r.menu : [`https://picsum.photos/seed/${seed}-menu/600/900`],
     tags: r.tags?.length ? r.tags : [r.cat].filter(Boolean),
-    price: r.price || "₺₺",
-    dist: r.dist || "—",
-    hours: r.hours || "11:00 - 23:00",
+    // Fiyat ve saat için varsayılan YAZILMIYOR: sunucuda yoksa yoktur (dış
+    // kaynaktan gelen kayıtların çoğunda yok), ekranlar boşken o satırı
+    // çizmiyor. Eskiden "₺₺" ve "11:00 - 23:00" uyduruluyordu.
+    price: r.price || null,
+    dist: r.dist || r.district || "—",
+    hours: r.hours || null,
     desc: r.desc || `${r.cat} kategorisinde hizmet veren mekan.`,
   };
 }

@@ -7,6 +7,8 @@
 // tablosudur; demo modda tohum liste burada duruyor.
 // ═══════════════════════════════════════════════════════════════════════
 
+import { BAKIRKOY, BAKIRKOY_ILCE } from '../../shared/bakirkoy.js';
+
 // ═══════════════════════════════════════════════
 // IMAGES
 // ═══════════════════════════════════════════════
@@ -65,6 +67,56 @@ export const RESTAURANTS = [
   { id:14, name:"Spice Market", cat:"Hint", rating:4.4, dist:"3.8 km", price:"₺450+", addr:"Cihangir, Akarsu Cd. No:15", desc:"Otantik Hint baharat dünyası.", imgs:[I.curry1,I.interior1,I.bread1], menu:["https://picsum.photos/seed/menu-spic1/600/900","https://picsum.photos/seed/menu-spic2/600/900"], hours:"12:00 - 23:00", tags:["Hint","Curry"], lat:41.033, lng:28.983, popular:["Butter Chicken","Lamb Vindaloo","Garlic Naan"] },
   { id:15, name:"Mövenpick Bosphorus", cat:"Fine Dining", rating:4.5, dist:"7.3 km", price:"₺1.800+", addr:"Örnektepe, İstanbul", desc:"Boğaz kenarında muhteşem manzara.", imgs:[I.bosphorus,I.interior3,I.seafood1], menu:["https://picsum.photos/seed/menu-mov1/600/900","https://picsum.photos/seed/menu-mov2/600/900"], hours:"07:00 - 00:00", tags:["Boğaz","Dünya Mutfağı"], lat:41.048, lng:29.011, popular:["Boğaz Kahvaltısı","Levrek Fileto","Çikolatalı Sufle"] },
 ];
+
+// ═══════════════════════════════════════════════
+// BAKIRKÖY LİSTESİ — dış kaynaktan gelen 218 kayıt (shared/bakirkoy.js)
+//
+// Tohum listeden FARKI: bunlar elle hazırlanmış değil, tablodan geldi ve
+// tabloda olmayan alanlar BOŞ. Bu yüzden:
+//   • lat/lng null — mekânın koordinatı yok. Yol tarifi isimle arama
+//     açıyor, ziyaret doğrulaması bu kayıtları hiç eşleştirmiyor.
+//   • area — yalnızca deste sıralaması için ilçe merkezi (bkz.
+//     shared/deck.js → orderByProximity). Mesafe olarak GÖSTERİLMİYOR;
+//     `dist` alanında ilçe adı yazıyor.
+//   • price / hours boş; ekranlar boşken o satırı çizmiyor.
+//   • gastro yok, claimed yok: rozet bağımsız şef değerlendirmesine
+//     dayanır, puanla verilemez.
+// Görseller diğer havuz kayıtlarıyla aynı yer tutucu (picsum): fotoğraf
+// da tabloda yok.
+// ═══════════════════════════════════════════════
+export function bakirkoyToCard(k) {
+  const id = `bkr-${k.anahtar}`;
+  return {
+    id,
+    name: k.ad,
+    cat: k.kategori,
+    rating: k.puan,
+    ratingCount: k.yorum,
+    dist: BAKIRKOY_ILCE.ad,
+    price: null,
+    addr: k.adres,
+    desc: `${k.tur}${k.mahalle ? ` · ${k.mahalle}` : ""}, ${BAKIRKOY_ILCE.ad}.`,
+    imgs: [0, 1, 2].map(i => `https://picsum.photos/seed/${id}-${i}/600/400`),
+    menu: [],
+    hours: null,
+    tags: [k.tur, k.mahalle].filter(Boolean),
+    popular: [],
+    lat: null, lng: null,
+    area: { lat: BAKIRKOY_ILCE.lat, lng: BAKIRKOY_ILCE.lng },
+    district: BAKIRKOY_ILCE.ad,
+    phone: k.telefon,
+    website: k.web,
+    email: k.eposta,
+    instagram: k.instagram,
+    facebook: k.facebook,
+    source: "api",
+  };
+}
+
+export const BAKIRKOY_MEKANLAR = BAKIRKOY.map(bakirkoyToCard);
+
+/** Tohum liste + Bakırköy listesi: tüketici ve işletme uygulamasının açılış havuzu. */
+export const HAVUZ = [...RESTAURANTS, ...BAKIRKOY_MEKANLAR];
 
 // Doyurucu panelinden yüklenen görselleri, sahibi olduğu restoranın kendi
 // dizilerine karıştırır. Tüm ekranlar (swipe kartı, detay galerisi, menü

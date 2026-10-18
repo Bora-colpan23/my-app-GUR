@@ -11,6 +11,7 @@ import { useModeration, pendingChanges, pendingVenues, approveChange, rejectChan
 import { useRequests, openRequests, requestFor, markQuoted, close as closeRequest, unseenCount, markAllSeen } from '../lib/requests.js';
 import { useCreatives, SLOTS, listFor, addCreative, removeCreative, toggleLive, liveCount } from '../lib/creatives.js';
 import { TEMPLATE_COLUMNS, templateHeaderLine, downloadTemplate, parseRestaurantFile } from '../lib/import-restaurants.js';
+import { BAKIRKOY } from '../../shared/bakirkoy.js';
 import {
   AD_PRODUCTS, AD_KEYS, useAdSlots, priceOf, setPrice, adminBook, decideBooking,
   pendingBookings, pendingBookingCount, dayState, monthGrid, endOf, prettyDay, gunFarki,
@@ -370,6 +371,18 @@ const RESTAURANTS = [
   { id: 13, name: 'Balıkçı Sabahattin', cat: 'Deniz Ürünleri', district: 'Fatih', rating: 4.6, reviews: 980, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-01-22', account: false, source: 'api', email: 'rezervasyon@balikcisabahattin.com', website: 'balikcisabahattin.com' },
   { id: 14, name: 'Spice Market', cat: 'Uzak Doğu', district: 'Şişli', rating: 4.4, reviews: 150, status: 'active', gastro: false, plan: 'Ücretsiz', joined: '2026-03-30', account: false, source: 'api', email: null, website: null },
   { id: 7, name: 'Lucca Lounge', cat: 'Gece Hayatı', district: 'Bebek', rating: 4.3, reviews: 450, status: 'active', gastro: false, plan: 'Pro', joined: '2024-07-22', account: true, source: 'owner' },
+  // Bakırköy listesi (shared/bakirkoy.js) — tüketici uygulamasındaki havuzla
+  // AYNI kayıtlar, aynı kimlikler (`bkr-…`): yönetici panelinde gizlenen
+  // ya da rozet verilen mekan, uygulamada da aynı mekân. Hepsi dış kaynaklı
+  // ve sahiplenilmemiş (`account: false`), yani Mekan Havuzu'nda görünürler.
+  ...BAKIRKOY.map(k => ({
+    id: `bkr-${k.anahtar}`, name: k.ad, cat: k.kategori, district: 'Bakırköy',
+    rating: k.puan, reviews: k.yorum, status: 'active', gastro: false,
+    plan: 'Ücretsiz', joined: '2026-10-18', account: false, source: 'api',
+    addr: k.adres, phone: k.telefon, email: k.eposta, website: k.web,
+    instagram: k.instagram, tur: k.tur,
+    imgs: [], menu: [], popular: [], tags: [k.tur, k.mahalle].filter(Boolean),
+  })),
 ];
 
 // ═══════════════════════════════════════════════════════════════════════

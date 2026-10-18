@@ -175,9 +175,10 @@ export function buildRouter() {
     const { rows } = await db.query(
       `SELECT r.*, earth_distance(ll_to_earth($1,$2), ll_to_earth(r.lat, r.lng)) AS distance_m
          FROM restaurants r
-        WHERE r.is_active AND ($3::text IS NULL OR r.name ILIKE '%' || $3 || '%')
+        WHERE r.is_active AND r.review_status = 'approved'
+          AND ($3::text IS NULL OR r.name ILIKE '%' || $3 || '%')
         ORDER BY distance_m LIMIT $4`,
-      [coords(query).lat, coords(query).lng, query.q || null, Math.min(Number(query.limit) || 40, 100)]);
+      [coords(query).lat, coords(query).lng, query.q || null, Math.min(Number(query.limit) || 40, 300)]);
     return { restaurants: rows.map(shapeCard) };
   });
 
@@ -505,7 +506,13 @@ function shapeCard(r) {
     desc: r.description,
     addr: r.address,
     district: r.district,
-    lat: r.lat, lng: r.lng,
+    // location_exact=false: lat/lng mekânın değil ilçe merkezinin koordinatı
+    // (migration 005). Mekân koordinatıymış gibi dışarı verilmez — istemci
+    // yol tarifini ve ziyaret doğrulamasını bu alanlardan kuruyor. Yalnızca
+    // sıralama için `area` gider.
+    lat: r.location_exact === false ? null : r.lat,
+    lng: r.location_exact === false ? null : r.lng,
+    area: r.location_exact === false ? { lat: r.lat, lng: r.lng } : undefined,
     rating: r.rating == null ? null : Number(r.rating),
     ratingCount: r.rating_count,
     price: r.price_level ? "₺".repeat(r.price_level) : null,
@@ -518,7 +525,8 @@ function shapeCard(r) {
     gastroVideo: r.gastro_video_url || null,
     // İşletme kaydını sahiplenmişse arayüzde doğrulama yıldızı çıkar.
     claimed: !!r.claimed_by_org,
-    dist: r.distance_m == null ? null : `${(Number(r.distance_m) / 1000).toFixed(1)} km`,
+    // İlçe merkezine olan uzaklık mekâna olan uzaklık değil: yazılmaz.
+    dist: r.distance_m == null || r.location_exact === false ? null : `${(Number(r.distance_m) / 1000).toFixed(1)} km`,
     isSuper: r.is_super ?? undefined,
     sponsored: r.sponsored ?? null,
     deckPosition: r.deckPosition,

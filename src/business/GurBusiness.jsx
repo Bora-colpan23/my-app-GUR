@@ -54,7 +54,7 @@ import {
   cancelBooking, bookingsOfRestaurant, dayState, monthGrid, today, endOf,
   addDays, prettyDay, gunFarki, slotsOf, WEEKDAYS_TR, MONTHS_TR as AY_ADLARI,
 } from '../lib/adslots.js';
-import { RESTAURANTS, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
+import { HAVUZ, findOwnerRestaurant, withOwnerMedia } from '../data/restaurants.js';
 import { DangerConfirm, Sheet } from '../ui/sheets.jsx';
 
 // ═══════════════════════════════════════════════
@@ -3755,7 +3755,7 @@ export default function GurBusiness() {
   const genis = useMediaQuery(GENIS);
 
   const basePool = useMemo(
-    () => RESTAURANTS.map(r => applyOwnerProfile(r, ownerProfiles)),
+    () => HAVUZ.map(r => applyOwnerProfile(r, ownerProfiles)),
     [ownerProfiles]
   );
   // Yönetilen mekan: sahiplenilen kayıt (bu oturumda ya da önceki

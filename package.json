@@ -14,6 +14,7 @@
     "db:setup": "./server/db/setup.sh",
     "db:reset": "./server/db/setup.sh --reset && npm run db:seed",
     "db:seed": "node server/db/seed.js",
+    "leads:import": "node scripts/bakirkoy-iceri-al.mjs",
     "artifact": "node scripts/build-artifact.mjs"
   },
   "dependencies": {

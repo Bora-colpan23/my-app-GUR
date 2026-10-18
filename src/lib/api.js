@@ -160,8 +160,8 @@ export const completeRewardedAd = (revenueMinor = 0) =>
   call("/rewarded-ad/complete", { method: "POST", body: { revenueMinor } });
 export const getSaved = () => call("/saved");
 export const getRestaurant = (id) => call(`/restaurants/${id}`, { auth: false });
-export function searchRestaurants(q, { lat, lng, limit = 40 } = {}) {
-  const p = new URLSearchParams({ limit: String(limit) });
+export function searchRestaurants(q, { lat, lng, limit } = {}) {
+  const p = new URLSearchParams({ limit: String(limit || 40) });
   if (q) p.set("q", q);
   if (lat != null && lng != null) { p.set("lat", lat); p.set("lng", lng); }
   return call(`/restaurants?${p}`, { auth: false });
