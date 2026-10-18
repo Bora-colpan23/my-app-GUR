@@ -18,6 +18,7 @@ import {
   pendingBookings, pendingBookingCount, dayState, monthGrid, endOf, prettyDay, gunFarki,
   today as adToday, WEEKDAYS_TR as AD_WEEKDAYS, MONTHS_TR as AD_MONTHS,
 } from '../lib/adslots.js';
+import { useAdContent, PLACEMENTS as AD_PLACEMENTS, GROUPS as AD_GROUPS, MAX_MB as AD_IMG_MAX_MB, adImage, isCustom as adImgCustom, setAdImage, resetAdImage, customCount as adImgCustomCount } from '../lib/adcontent.js';
 import {
   useMedia, KINDS as MEDIA_KINDS, listMedia, pendingAll as pendingMedia,
   pendingCount as mediaPendingCount, decideMedia, removeMedia,
@@ -641,6 +642,7 @@ const icons = {
   doc: <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></>,
   trend: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></>,
   money: <><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></>,
+  image: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>,
   ban: <><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></>,
 };
 
@@ -1187,6 +1189,7 @@ export default function GurAdmin() {
     { id: 'revenue', label: 'Gelir & Reklam', icon: icons.money },
     { id: 'services', label: 'Hizmetler', icon: icons.money },
     { id: 'adcal', label: 'Reklam Takvimi', icon: icons.trend, count: slotBekleyen, alert: slotBekleyen > 0 },
+    { id: 'adimg', label: 'Reklam Görselleri', icon: icons.image },
     { id: 'pricing', label: 'Fiyatlandırma', icon: icons.trend },
     { id: 'settings', label: 'Ayarlar', icon: icons.settings },
   ];
@@ -1333,6 +1336,7 @@ export default function GurAdmin() {
             <PricingPage restaurants={restaurants} query={query}
               stream={pricingStream} onStream={setPricingStream} />)}
           {page === 'adcal' && <AdCalendarPage restaurants={restaurants} query={query} />}
+          {page === 'adimg' && <AdImagesPage />}
           {page === 'settings' && <SettingsPage />}
         </div>
       </main>
@@ -2168,6 +2172,106 @@ function AdCalendarPage({ restaurants = [], query = '' }) {
             onClick={yerlestirOnayla} disabled={!secilenRest} />
         </Modal>
       )}
+    </div>
+  );
+}
+
+/**
+ * REKLAM GÖRSELLERİ — uygulama içindeki GUR reklam alanlarının görselleri.
+ *
+ * Reklam Takvimi'yle KARIŞTIRMAYIN: orası işletmenin SATIN ALDIĞI yayın
+ * (görseli işletme yükler, onay kuyruğundan geçer). Burası o yayın yokken
+ * dönen GUR'un kendi içeriği ve marka slaytı — yönetici doğrudan değiştirir,
+ * onay kuyruğu yok çünkü yetkili merci zaten bu panel.
+ *
+ * Katalog lib/adcontent.js'te; uygulama görseli aynı kimlikle okuyor, yani
+ * buraya eklenen yerleşim uygulamada da bağlanmadan çalışmaz (kimlik =
+ * BANNER_ADS / REWARD_ADS kaydının kimliği).
+ */
+function AdImagesPage() {
+  const durum = useAdContent();
+  const [yukleniyor, setYukleniyor] = useState(null);
+  const [hata, setHata] = useState({});
+  const girdiRef = useRef(null);
+  const hedefRef = useRef(null);
+
+  const sec = async (e) => {
+    const f = e.target.files?.[0];
+    const id = hedefRef.current;
+    e.target.value = '';
+    if (!f || !id) return;
+    setYukleniyor(id);
+    setHata(h => ({ ...h, [id]: '' }));
+    try { await setAdImage(id, f); }
+    catch (err) { setHata(h => ({ ...h, [id]: err.message || 'Yükleme başarısız.' })); }
+    finally { setYukleniyor(null); }
+  };
+  const ac = (id) => { hedefRef.current = id; girdiRef.current?.click(); };
+
+  return (
+    <div style={{ animation: 'fadeIn 0.2s' }}>
+      <input ref={girdiRef} type="file" accept="image/*" onChange={sec}
+        style={{ display: 'none' }} aria-label="Reklam görseli seç" tabIndex={-1} />
+
+      <div style={{ ...CARD, padding: '14px 18px', marginBottom: 18, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, fontFamily: FB, fontSize: 12.5, color: C.dim, lineHeight: 1.6 }}>
+          Uygulamadaki <b style={{ color: C.text }}>GUR'un kendi reklam alanları</b>. Yüklediğiniz görsel
+          uygulamada anında değişir; “Varsayılana dön” ilk görsele geri alır. İşletmelerin satın aldığı
+          yayınların görselleri buradan değişmez — onlar <b style={{ color: C.text }}>Moderasyon</b>{' '}
+          kuyruğundan geçer.
+          <div style={{ marginTop: 6, fontSize: 11.5, color: C.faint }}>
+            Görseller bu tarayıcının deposunda tutulur (en fazla {AD_IMG_MAX_MB} MB, yüklenirken küçültülür).
+            Başka cihazlarda görünmesi için sunucu deposu gerekir.
+          </div>
+        </div>
+        <span style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, ...NUM, whiteSpace: 'nowrap' }}>
+          {adImgCustomCount(durum)} / {AD_PLACEMENTS.length} değiştirildi
+        </span>
+      </div>
+
+      {AD_GROUPS.map(g => (
+        <section key={g.id} style={{ ...CARD, overflow: 'hidden', marginBottom: 18 }}>
+          <SectionHead title={g.label} right={g.desc} />
+          {AD_PLACEMENTS.filter(p => p.group === g.id).map(p => {
+            const ozel = adImgCustom(p.id, durum);
+            const yuk = yukleniyor === p.id;
+            const dikey = p.ratio === '2 / 3';
+            return (
+              <div key={p.id} style={{ padding: '14px 20px', borderTop: `1px solid ${C.border}`,
+                display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ width: dikey ? 84 : 176, aspectRatio: p.ratio, flexShrink: 0, borderRadius: 12,
+                  overflow: 'hidden', background: C.panel2, border: `1px solid ${C.border}` }}>
+                  <img src={adImage(p.id, durum)} alt={`${p.label} önizlemesi`} loading="lazy"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 700 }}>{p.label}</span>
+                    <span style={{ fontFamily: FB, fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, padding: '2px 8px',
+                      borderRadius: R.pill,
+                      background: ozel ? C.orangeSoft : C.panel2, color: ozel ? C.orangeInk : C.dim }}>
+                      {ozel ? 'DEĞİŞTİRİLDİ' : 'VARSAYILAN'}
+                    </span>
+                  </div>
+                  <div style={{ fontFamily: FB, fontSize: 12, color: C.dim, lineHeight: 1.5 }}>{p.where}</div>
+                  <div style={{ fontFamily: FB, fontSize: 11.5, color: C.faint, lineHeight: 1.5, marginTop: 2 }}>{p.hint}</div>
+                  {hata[p.id] && (
+                    <div role="alert" style={{ marginTop: 8, background: C.redSoft, border: `1px solid ${C.red}44`,
+                      borderRadius: 8, padding: '7px 10px', fontSize: 11.5, color: C.redInk }}>{hata[p.id]}</div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Btn label={ozel ? 'Görseli değiştir' : 'Görsel yükle'} size="sm" variant="outline"
+                    loading={yuk} onClick={() => ac(p.id)}
+                    icon={<Icon path={icons.upload} size={13} color={C.dim} />} />
+                  <Btn label="Varsayılana dön" size="sm" variant="plain" disabled={!ozel || yuk}
+                    onClick={() => resetAdImage(p.id)} />
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      ))}
     </div>
   );
 }

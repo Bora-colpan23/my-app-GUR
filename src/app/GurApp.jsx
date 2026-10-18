@@ -17,7 +17,7 @@ import {
   BadgeChips, BadgeMarks, GlossDefs, GLOSS, DinnerBell, SplitText, Orb, Skeleton,
   scrim, SocialAuthRow, StepProgress,
 } from '../ui/kit.jsx';
-import { I, RESTAURANTS, CATEGORIES, withOwnerMedia } from '../data/restaurants.js';
+import { RESTAURANTS, CATEGORIES, withOwnerMedia } from '../data/restaurants.js';
 import { Sheet, DangerConfirm, Chip } from '../ui/sheets.jsx';
 import * as visits from '../lib/visits.js';
 import * as backend from '../lib/backend.js';
@@ -25,6 +25,7 @@ import { usePlatformSettings, useFeature, visibleRestaurants, isDistrictOpen } f
 import { useModeration, publishedOnly } from '../lib/moderation.js';
 import { useMedia, ownerMediaFor, approvedMedia } from '../lib/media.js';
 import { useAdSlots, activeBookings } from '../lib/adslots.js';
+import { useAdContent, adImage, defaultImage } from '../lib/adcontent.js';
 import { pickRewardedAd, markWatched, useRewardedSeen } from '../lib/rewarded.js';
 import * as secondChance from '../lib/second-chance.js';
 import * as reservations from '../lib/reservations.js';
@@ -88,24 +89,24 @@ const REWARD_ADS = [
   {
     id: "rw-1", brand: "Öz Değirmen", tagline: "Taş değirmen tam buğday unu",
     headline: "15 dakikada ev yapımı pide", cta: "Tarifi Gör",
-    img: "https://picsum.photos/seed/gur-sp-bread/600/900", accent: "#C2410C",
+    img: defaultImage("rw-1"), accent: "#C2410C",
   },
   {
     id: "rw-2", brand: "Kalamış Zeytinyağı", tagline: "Erken hasat, soğuk sıkım",
     headline: "Şeflerin tercih ettiği zeytinyağı", cta: "Ürünü İncele",
-    img: "https://picsum.photos/seed/gur-sp-oil/600/900", accent: "#4D7C0F",
+    img: defaultImage("rw-2"), accent: "#4D7C0F",
   },
   {
     id: "rw-3", brand: "Bereket Baharat", tagline: "Tek kaynaktan öğütülmüş",
     headline: "Mangalını kurtaran baharat karışımı", cta: "Sepete Ekle",
-    img: "https://picsum.photos/seed/gur-sp-spice/600/900", accent: "#B45309",
+    img: defaultImage("rw-3"), accent: "#B45309",
   },
 ];
 
 // Keşfet üstündeki dönen banner: marka slaytı + sponsor slaytları
 const BANNER_ADS = [
-  { id: "ad-1", brand: "Öz Değirmen", text: "Tam buğday ununda %20 indirim", cta: "Kampanyayı gör", img: "https://picsum.photos/seed/gur-ad-flour/800/400", accent: "#C2410C" },
-  { id: "ad-2", brand: "Kalamış Zeytinyağı", text: "Erken hasat sezonu başladı", cta: "Ürünlere bak", img: "https://picsum.photos/seed/gur-ad-oil/800/400", accent: "#4D7C0F" },
+  { id: "ad-1", brand: "Öz Değirmen", text: "Tam buğday ununda %20 indirim", cta: "Kampanyayı gör", img: defaultImage("ad-1"), accent: "#C2410C" },
+  { id: "ad-2", brand: "Kalamış Zeytinyağı", text: "Erken hasat sezonu başladı", cta: "Ürünlere bak", img: defaultImage("ad-2"), accent: "#4D7C0F" },
 ];
 
 // ═══════════════════════════════════════════════
@@ -625,6 +626,8 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
   // reklamları dönüyor — karusel hiçbir zaman boş kalmıyor.
   const slotDurum = useAdSlots();
   const medyaDurum = useMedia();
+  // Yöneticinin Reklam Görselleri sayfasından yüklediği görseller; yüklenmediyse varsayılan.
+  const reklamGorsel = useAdContent();
   const slides = useMemo(() => {
     const satilan = activeBookings("bannerAds", undefined, slotDurum)
       .map(b => {
@@ -645,13 +648,13 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch
       .filter(Boolean);
 
     return [
-      { id: "brand", img: I.hero, title: "İstanbul'un Lezzetleri", sub: "En popüler restoranları keşfet" },
+      { id: "brand", img: adImage("brand", reklamGorsel), title: "İstanbul'un Lezzetleri", sub: "En popüler restoranları keşfet" },
       ...(satilan.length ? satilan : BANNER_ADS.map(a => ({
-        id: a.id, img: a.img, accent: a.accent, ad: true,
+        id: a.id, img: adImage(a.id, reklamGorsel), accent: a.accent, ad: true,
         eyebrow: a.brand, title: a.text, sub: a.cta,
       }))),
     ];
-  }, [slotDurum, medyaDurum, restaurants]);
+  }, [slotDurum, medyaDurum, restaurants, reklamGorsel]);
   // Yalnızca destede gerçekten bulunan restoranların fırsatları gösterilir
   const liveDeals = DEALS
     .map(d => ({ ...d, r: restaurants.find(x => x.id === d.restaurantId) }))
@@ -2317,6 +2320,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   const slotState = useAdSlots();
   const mediaState = useMedia();
   const rewardedSeen = useRewardedSeen();
+  const reklamGorsel = useAdContent();
 
   const quota = quotaState({ plan: "free", used, bonus });
   const outOfSwipes = !quota.allowed;
@@ -2325,7 +2329,7 @@ function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites
   // GUR'un demo havuzu → Google yedeği. Kural lib/rewarded.js'te tek yerde.
   const watchAd = () => {
     setPlayingAd(pickRewardedAd({
-      restaurants, origin: geo.origin(), houseAds: REWARD_ADS, houseIndex: adIdx,
+      restaurants, origin: geo.origin(), houseAds: REWARD_ADS.map(a => ({ ...a, img: adImage(a.id, reklamGorsel) })), houseIndex: adIdx,
       seen: rewardedSeen, slots: slotState, media: mediaState,
     }));
     setGate(false);

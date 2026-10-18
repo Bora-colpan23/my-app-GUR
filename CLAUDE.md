@@ -413,6 +413,7 @@ gur/
     │   ├── geo.js             # konum izni, elle ilçe seçimi, başlangıç noktası
     │   ├── moderation.js      # yayın öncesi onay kuyruğu (mekan + alan değişikliği)
     │   ├── requests.js        # işletmenin teklif talepleri (satın alma YOK)
+    │   ├── adcontent.js      # uygulama içi GUR reklam görselleri (yönetici değiştirir)
     │   ├── adslots.js        # SABİT FİYAT + takvim rezervasyonu (banner/video/push)
     │   ├── rewarded.js       # ödüllü video seçimi: yakınlık, tekrar yok, Google yedeği
     │   ├── creatives.js       # hizmet TANITIMI (yönetici yükler, işletme görür)
@@ -2117,6 +2118,36 @@ eziyor (sürüm göçü denemesi) ve sonra aynı modülü hiçbir şey olmamış
 kullanmaya devam ediyordu; yalnızca bayat önbellek sayesinde geçiyordu.
 Depo düzelince test kırıldı ve kendi kaydını taze oluşturacak şekilde
 düzeltildi.
+
+### Reklam görselleri: yönetici GUR'un kendi alanlarını değiştirir (`lib/adcontent.js`)
+
+Tüketici uygulamasındaki GUR'a ait reklam alanlarının görselleri koda
+gömülü picsum adresleriydi. Şimdi yönetici panelinde **Reklam Görselleri**
+sayfasından (`AdImagesPage`) yükleniyor, uygulama sayfa yenilenmeden yeni
+görseli çiziyor. Altı yerleşim: Keşfet banner'ının **marka slaytı** (`brand`),
+**iki ev reklamı** (`ad-1`, `ad-2`) ve ödüllü reklamın **üç ev havuzu
+kaydı** (`rw-1…3`).
+
+**İşletmenin satın aldığı yayın DEĞİL.** Satın alınan banner'ın görseli
+işletmenin yükleyip Moderasyon'un onayladığı dosyadır (`lib/media.js`);
+burası o yokken dönen GUR içeriği. Onay kuyruğu yok: yetkili merci zaten
+bu panel. Sponsorlu destede kartları (kampanya) bu sayfadan değişmez —
+görselleri restoranın kendi fotoğrafı.
+
+- **Katalog tek yerde** (`PLACEMENTS`); kimlik = `GurApp.jsx` içindeki
+  `BANNER_ADS` / `REWARD_ADS` kaydının kimliği. Yeni ev reklamı eklerken
+  hem diziye hem kataloğa yazın, yoksa yönetici onu göremez.
+- **Yalnızca DEĞİŞTİRİLENLER saklanıyor** (`gur.adcontent`); "Varsayılana
+  dön" kaydı siliyor, katalog varsayılanı güncellenince dokunulmamışlar
+  yenisini alır.
+- Görsel yazılmadan önce küçültülüyor (`fileToFittedDataUrl`: banner 1600,
+  ödüllü 1280); görsel olmayan dosya ve 6 MB üstü depoya girmeden
+  reddediliyor; kota taşarsa `setAdImage` HATA FIRLATIYOR.
+- **AÇIK EKSİK:** depo localStorage — CANLI modda da cihazlar arası
+  paylaşılmıyor (platform kapılarıyla aynı sınır; sunucuda nesne deposu +
+  tablo gerekir). Mobil paket (`mobile/`) bu depoyu okumuyor. Ölçüldü:
+  yönetici sekmesinde yükleme, açık uygulama sekmesinde sayfa
+  yenilenmeden görünüyor; sıfırlayınca varsayılana dönüyor.
 
 ### Reklam slotları: sabit fiyat + takvim (`lib/adslots.js`)
 
