@@ -93,9 +93,10 @@ düşüyor.
 **DEMO HESAP YOK.** Yönetici hesabı yalnızca `ADMIN_PASSWORD` (en az 8
 karakter; `ADMIN_USER` varsayılanı `admin`) ortamdan verilirse tohumda kurulur,
 verilmezse tohum uyarı yazar ve hesap açmaz — varsayılan parola yok. Sunucu
-yokken (YEREL mod, artifact önizlemesi) yönetici girişi de YOK: tarayıcıda
-doğrulanan sabit bir parola gerçek koruma sağlamaz, yalnızca herkesin bildiği bir
-kapı olurdu; panel sunucuya bağlıyken açılır. Tüketici kendi hesabını uygulamadan
+yokken (YEREL mod) yönetici girişi de YOK: tarayıcıda doğrulanan sabit bir
+parola gerçek koruma sağlamaz, yalnızca herkesin bildiği bir kapı olurdu; panel
+sunucuya bağlıyken açılır. TEK İSTİSNA tek dosyalık artifact önizlemesi (parolasız
+"Önizlemeyi aç" düğmesi, bkz. aşağıda). Tüketici kendi hesabını uygulamadan
 açar, işletme kaydını sahiplenerek girer.
 
 Derleme: `npm run build` → `dist/`. Lint: `npm run lint` (src + server + shared).
@@ -185,7 +186,9 @@ başlatıldığında **sayfa yenilenmeden ~6 saniyede** CANLI'ya geçiyor
 `DATABASE_URL=… node server/index.js` → `VITE_API_TARGET=http://127.0.0.1:8787
 npx vite`. Tek origin yine Vite proxy'sinden gelir.
 
-### Railway'de yayın — TEK servis + PostgreSQL
+### Tek servisle yayın (Railway vb.) — TEK servis + PostgreSQL
+
+**`railway.json` kaldırıldı** (Railway'e bağlama iptal edildi); aşağıdaki sunucu parçaları (`npm start`, `init.js`, `static.js`) herhangi bir barındırıcıda kullanılabilir. Derleme komutu: `npm install --include=dev && npm run build`, sağlık yolu `/api/health`.
 
 `npm start` = `node server/db/init.js && node server/index.js`. Sunucu
 `dist/` varsa derlenmiş arayüzü de servis ediyor (`server/src/http/static.js`):
@@ -311,8 +314,12 @@ yönettiğiniz bir mekân yok" boş durumunu görüyor. (Not: `/isletme/kayit` i
 havuzda olmayan yeni bir işletme kaydı henüz bir mekâna bağlanmıyor — kayıt
 akışı mekân kaydı üretmiyor, o da sahiplenmeye yönlenir.)
 
-**Artifact önizlemesinde yönetici sekmesi giriş ekranında kalır** (sunucu yok);
-işletme sekmesinde sahiplen → panel yolu çalışır.
+**Artifact önizlemesinde yönetici paneli parolasız açılır** (`GurAdmin.jsx` →
+`AdminLogin`, düğme "Önizlemeyi aç (sunucusuz)", yalnızca `__GUR_ARTIFACT__`
+derlemesinde): önizlemede sunucu ve hesap yok, veri zaten bu tarayıcının
+localStorage'ı — korunacak bir şey yok ve ekran bunu söylüyor. Normal derlemede
+sunucu düşse bile bu düğme YOK, gerçek yayında kapı sunucu parolası. İşletme
+sekmesinde sahiplen → panel yolu çalışır.
 
 Dış kaynaktan çekilen **Bakırköy kafe/restoran tablosu** (`.xlsx`, Google
 Maps taraması, 4 km yarıçap) havuza alındı. Tek kaynak `shared/bakirkoy.js`

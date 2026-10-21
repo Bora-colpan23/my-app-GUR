@@ -993,11 +993,24 @@ function AdminLogin({ onLogin, theme, onTheme }) {
 
           <Btn label={busy ? 'Bağlanıyor…' : 'Giriş yap'} onClick={submit} variant="filled" tone="orange" size="md" fullWidth />
 
+          {/* YALNIZCA tek dosyalık önizleme derlemesinde: orada sunucu da
+              hesap da yok, veriler zaten bu tarayıcının localStorage'ı —
+              korunacak bir şey olmadığı için panel parolasız açılıyor ve bunu
+              açıkça söylüyor. Normal derlemede (sunucu düşse bile) bu düğme
+              YOK: gerçek yayında kapı hâlâ yalnızca sunucu parolası. */}
+          {__GUR_ARTIFACT__ && !live && (
+            <div style={{ marginTop: 10 }}>
+              <Btn label="Önizlemeyi aç (sunucusuz)" onClick={onLogin} variant="outline" size="md" fullWidth />
+            </div>
+          )}
+
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
             <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
               {live
                 ? 'Sunucuya bağlı: parola scrypt özetiyle sunucuda doğrulanıyor.'
-                : 'Sunucu yok — yönetici girişi yalnızca sunucuya bağlıyken çalışır.'}
+                : __GUR_ARTIFACT__
+                  ? 'Önizleme: sunucu ve hesap yok, veriler bu tarayıcıda. Panel parolasız açılır; gerçek yayında giriş sunucuda doğrulanır.'
+                  : 'Sunucu yok — yönetici girişi yalnızca sunucuya bağlıyken çalışır.'}
             </div>
           </div>
         </div>
