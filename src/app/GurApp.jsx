@@ -1,489 +1,392 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
+import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
+import { Link } from 'react-router-dom';
+import { animate } from 'motion';
+import { getConsent, setConsent, initAnalytics, trackEvent } from '../lib/analytics.js';
+import { buildDeck, rankCampaigns, quotaState, orderByProximity, ringLabel } from '../../shared/deck.js';
+import { directionsUrl, placeUrl, defaultMapProvider, MAP_PROVIDERS } from '../../shared/deeplink.js';
+import { hydrateCampaigns } from '../lib/campaigns.js';
+import { submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles, saveOwnerProfile, saveOwnerLogo, clearOwnerLogo, ownerLogo, OVERRIDABLE } from '../lib/b2b.js';
+import { fileToSquareDataUrl } from '../lib/image.js';
+// Ortak arayüz kiti: üç uygulama da aynı butonu, alanı ve yüzeyi kullanıyor.
+import {
+  GRAD, projectMomentum, rubberband, haptic, keepVisible, toMediaFiles,
+  usePrefersReducedMotion, GurLogo, Icon, BackBtn, Img,
+  InputField, SelectField, ELEV,
+  Spinner, Btn, IconBtn, HScroll, UploadBox, PhoneFrame, Screen, GurStyles, VerifiedStar,
+  BadgeChips, BadgeMarks, GlossDefs, GLOSS, DinnerBell, SplitText, Orb, Skeleton,
+  scrim, SocialAuthRow, StepProgress,
+} from '../ui/kit.jsx';
+import { RESTAURANTS, CATEGORIES, withOwnerMedia } from '../data/restaurants.js';
+import { Sheet, DangerConfirm, Chip } from '../ui/sheets.jsx';
+import * as visits from '../lib/visits.js';
+import * as backend from '../lib/backend.js';
+import { usePlatformSettings, useFeature, visibleRestaurants, isDistrictOpen } from '../lib/platform.js';
+import { useModeration, publishedOnly } from '../lib/moderation.js';
+import { useMedia, ownerMediaFor, approvedMedia } from '../lib/media.js';
+import { useAdSlots, activeBookings } from '../lib/adslots.js';
+import { useAdContent, adImage, defaultImage } from '../lib/adcontent.js';
+import { pickRewardedAd, markWatched, useRewardedSeen } from '../lib/rewarded.js';
+import * as secondChance from '../lib/second-chance.js';
+import * as reservations from '../lib/reservations.js';
+import * as pricing from '../lib/pricing.js';
+import * as geo from '../lib/geo.js';
+import { seenCampaigns, markShown } from '../lib/ad-frequency.js';
+import { badgesOf, useBadgeMap } from '../lib/badges.js';
+
+// ── GUR Match: arkadaşın kararları ───────────────────────────────────────
+// Backend yok; arkadaşın beğenileri davet kodundan türeyen deterministik bir
+// diziyle üretilir. Aynı kod her zaman aynı sonucu verir, böylece "arkadaşınla
+// aynı oturumdasın" hissi tutarlı kalır ve demo tekrar edilebilir olur.
+function hashCode(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Arkadaş kartların ~%55'ini beğenir — eşleşme yeterince sık ama garanti değil
+function friendLikes(code, ids, likeRate = 0.55) {
+  const rand = mulberry32(hashCode(code || "GUR"));
+  const set = new Set();
+  ids.forEach(id => { if (rand() < likeRate) set.add(id); });
+  return set;
+}
+
+function makeInviteCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // karıştırılabilecek harfler yok
+  let out = "";
+  for (let i = 0; i < 6; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
+
+const FRIEND_NAMES = ["Ali", "Elif", "Mert", "Zeynep", "Can", "Deniz", "Ece", "Kaan"];
+function friendNameFor(code) {
+  return FRIEND_NAMES[hashCode(code || "GUR") % FRIEND_NAMES.length];
+}
 
 
 // ═══════════════════════════════════════════════
-// IMAGES
+// GELİR: ÖDÜLLÜ VİDEO REKLAM (Faz 1)
 // ═══════════════════════════════════════════════
-const I = {
-  hero: "https://picsum.photos/seed/gur-hero/800/400",
-  turkish1: "https://picsum.photos/seed/turkish1/600/400",
-  turkish2: "https://picsum.photos/seed/turkish2/600/400",
-  sushi1: "https://picsum.photos/seed/sushi1/600/400",
-  sushi2: "https://picsum.photos/seed/sushi2/600/400",
-  healthy1: "https://picsum.photos/seed/healthy1/600/400",
-  healthy2: "https://picsum.photos/seed/healthy2/600/400",
-  bbq1: "https://picsum.photos/seed/bbq1/600/400",
-  bbq2: "https://picsum.photos/seed/bbq2/600/400",
-  night1: "https://picsum.photos/seed/night1/600/400",
-  cocktail1: "https://picsum.photos/seed/cocktail1/600/400",
-  cafe1: "https://picsum.photos/seed/cafe1/600/400",
-  cafe2: "https://picsum.photos/seed/cafe2/600/400",
-  pasta1: "https://picsum.photos/seed/pasta1/600/400",
-  pizza1: "https://picsum.photos/seed/pizza1/600/400",
-  burger1: "https://picsum.photos/seed/burger1/600/400",
-  steak1: "https://picsum.photos/seed/steak1/600/400",
-  dessert1: "https://picsum.photos/seed/dessert1/600/400",
-  seafood1: "https://picsum.photos/seed/seafood1/600/400",
-  interior1: "https://picsum.photos/seed/interior1/600/400",
-  interior2: "https://picsum.photos/seed/interior2/600/400",
-  interior3: "https://picsum.photos/seed/interior3/600/400",
-  bosphorus: "https://picsum.photos/seed/bosphorus/600/400",
-  ramen1: "https://picsum.photos/seed/ramen1/600/400",
-  dimsum1: "https://picsum.photos/seed/dimsum1/600/400",
-  kebab1: "https://picsum.photos/seed/kebab1/600/400",
-  salad1: "https://picsum.photos/seed/salad1/600/400",
-  wine1: "https://picsum.photos/seed/wine1/600/400",
-  bread1: "https://picsum.photos/seed/bread1/600/400",
-  curry1: "https://picsum.photos/seed/curry1/600/400",
-  rooftop1: "https://picsum.photos/seed/rooftop1/600/400",
-  barista1: "https://picsum.photos/seed/barista1/600/400",
-  icecream1: "https://picsum.photos/seed/icecream1/600/400",
-  soup1: "https://picsum.photos/seed/soup1/600/400",
-  taco1: "https://picsum.photos/seed/taco1/600/400",
-};
+// Kaydırma bir kotaya bağlı: FREE_SWIPES hak biter, kullanıcı kısa bir
+// video reklam izleyerek REWARD_SWIPES hak kazanır. Reklam akışı bölmez,
+// akışın devamının bedelidir — envanter böylece izlenme garantili olur.
+const FREE_SWIPES = 40;
+const REWARD_SWIPES = 5;
+const AD_DURATION = 5; // saniye
 
-const GRAD = "#FF6600";
-
-const RESTAURANTS = [
-  { id:1, name:"Nusr-Et Steakhouse", cat:"Türk Mutfağı", rating:4.8, dist:"2.3 km", price:"₺2.500+", addr:"Etiler, Nispetiye Cd. No:87, Beşiktaş", desc:"Dünyaca ünlü et restoranı. Özel kesim etler ve eşsiz sunum.", imgs:[I.steak1,I.interior1,I.kebab1], menu:["https://picsum.photos/seed/menu-nusr1/600/900","https://picsum.photos/seed/menu-nusr2/600/900"], hours:"12:00 - 00:00", tags:["Fine Dining","Et"] },
-  { id:2, name:"Mikla Restaurant", cat:"Fine Dining", rating:4.9, dist:"5.1 km", price:"₺3.000+", addr:"Beyoğlu, Meşrutiyet Cd. No:15", desc:"Skandinav-Türk mutfağı füzyonu. İstanbul manzarası eşliğinde.", imgs:[I.interior2,I.bosphorus,I.wine1], menu:["https://picsum.photos/seed/menu-mikla1/600/900","https://picsum.photos/seed/menu-mikla2/600/900","https://picsum.photos/seed/menu-mikla3/600/900"], hours:"18:00 - 01:00", tags:["Manzara","Romantik"] },
-  { id:3, name:"La Sagrata Famila", cat:"Uzak Doğu", rating:4.5, dist:"10 km", price:"₺800+", addr:"Kadıköy, Moda Cd. No:42", desc:"Geleneksel Japon lezzetini taze malzemelerle modern bir dokunuşla sunuyoruz.", imgs:[I.interior3,I.sushi1,I.sushi2], menu:["https://picsum.photos/seed/menu-sagr1/600/900","https://picsum.photos/seed/menu-sagr2/600/900"], hours:"11:00 - 23:00", tags:["Sushi","Japon"] },
-  { id:4, name:"Green Bowl", cat:"Sağlıklı", rating:4.5, dist:"1.2 km", price:"₺350+", addr:"Şişli, Halaskargazi Cd. No:12", desc:"Organik ve sağlıklı tarifler. Vegan seçenekler.", imgs:[I.healthy1,I.healthy2,I.salad1], menu:["https://picsum.photos/seed/menu-green1/600/900"], hours:"08:00 - 22:00", tags:["Vegan","Organik"] },
-  { id:5, name:"Ateş Mangal", cat:"Mangal", rating:4.7, dist:"4.5 km", price:"₺600+", addr:"Üsküdar, Bağlarbaşı Cd. No:88", desc:"Geleneksel odun ateşinde pişen lezzetler.", imgs:[I.bbq1,I.bbq2,I.kebab1], menu:["https://picsum.photos/seed/menu-ates1/600/900","https://picsum.photos/seed/menu-ates2/600/900"], hours:"11:00 - 00:00", tags:["Mangal","Aile"] },
-  { id:6, name:"Klein Bistro", cat:"Kafe", rating:4.4, dist:"0.8 km", price:"₺200+", addr:"Beyoğlu, İstiklal Cd. No:156", desc:"Butik kahve ve ev yapımı pastalar.", imgs:[I.cafe1,I.cafe2,I.barista1], menu:["https://picsum.photos/seed/menu-klein1/600/900"], hours:"07:30 - 23:00", tags:["Kahve","Brunch"] },
-  { id:7, name:"Lucca Lounge", cat:"Gece Hayatı", rating:4.3, dist:"6.2 km", price:"₺1.200+", addr:"Bebek, Cevdetpaşa Cd. No:51", desc:"Boğaz manzaralı lounge. Canlı DJ.", imgs:[I.night1,I.cocktail1,I.rooftop1], menu:["https://picsum.photos/seed/menu-lucca1/600/900","https://picsum.photos/seed/menu-lucca2/600/900"], hours:"17:00 - 04:00", tags:["Lounge","Kokteyl"] },
-  { id:8, name:"Nonna's Trattoria", cat:"İtalyan", rating:4.6, dist:"3.1 km", price:"₺500+", addr:"Karaköy, Kemankeş Cd. No:29", desc:"Napoli usulü pizza ve makarna.", imgs:[I.pasta1,I.pizza1,I.bread1], menu:["https://picsum.photos/seed/menu-nonna1/600/900","https://picsum.photos/seed/menu-nonna2/600/900","https://picsum.photos/seed/menu-nonna3/600/900"], hours:"12:00 - 23:30", tags:["Pizza","Makarna"] },
-  { id:9, name:"Çiya Sofrası", cat:"Türk Mutfağı", rating:4.7, dist:"4.0 km", price:"₺400+", addr:"Kadıköy, Güneşlibahçe Sk. No:43", desc:"Anadolu'nun dört köşesinden geleneksel tarifler.", imgs:[I.turkish1,I.turkish2,I.soup1], menu:["https://picsum.photos/seed/menu-ciya1/600/900","https://picsum.photos/seed/menu-ciya2/600/900"], hours:"11:00 - 22:00", tags:["Geleneksel","Anadolu"] },
-  { id:10, name:"Mandarin Oriental", cat:"Uzak Doğu", rating:4.8, dist:"5.5 km", price:"₺1.500+", addr:"Kuruçeşme, Muallim Naci Cd.", desc:"Uzak Doğu'nun en rafine lezzetleri.", imgs:[I.dimsum1,I.ramen1,I.interior2], menu:["https://picsum.photos/seed/menu-mand1/600/900","https://picsum.photos/seed/menu-mand2/600/900"], hours:"12:00 - 23:00", tags:["Dim Sum","Ramen"] },
-  { id:11, name:"The Burger Joint", cat:"Fast Food", rating:4.2, dist:"1.5 km", price:"₺250+", addr:"Nişantaşı, Abdi İpekçi Cd. No:22", desc:"El yapımı burgerler ve özel soslar.", imgs:[I.burger1,I.taco1,I.icecream1], menu:["https://picsum.photos/seed/menu-burg1/600/900"], hours:"11:00 - 01:00", tags:["Burger","Casual"] },
-  { id:12, name:"Karaköy Güllüoğlu", cat:"Tatlıcı", rating:4.9, dist:"2.8 km", price:"₺150+", addr:"Kemankeş, Mumhane Cd. No:171", desc:"1820'den beri efsanevi baklava.", imgs:[I.dessert1,I.bread1,I.cafe1], menu:["https://picsum.photos/seed/menu-gull1/600/900","https://picsum.photos/seed/menu-gull2/600/900"], hours:"06:00 - 01:00", tags:["Baklava","Tatlı"] },
-  { id:13, name:"Balıkçı Sabahattin", cat:"Deniz Ürünleri", rating:4.6, dist:"6.0 km", price:"₺900+", addr:"Sultanahmet, Seyit Hasan Kuyu Sk.", desc:"1927'den beri taze deniz lezzetleri.", imgs:[I.seafood1,I.bosphorus,I.wine1], menu:["https://picsum.photos/seed/menu-bal1/600/900","https://picsum.photos/seed/menu-bal2/600/900","https://picsum.photos/seed/menu-bal3/600/900"], hours:"12:00 - 23:00", tags:["Balık","Tarihi"] },
-  { id:14, name:"Spice Market", cat:"Hint", rating:4.4, dist:"3.8 km", price:"₺450+", addr:"Cihangir, Akarsu Cd. No:15", desc:"Otantik Hint baharat dünyası.", imgs:[I.curry1,I.interior1,I.bread1], menu:["https://picsum.photos/seed/menu-spic1/600/900","https://picsum.photos/seed/menu-spic2/600/900"], hours:"12:00 - 23:00", tags:["Hint","Curry"] },
-  { id:15, name:"Mövenpick Bosphorus", cat:"Fine Dining", rating:4.5, dist:"7.3 km", price:"₺1.800+", addr:"Örnektepe, İstanbul", desc:"Boğaz kenarında muhteşem manzara.", imgs:[I.bosphorus,I.interior3,I.seafood1], menu:["https://picsum.photos/seed/menu-mov1/600/900","https://picsum.photos/seed/menu-mov2/600/900"], hours:"07:00 - 00:00", tags:["Boğaz","Dünya Mutfağı"] },
+const REWARD_ADS = [
+  {
+    id: "rw-1", brand: "Öz Değirmen", tagline: "Taş değirmen tam buğday unu",
+    headline: "15 dakikada ev yapımı pide", cta: "Tarifi Gör",
+    img: defaultImage("rw-1"), accent: "#C2410C",
+  },
+  {
+    id: "rw-2", brand: "Kalamış Zeytinyağı", tagline: "Erken hasat, soğuk sıkım",
+    headline: "Şeflerin tercih ettiği zeytinyağı", cta: "Ürünü İncele",
+    img: defaultImage("rw-2"), accent: "#4D7C0F",
+  },
+  {
+    id: "rw-3", brand: "Bereket Baharat", tagline: "Tek kaynaktan öğütülmüş",
+    headline: "Mangalını kurtaran baharat karışımı", cta: "Sepete Ekle",
+    img: defaultImage("rw-3"), accent: "#B45309",
+  },
 ];
 
-const CATEGORIES = [
-  { name:"Türk Mutfağı", img:I.turkish1 }, { name:"Uzak Doğu", img:I.sushi1 },
-  { name:"Sağlıklı", img:I.healthy1 }, { name:"Mangal", img:I.bbq1 },
-  { name:"Gece Hayatı", img:I.night1 }, { name:"Alkollü", img:I.cocktail1 },
-  { name:"Kafe", img:I.cafe1 }, { name:"İtalyan", img:I.pasta1 },
-  { name:"Fast Food", img:I.burger1 }, { name:"Tatlıcı", img:I.dessert1 },
-  { name:"Deniz Ürünleri", img:I.seafood1 }, { name:"Hint", img:I.curry1 },
-  { name:"Fine Dining", img:I.interior2 },
+// Keşfet üstündeki dönen banner: marka slaytı + sponsor slaytları
+const BANNER_ADS = [
+  { id: "ad-1", brand: "Öz Değirmen", text: "Tam buğday ununda %20 indirim", cta: "Kampanyayı gör", img: defaultImage("ad-1"), accent: "#C2410C" },
+  { id: "ad-2", brand: "Kalamış Zeytinyağı", text: "Erken hasat sezonu başladı", cta: "Ürünlere bak", img: defaultImage("ad-2"), accent: "#4D7C0F" },
 ];
 
+// ═══════════════════════════════════════════════
+// GELİR: ANLIK FIRSATLAR (Faz 2)
+// ═══════════════════════════════════════════════
+// Restoran ölü saatini doldurmak için süreli indirim yayınlar; platform
+// bunu konum bazlı bildirim reklamı olarak satar. Bitiş saati sabit bir
+// referanstan türetilir ki geri sayım demo boyunca tutarlı kalsın.
+// Anlık fırsat yok: gerçek bir işletme fırsat yayınlayana kadar boş. Eskiden
+// üç uydurma fırsat vardı (gerçek işletmeler adına yazılmış indirimler).
+const DEALS = [];
+function dealFor(restaurantId) {
+  return DEALS.find(d => d.restaurantId === restaurantId) || null;
+}
+function formatCountdown(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h} sa ${m} dk` : `${m} dk`;
+}
+
+// Restoran destesine her N kartta bir sponsorlu kart serpiştirilir.
+// Reklam yoğunluğu tek yerden ayarlanır; deste kısa olduğunda araya
+// hiç girmez ki keşif akışı reklamla boğulmasın.
 // ═══════════════════════════════════════════════
 // SHARED UI — Polished
 // ═══════════════════════════════════════════════
 
-// Logo: beyaz hap şeklinde arka plan ile her yerde okunur
-function GurLogo({ size = 48, pill = false }) {
-  const logo = <span style={{ fontSize: size, fontWeight: 900, fontFamily: "'Poppins', sans-serif", letterSpacing: -size/24, lineHeight: 1 }}>
-    <span style={{ color: "#FFA500" }}>G</span><span style={{ color: "#FF6600" }}>U</span><span style={{ color: "#FF0000" }}>R</span>
-  </span>;
-  if (pill) return <div style={{ background: "#fff", borderRadius: size * 0.5, padding: `${size*0.12}px ${size*0.35}px`, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 12px rgba(0,0,0,0.12)" }}>{logo}</div>;
-  return logo;
-}
+// ═══════════════════════════════════════════════
+// BUTON SİSTEMİ
+//
+// Üç karar burada toplanıyor:
+//
+// 1. DURUMLAR. Her buton altı durumu taşır: varsayılan, üzerine gelme,
+//    basılı, odaklı, yükleniyor, devre dışı. Renk geçişleri CSS'te,
+//    basılma hareketi Motion'da: ikisi aynı özelliği yazarsa biri
+//    diğerini sessizce eziyor (bu projede iki kez yaşandı).
+//
+// 2. RENK KURALI. Beyaz zeminde turuncu, turuncu zeminde beyaz.
+//    Varyantlar bu kurala göre adlandırıldı.
+//
+// 3. YÜZEY DİLİ. Yumuşak kabartma: dışta geniş ve düşük opaklıkta gölge,
+//    üst kenarda ince bir ışık çizgisi, basılınca gölgenin içeri dönmesi.
+//    Renk paleti markanın turuncusu; referanstaki mor yerine GUR'un kendi
+//    rengiyle aynı ışık mantığı kuruluyor.
+// ═══════════════════════════════════════════════
 
-// Basit çizgi ikon seti — emoji yerine
-function Icon({ n, size = 18, color = "currentColor", strokeWidth = 2 }) {
-  const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth, strokeLinecap: "round", strokeLinejoin: "round" };
-  const paths = {
-    plate: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /></>,
-    shield: <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />,
-    palette: <><path d="M12 21a9 9 0 010-18 5 5 0 010 10h-1a2 2 0 000 4h1" /><circle cx="8.5" cy="10.5" r="1" fill={color} stroke="none" /><circle cx="12" cy="7.5" r="1" fill={color} stroke="none" /><circle cx="15.5" cy="10.5" r="1" fill={color} stroke="none" /></>,
-    doc: <><path d="M6 2h9l5 5v15H6z" /><path d="M15 2v5h5" /></>,
-    camera: <><path d="M4 8h3l2-3h6l2 3h3v12H4z" /><circle cx="12" cy="14" r="3.5" /></>,
-    sparkle: <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18" />,
-    check: <polyline points="20 6 9 17 4 12" />,
-    clock: <><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 16 14" /></>,
-    heart: <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />,
-    cross: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
-    chat: <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />,
-    star: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />,
-    flame: <path d="M12 2c1 3-3 4-3 8a3 3 0 006 0c1.5 1 2 3 2 4a5 5 0 01-10 0c0-4 3-6 5-12z" />,
-    eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>,
-    chart: <><line x1="4" y1="20" x2="4" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="20" y1="20" x2="20" y2="14" /></>,
-    pin: <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></>,
-    bulb: <path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2.3h6c0-1.1.4-1.8 1-2.3A7 7 0 0012 2z" />,
-    trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></>,
-    search: <><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></>,
-    brokenHeart: <><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /><line x1="10" y1="9" x2="14" y2="14" /><line x1="14" y1="9" x2="10" y2="14" /></>,
-    bank: <><line x1="3" y1="21" x2="21" y2="21" /><line x1="5" y1="21" x2="5" y2="10" /><line x1="19" y1="21" x2="19" y2="10" /><polygon points="12 2 20 8 4 8" /></>,
-    photo: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>,
-    undo: <><path d="M3 7v6h6" /><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13" /></>,
-    refresh: <><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></>,
-  };
-  return <svg {...p}>{paths[n] || null}</svg>;
-}
-
-// Geri butonu: her arka planda görünür
-function BackBtn({ onClick, variant = "dark" }) {
-  const bg = variant === "dark" ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.9)";
-  const stroke = variant === "dark" ? "#fff" : "#FF6600";
-  return <button onClick={onClick} style={{ background: bg, border: "none", cursor: "pointer", padding: 8, borderRadius: 14, backdropFilter: "blur(8px)", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
-  </button>;
-}
-
-function Img({ src, style, bg = "#e8e0d8" }) {
-  const [ok, setOk] = useState(false);
-  return (
-    <div style={{ ...style, position: "relative", overflow: "hidden", background: bg }}>
-      {!ok && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 22, height: 22, border: "3px solid rgba(0,0,0,0.08)", borderTopColor: "#FF6600", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
-      <img src={src} alt="" onLoad={() => setOk(true)} onError={() => setOk(true)} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: ok ? 1 : 0, transition: "opacity 0.4s" }} />
-    </div>
-  );
-}
-
-function InputField({ label, value, onChange, placeholder, type = "text" }) {
-  return <div style={{ marginBottom: 20 }}>
-    <label style={{ display: "block", marginBottom: 7, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#2D2419" }}>{label}</label>
-    <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "#fff", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box" }} />
-  </div>;
-}
-
-function SelectField({ label, value, onChange, options }) {
-  return <div style={{ marginBottom: 20 }}>
-    <label style={{ display: "block", marginBottom: 7, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#2D2419" }}>{label}</label>
-    <select value={value} onChange={e => onChange(e.target.value)} style={{ width: "100%", padding: "15px 18px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "#fff", color: value ? "#333" : "#aaa", appearance: "none", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 18px center" }}>
-      <option value="">Seçiniz</option>{options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
-  </div>;
-}
-
-function Btn({ text, onClick, disabled }) {
-  return <button onClick={disabled ? undefined : onClick} style={{ width: "100%", padding: "17px 0", borderRadius: 30, border: "none", background: "#fff", color: "#FF6600", fontFamily: "'Outfit', sans-serif", fontSize: 14, cursor: disabled ? "not-allowed" : "pointer", boxShadow: "0 6px 24px rgba(255,69,0,0.2)", opacity: disabled ? 0.5 : 1, transition: "all 0.15s" }}
-    onMouseDown={e => !disabled && (e.currentTarget.style.transform = "scale(0.97)")}
-    onMouseUp={e => (e.currentTarget.style.transform = "scale(1)")}>{text}</button>;
-}
-
-function UploadBox({ label, icon, accept, files, setFiles, multiple = true }) {
-  const ref = useRef(null);
-  const handle = (e) => { const nf = Array.from(e.target.files).map(f => ({ name: f.name, url: URL.createObjectURL(f), type: f.type })); setFiles(prev => multiple ? [...prev, ...nf] : nf); };
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <label style={{ display: "block", marginBottom: 8, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#2D2419" }}>{label}</label>
-      <input ref={ref} type="file" accept={accept} multiple={multiple} onChange={handle} style={{ display: "none" }} />
-      <div onClick={() => ref.current?.click()} style={{ border: "2px dashed rgba(255,102,0,0.3)", borderRadius: 18, padding: files.length > 0 ? 14 : "30px 16px", textAlign: "center", cursor: "pointer", background: "#fff", transition: "border-color 0.2s" }}
-        onMouseEnter={e => e.currentTarget.style.borderColor = "#FF6600"}
-        onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,102,0,0.3)"}>
-        {files.length === 0 ? <><div style={{ display: "flex", justifyContent: "center" }}>{icon}</div><p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#A18F7C", margin: "10px 0 0" }}>Dosya seçmek için tıklayın</p></> : (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-            {files.map((f, i) => <div key={i} style={{ position: "relative" }}>{f.type?.startsWith("image/") ? <img src={f.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "2px solid rgba(255,102,0,0.2)" }} /> : <div style={{ width: 72, height: 72, borderRadius: 12, background: "#FFF3EA", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="doc" size={20} color="#FF6600" /></div>}<div onClick={e => { e.stopPropagation(); setFiles(prev => prev.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", background: "#FF3B30", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff", cursor: "pointer", fontWeight: 700, boxShadow: "0 2px 6px rgba(0,0,0,0.2)" }}>✕</div></div>)}
-            <div style={{ width: 72, height: 72, borderRadius: 12, border: "2px dashed rgba(255,102,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 18, color: "rgba(255,102,0,0.4)" }}>+</span></div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PhoneFrame({ children }) {
-  return <div style={{ width: 390, maxWidth: "100%", height: 844, borderRadius: 44, overflow: "hidden", boxShadow: "0 25px 80px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05)", position: "relative", background: "#fff", margin: "0 auto" }}>
-    <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 126, height: 30, background: "#000", borderBottomLeftRadius: 18, borderBottomRightRadius: 18, zIndex: 999 }} />
-    {children}
-  </div>;
-}
-
-function Screen({ children, grad = true }) {
-  return <div style={{ width: "100%", height: "100%", background: grad ? "#fff" : "#fff", overflowY: "auto", overflowX: "hidden", position: "relative" }}>{children}</div>;
-}
+// Kaydırma aksiyonlarının ortak ölçüsü. Apple HIG alt sınırı 44pt;
+// 64pt tek elle başparmak erişiminde rahat, üçü 390pt genişliğe sığıyor
+// (3×64 + 2×20 = 232) ve üç eylem de eşit güvenle basılabiliyor.
+const ACTION_SIZE = 64;
 
 // ═══════════════════════════════════════════════
-// SWIPE CARD — Gelişmiş Tinder stili jest & buton etkileşimi
+// SWIPE CARD — Eski Tinder stili, tam ekran fotoğraf
 // ═══════════════════════════════════════════════
-function SwipeCard({ r, onSwiped, isTop, onTap, triggerDir, dragOffset, setDragOffset }) {
+const SwipeCard = React.forwardRef(function SwipeCard({ r, onLeft, onRight, onSuper, isTop, onTap }, flingRef) {
   const ref = useRef(null);
-  const startX = useRef(0);
-  const startY = useRef(0);
-  const currentX = useRef(0);
-  const isDragging = useRef(false);
-  const hasMoved = useRef(false);
-  const [offset, setOffset] = useState(0);
-  const [offsetY, setOffsetY] = useState(0);
-  const [rotation, setRotation] = useState(0);
-  const [opacity, setOpacity] = useState(1);
-  const [exitDirection, setExitDirection] = useState(null);
-  const [imgIndex, setImgIndex] = useState(0);
+  const movedRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+  const [ii, setIi] = useState(0);
+  // Rozetler yönetici panelinden verilir; deposu canlı dinleniyor ki
+  // panelde takılan rozet uygulamada anında görünsün.
+  const badges = badgesOf(r, useBadgeMap());
 
-  // Buton tetikleyicisi (Like / Dislike butonu tıklandığında yumuşak uçuş animasyonu)
-  useEffect(() => {
-    if (triggerDir && isTop && !exitDirection) {
-      setExitDirection(triggerDir);
-      const targetX = triggerDir === "right" ? 520 : -520;
-      setOffset(targetX);
-      setRotation(triggerDir === "right" ? 22 : -22);
-      setOpacity(0);
-      const timer = setTimeout(() => {
-        onSwiped?.(triggerDir);
-      }, 320);
-      return () => clearTimeout(timer);
-    }
-  }, [triggerDir, isTop, exitDirection, onSwiped]);
+  // İki eksen ayrı motion değeri: tek bir 2B mesafeye bağlamak, X ve Y
+  // hızları farklı olduğunda senkronu bozuyor (§3 — eksenleri ayır).
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotate = useTransform(x, [-300, 0, 300], [-20, 0, 20]);
+  const dragOpacity = useTransform(x, [-320, -60, 0, 60, 320], [0.5, 1, 1, 1, 0.5]);
+  const favOpacity = useTransform(x, [30, 110], [0, 1]);
+  const nopeOpacity = useTransform(x, [-110, -30], [1, 0]);
+  const superOpacity = useTransform(y, [-120, -35], [1, 0]);
 
-  // Pointer event'leri: Mouse, dokunmatik ekran ve trackpad ile uyumlu swipe jesti
-  const handlePointerDown = (e) => {
-    if (!isTop || exitDirection) return;
-    if (e.currentTarget.setPointerCapture) {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    }
-    isDragging.current = true;
-    hasMoved.current = false;
-    startX.current = e.clientX;
-    startY.current = e.clientY;
-    currentX.current = 0;
+  // Üç karar da aynı çıkış animasyonundan geçer: sürükleyerek de,
+  // düğmeye basarak da kart aynı fizikle uçar.
+  const commit = (direction, velocity = 0) => {
+    haptic(direction > 0 ? [10, 28, 14] : 8);
+    animate(x, direction * 900, { type: "spring", bounce: 0, duration: 0.5, velocity })
+      .then(() => (direction > 0 ? onRight() : onLeft()));
+  };
+  // Yukarı kaydırma artık kartı uçurmuyor: restoranın sayfasını açıyor.
+  // Kart yerinde kaldığı için sayfa kapanınca destede aynı yerden devam
+  // ediliyor — karar vermeden bilgi almak mümkün.
+  const commitSuper = (velocity = 0) => {
+    haptic(14);
+    animate(y, 0, { type: "spring", bounce: 0.2, duration: 0.4, velocity });
+    (onSuper || onTap)?.();
+  };
+  React.useImperativeHandle(flingRef, () => ({
+    fling: (direction) => commit(direction),
+    flingUp: () => commitSuper(),
+  }), [onLeft, onRight, onSuper]);
+
+  const handleDragStart = () => { movedRef.current = false; setDragging(true); };
+  const handleDrag = (e, info) => {
+    if (Math.abs(info.offset.x) > 6 || Math.abs(info.offset.y) > 6) movedRef.current = true;
   };
 
-  const handlePointerMove = (e) => {
-    if (!isDragging.current || !isTop || exitDirection) return;
-    const dx = e.clientX - startX.current;
-    const dy = e.clientY - startY.current;
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-      hasMoved.current = true;
+  const handleDragEnd = (e, info) => {
+    setDragging(false);
+    // §6 — bırakma noktası değil, hızın taşıyacağı nokta karar verir
+    const projX = info.offset.x + projectMomentum(info.velocity.x);
+    const projY = info.offset.y + projectMomentum(info.velocity.y);
+
+    // Yukarı kaydırma yalnızca dikey niyet baskınsa süper beğeni sayılır;
+    // aksi halde çapraz her hareket yanlışlıkla süper beğeniye dönerdi.
+    if (projY < -140 && Math.abs(projY) > Math.abs(projX)) {
+      commitSuper(info.velocity.y);
+      return;
     }
-    currentX.current = dx;
-    setOffset(dx);
-    setOffsetY(dy * 0.18);
-    setRotation(dx * 0.07);
-    setOpacity(Math.max(0.6, 1 - Math.abs(dx) / 600));
-    if (setDragOffset) setDragOffset(dx);
+    if (projX > 100 || projX < -100) {
+      // §5 — bırakma hızı sıfırlanmadan spring'e devrediliyor
+      commit(projX > 0 ? 1 : -1, info.velocity.x);
+      animate(y, 0, { type: "spring", bounce: 0, duration: 0.4 });
+      return;
+    }
+    animate(x, 0, { type: "spring", bounce: 0.15, duration: 0.5, velocity: info.velocity.x });
+    animate(y, 0, { type: "spring", bounce: 0.15, duration: 0.5, velocity: info.velocity.y });
   };
 
-  const handlePointerUp = (e) => {
-    if (!isDragging.current || !isTop || exitDirection) return;
-    isDragging.current = false;
-    if (e.currentTarget.releasePointerCapture) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-
-    const dx = currentX.current;
-    const swipeThreshold = 85;
-
-    if (Math.abs(dx) > swipeThreshold) {
-      const dir = dx > 0 ? "right" : "left";
-      setExitDirection(dir);
-      setOffset(dir === "right" ? 520 : -520);
-      setRotation(dir === "right" ? 22 : -22);
-      setOpacity(0);
-      if (setDragOffset) setDragOffset(0);
-      setTimeout(() => {
-        onSwiped?.(dir);
-      }, 300);
-    } else {
-      setOffset(0);
-      setOffsetY(0);
-      setRotation(0);
-      setOpacity(1);
-      if (setDragOffset) setDragOffset(0);
-
-      // Sürükleme yapılmadıysa fotoğraf değiştir veya detayı aç
-      if (!hasMoved.current) {
-        const rect = ref.current?.getBoundingClientRect();
-        if (rect) {
-          const clickX = e.clientX - rect.left;
-          const totalImgs = r.imgs?.length || 1;
-          if (clickX > rect.width * 0.65) {
-            setImgIndex(i => Math.min(i + 1, totalImgs - 1));
-          } else if (clickX < rect.width * 0.35) {
-            setImgIndex(i => Math.max(i - 1, 0));
-          } else {
-            onTap?.();
-          }
-        }
-      }
-    }
+  const tap = (e) => { if (movedRef.current) return; const rect = ref.current?.getBoundingClientRect(); if (!rect) return; const tx = e.clientX - rect.left;
+    if (tx > rect.width * 0.6) setIi(i => Math.min(i + 1, r.imgs.length - 1));
+    else if (tx < rect.width * 0.4) setIi(i => Math.max(i - 1, 0));
+    else onTap?.();
   };
-
-  const handlePointerCancel = () => {
-    if (isDragging.current) {
-      isDragging.current = false;
-      setOffset(0);
-      setOffsetY(0);
-      setRotation(0);
-      setOpacity(1);
-      if (setDragOffset) setDragOffset(0);
-    }
-  };
-
-  const isFavStamp = exitDirection === "right" || (offset > 25 && isTop);
-  const isNopeStamp = exitDirection === "left" || (offset < -25 && isTop);
-  const favStampOpacity = exitDirection === "right" ? 1 : Math.min(1, Math.max(0, (offset - 25) / 55));
-  const nopeStampOpacity = exitDirection === "left" ? 1 : Math.min(1, Math.max(0, (-offset - 25) / 55));
-
-  const totalImgs = r.imgs?.length || 1;
-  const currentImg = (r.imgs && r.imgs[imgIndex]) || r.imgs?.[0] || I.hero;
 
   return (
-    <div
+    <motion.div
       ref={ref}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
+      drag={isTop}
+      dragMomentum={false}
+      onDragStart={handleDragStart}
+      onDrag={handleDrag}
+      onDragEnd={handleDragEnd}
+      onClick={tap}
       style={{
-        position: "absolute",
-        inset: 0,
-        transform: isTop
-          ? `translate3d(${offset}px, ${offsetY}px, 0) rotate(${rotation}deg)`
-          : `scale(${0.96 + Math.min(0.04, Math.abs(dragOffset || 0) / 1200)}) translateY(8px)`,
-        opacity: isTop ? opacity : (0.85 + Math.min(0.15, Math.abs(dragOffset || 0) / 900)),
-        transition: exitDirection
-          ? "all 0.32s cubic-bezier(0.2, 0.8, 0.3, 1)"
-          : isDragging.current
-            ? "none"
-            : "all 0.28s cubic-bezier(0.34, 1.25, 0.64, 1)",
-        cursor: isTop ? (isDragging.current ? "grabbing" : "grab") : "default",
-        userSelect: "none",
-        touchAction: "none",
-        pointerEvents: isTop ? "auto" : "none",
-        zIndex: isTop ? 2 : 1,
-        borderRadius: 24,
-        overflow: "hidden",
-        boxShadow: isTop ? "0 14px 44px rgba(0,0,0,0.4)" : "0 4px 16px rgba(0,0,0,0.12)",
+        x: isTop ? x : 0, y: isTop ? y : 0, rotate: isTop ? rotate : 0, opacity: isTop ? dragOpacity : 1,
+        position: "absolute", inset: 0,
+        cursor: isTop ? (dragging ? "grabbing" : "grab") : "default",
+        userSelect: "none", WebkitTouchCallout: "none", pointerEvents: isTop ? "auto" : "none", zIndex: isTop ? 2 : 1,
+        // Hareket iki eksende de bizim: Android Chrome aksi hâlde dikey
+        // sürüklemeyi sayfa kaydırması sanıp "yukarı = hemen gitmek
+        // istiyorum" hareketini yutabiliyor. sheets.jsx da bunu açıkça yazıyor.
+        touchAction: isTop ? "none" : "auto",
+        borderRadius: 24, overflow: "hidden",
+        boxShadow: isTop ? "var(--sh-d3)" : "var(--sh-d1)",
       }}
+      animate={{ scale: isTop ? 1 : 0.96 }}
+      transition={{ type: "spring", bounce: 0, duration: 0.35 }}
     >
-      <Img
-        src={currentImg}
-        style={{ position: "absolute", inset: 0, borderRadius: 24, pointerEvents: "none" }}
-        bg="linear-gradient(135deg, #1a1008, #2a1a0a, #1a1008)"
-      />
-
-      {/* Karartma gradyanı */}
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.4) 35%, transparent 60%)", borderRadius: 24, pointerEvents: "none" }} />
-
-      {/* Fotoğraf göstergeleri (yalnızca üst kartta) */}
-      {isTop && totalImgs > 1 && (
-        <div style={{ position: "absolute", top: 14, left: 14, right: 14, display: "flex", gap: 4, zIndex: 12, pointerEvents: "none" }}>
-          {r.imgs.map((_, i) => (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                height: 3,
-                borderRadius: 2,
-                background: i === imgIndex ? "#fff" : "rgba(255,255,255,0.35)",
-                transition: "background 0.2s",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
-              }}
-            />
-          ))}
-        </div>
+      <Img src={r.imgs[ii]} style={{ position: "absolute", inset: 0, borderRadius: 24 }} bg="linear-gradient(135deg, #1a1008, #2a1a0a, #1a1008)" />
+      {/* Sürükleme etiketleri her kart türünde görünür — reklam kartında da
+          kullanıcı ne yaptığını anlamalı (§1 — sürekli geri bildirim) */}
+      {isTop && (
+        <>
+          <motion.div style={{ opacity: favOpacity, position: "absolute", top: 90, left: 24, zIndex: 10, border: "4px solid var(--c-ok-light)", borderRadius: 14, padding: "8px 22px", transform: "rotate(-15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-ok-light)" }}>FAV!</span>
+          </motion.div>
+          <motion.div style={{ opacity: nopeOpacity, position: "absolute", top: 90, right: 24, zIndex: 10, border: "4px solid var(--c-bad-light)", borderRadius: 14, padding: "8px 22px", transform: "rotate(15deg)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-bad-ink)" }}>NOPE</span>
+          </motion.div>
+          {/* Yukarı kaydırma etiketi ortada: yön hangi karara gittiğini
+              hareketin kendisiyle aynı eksende söylüyor (§8) */}
+          <motion.div style={{ opacity: superOpacity, position: "absolute", top: 140, left: "50%", translateX: "-50%", zIndex: 10, border: "4px solid var(--c-brand-light)", borderRadius: 14, padding: "8px 22px", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", gap: 7 }}>
+            <Icon n="sparkle" size={14} color="var(--c-brand-light)" />
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-brand-light)" }}>RESTORANA GİT</span>
+          </motion.div>
+        </>
       )}
 
-      {/* FAV damgası */}
-      {isFavStamp && (
-        <div
-          style={{
-            position: "absolute",
-            top: 60,
-            left: 20,
-            zIndex: 20,
-            border: "3.5px solid #22C55E",
-            borderRadius: 14,
-            padding: "6px 18px",
-            transform: "rotate(-14deg)",
-            background: "rgba(0,0,0,0.45)",
-            backdropFilter: "blur(6px)",
-            opacity: favStampOpacity,
-            transition: exitDirection ? "none" : "opacity 0.1s ease",
-            boxShadow: "0 4px 24px rgba(34,197,94,0.35)",
-            pointerEvents: "none",
-          }}
-        >
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 900, color: "#22C55E", letterSpacing: 1.5 }}>
-            BEĞENİLDİ ❤️
-          </span>
+      {isTop && <>
+      {/* Sponsorlu yerleşim. Kart organikle birebir aynı; yalnızca bu
+          zarif rozet farkı taşır — şeffaflık için zorunlu, dikkat
+          çekmemesi için küçük. */}
+      {r.sponsored && (
+        <div style={{ position: "absolute", top: 54, right: 14, zIndex: 6, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.38)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 20, padding: "4px 11px" }}>
+          <Icon n="sparkle" size={10} color="rgba(255,255,255,0.75)" />
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.85)", letterSpacing: 0.2 }}>{r.sponsored.label}</span>
         </div>
       )}
-
-      {/* NOPE damgası */}
-      {isNopeStamp && (
-        <div
-          style={{
-            position: "absolute",
-            top: 60,
-            right: 20,
-            zIndex: 20,
-            border: "3.5px solid #EF4444",
-            borderRadius: 14,
-            padding: "6px 18px",
-            transform: "rotate(14deg)",
-            background: "rgba(0,0,0,0.45)",
-            backdropFilter: "blur(6px)",
-            opacity: nopeStampOpacity,
-            transition: exitDirection ? "none" : "opacity 0.1s ease",
-            boxShadow: "0 4px 24px rgba(239,68,68,0.35)",
-            pointerEvents: "none",
-          }}
-        >
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 900, color: "#EF4444", letterSpacing: 1.5 }}>
-            PAS ✕
-          </span>
+      {/* İşletmenin kendi yüklediği fotoğraflar öne alınır ve işaretlenir */}
+      {ii < (r.ownerPhotoCount || 0) && (
+        <div style={{ position: "absolute", top: 54, left: 14, zIndex: 6, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 20, padding: "4px 11px" }}>
+          <Icon n="camera" size={11} color="var(--c-warn)" />
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, color: "#fff" }}>İşletmeden</span>
         </div>
       )}
-
-      {/* Kart İçeriği */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "20px 20px 24px", zIndex: 10, pointerEvents: "none" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 21, fontWeight: 800, color: "#fff", margin: 0, textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>
-            {r.name}
-          </h3>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
-          <span style={{ background: "#fff", borderRadius: 10, padding: "3px 10px", fontSize: 12, fontWeight: 700, color: "#1C1917", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Icon n="star" color="#F59E0B" size={12} />
-            {r.rating}
-          </span>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.9)", fontFamily: "'Outfit', sans-serif" }}>{r.dist}</span>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.9)", fontFamily: "'Outfit', sans-serif" }}>• {r.price}</span>
-          <span style={{ fontSize: 12, color: "#FFA500", fontFamily: "'Outfit', sans-serif", fontWeight: 700 }}>• {r.cat}</span>
-        </div>
-
-        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.85)", margin: "0 0 10px", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-          {r.desc}
-        </p>
-
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {(r.tags || []).slice(0, 3).map(t => (
-            <span key={t} style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", borderRadius: 16, padding: "3px 10px", fontSize: 11, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>
-              {t}
-            </span>
-          ))}
-          {isTop && (
-            <span style={{ marginLeft: "auto", fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 3 }}>
-              Fotoğraflar için dokun <Icon n="photo" size={12} color="rgba(255,255,255,0.5)" />
-            </span>
-          )}
-        </div>
+      {/* Photo indicators */}
+      <div style={{ position: "absolute", top: 40, left: 14, right: 14, display: "flex", gap: 4, zIndex: 5 }}>
+        {r.imgs.map((_, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === ii ? "#fff" : "rgba(255,255,255,0.3)", transition: "background 0.2s" }} />)}
       </div>
-    </div>
+      <div style={{ position: "absolute", inset: 0, background: scrim(0.9, 55), borderRadius: 24 }} />
+      {/* Content */}
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 22px 28px", zIndex: 5 }}>
+        <h3 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px", textShadow: "0 2px 10px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", gap: 7 }}>
+          {r.name}
+          <BadgeMarks badges={badges} size={15} onLight={false} />
+          {(r.claimed || r.ownerClaimed) && <VerifiedStar size={15} title="İşletme hesabı doğrulanmış" />}
+        </h3>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+          <span style={{ background: "#fff", borderRadius: 10, padding: "4px 12px", fontSize: 13, fontWeight: 700, color: "#1C1917", fontFamily: "var(--f-body)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="var(--c-warn)" size={12} />{r.rating}</span>
+          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "var(--f-body)" }}>{distText(r)}</span>
+          {r.price && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "var(--f-body)" }}>•  {r.price}</span>}
+        </div>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "rgba(255,255,255,0.85)", margin: "0 0 12px", lineHeight: 1.45 }}>{r.desc}</p>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+          {r.tags.map(t => <span key={t} style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 14px", fontSize: 12, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 600 }}>{t}</span>)}
+        </div>
+        {/* Detay davetiyesi. Kartın kendisi yukarı kaydırınca süper beğeni
+            olduğu için detay ayrı bir hedefte: dokunmak açar. */}
+        <button
+          type="button" className="gur-btn"
+          onClick={e => { e.stopPropagation(); onTap?.(); }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", border: "none", background: "rgba(255,255,255,0.14)", backdropFilter: "blur(10px)", borderRadius: 999, padding: "9px 0", cursor: "pointer", outline: "none" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Menü, saatler ve yol tarifi</span>
+        </button>
+      </div>
+      </>}
+    </motion.div>
   );
-}
+});
 
 // ═══════════════════════════════════════════════
 // SCREENS
 // ═══════════════════════════════════════════════
 
+// Açılış animasyonu hiçbir yüklemeye bağlı değil: saf marka anı. Bu yüzden
+// üç kural var, üçü de ölçümden geldi (soğuk açılışta etkileşime kadar
+// 3294 ms ve bunun 3200'ü sabit bekleme idi):
+//
+//  1. ATLANABİLİR. Ekrana dokunmak doğrudan geçiriyor. Bekleyebileceğin
+//     bir animasyon değilse bekletmek saygısızlık.
+//  2. İKİNCİ AÇILIŞTAN İTİBAREN KISA. İlk açılışta marka anı yerinde;
+//     beşinci açılışta aynı 3.2 saniye sadece gecikme. Dönen kullanıcı
+//     ~900 ms görüyor.
+//  3. AZALTILMIŞ HAREKET tercihinde hiç oynatılmıyor.
+const SPLASH_GORULDU = "gur.splashSeen";
+
 function SplashScreen({ onNext }) {
-  const [phase, setPhase] = useState(0); // 0=wait, 1=G, 2=U, 3=R, 4=together, 5=done
+  const reduced = usePrefersReducedMotion();
+  // İlk açılış mı: depoya yazılmamışsa evet. try/catch — gizli sekmede
+  // localStorage erişimi hata atabiliyor, o zaman ilk açılış sayılır.
+  const ilkAcilis = useMemo(() => {
+    try { return !localStorage.getItem(SPLASH_GORULDU); } catch { return true; }
+  }, []);
+  const [phase, setPhase] = useState(reduced ? 5 : 0); // 0=bekle 1=G 2=U 3=R 4=birlikte 5=bitti
+  const gecildi = useRef(false);
+  const gec = useCallback(() => {
+    if (gecildi.current) return;
+    gecildi.current = true;
+    try { localStorage.setItem(SPLASH_GORULDU, "1"); } catch { /* depolama kapalı */ }
+    onNext();
+  }, [onNext]);
+
   useEffect(() => {
+    if (reduced) { const t = setTimeout(gec, 200); return () => clearTimeout(t); }
+    const k = ilkAcilis ? 1 : 0.28;   // dönen kullanıcı: aynı koreografi, dörtte bir sürede
+    // TOPLAM 2600 ms. Kural: açılış ekranı 1–3 saniye görünür, daha
+    // uzunsa bir yükleme göstergesi ister. 3200 ms eşiğin üstündeydi ve
+    // gösterge takmak da yanlış olurdu: bu ekran HİÇBİR YÜKLEMEYE BAĞLI
+    // DEĞİL, dönen bir çark orada olmayan bir işi varmış gibi gösterirdi.
+    // 2600 seçildi, 3000 değil: kullanıcının saydığı süre sayfanın
+    // açılmasıyla başlıyor ve tam eşiğe yaslanmak ölçümde 3007 ms
+    // veriyordu. Bütün fazlar aynı oranda kısaldı, koreografi birebir aynı.
     const timers = [
-      setTimeout(() => setPhase(1), 300),
-      setTimeout(() => setPhase(2), 800),
-      setTimeout(() => setPhase(3), 1300),
-      setTimeout(() => setPhase(4), 1900),
-      setTimeout(() => setPhase(5), 2600),
-      setTimeout(onNext, 3200),
+      setTimeout(() => setPhase(1), 240 * k),
+      setTimeout(() => setPhase(2), 650 * k),
+      setTimeout(() => setPhase(3), 1060 * k),
+      setTimeout(() => setPhase(4), 1545 * k),
+      setTimeout(() => setPhase(5), 2110 * k),
+      setTimeout(gec, 2600 * k),
     ];
     return () => timers.forEach(clearTimeout);
-  }, []);
+  }, [reduced, ilkAcilis, gec]);
 
   const letterStyle = (letter, delay) => ({
     fontSize: phase >= 4 ? 110 : 130,
     fontWeight: 900,
-    fontFamily: "'Poppins', sans-serif",
+    fontFamily: "var(--f-display)",
     display: "inline-block",
     opacity: phase >= (letter === "G" ? 1 : letter === "U" ? 2 : 3) ? 1 : 0,
     transform: phase >= 4
@@ -497,7 +400,11 @@ function SplashScreen({ onNext }) {
 
   return (
     <Screen grad={false}>
-      <div style={{
+      {/* Dokununca geç. Ayrı bir "Atla" düğmesi yok: ekranda başka hedef
+          olmadığı için tamamı zaten tek bir dokunma alanı. */}
+      <div role="button" tabIndex={0} aria-label="Açılışı geç"
+        onClick={gec} onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") gec(); }}
+        style={{
         height: "100%", display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
         background: "#fff", position: "relative",
@@ -516,8 +423,8 @@ function SplashScreen({ onNext }) {
 
         {/* Alt yazı — harfler birleştikten sonra */}
         <p style={{
-          fontFamily: "'Outfit', sans-serif", fontSize: 14,
-          color: "#bbb",
+          fontFamily: "var(--f-body)", fontSize: 14,
+          color: "var(--c-warm-4)",
           marginTop: 20,
           opacity: phase >= 4 ? 1 : 0,
           transform: phase >= 4 ? "translateY(0)" : "translateY(20px)",
@@ -531,7 +438,7 @@ function SplashScreen({ onNext }) {
   );
 }
 
-function WelcomeScreen({ onStart, onDoyurucu }) {
+function WelcomeScreen({ onStart }) {
   const [show, setShow] = useState(false);
   useEffect(() => { setTimeout(() => setShow(true), 100); }, []);
 
@@ -555,7 +462,8 @@ function WelcomeScreen({ onStart, onDoyurucu }) {
           </div>
 
           <p style={{
-            fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#ccc",
+            // Açık kâğıt üstünde: sıcak açık gri (--c-warm-3) 1.5:1 kalıyordu
+            fontFamily: "var(--f-body)", fontSize: 16, color: "var(--c-muted)",
             marginTop: 10, letterSpacing: 2,
             opacity: show ? 1 : 0, transform: show ? "translateY(0)" : "translateY(10px)",
             transition: "all 0.5s ease-out 0.4s",
@@ -565,7 +473,7 @@ function WelcomeScreen({ onStart, onDoyurucu }) {
         </div>
 
         {/* Alt kısım — turuncu gradient eğri */}
-        <div style={{
+        <div className="gur-on-brand" style={{
           background: GRAD, padding: "40px 30px 50px",
           borderTopLeftRadius: 40, borderTopRightRadius: 40,
           position: "relative", zIndex: 3,
@@ -576,865 +484,234 @@ function WelcomeScreen({ onStart, onDoyurucu }) {
           <div style={{
             position: "absolute", top: -22, left: "50%", transform: "translateX(-50%)",
             background: "#fff", borderRadius: 20, padding: "8px 20px",
-            boxShadow: "0 4px 20px rgba(255,69,0,0.2)",
+            boxShadow: "var(--sh-brand)",
           }}>
             <GurLogo size={22} pill />
           </div>
 
-          <h2 style={{
-            fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff",
-            textAlign: "center", margin: "14px 0 6px",
-            textShadow: "0 2px 8px rgba(0,0,0,0.1)",
-          }}>
-            Hoş geldin!
+          {/* Uygulamanın ilk cümlesi harf harf beliriyor. Yalnızca
+              BURADA: her başlığı canlandırmak gürültü olur, ilk izlenim
+              tek başına duruyor. */}
+          <h2 style={{ textAlign: "center", margin: "14px 0 6px" }}>
+            <SplitText text="Hoş geldin!" size={28} weight={700}
+              color="var(--c-on-brand)" delay={0.12} />
           </h2>
           <p style={{
-            fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.75)",
+            fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-on-brand-2)",
             textAlign: "center", margin: "0 0 28px", lineHeight: 1.5,
           }}>
             İstanbul'un en iyi restoranlarını keşfet, favorilerini kaydet
           </p>
 
-          <Btn text="GUR uldamaya başla sende" onClick={onStart} />
-          <div style={{ height: 12 }} />
-          <button onClick={onDoyurucu} style={{
-            width: "100%", padding: "16px 0", borderRadius: 30,
-            border: "2px solid rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.08)",
-            color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 14,
-            cursor: "pointer", backdropFilter: "blur(10px)", transition: "all 0.15s",
-          }}
-            onMouseDown={e => e.currentTarget.style.transform = "scale(0.97)"}
-            onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}>
-            Doyurucu için doğru yer
-          </button>
+          <Btn text="GUR'u kullanmaya başla" onClick={onStart} />
+          {/* İşletme girişi bu uygulamada yok: işletmeler kendi
+              uygulamalarından (/isletme) giriyor. Aynı ürünün iki ayrı
+              tarafı — müşteriye işletme paneli göstermenin anlamı yok.
+
+              Bağlantı düz <a> değil <Link>: uygulama iki ayrı yönlendiriciyle
+              çalışıyor (dev/üretimde yol tabanlı, tek dosyalık artifact
+              önizlemesinde hash tabanlı). <Link> hedefi hangisiyse ona göre
+              yazar; sabit "/isletme" önizlemede olmayan bir yola giderdi. */}
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-on-brand-2)", textAlign: "center", margin: "16px 0 0", lineHeight: 1.55 }}>
+            Restoran sahibi misin?{" "}
+            <Link to="/isletme" className="gur-tap" style={{ display: "inline-block", color: "var(--c-on-brand)", fontWeight: 700, textDecoration: "underline" }}>Doyurucu uygulamasına geç</Link>
+          </p>
         </div>
       </div>
     </Screen>
   );
 }
 
-function LoginScreen({ onBack, onLogin, onRegister }) {
+function LoginScreen({ onBack, onLogin, onRegister, live }) {
   const [e, setE] = useState(""); const [p, setP] = useState("");
-  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fafafa" }}><GurLogo size={60} pill /></div><div style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>Giriş yap</h2><p onClick={onRegister} style={{ textAlign: "center", color: "rgba(255,255,255,0.85)", fontSize: 14, marginBottom: 32, cursor: "pointer", textDecoration: "underline", fontFamily: "'Outfit', sans-serif" }}>Üyeliğiniz yoksa lütfen kayıt için dokununuz</p><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR uldamaya başla" onClick={onLogin} /></div></div></Screen>;
-}
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
 
-function RegisterScreen({ onBack, onDone }) {
-  const [n,setN]=useState(""); const [e,setE]=useState(""); const [p,setP]=useState(""); const [d,setD]=useState(""); const [a,setA]=useState(false);
-  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "'Outfit', sans-serif", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Lütfen yasal sözleşmeyi onaylayarak devam ediniz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" onClick={onDone} /></div></Screen>;
-}
-
-// ═══════════════════════════════════════════════
-// DOYURUCU GİRİŞ — Hesap seçimi
-// ═══════════════════════════════════════════════
-function DoyurucuAuthScreen({ onBack, onLogin, onRegister }) {
-  return (
-    <Screen grad={false}>
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-        {/* Üst beyaz alan */}
-        <div style={{ flex: 1, background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative" }}>
-          <div style={{ position: "absolute", top: -30, right: -30, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,102,0,0.04)" }} />
-          <div style={{ position: "absolute", bottom: -15, left: -20, width: 70, height: 70, borderRadius: "50%", background: "rgba(255,0,0,0.03)" }} />
-          
-<div style={{ marginBottom: 16, animation: "fadeInUp 0.6s ease-out" }}><Icon n="plate" color="#FF6600" size={34} /></div>
-          <GurLogo size={60} pill />
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#bbb", marginTop: 8, letterSpacing: 1.5 }}>DOYURUCU PANELİ</p>
-        </div>
-
-        {/* Alt turuncu alan */}
-        <div style={{ background: GRAD, padding: "28px 28px 50px", borderTopLeftRadius: 40, borderTopRightRadius: 40, position: "relative" }}>
-          <div style={{ position: "absolute", left: 14, top: 14 }}>
-            <BackBtn onClick={onBack} />
-          </div>
-
-          <div style={{ position: "absolute", top: -22, left: "50%", transform: "translateX(-50%)", background: "#fff", borderRadius: 20, padding: "8px 20px", boxShadow: "0 4px 20px rgba(255,69,0,0.2)" }}>
-            <GurLogo size={22} pill />
-          </div>
-
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#fff", textAlign: "center", margin: "16px 0 8px", textShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>Doyurucu Girişi</h2>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.75)", textAlign: "center", margin: "0 0 28px", lineHeight: 1.5 }}>
-            Restoranınızı yönetin, istatistikleri takip edin
-          </p>
-
-          <Btn text="Giriş Yap" onClick={onLogin} />
-          <div style={{ height: 12 }} />
-          <button onClick={onRegister} style={{
-            width: "100%", padding: "16px 0", borderRadius: 30,
-            border: "2px solid rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.08)",
-            color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 14,
-            cursor: "pointer", backdropFilter: "blur(10px)", transition: "all 0.15s",
-          }}
-            onMouseDown={e => e.currentTarget.style.transform = "scale(0.97)"}
-            onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}>
-            Yeni Hesap Oluştur
-          </button>
-        </div>
-      </div>
-    </Screen>
-  );
-}
-
-// ═══════════════════════════════════════════════
-// DOYURUCU LOGIN — Mevcut hesapla giriş
-// ═══════════════════════════════════════════════
-function DoyurucuLoginScreen({ onBack, onLogin }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  return (
-    <Screen grad={false}>
-      <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-        {/* Üst beyaz */}
-        <div style={{ height: "32%", background: "#fafafa", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-<div style={{ marginBottom: 10 }}><Icon n="plate" color="#FF6600" size={22} /></div>
-          <GurLogo size={60} pill />
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#bbb", marginTop: 4, letterSpacing: 1.5 }}>DOYURUCU</p>
-        </div>
-
-        {/* Alt gradient */}
-        <div style={{ flex: 1, background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}>
-          <div style={{ position: "absolute", left: 14, top: 18 }}>
-            <BackBtn onClick={onBack} />
-          </div>
-
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#fff", margin: "0 0 6px", textAlign: "center", textShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>Giriş Yap</h2>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.7)", textAlign: "center", margin: "0 0 30px" }}>
-            İşletme hesabınızla giriş yapın
-          </p>
-
-          <InputField label="E-posta Adresi" value={email} onChange={setEmail} placeholder="restoran@mail.com" />
-          <InputField label="Şifre" value={password} onChange={setPassword} placeholder="******" type="password" />
-
-          <div style={{ marginTop: 8 }}>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "right", margin: "0 0 20px", cursor: "pointer", textDecoration: "underline" }}>Şifremi unuttum</p>
-          </div>
-
-          <Btn text="İşletme Paneline Gir" onClick={onLogin} />
-        </div>
-      </div>
-    </Screen>
-  );
-}
-
-// ─── Progress Bar Component ───
-function StepProgress({ current, total = 3 }) {
-  return (
-    <div style={{ display: "flex", gap: 6, marginBottom: 22 }}>
-      {Array.from({ length: total }, (_, i) => (
-        <div key={i} style={{ flex: 1, height: 4, borderRadius: 4, background: i < current ? "#FF6600" : "rgba(45,36,25,0.1)", transition: "background 0.4s" }} />
-      ))}
-    </div>
-  );
-}
-
-// ─── Step Header ───
-function StepHeader({ step, title, subtitle, onBack }) {
-  return (
-    <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <BackBtn onClick={onBack} />
-        <GurLogo size={42} pill />
-        <div style={{ width: 38 }} /> {/* spacer for centering */}
-      </div>
-      <StepProgress current={step} />
-      <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 800, color: "#2D2419", margin: "0 0 6px", textAlign: "center" }}>{title}</h2>
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#8A7A68", textAlign: "center", marginBottom: 24 }}>{subtitle}</p>
-    </>
-  );
-}
-
-// ─── Info Card ───
-function InfoCard({ icon, text }) {
-  return (
-    <div style={{ background: "#FFF3EA", borderRadius: 18, padding: "14px 16px", marginBottom: 22, display: "flex", gap: 12, alignItems: "flex-start" }}>
-      <div style={{ width: 30, height: 30, borderRadius: 10, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</div>
-      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#6B5D4C", margin: 0, lineHeight: 1.55 }}>{text}</p>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════
-// ADIM 1 — İşletme Bilgileri
-// ═══════════════════════════════════════════════
-function RestRegStep1({ onBack, onNext }) {
-  const [name, setName] = useState("");
-  const [location, setLocation] = useState("");
-  const [locFocused, setLocFocused] = useState(false);
-  const [serviceType, setServiceType] = useState("");
-  const [size, setSize] = useState("");
-  const [year, setYear] = useState("");
-
-  // Basit lokasyon önerileri
-  const locationSuggestions = [
-    "Kadıköy, İstanbul", "Beşiktaş, İstanbul", "Beyoğlu, İstanbul",
-    "Şişli, İstanbul", "Üsküdar, İstanbul", "Fatih, İstanbul",
-    "Bakırköy, İstanbul", "Sarıyer, İstanbul", "Maltepe, İstanbul",
-  ];
-  const filteredLocs = location.length > 0
-    ? locationSuggestions.filter(l => l.toLowerCase().includes(location.toLowerCase()))
-    : [];
-
-  const canProceed = name.trim().length > 0 && location.trim().length > 0 && serviceType && size;
-
-  return (
-    <Screen>
-      <div style={{ padding: "44px 24px 40px" }}>
-        <StepHeader step={1} title="İşletme Bilgileri" subtitle="Adım 1/3 — Restoranınızı tanıyalım" onBack={onBack} />
-
-        <InfoCard icon={<Icon n="plate" color="#FF6600" size={16} />} text="İşletmenizin temel bilgilerini girin. Bu bilgiler uygulamada profilinizi oluşturmak için kullanılacaktır." />
-
-        <InputField label="İşletme Adı" value={name} onChange={setName} placeholder="ör: Karadeniz Pide Salonu" />
-
-        {/* Lokasyon — önerilerle */}
-        <div style={{ marginBottom: 20, position: "relative" }}>
-          <label style={{ display: "block", marginBottom: 7, fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#2D2419" }}>Lokasyon</label>
-          <div style={{ position: "relative" }}>
-            <input
-              value={location} onChange={e => setLocation(e.target.value)}
-              onFocus={() => setLocFocused(true)} onBlur={() => setTimeout(() => setLocFocused(false), 200)}
-              placeholder="İlçe veya adres yazın..."
-              style={{ width: "100%", padding: "15px 18px 15px 42px", borderRadius: 16, border: "none", outline: "none", fontSize: 15, fontFamily: "'Outfit', sans-serif", background: "#fff", boxShadow: "0 2px 16px rgba(0,0,0,0.06)", boxSizing: "border-box" }}
-            />
-            <svg style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
-          </div>
-          {/* Öneri dropdown */}
-          {locFocused && filteredLocs.length > 0 && (
-            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", borderRadius: 14, boxShadow: "0 8px 30px rgba(0,0,0,0.15)", zIndex: 20, marginTop: 4, overflow: "hidden" }}>
-              {filteredLocs.slice(0, 4).map((l, i) => (
-                <div key={i} onMouseDown={() => { setLocation(l); setLocFocused(false); }}
-                  style={{ padding: "12px 16px", cursor: "pointer", borderBottom: i < Math.min(filteredLocs.length, 4) - 1 ? "1px solid #f5f5f5" : "none", display: "flex", alignItems: "center", gap: 10, transition: "background 0.15s" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#FFF8F4"}
-                  onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#333" }}>{l}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <SelectField label="Hizmet Türü" value={serviceType} onChange={setServiceType}
-          options={["Restoran", "Kafe", "Bar", "Fast Food", "Fine Dining", "Kahvaltıcı", "Tatlıcı", "Balıkçı", "Pub & Lounge"]} />
-
-        <SelectField label="İşletme Büyüklüğü" value={size} onChange={setSize}
-          options={["Küçük (1-10 masa)", "Orta (10-25 masa)", "Büyük (25-50 masa)", "Çok Büyük (50+ masa)"]} />
-
-        <SelectField label="Açılış Yılı" value={year} onChange={setYear}
-          options={Array.from({ length: 30 }, (_, i) => String(2025 - i))} />
-
-        <div style={{ marginTop: 24 }}>
-          <Btn text="Devam Et →" onClick={onNext} disabled={!canProceed} />
-          {!canProceed && (
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(45,36,25,0.45)", textAlign: "center", marginTop: 10 }}>
-              İşletme adı, lokasyon, hizmet türü ve büyüklük alanları zorunludur
-            </p>
-          )}
-        </div>
-      </div>
-    </Screen>
-  );
-}
-
-// ═══════════════════════════════════════════════
-// ADIM 2 — İşletme Doğrulama (Vergi Levhası)
-// ═══════════════════════════════════════════════
-function RestRegStep2({ onBack, onNext }) {
-  const [taxNo, setTaxNo] = useState("");
-  const [companyTitle, setCompanyTitle] = useState("");
-  const [taxOffice, setTaxOffice] = useState("");
-  const [levhaFiles, setLevhaFiles] = useState([]);
-
-  const canProceed = levhaFiles.length > 0 && taxNo.trim().length > 0;
-
-  return (
-    <Screen>
-      <div style={{ padding: "44px 24px 40px" }}>
-        <StepHeader step={2} title="İşletme Doğrulama" subtitle="Adım 2/3 — Restoranınızı doğrulayalım" onBack={onBack} />
-
-        <InfoCard icon={<Icon n="shield" color="#FF6600" size={16} />} text="Platformumuzda sadece doğrulanmış işletmeler yer alır. Vergi levhanızı yükleyerek işletmenizi doğrulayın. Belgeleriniz 24 saat içinde incelenir." />
-
-        <InputField label="Vergi Numarası" value={taxNo} onChange={setTaxNo} placeholder="ör: 1234567890" />
-        <InputField label="Şirket Ünvanı (Opsiyonel)" value={companyTitle} onChange={setCompanyTitle} placeholder="ör: Lezzet Gıda San. Tic. Ltd. Şti." />
-        <InputField label="Vergi Dairesi" value={taxOffice} onChange={setTaxOffice} placeholder="ör: Kadıköy Vergi Dairesi" />
-
-        <UploadBox
-          label="Vergi Levhası Görseli"
-          icon={<Icon n="bank" color="#FF6600" size={20} />}
-          accept=".pdf,.jpg,.jpeg,.png"
-          files={levhaFiles}
-          setFiles={setLevhaFiles}
-          multiple={false}
-        />
-
-        {/* Yükleme ipuçları */}
-        <div style={{ background: "#F6F1EA", borderRadius: 16, padding: "14px 16px", marginBottom: 24 }}>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#6B5D4C", margin: "0 0 8px" }}>Yükleme İpuçları</p>
-          {["Telefonunuzdan fotoğraf çekerek yükleyebilirsiniz", "PDF veya görsel formatları kabul edilir", "Belgenin tamamının görünür olduğundan emin olun"].map((tip, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < 2 ? 5 : 0 }}>
-              <div style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(45,36,25,0.3)", flexShrink: 0 }} />
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#8A7A68", margin: 0 }}>{tip}</p>
-            </div>
-          ))}
-        </div>
-
-        <Btn text="Devam Et →" onClick={onNext} disabled={!canProceed} />
-        {!canProceed && (
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(45,36,25,0.45)", textAlign: "center", marginTop: 10 }}>
-            {levhaFiles.length === 0 ? "Devam etmek için vergi levhası yüklemeniz gerekiyor" : "Vergi numarası zorunludur"}
-          </p>
-        )}
-      </div>
-    </Screen>
-  );
-}
-
-// ═══════════════════════════════════════════════
-// ADIM 3 — Menü, Logo & Görseller
-// ═══════════════════════════════════════════════
-function RestRegStep3({ onBack, onDone }) {
-  const [logoFiles, setLogoFiles] = useState([]);
-  const [menuFiles, setMenuFiles] = useState([]);
-  const [photoFiles, setPhotoFiles] = useState([]);
-  const [submitted, setSubmitted] = useState(false);
-
-  if (submitted) {
-    return (
-      <Screen>
-        <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "30px 28px" }}>
-          {/* Başarı animasyonu */}
-          <div style={{
-            width: 100, height: 100, borderRadius: "50%",
-            background: "#EAF7EC",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            marginBottom: 24, animation: "fadeInUp 0.5s ease-out",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.06)",
-          }}>
-            <Icon n="check" color="#22A34D" size={32} strokeWidth={2.5} />
-          </div>
-
-          <h2 style={{
-            fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 800, color: "#2D2419",
-            textAlign: "center", margin: "0 0 10px",
-            animation: "fadeInUp 0.5s ease-out 0.1s both",
-          }}>Başvurunuz Alındı!</h2>
-
-          <p style={{
-            fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "#6B5D4C",
-            textAlign: "center", lineHeight: 1.6, margin: "0 0 24px",
-            animation: "fadeInUp 0.5s ease-out 0.2s both",
-          }}>
-            Belgeleriniz incelemeye alınmıştır. Onay süreciniz tamamlandığında size bildirim gönderilecektir.
-          </p>
-
-          {/* Yükleme özeti */}
-          <div style={{
-            width: "100%", background: "#fff", borderRadius: 20,
-            padding: "18px 18px 14px", marginBottom: 28, boxShadow: "0 2px 16px rgba(0,0,0,0.05)",
-            animation: "fadeInUp 0.5s ease-out 0.3s both",
-          }}>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700, color: "#8A7A68", margin: "0 0 12px" }}>Yükleme Özeti</p>
-            {[
-              { icon: <Icon n="bank" size={16} color="#8A7A68" />, text: "Vergi levhası", done: true },
-              { icon: <Icon n="palette" size={16} color="#8A7A68" />, text: logoFiles.length > 0 ? "Logo yüklendi" : "Logo yüklenmedi", done: logoFiles.length > 0 },
-              { icon: <Icon n="doc" size={16} color="#8A7A68" />, text: menuFiles.length > 0 ? `${menuFiles.length} menü dosyası` : "Menü yüklenmedi", done: menuFiles.length > 0 },
-              { icon: <Icon n="camera" size={16} color="#8A7A68" />, text: photoFiles.length > 0 ? `${photoFiles.length} fotoğraf` : "Fotoğraf yüklenmedi", done: photoFiles.length > 0 },
-            ].map((item, i) => (
-              <div key={i} style={{
-                display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
-                borderBottom: i < 3 ? "1px solid rgba(45,36,25,0.06)" : "none",
-              }}>
-                {item.icon}
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#4A3F33", flex: 1 }}>{item.text}</span>
-                {item.done ? <Icon n="check" size={16} color="#22A34D" /> : <Icon n="clock" size={16} color="#C9A24B" />}
-              </div>
-            ))}
-          </div>
-
-          {/* Bilgi kartı */}
-          <div style={{
-            width: "100%", background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.25)",
-            borderRadius: 16, padding: "14px 16px", marginBottom: 24, display: "flex", gap: 12,
-            animation: "fadeInUp 0.5s ease-out 0.4s both",
-          }}>
-            <Icon n="clock" size={16} color="#2F8C46" />
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#2F8C46", margin: 0, lineHeight: 1.5 }}>
-              Başvurunuz en geç 24 saat içinde incelenecek ve onaylandığında restoranınız GUR'da yayınlanacaktır.
-            </p>
-          </div>
-
-          <div style={{ width: "100%", animation: "fadeInUp 0.5s ease-out 0.5s both" }}>
-            <Btn text="Ana Sayfaya Dön" onClick={onDone} />
-          </div>
-        </div>
-      </Screen>
-    );
-  }
-
-  return (
-    <Screen>
-      <div style={{ padding: "44px 24px 40px" }}>
-        <StepHeader step={3} title="Menü & Görseller" subtitle="Adım 3/3 — Restoranınızı öne çıkarın" onBack={onBack} />
-
-        <InfoCard icon={<Icon n="sparkle" color="#FF6600" size={16} />} text="Logo, menü ve fotoğraflar restoranınızın uygulamadaki vitrinidir. Kaliteli görseller müşteri ilgisini %70 artırır!" />
-
-        {/* Logo */}
-        <UploadBox
-          label="Restoran Logosu"
-          icon={<Icon n="palette" color="#FF6600" size={20} />}
-          accept=".jpg,.jpeg,.png,.svg,.webp"
-          files={logoFiles}
-          setFiles={setLogoFiles}
-          multiple={false}
-        />
-
-        {/* Menü */}
-        <UploadBox
-          label="Menü (PDF veya Fotoğraf)"
-          icon={<Icon n="doc" color="#FF6600" size={20} />}
-          accept=".pdf,.jpg,.jpeg,.png"
-          files={menuFiles}
-          setFiles={setMenuFiles}
-          multiple={true}
-        />
-
-        {/* Fotoğraflar */}
-        <UploadBox
-          label="Mekan & Yemek Fotoğrafları"
-          icon={<Icon n="camera" color="#FF6600" size={20} />}
-          accept=".jpg,.jpeg,.png,.webp"
-          files={photoFiles}
-          setFiles={setPhotoFiles}
-          multiple={true}
-        />
-
-        {/* İpucu kartı */}
-        <div style={{ background: "#F6F1EA", borderRadius: 16, padding: "14px 16px", marginBottom: 24 }}>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#6B5D4C", margin: "0 0 8px" }}>Fotoğraf Önerileri</p>
-          {[
-            "Mekan iç görünümü (ambiyans)",
-            "Mekan dış cephesi (bulunabilirlik)",
-            "En popüler 2-3 yemek fotoğrafı",
-            "Menü görseli (okunabilir kalitede)",
-          ].map((tip, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < 3 ? 5 : 0 }}>
-              <div style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(45,36,25,0.3)", flexShrink: 0 }} />
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#8A7A68", margin: 0 }}>{tip}</p>
-            </div>
-          ))}
-        </div>
-
-        <Btn text="Başvuruyu Tamamla ✓" onClick={() => setSubmitted(true)} />
-      </div>
-    </Screen>
-  );
-}
-
-// ═══════════════════════════════════════════════
-// RESTORAN PANELİ — İstatistikler (sadece restoranlar görür)
-// ═══════════════════════════════════════════════
-function RestaurantDashboard({ onLogout }) {
-  const [activeTab, setActiveTab] = useState("stats");
-  const [showLogout, setShowLogout] = useState(false);
-  const [menuUploads, setMenuUploads] = useState([]);
-  const [photoUploads, setPhotoUploads] = useState([]);
-
-  // Mock istatistik verileri
-  const stats = {
-    totalViews: 1248,
-    swipeRight: 847,
-    swipeLeft: 401,
-    favRate: 67.9,
-    avgRating: 4.6,
-    totalReviews: 38,
-    weeklyData: [
-      { day: "Pzt", right: 95, left: 45 },
-      { day: "Sal", right: 120, left: 55 },
-      { day: "Çar", right: 140, left: 60 },
-      { day: "Per", right: 110, left: 50 },
-      { day: "Cum", right: 165, left: 70 },
-      { day: "Cmt", right: 190, left: 80 },
-      { day: "Paz", right: 170, left: 75 },
-    ],
-    reviews: [
-      { user: "Ahmet Y.", stars: 5, text: "Muhteşem lezzetler! Özellikle köfte tabağı harikaydı. Kesinlikle tekrar geleceğim.", date: "2 saat önce" },
-      { user: "Elif K.", stars: 4, text: "Ambiyans çok güzel, servis hızlı. Fiyatlar biraz yüksek ama kalite var.", date: "1 gün önce" },
-      { user: "Mert S.", stars: 5, text: "Şehirdeki en iyi mekan! Personel çok ilgili ve yemekler şahane.", date: "2 gün önce" },
-      { user: "Zeynep A.", stars: 3, text: "Yemekler güzeldi ama bekleme süresi uzundu. İyileştirme gerekli.", date: "3 gün önce" },
-      { user: "Can B.", stars: 5, text: "Arkadaşlarımla harika bir akşam geçirdik. Tatlılar enfes!", date: "5 gün önce" },
-    ],
+  // Canlı modda hesap sunucuda; yerel modda giriş ekranı bir formalite ve
+  // bunu kullanıcıya söylüyoruz, sessizce "başarılı" göstermek yerine.
+  const submit = async () => {
+    // DOĞRULAMA HER İKİ MODDA DA. Önceden `if (!live) return onLogin()`
+    // ilk satırdaydı: BOŞ e-posta ve BOŞ parolayla giriş yapılıyordu.
+    // "Yerel modda giriş bir formalite" doğru olabilir ama formu
+    // doğrulamamak, alanları hiç sormamaktan kötü — kullanıcı yazdığının
+    // bir yere gittiğini sanıyor.
+    if (!e.includes("@") || p.length < 6) { setError("E-posta ve en az 6 karakter parola gerekli."); return; }
+    if (!live) return onLogin();
+    setBusy(true); setError(null);
+    try { await backend.signIn({ email: e.trim(), password: p }); onLogin(); }
+    catch (err) { setError(err.message || "Giriş yapılamadı"); }
+    finally { setBusy(false); }
   };
+  return <Screen grad={false}><div style={{ height: "38%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--c-warm-1)" }}><GurLogo size={60} pill /></div><div className="gur-on-brand" style={{ minHeight: "62%", background: GRAD, borderTopLeftRadius: 44, borderTopRightRadius: 44, padding: "28px 28px 40px", position: "relative" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "var(--c-on-brand)", margin: "0 0 6px", textAlign: "center" }}>Giriş yap</h2><div style={{ marginBottom: 32, display: "flex", justifyContent: "center" }}><Btn variant="plainBrand" size="md" fullWidth={false} onClick={onRegister} text="Üyeliğiniz yoksa lütfen kayıt için dokununuz" /></div><InputField label="Mail Adresi" value={e} onChange={setE} placeholder="kullanıcı@mail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><div style={{ marginTop: 24 }}><Btn text="GUR'u kullanmaya başla" onClick={submit} loading={busy} /></div>{error && <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "#fff", background: "rgba(0,0,0,0.25)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{error}</p>}<SocialAuthRow tone="brand" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onLogin(); }} /></div></Screen>;
+}
 
-  const maxBar = Math.max(...stats.weeklyData.map(d => d.right + d.left));
-
-  return (
-    <Screen grad={false}>
-      <div style={{ height: "100%", background: "#0f0f0f", overflowY: "auto" }}>
-        {/* Header */}
-        <div style={{ background: GRAD, padding: "44px 20px 24px", borderBottomLeftRadius: 32, borderBottomRightRadius: 32, marginBottom: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <button onClick={() => setShowLogout(true)} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", padding: "8px 14px", borderRadius: 14, backdropFilter: "blur(8px)", display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#fff", fontWeight: 600 }}>Çıkış</span>
-            </button>
-            <GurLogo size={42} pill />
-            <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 12, padding: "6px 12px", backdropFilter: "blur(8px)" }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#fff", fontWeight: 700 }}>İŞLETME PANELİ</span>
-            </div>
-          </div>
-
-          {/* Restoran bilgisi */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 18, background: "rgba(255,255,255,0.15)", border: "2px solid rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="plate" color="#fff" size={22} /></div>
-            <div>
-              <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>Restoranınız</h2>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.7)", margin: 0 }}>Kadıköy, İstanbul • Aktif</p>
-            </div>
-          </div>
-
-          {/* Puan badge */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)" }}>
-<Icon n="star" color="#fff" size={18} />
-              <div>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.avgRating}</p>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Ortalama Puan</p>
-              </div>
-            </div>
-            <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)" }}>
-<Icon n="chat" color="#fff" size={18} />
-              <div>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1 }}>{stats.totalReviews}</p>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0 }}>Toplam Yorum</p>
-              </div>
-            </div>
-            <div style={{ background: "rgba(76,175,80,0.2)", border: "1px solid rgba(76,175,80,0.3)", borderRadius: 14, padding: "8px 16px", display: "flex", alignItems: "center", gap: 8 }}>
-<Icon n="flame" color="#4CAF50" size={18} />
-              <div>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#4CAF50", margin: 0, lineHeight: 1 }}>%{stats.favRate}</p>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(76,175,80,0.7)", margin: 0 }}>Beğeni Oranı</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ padding: "0 16px 40px" }}>
-          {/* Tab seçici */}
-          <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: 16, overflow: "hidden", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-            {[
-              { id: "stats", label: "İstatistikler" },
-              { id: "reviews", label: "Yorumlar" },
-              { id: "menu", label: "Menü" },
-              { id: "photos", label: "Fotoğraflar" },
-            ].map(tab => (
-              <div key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-                flex: 1, padding: "13px 8px", textAlign: "center", cursor: "pointer",
-                background: activeTab === tab.id ? "rgba(255,102,0,0.15)" : "transparent",
-                borderBottom: activeTab === tab.id ? "2px solid #FF6600" : "2px solid transparent",
-                transition: "all 0.25s",
-              }}>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 500, color: activeTab === tab.id ? "#FF6600" : "rgba(255,255,255,0.4)" }}>
-                  {tab.label}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* ─── TAB: İstatistikler ─── */}
-          {activeTab === "stats" && (
-            <div>
-              {/* Büyük stat kartları */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-                {/* Sağ kaydırma */}
-                <div style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.15)", borderRadius: 20, padding: "18px 16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-<div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(76,175,80,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="heart" color="#4CAF50" size={16} /></div>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(76,175,80,0.8)", fontWeight: 600 }}>Sağ Kaydırma</span>
-                  </div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#4CAF50", margin: "0 0 2px" }}>{stats.swipeRight}</p>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>kişi beğendi</p>
-                </div>
-                {/* Sol kaydırma */}
-                <div style={{ background: "rgba(255,59,48,0.08)", border: "1px solid rgba(255,59,48,0.15)", borderRadius: 20, padding: "18px 16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-<div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(255,59,48,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="cross" color="#FF3B30" size={16} /></div>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,59,48,0.8)", fontWeight: 600 }}>Sol Kaydırma</span>
-                  </div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#FF3B30", margin: "0 0 2px" }}>{stats.swipeLeft}</p>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>kişi geçti</p>
-                </div>
-              </div>
-
-              {/* Toplam görüntülenme */}
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-<div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(255,165,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="eye" color="#FFA500" size={18} /></div>
-                  <div>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 2px" }}>Toplam Görüntülenme</p>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#fff", margin: 0 }}>{stats.totalViews.toLocaleString()}</p>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#4CAF50", fontWeight: 700 }}>↑ 12%</span>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.3)", margin: "2px 0 0" }}>bu hafta</p>
-                </div>
-              </div>
-
-              {/* Haftalık grafik */}
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 16px", marginBottom: 20 }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 16px" }}>Haftalık Kaydırma Grafiği</p>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120, paddingBottom: 24, position: "relative" }}>
-                  {stats.weeklyData.map((d, i) => {
-                    const totalH = ((d.right + d.left) / maxBar) * 100;
-                    const rightH = (d.right / (d.right + d.left)) * totalH;
-                    const leftH = totalH - rightH;
-                    return (
-                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-                        <div style={{ width: "100%", display: "flex", flexDirection: "column", borderRadius: 8, overflow: "hidden" }}>
-                          <div style={{ height: leftH * 0.96, background: "rgba(255,59,48,0.4)", transition: "height 0.5s ease-out", transitionDelay: `${i * 0.05}s` }} />
-                          <div style={{ height: rightH * 0.96, background: "rgba(76,175,80,0.6)", transition: "height 0.5s ease-out", transitionDelay: `${i * 0.05}s` }} />
-                        </div>
-                        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 6 }}>{d.day}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {/* Legend */}
-                <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 4 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 3, background: "rgba(76,175,80,0.6)" }} />
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Beğeni</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 3, background: "rgba(255,59,48,0.4)" }} />
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Geçme</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Puan dağılımı */}
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 16px" }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 14px" }}>Puan Dağılımı</p>
-                {[
-                  { stars: 5, count: 18, pct: 47 },
-                  { stars: 4, count: 11, pct: 29 },
-                  { stars: 3, count: 5, pct: 13 },
-                  { stars: 2, count: 2, pct: 5 },
-                  { stars: 1, count: 2, pct: 5 },
-                ].map((r, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: i < 4 ? 8 : 0 }}>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.5)", width: 14, textAlign: "right" }}>{r.stars}</span>
-                    <span style={{ fontSize: 12, color: "#FFA500" }}>★</span>
-                    <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-                      <div style={{ width: `${r.pct}%`, height: "100%", borderRadius: 4, background: r.stars >= 4 ? "rgba(76,175,80,0.5)" : r.stars === 3 ? "rgba(255,165,0,0.5)" : "rgba(255,59,48,0.4)", transition: "width 0.6s ease-out", transitionDelay: `${i * 0.1}s` }} />
-                    </div>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.35)", width: 28, textAlign: "right" }}>{r.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ─── TAB: Yorumlar ─── */}
-          {activeTab === "reviews" && (
-            <div>
-              {stats.reviews.map((rev, i) => (
-                <div key={i} style={{
-                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)",
-                  borderRadius: 20, padding: "16px 18px", marginBottom: 12,
-                  animation: `fadeInUp 0.4s ease-out ${i * 0.07}s both`,
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 12, background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 800 }}>
-                        {rev.user.charAt(0)}
-                      </div>
-                      <div>
-                        <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{rev.user}</p>
-                        <div style={{ display: "flex", gap: 2, marginTop: 2 }}>
-                          {[1, 2, 3, 4, 5].map(s => (
-                            <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "#FFA500" : "rgba(255,255,255,0.12)" }}>★</span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.25)" }}>{rev.date}</span>
-                  </div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>{rev.text}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ─── TAB: Menü Yönetimi ─── */}
-          {activeTab === "menu" && (
-            <div>
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>Menü görsellerinizi buradan yükleyin. Kullanıcılar restoranınızın menüsünü bu görseller üzerinden görecektir.</p>
-              </div>
-
-              {/* Yüklü menüler */}
-              {menuUploads.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-                  {menuUploads.map((file, i) => (
-                    <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", animation: `fadeInUp 0.3s ease-out ${i * 0.05}s both` }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-<Icon n="doc" color="#FF6600" size={18} />
-                        </div>
-                        <div>
-                          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600, color: "#fff", margin: "0 0 2px" }}>{file.name}</p>
-                          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.3)", margin: 0 }}>Menü sayfası {i + 1}</p>
-                        </div>
-                      </div>
-                      <button onClick={() => setMenuUploads(p => p.filter((_, idx) => idx !== i))} style={{ background: "rgba(255,59,48,0.1)", border: "none", borderRadius: 10, padding: "6px 10px", cursor: "pointer" }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Yükleme alanı */}
-              <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px 16px", borderRadius: 20, border: "2px dashed rgba(255,102,0,0.25)", background: "rgba(255,102,0,0.04)", cursor: "pointer" }}>
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ display: "none" }} onChange={e => { const files = Array.from(e.target.files || []); setMenuUploads(p => [...p, ...files]); e.target.value = ""; }} />
-                <div style={{ width: 48, height: 48, borderRadius: 16, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                </div>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600, color: "#FF6600", margin: 0 }}>Menü Görseli Yükle</p>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>PDF veya fotoğraf (JPG, PNG)</p>
-              </label>
-
-              {menuUploads.length > 0 && (
-                <div style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.15)", borderRadius: 16, padding: "12px 16px", marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
-<Icon n="check" color="#4CAF50" size={16} />
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(76,175,80,0.8)", margin: 0 }}>{menuUploads.length} menü sayfası yüklendi</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ─── TAB: Fotoğraf Yönetimi ─── */}
-          {activeTab === "photos" && (
-            <div>
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "16px 18px", marginBottom: 16 }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.5 }}>Mekan ve yemek fotoğraflarınızı yükleyin. Kaliteli görseller müşteri ilgisini %70 artırır!</p>
-              </div>
-
-              {/* Yüklü fotoğraflar — grid */}
-              {photoUploads.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
-                  {photoUploads.map((file, i) => (
-                    <div key={i} style={{ position: "relative", borderRadius: 14, overflow: "hidden", aspectRatio: "1", animation: `fadeInUp 0.3s ease-out ${i * 0.05}s both` }}>
-                      <img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      <button onClick={() => setPhotoUploads(p => p.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: 8, padding: 4, cursor: "pointer" }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Yükleme alanı */}
-              <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px 16px", borderRadius: 20, border: "2px dashed rgba(255,102,0,0.25)", background: "rgba(255,102,0,0.04)", cursor: "pointer" }}>
-                <input type="file" accept=".jpg,.jpeg,.png,.webp" multiple style={{ display: "none" }} onChange={e => { const files = Array.from(e.target.files || []); setPhotoUploads(p => [...p, ...files]); e.target.value = ""; }} />
-                <div style={{ width: 48, height: 48, borderRadius: 16, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
-                </div>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600, color: "#FF6600", margin: 0 }}>Fotoğraf Yükle</p>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>JPG, PNG, WEBP</p>
-              </label>
-
-              {/* İpuçları */}
-              <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "14px 16px", marginTop: 16 }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", margin: "0 0 8px" }}>Fotoğraf Önerileri</p>
-                {["Mekan iç görünümü (ambiyans)", "Dış cephe (bulunabilirlik)", "En popüler 2-3 yemek", "Servis ve sunum detayları"].map((tip, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < 3 ? 5 : 0 }}>
-                    <div style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(255,255,255,0.25)", flexShrink: 0 }} />
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.35)", margin: 0 }}>{tip}</p>
-                  </div>
-                ))}
-              </div>
-
-              {photoUploads.length > 0 && (
-                <div style={{ background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.15)", borderRadius: 16, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
-<Icon n="check" color="#4CAF50" size={16} />
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(76,175,80,0.8)", margin: 0 }}>{photoUploads.length} fotoğraf yüklendi</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Çıkış onay modalı */}
-      {showLogout && (
-        <div style={{
-          position: "absolute", inset: 0, zIndex: 200,
-          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: 30, animation: "fadeInUp 0.25s ease-out",
-        }}>
-          <div style={{
-            background: "#1a1a1a", borderRadius: 24, padding: "30px 24px 24px",
-            width: "100%", maxWidth: 320, border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-          }}>
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <div style={{
-                width: 60, height: 60, borderRadius: "50%",
-                background: "rgba(255,59,48,0.1)", margin: "0 auto 16px",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round">
-                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-              </div>
-              <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>Çıkış Yap</h3>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.5 }}>
-                İşletme panelinden çıkış yapmak istediğinize emin misiniz?
-              </p>
-            </div>
-
-            <button onClick={onLogout} style={{
-              width: "100%", padding: "15px 0", borderRadius: 16, border: "none",
-              background: "#FF3B30", color: "#fff",
-              fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 700,
-              cursor: "pointer", marginBottom: 10,
-              boxShadow: "0 4px 16px rgba(255,59,48,0.3)",
-              transition: "transform 0.15s",
-            }}
-              onMouseDown={e => e.currentTarget.style.transform = "scale(0.97)"}
-              onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}>
-              Evet, Çıkış Yap
-            </button>
-
-            <button onClick={() => setShowLogout(false)} style={{
-              width: "100%", padding: "15px 0", borderRadius: 16,
-              border: "1px solid rgba(255,255,255,0.1)", background: "transparent",
-              color: "rgba(255,255,255,0.6)",
-              fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 600,
-              cursor: "pointer", transition: "all 0.15s",
-            }}
-              onMouseDown={e => e.currentTarget.style.transform = "scale(0.97)"}
-              onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}>
-              Vazgeç
-            </button>
-          </div>
-        </div>
-      )}
-
-    </Screen>
-  );
+function RegisterScreen({ onBack, onDone, onLegal, live }) {
+  const [n,setN]=useState(""); const [e,setE]=useState(""); const [p,setP]=useState(""); const [d,setD]=useState(""); const [a,setA]=useState(false);
+  // KOŞUL ONAYI DEKORATİFTİ: kutu işaretlenmeden de kayıt tamamlanıyordu.
+  // Ekranda "kabul ettiğinizi onaylıyorsunuz" yazarken onayı sormamak hem
+  // yalan hem hukuken sakıncalı. Artık düğme kapalı ve sebebi yazılı.
+  const [err,setErr]=useState(null);
+  return <Screen><div style={{ padding: "24px 26px 40px" }}><div style={{ position: "absolute", left: 14, top: 18 }}><BackBtn onClick={onBack} /></div><div style={{ textAlign: "center", marginTop: 12, marginBottom: 14 }}><GurLogo size={42} pill /></div>{/* Kurulum iki ekran: kayıt → konum. Göstergesiz akışta kullanıcı kaç
+          ekran kaldığını bilmiyor; "daha ne kadar sürecek" belirsizliği
+          ikinci ekranda bırakmanın en yaygın sebebi. */}<StepProgress current={1} total={2} label="Kurulum adımı 1 / 2" /><p style={{ textAlign: "center", color: "#6B5D4C", fontSize: 14, fontFamily: "var(--f-body)", marginBottom: 26 }}>Eğer hesabınız varsa lütfen burda kendinizi yormayınınız =)</p><InputField label="İsim" value={n} onChange={setN} placeholder="Bora Çolpan" /><InputField label="Mail adresi" value={e} onChange={setE} placeholder="kullanıcı@gmail.com" /><InputField label="Şifre" value={p} onChange={setP} placeholder="******" type="password" /><SelectField label="Doğum Tarihi" value={d} onChange={setD} options={Array.from({length:30},(_,i)=>String(1980+i))} /><div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 10, marginBottom: 22 }}><p style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 15, color: "#6B5D4C", margin: 0 }}>Devam ederek <span onClick={onLegal} style={{ color: "var(--c-brand-ink)", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>kullanım koşulları, gizlilik politikası ve KVKK aydınlatma metnini</span> okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz.</p><div onClick={()=>setA(!a)} style={{ width: 28, height: 28, borderRadius: 10, border: "2px solid #FF6600", background: a?"#FF6600":"transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{a && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}</div></div><Btn text="Kaydınızı Tamamlayınız" disabled={!a || !n.trim() || !e.includes("@") || p.length < 6} onClick={async () => { if (!a || !n.trim() || !e.includes("@") || p.length < 6) { setErr(!a ? "Devam etmek için koşulları onaylamanız gerekiyor." : "Ad, geçerli bir e-posta ve en az 6 karakter parola gerekli."); return; } setErr(null); if (live) { try { await backend.signIn({ email: e, password: p, name: n }); } catch { /* var olan hesap: giriş ekranı denenmeli */ } } onDone(); }} />{err && <p role="alert" style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-bad-ink)", background: "var(--c-bad-soft)", borderRadius: 12, padding: "8px 12px", margin: "10px 0 0", textAlign: "center" }}>{err}</p>}<SocialAuthRow tone="dark" onDone={async (res) => { if (live) { try { await backend.signInSocial(res.provider, res); } catch { /* demo profili */ } } onDone(); }} /></div></Screen>;
 }
 
 // ═══════════════════════════════════════════════
 // KEŞFET SAYFASI — 4 rastgele kategori + tüm kategoriler sayfası
 // ═══════════════════════════════════════════════
-function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile }) {
+// Keşfet üstündeki dönen banner: marka slaytı ile sponsor slaytları
+// sırayla döner. Reklam slaytları her zaman "REKLAM" etiketi taşır.
+function HeroCarousel({ slides, intervalMs = 4500 }) {
+  const [i, setI] = useState(0);
+  const reduced = usePrefersReducedMotion();
+  useEffect(() => {
+    // Hareket azaltıldığında kendiliğinden dönmez: sürekli tekrar eden
+    // hareket vestibüler rahatsızlık kaynağı. Slaytlar noktalarla gezilir.
+    if (reduced || slides.length < 2) return;
+    const t = setTimeout(() => setI(v => (v + 1) % slides.length), intervalMs);
+    return () => clearTimeout(t);
+  }, [i, slides.length, intervalMs, reduced]);
+
+  const slide = slides[i] || slides[0];
+  if (!slide) return null;
+
+  return (
+    <div style={{ borderRadius: 24, overflow: "hidden", marginBottom: 18, height: 148, position: "relative", boxShadow: "var(--sh-2)", flexShrink: 0 }}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={slide.id}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          transition={{ duration: 0.45 }}
+          style={{ position: "absolute", inset: 0 }}
+        >
+          <Img src={slide.img} style={{ position: "absolute", inset: 0 }} bg={slide.accent || "#2c1810"} />
+          <div style={{ position: "absolute", inset: 0, background: scrim(0.78, 100, 0.25) }} />
+          {slide.ad && (
+            <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "2px 7px", fontFamily: "var(--f-body)", fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.85)", letterSpacing: 0.5 }}>REKLAM</span>
+          )}
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "18px 18px 22px" }}>
+            {slide.eyebrow && (
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 4px" }}>{slide.eyebrow}</p>
+            )}
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 17, color: "#fff", margin: "0 0 3px", fontWeight: 800, textShadow: "0 2px 10px rgba(0,0,0,0.45)" }}>{slide.title}</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.75)", margin: 0 }}>{slide.sub}</p>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Slayt göstergeleri */}
+      {slides.length > 1 && (
+        <div style={{ position: "absolute", bottom: 10, right: 14, display: "flex", gap: 5, zIndex: 3 }}>
+          {slides.map((sl, k) => (
+            <button
+              key={sl.id} onClick={() => setI(k)} className="gur-dot"
+              aria-label={`${k + 1}. slayt`} aria-current={k === i}
+              style={{
+                width: k === i ? 16 : 6, height: 6, borderRadius: 3, cursor: "pointer",
+                border: "none", padding: 0, WebkitTapHighlightColor: "transparent",
+                background: k === i ? "#fff" : "rgba(255,255,255,0.45)", transition: "width 0.3s, background 0.3s",
+              }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile, onMatch, matchEnabled = true, restaurants = [], onDetail }) {
+  // ── Banner slaytları ──
+  // Marka slaytı her zaman ilk sırada. Onu SATIN ALINMIŞ slaytlar izliyor:
+  // takvimde bugüne denk gelen, onaylanmış banner rezervasyonları
+  // (lib/adslots.js). Satın alınmış slayt yoksa GUR'un kendi demo
+  // reklamları dönüyor — karusel hiçbir zaman boş kalmıyor.
+  const slotDurum = useAdSlots();
+  const medyaDurum = useMedia();
+  // Yöneticinin Reklam Görselleri sayfasından yüklediği görseller; yüklenmediyse varsayılan.
+  const reklamGorsel = useAdContent();
+  const slides = useMemo(() => {
+    const satilan = activeBookings("bannerAds", undefined, slotDurum)
+      .map(b => {
+        const r = restaurants.find(x => String(x.id) === String(b.restaurantId));
+        if (!r) return null;                 // gizlenmiş ya da yayında değil
+        // Görsel: işletmenin BANNER için onaylanmış materyali, yoksa kendi
+        // fotoğrafı. Onaysız dosya hiçbir koşulda ekrana çıkmıyor.
+        // Yerleşime göre ayrı kova (bkz. lib/media.js → KINDS): önceden tek
+        // havuzdan ilk GÖRSEL alınıyordu ve ödüllü video için yüklenmiş bir
+        // kare banner'a düşebiliyordu.
+        const materyal = approvedMedia(r.id, "bannerAds", medyaDurum)[0];
+        return {
+          id: `bk-${b.id}`, img: materyal?.url || r.imgs?.[0], accent: "#FF6600", ad: true,
+          eyebrow: r.name, title: r.desc || `${r.cat} · ${r.district || ""}`.trim(),
+          sub: "Mekânı gör",
+        };
+      })
+      .filter(Boolean);
+
+    return [
+      { id: "brand", img: adImage("brand", reklamGorsel), title: "İstanbul'un Lezzetleri", sub: "En popüler restoranları keşfet" },
+      ...(satilan.length ? satilan : BANNER_ADS.map(a => ({
+        id: a.id, img: adImage(a.id, reklamGorsel), accent: a.accent, ad: true,
+        eyebrow: a.brand, title: a.text, sub: a.cta,
+      }))),
+    ];
+  }, [slotDurum, medyaDurum, restaurants, reklamGorsel]);
+  // Yalnızca destede gerçekten bulunan restoranların fırsatları gösterilir
+  const liveDeals = DEALS
+    .map(d => ({ ...d, r: restaurants.find(x => x.id === d.restaurantId) }))
+    .filter(d => d.r);
   const [showAll, setShowAll] = useState(false);
-  const [randomCats] = useState(() => {
-    const shuffled = [...CATEGORIES].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 4);
-  });
+  // ── Konum: başlıktaki satır ve "yakınında" sıralaması için ──
+  const loc = geo.useUserLocation();
+  useEffect(() => { geo.requestLocation({ silent: true }); }, []);
+  const precise = loc.source === "device";
+  // Elle seçilen ilçe de bir başlangıç noktası: izin vermeyen kullanıcı da
+  // "yakınımdakiler" görebilmeli, yalnızca hassasiyeti farklı.
+  const placed = precise || loc.source === "manual";
+  const origin = placed ? { lat: loc.lat, lng: loc.lng } : geo.DEFAULT_ORIGIN;
+  const [locSheet, setLocSheet] = useState(false);
+  const badgeMap = useBadgeMap();
+
+  // Yakınlık sırası bir kez hesaplanıp hem arama hem "yakınında popüler"
+  // için kullanılıyor: iki liste aynı mesafeyi iki türlü söylemesin.
+  const nearby = useMemo(
+    () => orderByProximity(restaurants, origin, { seed: "explore" }),
+    // origin nesnesi her çizimde yeni; kimliğine değil koordinatına bakıyoruz.
+    [restaurants, origin.lat, origin.lng]
+  );
+
+  // "Yakınında popüler": önce yakınlık, sonra puan. Tersi olsaydı şehrin
+  // öbür ucundaki 4.9'luk mekan hep başa gelirdi.
+  const popular = useMemo(
+    () => nearby.slice(0, 10).sort((a, b) => b.rating - a.rating).slice(0, 6),
+    [nearby]
+  );
+
+  // Restoran arama. Önce isim eşleşmeleri, sonra mutfak/etiket: kullanıcı
+  // "ismini arattığı restoranı" en üstte görmeli.
+  const [query, setQuery] = useState("");
+  const searching = query.trim().length > 0;
+  const results = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase("tr");
+    if (!q) return [];
+    const byName = [];
+    const byOther = [];
+    for (const r of nearby) {
+      if (r.name.toLocaleLowerCase("tr").includes(q)) byName.push(r);
+      else if (r.cat.toLocaleLowerCase("tr").includes(q) ||
+               (r.tags || []).some(t => t.toLocaleLowerCase("tr").includes(q))) byOther.push(r);
+    }
+    return [...byName, ...byOther];
+  }, [nearby, query]);
+
+  // Başlıkta gösterilen semt: koordinattan değil, en yakın kaydın adresinden
+  // türetiliyor — ters coğrafi kodlama için ağa çıkmaya değmez.
+  const districtLabel = useMemo(() => {
+    if (loc.source === "manual") return loc.label || "Bakırköy merkezi";
+    if (!precise) return geo.DEFAULT_ORIGIN.label;
+    const closest = nearby.find(r => Number.isFinite(r.distanceKm));
+    const part = closest?.addr?.split(",").map(x => x.trim()).filter(Boolean);
+    return part?.[part.length - 2] || part?.[0] || "Yakınındakiler";
+  }, [precise, nearby, loc.source, loc.label]);
 
   // Tüm Kategoriler overlay
   if (showAll) {
@@ -1443,30 +720,31 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile }) {
         <div style={{ padding: "44px 16px 30px" }}>
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-            <button onClick={() => setShowAll(false)} style={{ background: "rgba(45,36,25,0.06)", border: "none", cursor: "pointer", padding: 8, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2D2419" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
-            </button>
+            <IconBtn
+              onClick={() => setShowAll(false)} tone="subtle" title="Geri"
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>}
+            />
             <GurLogo size={42} pill />
             <div style={{ width: 38 }} />
           </div>
 
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 800, color: "#2D2419", margin: "0 0 6px", textAlign: "center" }}>Tüm Kategoriler</h2>
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.55)", textAlign: "center", marginBottom: 24 }}>{CATEGORIES.length} mutfak türü</p>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 6px", textAlign: "center" }}>Tüm Kategoriler</h2>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", textAlign: "center", marginBottom: 24 }}>{CATEGORIES.length} mutfak türü</p>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             {CATEGORIES.map((c, i) => (
               <div key={i} onClick={() => onCategoryTap(c.name)} style={{
                 borderRadius: 22, overflow: "hidden", height: 130, position: "relative", cursor: "pointer",
-                transition: "transform 0.15s", boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
+                transition: "transform 0.15s", boxShadow: "var(--sh-2)",
                 animation: `fadeInUp 0.35s ease-out ${i * 0.04}s both`,
               }}
                 onMouseDown={e => e.currentTarget.style.transform = "scale(0.95)"}
                 onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
                 onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
                 <Img src={c.img} style={{ position: "absolute", inset: 0 }} bg="#d4c8bc" />
-                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.05) 55%)" }} />
+                <div style={{ position: "absolute", inset: 0, background: scrim(0.75, 55, 0.05) }} />
                 <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "14px 16px" }}>
-                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{c.name}</span>
+                  <span style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{c.name}</span>
                 </div>
               </div>
             ))}
@@ -1479,598 +757,2355 @@ function ExploreScreen({ onCategoryTap, onSwipe, onFavorites, onProfile }) {
   // Ana keşfet ekranı — 4 rastgele kategori
   return (
     <Screen>
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: "44px 16px 0" }}>
+      <div className="gur-screen" style={{ height: "100%", display: "flex", flexDirection: "column", padding: "44px 16px 0" }}>
 
-        {/* Logo + profil */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, position: "relative", animation: "fadeInUp 0.6s ease-out" }}>
-          <GurLogo size={42} pill />
-          <button onClick={onProfile} style={{ position: "absolute", right: 0, width: 40, height: 40, borderRadius: "50%", border: "none", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 10px rgba(0,0,0,0.06)" }}>
-            <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 800 }}>B</div>
+        {/* Gövde kayar, alt bar sabit kalır */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", margin: "0 -16px", padding: "0 16px" }}>
+
+        {/* Başlık: solda konum, ortada logo, sağda profil.
+            Konum satırı yeni: "yakınında" diyen bir uygulamanın nereye göre
+            konuştuğunu söylemesi gerekir. Dokununca hassas konum istenir. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, animation: "fadeInUp 0.6s ease-out" }}>
+          {/* 114×40 idi: dört piksel eksik bir hedef de eksik hedeftir.
+              Yükseklik 44'e sabitlendi, içerik dikeyde ortalı kalıyor. */}
+          <button type="button" className="gur-btn" onClick={() => setLocSheet(true)}
+            style={{ flex: 1, minWidth: 0, minHeight: 44, display: "flex", alignItems: "center", gap: 8, border: "none", background: "transparent", padding: 0, cursor: precise ? "default" : "pointer", outline: "none", textAlign: "left" }}>
+            <div style={{ width: 34, height: 34, borderRadius: 12, background: "var(--c-subtle)", border: "1px solid var(--c-line)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon n="pin" size={16} color="var(--c-ink-2)" />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 600, color: "var(--c-muted)", margin: 0, letterSpacing: 0.3 }}>
+                {precise ? "Konumun" : loc.source === "manual" ? "Seçtiğin ilçe" : "Konum kapalı"}
+              </p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 800, color: "var(--c-ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {districtLabel}{!precise && " ▾"}
+              </p>
+            </div>
           </button>
-        </div>
-
-        {/* Arama */}
-        <div style={{ background: "#F6F5F3", borderRadius: 12, padding: "12px 14px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, border: "1px solid rgba(0,0,0,0.05)" }}>
-          <Icon n="search" size={16} color="#9A938B" />
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#9A938B" }}>Restoran veya mutfak ara...</span>
-        </div>
-
-        {/* Hero Banner */}
-        <div style={{ borderRadius: 24, overflow: "hidden", marginBottom: 20, height: 130, position: "relative", boxShadow: "0 8px 30px rgba(0,0,0,0.12)", flexShrink: 0 }}>
-          <Img src={I.hero} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
-          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: 18 }}>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#fff", margin: "0 0 2px", fontWeight: 700, textShadow: "0 2px 10px rgba(0,0,0,0.4)" }}>İstanbul'un Lezzetleri</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.7)", margin: 0 }}>En popüler restoranları keşfet</p>
+          <GurLogo size={38} pill />
+          <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
+            <IconBtn onClick={onProfile} tone="solidLight" size={40} title="Profil">
+              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--c-on-brand)", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800 }}>B</div>
+            </IconBtn>
           </div>
         </div>
 
-        {/* Başlık */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 800, color: "#2D2419", margin: 0 }}>Senin İçin Öneriler</h3>
+        {/* Arama — yazınca sonuçlar hemen altında açılır, ayrı ekrana gitmez */}
+        <div style={{ position: "relative", marginBottom: 14, flexShrink: 0 }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10, background: "var(--c-card)", borderRadius: 999,
+            padding: "6px 6px 6px 16px", boxShadow: ELEV.restLight,
+          }}>
+            <Icon n="search" size={17} color="rgba(45,36,25,0.35)" />
+            <input
+              value={query} onChange={e => setQuery(e.target.value)} onFocus={keepVisible}
+              placeholder="Restoran ara"
+              style={{
+                flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent",
+                fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 500, color: "var(--c-ink)", padding: "10px 0",
+              }} />
+            {query ? (
+              <IconBtn onClick={() => setQuery("")} tone="subtle" size={36} title="Temizle"
+                icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+            ) : (
+              <IconBtn onClick={onSwipe} tone="solidLight" size={36} title="Kaydırarak keşfet" elevated
+                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink-2)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="13" height="16" rx="3" /><path d="M19 8v8" /></svg>} />
+            )}
+          </div>
+
         </div>
 
-        {/* 4 Rastgele Kategori — 2x2 grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, flex: 1, minHeight: 0 }}>
-          {randomCats.map((c, i) => (
-            <div key={c.name} onClick={() => onCategoryTap(c.name)} style={{
-              borderRadius: 20, overflow: "hidden", position: "relative", cursor: "pointer",
-              transition: "transform 0.15s", boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-              animation: `fadeInUp 0.4s ease-out ${i * 0.08}s both`,
-            }}
-              onMouseDown={e => e.currentTarget.style.transform = "scale(0.95)"}
-              onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
-              <Img src={c.img} style={{ position: "absolute", inset: 0 }} bg="#d4c8bc" />
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.05) 55%)" }} />
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px 14px" }}>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{c.name}</span>
+        {/* Arama sonuçları — açılır kutu değil, sayfanın kendisi. Aranan
+            restoranın kartını görmek, listeyi kaydırmak ve karşılaştırmak
+            küçük bir katmanda zor. */}
+        {searching && (
+          <div style={{ marginBottom: 16, flexShrink: 0 }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 10px" }}>
+              {results.length > 0
+                ? `"${query.trim()}" için ${results.length} restoran`
+                : `"${query.trim()}" için sonuç yok`}
+            </p>
+            {results.map(r => (
+              <motion.div key={r.id} onClick={() => onDetail?.(r)}
+                whileTap={{ scale: 0.985 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--c-card)", borderRadius: 20, padding: "10px 12px", marginBottom: 9, cursor: "pointer", boxShadow: ELEV.restLight }}>
+                <Img src={r.imgs?.[0]} box={112} style={{ width: 56, height: 56, borderRadius: 16, flexShrink: 0 }} bg="var(--c-img-bg)" />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 3px", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                    {(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}
+                  </p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
+                    <Icon n="star" size={11} color="var(--c-warn)" />{r.rating} · {r.cat} · {distText(r)}
+                  </p>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--c-line)" strokeWidth="2.4" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
+              </motion.div>
+            ))}
+            {results.length === 0 && (
+              <div style={{ background: "var(--c-card)", borderRadius: 20, padding: "18px 18px", textAlign: "center", boxShadow: ELEV.restLight }}>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
+                  Başka bir isim ya da mutfak deneyebilirsin.
+                </p>
+                {/* Boş sonuç bir çıkmaz sokak olmamalı: uygulamanın asıl
+                    işi kaydırarak keşif, oraya bir kapı duruyor. */}
+                <Btn text="Kaydırarak keşfet" onClick={() => { setQuery(""); onSwipe(); }}
+                  variant="brandSoft" size="md" fullWidth={false} />
               </div>
+            )}
+          </div>
+        )}
+
+        {/* BOŞ DURUM — görünür hiçbir mekan yok.
+            Yönetici hepsini gizlemiş, moderasyon kuyruğu hepsini tutuyor
+            ya da besleme hiç dönmemiş olabilir. Önceden bu durumda ekran
+            yine çiziliyordu: kategoriler hepsi "0", "yakınında popüler"
+            şeridi bomboş, fırsat yok — kullanıcı uygulamanın bozuk
+            olduğunu sanıyordu. Artık ne olduğunu yazıyor ve tek bir yol
+            gösteriyor. */}
+        {!searching && restaurants.length === 0 && (
+          <div style={{ textAlign: "center", padding: "48px 24px 32px" }}>
+            <div style={{
+              width: 92, height: 92, borderRadius: "50%", background: "var(--c-brand-soft)",
+              margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Icon n="plate" color="#FF6600" size={32} />
             </div>
-          ))}
+            <h3 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 8px" }}>
+              Burada henüz mekan yok
+            </h3>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)", margin: "0 0 22px", lineHeight: 1.55 }}>
+              Yakınındaki restoranlar yüklenemedi. Konumunu değiştirip tekrar
+              deneyebilir ya da birazdan yeniden bakabilirsin.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              <Btn text="Konumu değiştir" onClick={() => setLocSheet(true)} variant="filled" size="md" fullWidth={false} />
+              {/* İkincil yol kâğıt üstünde `brandSoft`: `outline` koyu zemin
+                  için tasarlandı, kremsi kâğıtta hap neredeyse görünmüyordu
+                  (ölçüldü — ekran görüntüsünde boş bir leke). */}
+              <Btn text="Favorilerim" onClick={onFavorites} variant="brandSoft" size="md" fullWidth={false} />
+            </div>
+          </div>
+        )}
+
+        {/* Arama açıkken keşif akışı gizlenir: kullanıcı bir şey aradığında
+            sayfanın geri kalanı gürültüdür. */}
+        {!searching && restaurants.length > 0 && (
+        <>
+        {/* Dönen banner — marka slaytı + sponsor reklamları, ekranın en üstünde */}
+        <HeroCarousel slides={slides} />
+
+        {/* Anlık fırsatlar — Faz 2 (konum bazlı süreli indirim) */}
+        {liveDeals.length > 0 && (
+          <div style={{ marginBottom: 16, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "var(--c-ink)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--c-ok)", animation: "pulse 1.6s ease-in-out infinite" }} />
+                Şu an yakınında
+              </p>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)" }}>{liveDeals.length} fırsat</span>
+            </div>
+            <HScroll style={{ gap: 10, paddingBottom: 2 }}>
+              {liveDeals.map(d => (
+                <motion.div
+                  key={d.restaurantId} onClick={() => onDetail?.(d.r)}
+                  whileTap={{ scale: 0.97 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                  style={{ flexShrink: 0, width: 178, borderRadius: 18, overflow: "hidden", position: "relative", height: 96, cursor: "pointer", boxShadow: "var(--sh-1)" }}>
+                  <Img src={d.r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
+                  <div style={{ position: "absolute", inset: 0, background: scrim(0.88, 100, 0.15) }} />
+                  <div style={{ position: "absolute", top: 8, left: 8, background: "var(--c-ok)", borderRadius: 8, padding: "3px 8px" }}>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 800, color: "var(--c-ok-on)" }}>%{d.pct}</span>
+                  </div>
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "8px 10px" }}>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "#fff", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.r.name}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.75)", margin: 0 }}>{formatCountdown(d.minutesLeft)} kaldı</p>
+                  </div>
+                </motion.div>
+              ))}
+            </HScroll>
+          </div>
+        )}
+
+        {/* GUR Match girişi — yönetici panelinden kapatılabilir bir özellik.
+            Kapalıyken kart hiç çizilmiyor: tıklanınca "kapalı" diyen bir
+            giriş, olmayan girişten daha kötü. */}
+        {matchEnabled && (
+          <motion.div
+            onClick={onMatch}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+            style={{
+              display: "flex", alignItems: "center", gap: 12, marginBottom: 16, cursor: "pointer", flexShrink: 0,
+              background: "linear-gradient(100deg, #FF7A1A, #F04E00)", borderRadius: 18, padding: "13px 14px",
+              boxShadow: "var(--sh-brand)",
+            }}
+          >
+            <div style={{ width: 38, height: 38, borderRadius: 13, background: "rgba(43,20,0,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon n="sparkle" size={18} color="var(--c-on-brand)" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 800, color: "var(--c-on-brand)", margin: "0 0 2px" }}>GUR Match</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-on-brand-2)", margin: 0 }}>Arkadaşınla birlikte kaydır, birlikte karar ver</p>
+            </div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--c-on-brand-2)" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6" /></svg>
+          </motion.div>
+        )}
+
+        {/* Kategoriler — yuvarlak simge şeridi. 2×2 ızgaranın yerine geçti:
+            aynı işlev, daha az yer, tek bakışta daha çok seçenek. */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, flexShrink: 0 }}>
+          <h3 style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "var(--c-ink)", margin: 0 }}>Ne canın çekti?</h3>
+          {/* 37×14 idi; görsel ölçü aynı, hedef `.gur-tap` ile 44. */}
+          <button type="button" className="gur-btn gur-tap" onClick={() => setShowAll(true)}
+            style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-ink-2)" }}>
+            Tümü
+          </button>
         </div>
+        <HScroll style={{ gap: 12, paddingBottom: 6, marginBottom: 16, flexShrink: 0 }}>
+          {CATEGORIES.slice(0, 8).map((c, i) => (
+            <motion.div key={c.name} onClick={() => onCategoryTap(c.name)}
+              whileTap={{ scale: 0.94 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+              style={{ flexShrink: 0, width: 66, cursor: "pointer", textAlign: "center", animation: `fadeInUp 0.4s ease-out ${i * 0.03}s both` }}>
+              <div style={{
+                width: 62, height: 62, borderRadius: "50%", overflow: "hidden", position: "relative",
+                margin: "0 auto 7px", border: "2px solid var(--c-line)", boxShadow: ELEV.restLight,
+              }}>
+                <Img src={c.img} box={124} style={{ position: "absolute", inset: 0 }} bg="var(--c-img-bg)" />
+              </div>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-ink)", lineHeight: 1.25, display: "block" }}>{c.name}</span>
+            </motion.div>
+          ))}
+        </HScroll>
+
+        {/* Yakınında popüler — önce yakınlık, sonra puan */}
+        {popular.length > 0 && (
+          <div style={{ marginBottom: 16, flexShrink: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+              <h3 style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "var(--c-ink)", margin: 0 }}>Yakınında popüler</h3>
+              {/* Görsel boyut korunuyor, dokunma hedefi `.gur-tap` ile
+                  44'e çıkıyor: 101×14 idi. */}
+              <button type="button" className="gur-btn gur-tap" onClick={onSwipe}
+                style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-ink-2)" }}>
+                Kaydırarak gez
+              </button>
+            </div>
+            <HScroll style={{ gap: 12, paddingBottom: 6 }}>
+              {popular.map(r => (
+                <motion.div key={r.id} onClick={() => onDetail?.(r)}
+                  whileTap={{ scale: 0.97 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                  style={{ flexShrink: 0, width: 208, background: "var(--c-card)", borderRadius: 22, overflow: "hidden", cursor: "pointer", boxShadow: ELEV.restLight }}>
+                  {/* layoutId ile detaydaki kapak görselinin AYNISI:
+                      karta dokununca görsel büyüyerek detayın kapağına
+                      dönüşüyor, iki ayrı resim arasında kesme olmuyor.
+                      Kimliğin mekan id'sine bağlı olması şart — sabit bir
+                      id verilseydi listedeki bütün kartlar tek bir
+                      görselmiş gibi birbirine morph olurdu. */}
+                  <motion.div layoutId={`gur-kapak-${r.id}`} style={{ position: "relative", height: 116 }}>
+                    <Img src={r.imgs?.[0]} box={416} style={{ position: "absolute", inset: 0 }} bg="var(--c-img-bg)" />
+                    {r.claimed && (
+                      <div style={{ position: "absolute", top: 9, right: 9, background: "rgba(255,255,255,0.92)", borderRadius: 999, padding: "3px 5px", display: "flex", alignItems: "center", boxShadow: "var(--sh-d1)" }}>
+                        <VerifiedStar size={12} />
+                      </div>
+                    )}
+                    {/* Anasayfada rozet restoranın üstünde */}
+                    <div style={{ position: "absolute", top: 9, left: 9 }}>
+                      <BadgeChips badges={badgesOf(r, badgeMap)} max={1} size="sm" />
+                    </div>
+                  </motion.div>
+                  <div style={{ padding: "11px 13px 13px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 3 }}>
+                      <p style={{ flex: 1, minWidth: 0, fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</p>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0, fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800, color: "var(--c-ink)" }}>
+                        <Icon n="star" size={12} color="var(--c-warn)" />{r.rating}
+                      </span>
+                    </div>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: "0 0 10px" }}>{r.cat}</p>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, minWidth: 0, fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)" }}>
+                        <Icon n="pin" size={11} color="var(--c-muted)" />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{distText(r)}</span>
+                      </span>
+                      {/* Saati bilinmeyen mekân için "Aç" denmez: durum çipi bir iddia. */}
+                      {r.hours && (
+                        <span style={{ flexShrink: 0, fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "var(--c-ok-ink)", background: "var(--c-ok-soft)", border: "1px solid rgba(19,179,100,0.22)", borderRadius: 999, padding: "6px 13px" }}>
+                          Aç
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </HScroll>
+          </div>
+        )}
 
         {/* Tüm Kategoriler butonu */}
         <div onClick={() => setShowAll(true)} style={{
-          margin: "14px 0", background: "#fff", borderRadius: 20, padding: "14px 20px",
+          margin: "14px 0", background: "var(--c-card)", borderRadius: 20, padding: "14px 20px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+          cursor: "pointer", boxShadow: "var(--sh-2)",
           transition: "transform 0.15s",
         }}
           onMouseDown={e => e.currentTarget.style.transform = "scale(0.97)"}
           onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 14, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
+            <div style={{ width: 40, height: 40, borderRadius: 14, background: "var(--c-subtle)", border: "1px solid var(--c-line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink-2)" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
             </div>
             <div>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 700, color: "#333", margin: 0 }}>Tüm Kategoriler</p>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#aaa", margin: 0 }}>{CATEGORIES.length} mutfak türü</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "var(--c-warm-ink)", margin: 0 }}>Tüm Kategoriler</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", margin: 0 }}>{CATEGORIES.length} mutfak türü</p>
             </div>
           </div>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c-warm-3)" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
+        </div>
+        </>
+        )}
+
         </div>
 
         {/* Alt bar — beyaz, sabit */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", margin: "0 0 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", margin: "12px 0 16px", boxShadow: "var(--sh-2)", flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF6600" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-brand-ink)", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
-          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
 
+      </div>
+
+      {/* Konum sayfası: izni yeniden dene ya da ilçe değiştir */}
+      {locSheet && <LocationSheet onClose={() => setLocSheet(false)} />}
+    </Screen>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// KAYDIRMA (Swipe) SAYFASI — Temiz, profesyonel
+// ═══════════════════════════════════════════════
+// ── Ödüllü video reklam ──────────────────────────────────────────────────
+// Geri sayım bitmeden kapatılamaz; bitince ödül verilir. Süre boyunca
+// ilerleme çubuğu doluyor, kullanıcı ne kadar kaldığını görüyor.
+function RewardedAdOverlay({ ad, onComplete, onAbort }) {
+  const [left, setLeft] = useState(AD_DURATION);
+  useEffect(() => {
+    if (left <= 0) return;
+    const t = setTimeout(() => setLeft(v => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [left]);
+  const done = left <= 0;
+  const pct = ((AD_DURATION - left) / AD_DURATION) * 100;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      style={{ position: "absolute", inset: 0, zIndex: 400, background: "#0a0500", display: "flex", flexDirection: "column" }}
+    >
+      {/* Video alanı */}
+      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg, ${ad.accent}, #0a0500)` }} />
+        {/* Restoranın gerçek videosu varsa O oynuyor. `muted` şart:
+            tarayıcı sesli otomatik oynatmayı engelliyor ve video hiç
+            başlamıyordu — geri sayım dolarken ekran boş kalıyordu. */}
+        {ad.video ? (
+          <video src={ad.video} autoPlay muted loop playsInline
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.85 }} />
+        ) : (
+          <Img src={ad.img} style={{ position: "absolute", inset: 0, opacity: 0.45 }} bg="transparent" />
+        )}
+        <div style={{ position: "absolute", inset: 0, background: scrim(0.9, 55, 0.2) }} />
+
+        {/* Üst şerit: reklam etiketi + geri sayım */}
+        <div style={{ position: "absolute", top: 44, left: 16, right: 16, display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 5 }}>
+          <span style={{ background: "rgba(255,255,255,0.16)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 20, padding: "4px 11px", fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 800, color: "#fff", letterSpacing: 0.6 }}>REKLAM</span>
+          {done ? (
+            <IconBtn onClick={onComplete} tone="glassLight" size={32} title="Kapat"
+              icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+          ) : (
+            <span style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "5px 13px", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.9)", fontVariantNumeric: "tabular-nums" }}>{left} sn</span>
+          )}
+        </div>
+
+        {/* Oynatma göstergesi — gerçek video oynuyorsa çizilmiyor. */}
+        {!ad.video && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
+            {ad.source === "google" ? (
+              // Google yedeği: AdSense/AdMob birimi bağlanana kadar yer
+              // tutucu. Akış tıkanmıyor, kullanıcı hakkını yine kazanıyor.
+              <div style={{ textAlign: "center", padding: 20 }}>
+                <div style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.8)", letterSpacing: 1.2, marginBottom: 6 }}>
+                  GOOGLE REKLAMI
+                </div>
+                <div style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, maxWidth: 230 }}>
+                  Yakınındaki mekanların hepsini izledin. Bu alan reklam ağından dolduruluyor.
+                </div>
+              </div>
+            ) : (
+              <div style={{ width: 62, height: 62, borderRadius: "50%", background: "rgba(255,255,255,0.14)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)"><polygon points="6 3 20 12 6 21" /></svg>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Marka bilgisi */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 20px 22px", zIndex: 5 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 800, color: "rgba(255,255,255,0.75)", margin: "0 0 4px" }}>{ad.brand}</p>
+          <h3 style={{ fontFamily: "var(--f-body)", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 6px", lineHeight: 1.25 }}>{ad.headline}</h3>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.6)", margin: "0 0 14px" }}>{ad.tagline}</p>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#fff", borderRadius: 999, padding: "9px 18px" }}>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: ad.accent }}>{ad.cta}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ad.accent} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </div>
+        </div>
+
+        {/* İlerleme — width yerine transform: layout tetiklemez, kompozitörde kalır */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, background: "rgba(255,255,255,0.12)", zIndex: 6, overflow: "hidden" }}>
+          <div style={{
+            width: "100%", height: "100%", background: "#FF6600",
+            transformOrigin: "left center", transform: `scaleX(${pct / 100})`,
+            transition: "transform 1s linear", willChange: "transform",
+          }} />
+        </div>
+      </div>
+
+      {/* Alt eylem */}
+      <div style={{ padding: "16px 20px 22px", background: "#0a0500" }}>
+        {done ? (
+          <Btn text={`+${REWARD_SWIPES} kaydırma hakkı al`} onClick={onComplete} variant="filled" icon={<Icon n="check" size={15} color="#fff" />} />
+        ) : (
+          <>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.45)", textAlign: "center", margin: "0 0 10px" }}>
+              Reklam bitince {REWARD_SWIPES} kaydırma hakkı kazanacaksın
+            </p>
+            {/* Çıkış yolu görünür olmalı: soluk bir bağlantı, kapana
+                kısılmışlık hissi verir. */}
+            <Btn text="Vazgeç" onClick={onAbort} variant="outline" size="sm" />
+          </>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// Kota dolduğunda çıkan teklif.
+//
+// Ekranın hiçbir yerinde "kalan hakkın: X" yazmaz; kullanıcı sayacı
+// izlemek yerine keşfetmeye odaklansın diye. Sınıra gelindiğinde de
+// ceza değil iki yol sunulur: bir reklam ya da GUR Plus.
+// Ekran geçişinin varyantları. Sekmeler arası geçişte içerik yatay
+// kayıyor; sekme olmayan geçişlerde (giriş, detay, yasal metin) yalnızca
+// yumuşak bir ölçek + solma — oralarda "sağ/sol" diye bir anlam yok.
+//
+// Yay Apple HIG'e göre: momentum taşımayan bir geçiş, o yüzden bounce 0.
+const EKRAN_GECIS = {
+  gir: (yon) => ({
+    opacity: 0,
+    x: yon === 0 ? 0 : yon * 34,
+    scale: yon === 0 ? 0.985 : 1,
+  }),
+  dur: {
+    opacity: 1, x: 0, scale: 1,
+    transition: { type: "spring", bounce: 0, duration: 0.42 },
+  },
+  cik: (yon) => ({
+    opacity: 0,
+    x: yon === 0 ? 0 : yon * -28,
+    scale: yon === 0 ? 0.99 : 1,
+    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
+  }),
+};
+
+function PremiumOffer({ onWatch, onExplore, onPlus }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      style={{ position: "absolute", inset: 0, zIndex: 350, background: "rgba(10,5,0,0.9)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 28 }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+        style={{ width: "100%", textAlign: "center" }}
+      >
+        {/* Zil çalıyor: kota dolduğunda "mutfak kapandı" demenin görsel
+            hâli. Ses YOK — izinsiz ses çalmak kaba, üstelik sessiz moddaki
+            telefonu da yok sayardı. */}
+        <div style={{ position: "relative", width: 120, height: 120, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span className="gur-bell-wave" />
+          <span className="gur-bell-wave" />
+          <DinnerBell size={96} />
+        </div>
+        <h3 style={{ fontFamily: "var(--f-body)", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px" }}>Bugünlük bu kadar keşif</h3>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: "0 0 22px", lineHeight: 1.55 }}>
+          Yarın taze bir deste seni bekliyor. Şimdi devam etmek istersen
+          kısa bir reklam izleyip aramaya devam edebilirsin.
+        </p>
+        <Btn text="GUR Plus ile sınırsız keşfet" onClick={onPlus} variant="filled"
+          icon={<Icon n="sparkle" size={15} color="#fff" />} />
+        <div style={{ marginTop: 10 }}>
+          <Btn text="Reklam izle, aramaya devam et" onClick={onWatch} variant="onColor" size="md" />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <Btn text="Keşfete dön" onClick={onExplore} variant="outline" size="sm" />
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// KONUM DOĞRULAMALI ZİYARET — arayüz parçaları
+// ═══════════════════════════════════════════════
+
+// GUR Plus — kota teklifinin karşılığı. Fiyat ve fayda tek ekranda,
+// karşılaştırma tablosu yok: tek plan, tek karar (§16 — sadelik).
+function PremiumSheet({ onClose }) {
+  const [period, setPeriod] = useState("month");
+  const price = period === "month" ? "₺79 / ay" : "₺690 / yıl";
+  return (
+    <Sheet title="GUR Plus" subtitle="Sınırsız keşif" onClose={onClose}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        {/* İNDİRİM ORANI ÖLÇÜLDÜ. "2 ay hediye" tutmuyordu: ₺79×12 = ₺948,
+            yıllık ₺690 → aradaki fark ₺258, yani ~%27 (2 ay değil ~3.3 ay).
+            Fiyat iddiası doğrulanabilir olmalı, oranı yazıyoruz. */}
+        {[["month", "Aylık"], ["year", "Yıllık · %27 indirim"]].map(([id, label]) => (
+          <button key={id} type="button" className="gur-btn" onClick={() => setPeriod(id)}
+            style={{
+              flex: 1, border: period === id ? "none" : "1px solid rgba(45,36,25,0.14)",
+              background: period === id ? "#FF6600" : "#fff",
+              color: period === id ? "#fff" : "var(--c-ink-2)",
+              borderRadius: 999, padding: "10px 0", cursor: "pointer", outline: "none",
+              fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700,
+            }}>{label}</button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 11, marginBottom: 20 }}>
+        {[
+          ["sparkle", "Günlük kaydırma sınırı yok"],
+          ["heart", "Sınırsız süper beğeni"],
+          ["shield", "Reklamsız keşif akışı"],
+          ["star", "Gastro Onaylı mekânlara erken erişim"],
+        ].map(([icon, text]) => (
+          <div key={text} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Icon n={icon} size={15} color="#FF6600" />
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink)" }}>{text}</span>
+          </div>
+        ))}
+      </div>
+
+      <Btn text={`${price} ile başla`} onClick={onClose} variant="filled" />
+      {/* Abonelik ekranının söylemesi GEREKEN şey: ne zaman yenilendiği ve
+          nasıl durdurulacağı. Fiyatı ve faydayı yazıp bunu atlamak, kararı
+          eksik bilgiyle aldırmak olurdu. */}
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", textAlign: "center", margin: "10px 0 0", lineHeight: 1.5 }}>
+        {period === "month" ? "Her ay" : "Her yıl"} otomatik yenilenir; profilinden
+        istediğin zaman iptal edebilirsin. İptal edersen dönem sonuna kadar açık kalır.
+      </p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", textAlign: "center", margin: "6px 0 0", lineHeight: 1.5 }}>
+        Demo sürümü — ödeme entegrasyonu (iyzico/Stripe) bağlanmadı.
+      </p>
+    </Sheet>
+  );
+}
+
+// İzin istemi gerekçesiz açılmaz: reddedilen konum izni geri alınması
+// zor bir karar, önce ne işe yaradığını anlatıyoruz (§16 — sorumluluk).
+// ═══════════════════════════════════════════════
+// KONUM KURULUMU — girişten hemen sonra
+//
+// İzin istemini gerekçesiz açmak reddedilme oranını yükseltiyor ve
+// reddedildikten sonra tarayıcı bir daha sormuyor. Bu yüzden önce neden
+// istediğimizi söyleyen bir adım var; reddedilirse akış tıkanmıyor,
+// kullanıcı ilçesini elle seçip devam edebiliyor.
+// ═══════════════════════════════════════════════
+// İlçe seçici: AÇIK bölgeler üstte ve seçilebilir, henüz açılmamış olanlar
+// altta "ÇOK YAKINDA" parıltısıyla ve seçilemez. Hangi bölgenin açık olduğu
+// yönetici panelinden geliyor (platform.js → isDistrictOpen); iki yerde
+// (kurulum ekranı ve konum sayfası) aynı bileşen çiziliyor.
+function DistrictGrid({ onPick, selected }) {
+  const platform = usePlatformSettings();
+  const acik = geo.DISTRICTS.filter(d => isDistrictOpen(d.name, platform));
+  const yakinda = geo.DISTRICTS.filter(d => !isDistrictOpen(d.name, platform));
+  const baslik = (t, n) => (
+    <p style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-muted)", margin: "0 0 8px", letterSpacing: 0.6 }}>
+      {t} · {n}
+    </p>
+  );
+  const izgara = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 8 };
+  return (
+    <div>
+      {acik.length > 0 && (
+        <>
+          {baslik("AÇIK BÖLGELER", acik.length)}
+          <div style={{ ...izgara, marginBottom: yakinda.length ? 18 : 0 }}>
+            {acik.map(d => {
+              const on = selected === d.name;
+              return (
+                <button
+                  key={d.name} type="button" className="gur-btn"
+                  onClick={() => onPick(d)} aria-pressed={on}
+                  style={{
+                    "--btn-bg": on ? "var(--c-brand-soft)" : "var(--c-subtle)",
+                    "--btn-bg-hover": "var(--c-brand-soft)",
+                    "--btn-bg-press": "rgba(255,102,0,0.18)",
+                    border: `1px solid ${on ? "rgba(255,102,0,0.4)" : "var(--c-line)"}`,
+                    borderRadius: 14, padding: "11px 8px", outline: "none", minHeight: 44,
+                    fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700,
+                    color: on ? "var(--c-brand-ink)" : "var(--c-ink)",
+                  }}>{d.name}</button>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {acik.length === 0 && (
+        <p role="status" style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: "0 0 16px", lineHeight: 1.5 }}>
+          Şu an hizmet verdiğimiz bir bölge yok. Çok yakında.
+        </p>
+      )}
+      {yakinda.length > 0 && (
+        <>
+          {baslik("ÇOK YAKINDA", yakinda.length)}
+          <div style={izgara}>
+            {yakinda.map(d => (
+              // Seçilemez ama SOLUK DEĞİL: pasif durum opacity ile kurulmuyor,
+              // fark çerçevedeki parıltı ve etiketle.
+              <div
+                key={d.name} className="gur-soon" role="button" aria-disabled="true"
+                aria-label={`${d.name}: çok yakında açılacak`}
+                style={{
+                  background: "var(--c-brand-soft)", borderRadius: 14, padding: "9px 8px 8px",
+                  minHeight: 44, textAlign: "center", boxSizing: "border-box",
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
+                  cursor: "default",
+                }}>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)" }}>{d.name}</span>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.9, color: "var(--c-brand-ink-soft)" }}>ÇOK YAKINDA</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function LocationSetupScreen({ onDone, step = null }) {
+  const [busy, setBusy] = useState(false);
+  const [denied, setDenied] = useState(false);
+  const [picking, setPicking] = useState(false);
+
+  const izinIste = async () => {
+    setBusy(true);
+    const o = await geo.requestLocation();
+    setBusy(false);
+    if (o) { onDone(); return; }
+    // Reddedildi ya da alınamadı: akışı tıkamıyoruz, ilçe seçimine geçiyoruz.
+    setDenied(true);
+    setPicking(true);
+  };
+
+  return (
+    <Screen>
+      <div style={{ padding: "56px 26px 40px", minHeight: "100%", display: "flex", flexDirection: "column" }}>
+        {/* Gösterge YALNIZCA kayıttan gelindiğinde. Girişten gelen
+            kullanıcı için bu tek ekranlık bir adım ve "1/1" yazan bir
+            çubuk bilgi değil gürültü olurdu. */}
+        {step && <StepProgress current={step} total={2} label={`Kurulum adımı ${step} / 2`} />}
+        <div style={{ textAlign: "center", marginBottom: 26 }}>
+          {/* İzin kutusu açıkken konum bulmak saniyeler sürebiliyor ve
+              o sırada ekranda hiçbir şey olmuyordu — kullanıcı düğmenin
+              çalışmadığını sanıyor. Bekleme boyunca iğnenin yerini küre
+              alıyor: aynı kutuda, aynı ölçüde, düzen zıplamıyor. */}
+          <div style={{
+            width: 68, height: 68, borderRadius: 24, margin: "0 auto 16px",
+            background: "var(--c-brand-soft)", border: "1px solid rgba(255,102,0,0.18)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            {busy ? <Orb size={54} label="Konum aranıyor" /> : <Icon n="pin" size={30} color="#FF6600" />}
+          </div>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 24, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 8px" }}>
+            Nerede yemek arıyorsun?
+          </h2>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.55, margin: 0 }}>
+            Konumunu bilirsek deste sana en yakın mekanlarla başlar ve
+            uzaklaştıkça açılır. Vermezsen ilçeni seçebilirsin.
+          </p>
+        </div>
+
+        {denied && (
+          <div role="status" style={{
+            background: "var(--c-warn-soft)", border: "1px solid rgba(245,158,11,0.28)",
+            borderRadius: 14, padding: "11px 13px", marginBottom: 16,
+            fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-warn-ink)", lineHeight: 1.5,
+          }}>
+            Konum izni alınamadı. Tarayıcı ayarlarından açabilir ya da aşağıdan
+            ilçeni seçebilirsin — sonradan sol üstteki konum satırından değiştirebilirsin.
+          </div>
+        )}
+
+        {picking ? (
+          <>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-muted)", margin: "0 0 10px", letterSpacing: 0.3 }}>
+              İLÇENİ SEÇ
+            </p>
+            <DistrictGrid onPick={d => { geo.setManualOrigin(d); onDone(); }} />
+            {!denied && (
+              <div style={{ marginTop: 14 }}>
+                <Btn text="Konumumu kullan" onClick={izinIste} loading={busy} variant="outlineDark" size="md" />
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <Btn text="Konumumu kullan" onClick={izinIste} loading={busy} variant="filled" />
+            <div style={{ height: 10 }} />
+            <Btn text="İlçemi seçeyim" onClick={() => setPicking(true)} variant="outlineDark" />
+          </>
+        )}
+
+        <div style={{ marginTop: "auto", paddingTop: 22 }}>
+          {/* "Şimdi değil" de bir karar: reddetmek kabul etmek kadar kolay
+              olmalı ve her açılışta tekrar sorulmamalı.
+
+              EŞİT AĞIRLIK ÖLÇÜLDÜ. Üstteki iki yol 341×53 / 16px iken bu
+              341×35 / 12.5px idi: "eşit ağırlık" yazılıydı ama doğru
+              değildi, üstelik 35px dokunma hedefi de 44'ün altındaydı.
+              Aynı boy, aynı punto; ayrım yalnızca varyantta (dolgusuz
+              hap), çünkü birincil eylem bu değil — ama küçük de değil. */}
+          <Btn text="Şimdi değil" onClick={() => { geo.markConsentSkipped(); onDone(); }} variant="plainDark" size="lg" />
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-muted)", textAlign: "center", margin: "10px 0 0", lineHeight: 1.5 }}>
+            Ham koordinatın sunucuya gönderilmez; yalnızca sıralama için bellekte tutulur.
+          </p>
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+// Başlıktaki konum satırından açılır: izni yeniden dene ya da ilçe değiştir.
+function LocationSheet({ onClose }) {
+  const loc = geo.useUserLocation();
+  const [busy, setBusy] = useState(false);
+  const [durum, setDurum] = useState(null);
+  useEffect(() => { geo.permissionState().then(setDurum); }, []);
+
+  const izinIste = async () => {
+    setBusy(true);
+    const o = await geo.requestLocation();
+    setBusy(false);
+    setDurum(await geo.permissionState());
+    if (o) onClose();
+  };
+
+  return (
+    <Sheet title="Konum" subtitle="Deste buna göre sıralanır" onClose={onClose}>
+      {loc.source === "device" && (
+        <p role="status" style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-ok-ink)", margin: "0 0 14px", lineHeight: 1.5 }}>
+          Cihaz konumun kullanılıyor.
+        </p>
+      )}
+      {durum === "denied" && (
+        <p role="status" style={{
+          background: "var(--c-warn-soft)", border: "1px solid rgba(245,158,11,0.28)", borderRadius: 12,
+          padding: "10px 12px", fontFamily: "var(--f-body)", fontSize: 12.5,
+          color: "var(--c-warn-ink)", margin: "0 0 14px", lineHeight: 1.5,
+        }}>
+          Konum izni tarayıcıda reddedilmiş. Tarayıcı ayarlarından açman gerekiyor —
+          o zamana kadar ilçeni seçebilirsin.
+        </p>
+      )}
+
+      {durum !== "denied" && (
+        <div style={{ marginBottom: 16 }}>
+          <Btn text={loc.source === "device" ? "Konumu yenile" : "Konumumu kullan"}
+            onClick={izinIste} loading={busy} variant="filled" size="md" />
+        </div>
+      )}
+
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-muted)", margin: "0 0 10px", letterSpacing: 0.3 }}>
+        İLÇE SEÇ
+      </p>
+      <DistrictGrid selected={loc.source === "manual" ? loc.label : null}
+        onPick={d => { geo.setManualOrigin(d); onClose(); }} />
+    </Sheet>
+  );
+}
+
+function LocationRationale({ onAllow, onDemo, onClose }) {
+  return (
+    <Sheet title="Konumla doğrulanmış yorumlar" subtitle="Neden konum istiyoruz" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 18 }}>
+        {[
+          ["check", "Gittiğin yeri doğrularız", "Bir mekânda 15 dakika kaldığında ziyaret doğrulanır ve yorum alanın açılır."],
+          ["star", "Yorumun daha çok değer taşır", "Doğrulanmış yorumlar rozet alır ve listede önde görünür."],
+          ["shield", "Konumun bizde kalmaz", "Yalnızca hangi mekâna ne kadar yakın kaldığın özeti tutulur; koordinat geçmişi kaydedilmez."],
+        ].map(([icon, title, body]) => (
+          <div key={title} style={{ display: "flex", gap: 11 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: "rgba(255,102,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon n={icon} size={15} color="#FF6600" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 2px" }}>{title}</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", lineHeight: 1.5, margin: 0 }}>{body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <Btn text="Konum iznini ver" onClick={onAllow} variant="filled" />
+      <div style={{ marginTop: 9 }}>
+        {/* Önizleme ortamında gerçek konum yok; akışın denenebilmesi için. */}
+        <Btn text="Demo: bu mekânda olduğumu varsay" onClick={onDemo} variant="outlineDark" size="md" />
+      </div>
+      <div style={{ marginTop: 9 }}>
+        <Btn text="Şimdi değil" onClick={onClose} variant="destructiveSoft" size="md" />
+      </div>
+    </Sheet>
+  );
+}
+
+// Ziyaretten bir süre sonra gelen "deneyim nasıldı" daveti.
+function VisitPrompt({ visit, onWrite, onDismiss }) {
+  return (
+    <motion.div
+      role="status" aria-live="polite"
+      initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
+      transition={{ type: "spring", bounce: 0.2, duration: 0.45 }}
+      style={{
+        position: "absolute", left: 12, right: 12, bottom: 92, zIndex: 800,
+        background: "rgba(20,14,8,0.94)", backdropFilter: "blur(14px)",
+        border: "1px solid rgba(255,255,255,0.1)", borderRadius: 22,
+        padding: "14px 15px", boxShadow: "var(--sh-d3)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 11, background: "rgba(255,102,0,0.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon n="chat" size={15} color="var(--c-warn)" />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "#fff", margin: "0 0 3px" }}>
+            {visit.restaurantName} nasıldı?
+          </p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45, margin: "0 0 11px" }}>
+            Ziyaretin doğrulandı. Deneyimini yazarsan yorumun rozet alır.
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn text="Yorum yaz" onClick={onWrite} variant="filled" size="sm" fullWidth={false} />
+            <Btn text="Sonra" onClick={onDismiss} variant="plain" size="sm" fullWidth={false} />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// İşletme masa talebini karara bağladığında misafire çıkan şerit.
+// VisitPrompt ile aynı yerde ve aynı biçimde duruyor: bildirim tek bir
+// dille konuşsun, kullanıcı "bu da ne" diye düşünmesin.
+function ReservationNotice({ record, onOpen, onDismiss }) {
+  const ok = record.status === "confirmed";
+  return (
+    <motion.div
+      role="status" aria-live="polite"
+      initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
+      transition={{ type: "spring", bounce: 0.2, duration: 0.45 }}
+      style={{
+        position: "absolute", left: 12, right: 12, bottom: 92, zIndex: 800,
+        background: "rgba(20,14,8,0.94)", backdropFilter: "blur(14px)",
+        border: `1px solid ${ok ? "rgba(76,175,80,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: 22,
+        padding: "14px 15px", boxShadow: "var(--sh-d3)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 11, background: ok ? "rgba(76,175,80,0.18)" : "rgba(255,59,48,0.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon n={ok ? "check" : "cross"} size={15} color={ok ? "var(--c-ok-light)" : "var(--c-bad-light)"} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "#fff", margin: "0 0 3px" }}>
+            {ok ? "Rezervasyonun kabul edildi" : "Rezervasyonun kabul edilmedi"}
+          </p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45, margin: "0 0 11px" }}>
+            {record.restaurantName} · {record.day} {record.time} · {record.people} kişi
+            {ok ? " — masan hazır." : " — başka bir saat deneyebilirsin."}
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn text={ok ? "Yol tarifi al" : "Başka saat seç"} onClick={onOpen} variant="filled" size="sm" fullWidth={false} />
+            <Btn text="Tamam" onClick={onDismiss} variant="plain" size="sm" fullWidth={false} />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// PAYLAŞILAN RESTORAN PARÇALARI
+//
+// Aynı bilgi hem kaydırma kartındaki detay sayfasında hem tam detay
+// ekranında görünüyor. İki yerde ayrı yazmak, birinin sessizce geride
+// kalması demek — bu yüzden tek bileşen.
+// ═══════════════════════════════════════════════
+
+
+// İşletmenin aldığı hizmetler. Sponsorluğu gizlemek yerine açıkça
+// yazıyoruz: kullanıcı bir kartın neden öne çıktığını görebilmeli.
+/**
+ * Galeri slaytları: şef tanıtımı restoran görselleriyle aynı diziye giriyor.
+ *
+ * İkinci sıraya konuyor — ilk kare mekânın kendi kapağı olarak kalsın ama
+ * video da ilk kaydırmada çıksın. Rozet yalnızca bu slaytta, sağ üstte:
+ * hangi karenin video olduğu bakışta anlaşılmalı.
+ */
+function galleryOf(r, showChef = true) {
+  const photos = (r.imgs || []).map(src => ({ src, chef: false }));
+  if (!showChef || !(r.gastro && r.gastroVideo)) return photos;
+  const chef = { src: r.gastroVideo, chef: true, chefName: r.gastroChef };
+  return photos.length ? [photos[0], chef, ...photos.slice(1)] : [chef];
+}
+
+// Video slaytının üstündeki katman: oynat düğmesi, sağ üst rozet ve
+// altta şefin adı.
+function ChefOverlay({ chefName, compact = false }) {
+  return (
+    <>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.28)", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+        <div style={{ width: compact ? 44 : 52, height: compact ? 44 : 52, borderRadius: "50%", background: "rgba(255,255,255,0.92)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--sh-d2)" }}>
+          <svg width={compact ? 17 : 20} height={compact ? 17 : 20} viewBox="0 0 24 24" fill="#FF6600"><polygon points="6 3 20 12 6 21" /></svg>
+        </div>
+      </div>
+      <div style={{
+        position: "absolute", top: compact ? 24 : 10, right: 10, pointerEvents: "none",
+        display: "inline-flex", alignItems: "center", gap: 5,
+        background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)",
+        border: "1px solid rgba(255,255,255,0.22)", borderRadius: 20, padding: "4px 10px",
+      }}>
+        <Icon n="sparkle" size={10} color="var(--c-warn)" />
+        <span style={{ fontFamily: "var(--f-body)", fontSize: 10, fontWeight: 800, color: "#fff", letterSpacing: 0.2 }}>Şef Tanıtımı</span>
+      </div>
+      {chefName && (
+        <div style={{ position: "absolute", bottom: 10, left: 12, right: 12, pointerEvents: "none" }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.92)", margin: 0, textShadow: "0 1px 6px rgba(0,0,0,0.6)" }}>{chefName} · 15 sn</p>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// YORUM KAPISI — uygulamanın her yerinde aynı
+//
+// Yorum yazma tek bir kuralla açılıyor: mekânda konumla doğrulanmış bir
+// ziyaret. Kart detayında da, tam detay ekranında da bu bileşen kullanılıyor
+// ki kilit, gerekçe ve doğrulama düğmesi her yerde aynı olsun.
+// ═══════════════════════════════════════════════
+function ReviewGate({ restaurant, onReview, onVerifyLocation, compact = false }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => visits.subscribeVisits(() => setTick(t => t + 1)), []);
+  const unlocked = tick >= 0 && visits.reviewPermission(restaurant.id).allowed;
+  // Takip durumu doğrudan geo'dan okunuyor, prop olarak inmiyor: iki ayrı
+  // ekran (kart sayfası ve tam detay) aynı bileşeni çiziyor ve prop
+  // zincirinde birini güncellemeyi unutmak iki ekranın farklı şey
+  // söylemesi demekti. Cihaz izni varsa ziyaret takibi zaten çalışıyor.
+  const tracking = geo.useUserLocation().source === "device";
+
+  return (
+    <div style={{
+      background: unlocked ? "rgba(34,197,94,0.07)" : "#FBFAF8",
+      border: `1px solid ${unlocked ? "rgba(34,197,94,0.2)" : "var(--c-border)"}`,
+      borderRadius: 16, padding: compact ? "12px 14px" : "13px 15px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <Icon n={unlocked ? "check" : "shield"} size={14} color={unlocked ? "var(--c-ok-ink)" : "var(--c-muted)"} />
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: 0 }}>
+          {unlocked ? "Yorum yazabilirsin" : "Yorum konumla açılır"}
+        </p>
+      </div>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-muted)", lineHeight: 1.5, margin: "0 0 10px" }}>
+        {unlocked
+          ? "Bu mekânda geçirdiğin zaman doğrulandı; yorumun “Konumla doğrulandı” rozetiyle yayınlanır."
+          : tracking
+            ? "Konum iznin açık. Bu mekânda 15 dakika dolunca yorum alanı kendiliğinden açılır — bir şey yapmana gerek yok."
+            : "Mekânda en az 15 dakika kaldığında yorum alanı kendiliğinden açılır ve yorumun doğrulanmış sayılır."}
+      </p>
+      {unlocked ? (
+        <Btn text="Deneyimini yaz" onClick={onReview} variant="filled" size="md" />
+      ) : tracking ? (
+        // İzin zaten verilmiş: "konumumu doğrula" demek kullanıcıya
+        // vermiş olduğu izni tekrar istemek olurdu. Onun yerine durum
+        // yazılıyor; önizlemede test edilebilsin diye demo yolu düz bir
+        // bağlantı olarak duruyor.
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Icon n="check" size={13} color="var(--c-ok-ink)" />
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-ok-ink)" }}>
+            Konumun izleniyor
+          </span>
+          <div style={{ flex: 1 }} />
+          <Btn text="Demo: buradayım" onClick={() => onVerifyLocation?.(restaurant)}
+            variant="plainDark" size="sm" fullWidth={false} />
+        </div>
+      ) : (
+        <Btn text="Buradayım, konumumu doğrula" onClick={() => onVerifyLocation?.(restaurant)} variant="outlineDark" size="md" />
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// DIŞ KAYNAK YORUMLARI (Google Haritalar)
+//
+// Bu yorumlar bize ait değil: yazarın adı, bağlantısı ve kaynağı korunmak
+// zorunda. Sağlayıcı anahtarı tanımlı değilken örnek satırlar gösteriliyor
+// ve "örnek" etiketiyle işaretleniyor — Google yorumu gibi sunulmuyor.
+// ═══════════════════════════════════════════════
+function ExternalReviews({ reviews = [], photos = [], restaurant, loading }) {
+  const [open, setOpen] = useState(false);
+  const [buyut, setBuyut] = useState(null);
+  // Açıkken HEPSİ çiziliyor ve liste KENDİ İÇİNDE kayıyor: eskiden
+  // "2 yorum daha" sayfayı uzatıyordu ve sekiz yorumda detay sayfası
+  // yorumlardan ibaret kalıyordu. Kapalıyken ilk iki yorum görünür.
+  const shown = open ? reviews : reviews.slice(0, 2);
+  const sample = reviews.length > 0 && reviews.every(r => r.provider !== "google_places");
+  const mapsUrl = placeUrl({ name: restaurant.name, address: restaurant.addr, lat: restaurant.lat, lng: restaurant.lng }, "google");
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#4285F4" d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z" opacity=".9" />
+          <circle cx="12" cy="9" r="2.6" fill="#fff" />
+        </svg>
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: 0 }}>
+          Google Haritalar yorumları
+        </p>
+        {sample && (
+          <span style={{ fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.3, color: "#B45309", background: "var(--c-warn-soft)", borderRadius: 6, padding: "2px 7px" }}>ÖRNEK</span>
+        )}
+      </div>
+
+      {loading ? (
+        // Düz "Yükleniyor…" yazısı sayfanın şeklini tutmuyordu: yorumlar
+        // gelince düzen zıplıyordu. İskelet gelecek satırların yerini
+        // şimdiden ayırıyor.
+        <div role="status" aria-label="Yorumlar yükleniyor" style={{ display: "grid", gap: 14 }}>
+          {[0, 1].map(i => (
+            <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+              <Skeleton w={22} h={22} radius={11} />
+              <div style={{ flex: 1, display: "grid", gap: 7 }}>
+                <Skeleton w="42%" h={11} />
+                <Skeleton w="100%" h={10} />
+                <Skeleton w="78%" h={10} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : reviews.length === 0 ? (
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-muted)", lineHeight: 1.55, margin: 0 }}>
+          Bu mekan için Google yorumu çekilmedi. Places anahtarı tanımlanınca besleme
+          turu yorumları otomatik getirir.
+        </p>
+      ) : (
+        <>
+        <div data-yorum-kutusu={open ? "acik" : "kapali"} style={open ? {
+          maxHeight: 260, overflowY: "auto", overscrollBehavior: "contain",
+          borderTop: "1px solid rgba(0,0,0,0.05)", borderBottom: "1px solid rgba(0,0,0,0.05)",
+        } : undefined}>
+          {shown.map((rv, i) => (
+            <div key={i} style={{ padding: "10px 0", borderBottom: i < shown.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                {rv.author_photo
+                  ? <img src={rv.author_photo} alt="" loading="lazy" decoding="async" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover" }} />
+                  : <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#EFE9E2", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--f-body)", fontSize: 10, fontWeight: 800, color: "var(--c-muted)" }}>{(rv.author_name || "?").charAt(0)}</div>}
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700, color: "var(--c-ink)" }}>{rv.author_name || "Google kullanıcısı"}</span>
+                <span style={{ display: "flex", gap: 1, marginLeft: "auto" }}>
+                  {[1, 2, 3, 4, 5].map(n => <Icon key={n} n="star" size={10} color={n <= (rv.rating || 0) ? "var(--c-warn)" : "#E5E0D8"} />)}
+                </span>
+              </div>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-ink-2)", lineHeight: 1.5, margin: "0 0 3px" }}>{rv.body}</p>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "var(--c-muted)" }}>{rv.relative_time || ""}</span>
+            </div>
+          ))}
+        </div>
+          {reviews.length > 2 && (
+            <button type="button" className="gur-btn" onClick={() => setOpen(o => !o)}
+              style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-brand-ink)" }}>
+              {open ? "Daha az göster" : `${reviews.length - 2} yorum daha`}
+            </button>
+          )}
+        </>
+      )}
+
+      {/* ─── DIŞ KAYNAK GÖRSELLERİ ───
+          Google Places'ten gelen mekan fotoğrafları (ve varsa videolar).
+          Sunucu bunları zaten döndürüyordu ama istemci cephesi alanı
+          DÜŞÜRÜYORDU — arayüze hiç ulaşmıyorlardı (bkz. lib/backend.js →
+          loadRestaurantDetail). Yatay şerit: dikey listeye koymak
+          yorumları aşağı itiyordu. */}
+      {photos.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "var(--c-muted)", margin: "0 0 7px" }}>
+            Google Haritalar görselleri
+          </p>
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", overscrollBehavior: "contain", paddingBottom: 4 }}>
+            {photos.map((f, i) => (
+              <button key={i} type="button" onClick={() => setBuyut(f)}
+                aria-label={`${restaurant.name} görseli ${i + 1} — büyüt`}
+                style={{ flexShrink: 0, width: 108, height: 80, borderRadius: 12, overflow: "hidden",
+                  border: "1px solid var(--c-border)", padding: 0, cursor: "pointer", background: "#EFE9E2",
+                  position: "relative", outline: "none" }}>
+                {f.video ? (
+                  <>
+                    <video src={f.url} muted playsInline preload="metadata"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <span aria-hidden style={{ position: "absolute", inset: 0, display: "flex",
+                      alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.28)" }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><polygon points="6 3 20 12 6 21" /></svg>
+                    </span>
+                  </>
+                ) : (
+                  <img src={f.url} alt="" loading="lazy" decoding="async"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Büyütme — görsel de video da tam boy. */}
+      <AnimatePresence>
+        {buyut && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setBuyut(null)}
+            role="dialog" aria-modal="true" aria-label="Görsel önizleme"
+            style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(8,6,4,0.88)",
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+            {buyut.video
+              ? <video src={buyut.url} controls autoPlay playsInline
+                  style={{ maxWidth: "100%", maxHeight: "80vh", borderRadius: 14, background: "#000" }} />
+              : <img src={buyut.url} alt="" style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderRadius: 14 }} />}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <button type="button" className="gur-btn"
+        onClick={() => window.open(mapsUrl, "_blank", "noopener,noreferrer")}
+        style={{ display: "block", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: "8px 0 0", fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 600, color: "var(--c-muted)", textDecoration: "underline" }}>
+        Google Haritalar'da aç
+      </button>
+    </div>
+  );
+}
+
+// Sahiplenilmemiş mekânda menüye basılınca çıkan sayfa.
+//
+// Metin iki ekranda birebir aynı olmalı; kopyalayıp yapıştırmak ikisinin
+// zamanla ayrışması demek, o yüzden tek bileşen.
+function NotYetSheet({ r, onClose }) {
+  return (
+    <Sheet title="Bu mekan henüz GUR uldamadı" subtitle={r.name} onClose={onClose}>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink-2)", lineHeight: 1.6, margin: "0 0 8px" }}>
+        {r.name} GUR'daki kaydını henüz sahiplenmedi. Sahiplendiği gün menüsü ve
+        masa ayırtma tam burada açılacak.
+      </p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "var(--c-brand-ink)", margin: "0 0 16px" }}>
+        Çok yakında.
+      </p>
+      <Btn text="Tamam, beklerim" onClick={onClose} variant="filled" />
+    </Sheet>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// KART DETAY SAYFASI — Bumble kalıbı
+//
+// Detay ayrı bir ekrana gitmez: kartın üstünde açılan, iki durak noktalı
+// (yarım / tam) genişleyebilir bir sayfa. Kaydırma akışı arkada durur,
+// sayfa kapanınca kullanıcı desteyi kaybetmeden devam eder.
+// ═══════════════════════════════════════════════
+const SHEET_PEEK = 0.46;    // ekranın üstünden bu oranda açılır
+const SHEET_FULL = 0.06;
+
+function CardDetailSheet({ r, onClose, onSave, onReview, onDirections, onVerifyLocation }) {
+  // Kapılar tam detay ekranıyla aynı kaynaktan: bir özellik iki ekranda
+  // farklı davranırsa kullanıcı hangisinin doğru olduğunu bilemez.
+  const canMenu = useFeature("menuEnabled", r?.id);
+  const chefVideoOn = useFeature("gastroVideoEnabled", r?.id);
+  const panelRef = useRef(null);
+  const [full, setFull] = useState(false);
+  const [ii, setIi] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(null);
+  const [soon, setSoon] = useState(false);
+  // İşletmenin aldığı hizmetler ve Google yorumları kartta yok; detay
+  // açıldığında ayrıca yükleniyor.
+  const [detail, setDetail] = useState(null);
+  useEffect(() => {
+    let off = false;
+    // .catch() ŞART: `detail` null kaldığı sürece iskelet dönmeye devam
+    // eder. Cephe kendi içinde yerele düşüyor ama bu yoldan sonra atılan
+    // bir hata (ya da reddedilen bir söz) sonsuz iskelet demekti — ekranda
+    // dönen ama asla bitmeyen bir yükleme, hatanın en kötü hâli.
+    backend.loadRestaurantDetail(r)
+      .then(d => { if (!off) setDetail(d); })
+      .catch(() => { if (!off) setDetail({ services: null, externalReviews: [], externalPhotos: [] }); });
+    return () => { off = true; };
+  }, [r]);
+  const claimed = !!(detail?.services?.claimed ?? (r.claimed || r.ownerClaimed));
+  const y = useMotionValue(0);
+  const drag = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const scrimOpacity = useTransform(y, [0, 400], [1, 0]);
+
+  const height = () => panelRef.current?.offsetHeight || 600;
+  const peekY = () => Math.round(height() * (SHEET_PEEK - SHEET_FULL));
+
+  useLayoutEffect(() => {
+    y.set(height());
+    animate(y, peekY(), { type: "spring", bounce: 0.2, duration: 0.4 });
+     
+  }, []);
+
+  const close = () => {
+    animate(y, height(), { type: "spring", bounce: 0, duration: 0.32 }).then(onClose);
+  };
+  const expand = () => {
+    setFull(true);
+    animate(y, 0, { type: "spring", bounce: 0.2, duration: 0.4 });
+  };
+  const collapse = () => {
+    setFull(false);
+    animate(y, peekY(), { type: "spring", bounce: 0.2, duration: 0.4 });
+  };
+
+  const onPointerDown = (e) => {
+    // Düğmeden başlayan basış sürükleme değildir: pointer'ı yakalarsak
+    // tıklama butona hiç ulaşmıyor ve kapatma çalışmıyordu.
+    if (e.target.closest("button")) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { startY: e.clientY, base: y.get(), hist: [[performance.now(), e.clientY]] };
+    setDragging(true);
+  };
+  const onPointerMove = (e) => {
+    const d = drag.current; if (!d) return;
+    const raw = d.base + (e.clientY - d.startY);
+    // Üst sınırın ötesine lastik direnç (§9)
+    y.set(raw < 0 ? -rubberband(-raw, height()) : raw);
+    d.hist.push([performance.now(), e.clientY]);
+    if (d.hist.length > 6) d.hist.shift();
+  };
+  const onPointerUp = () => {
+    const d = drag.current; if (!d) return;
+    drag.current = null; setDragging(false);
+    const [t0, y0] = d.hist[0];
+    const [t1, y1] = d.hist[d.hist.length - 1];
+    const velocity = t1 > t0 ? ((y1 - y0) / (t1 - t0)) * 1000 : 0;
+    // §6 — hızın taşıyacağı noktaya en yakın durak seçilir
+    const projected = y.get() + projectMomentum(velocity);
+    const stops = [0, peekY(), height()];
+    const target = stops.reduce((a, b) => (Math.abs(b - projected) < Math.abs(a - projected) ? b : a));
+    if (target === height()) { animate(y, height(), { type: "spring", bounce: 0, duration: 0.35, velocity }).then(onClose); return; }
+    setFull(target === 0);
+    animate(y, target, { type: "spring", bounce: 0.2, duration: 0.35, velocity });
+  };
+
+  // Şef tanıtımı galerinin bir karesi (bkz. galleryOf); ayrı bölüm değil.
+  const gallery = galleryOf(r, chefVideoOn);
+  // Rozetlerin adı yalnız burada yazılı: karttaki simge kısa, açıklaması
+  // detayda. Aynı depodan okunuyor, panelden verilen rozet anında düşer.
+  const detayRozet = badgesOf(r, useBadgeMap());
+  const provider = defaultMapProvider(typeof navigator !== "undefined" ? navigator.userAgent : "");
+  const place = { name: r.name, address: r.addr, lat: r.lat, lng: r.lng };
+  const openMap = (p) => {
+    onDirections?.(p);
+    window.open(directionsUrl(place, p), "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <>
+      <motion.div
+        onClick={close}
+        style={{ opacity: scrimOpacity, position: "absolute", inset: 0, zIndex: 300, background: "rgba(6,3,0,0.6)", backdropFilter: "blur(3px)" }}
+      />
+      <motion.div
+        ref={panelRef}
+        style={{
+          y, position: "absolute", left: 0, right: 0, bottom: 0, top: `${SHEET_FULL * 100}%`,
+          zIndex: 310, background: "var(--c-card)", borderTopLeftRadius: 26, borderTopRightRadius: 26,
+          boxShadow: "var(--sh-up)", display: "flex", flexDirection: "column", overflow: "hidden",
+        }}
+      >
+        {/* Sürükleme bölgesi */}
+        <div
+          data-sheet-drag
+          onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
+          style={{ touchAction: "none", cursor: dragging ? "grabbing" : "grab", padding: "10px 0 6px", flexShrink: 0 }}
+        >
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(45,36,25,0.18)", margin: "0 auto" }} />
+        </div>
+
+        <div style={{ flex: 1, overflowY: dragging ? "hidden" : "auto", minHeight: 0, padding: "0 20px 22px" }}>
+          {/* Galeri — kartın üstündeki gibi yatay dokunuş */}
+          <div
+            onClick={e => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const tx = e.clientX - rect.left;
+              if (tx > rect.width * 0.5) setIi(i => Math.min(i + 1, gallery.length - 1));
+              else setIi(i => Math.max(i - 1, 0));
+            }}
+            style={{ position: "relative", height: 190, borderRadius: 20, overflow: "hidden", marginBottom: 14, cursor: "pointer" }}
+          >
+            <Img src={gallery[ii]?.src} alt={`${r.name} — ${ii + 1}. fotoğraf`} style={{ position: "absolute", inset: 0 }} bg="var(--c-img-bg)" box={360} />
+            {gallery[ii]?.chef && <ChefOverlay chefName={gallery[ii].chefName} compact />}
+            <div style={{ position: "absolute", top: 10, left: 12, right: 12, display: "flex", gap: 4 }}>
+              {gallery.map((g, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i === ii ? (g.chef ? "var(--c-warn)" : "#fff") : "rgba(255,255,255,0.35)" }} />)}
+            </div>
+            {!gallery[ii]?.chef && ii < (r.ownerPhotoCount || 0) && (
+              <div style={{ position: "absolute", bottom: 10, left: 12, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "4px 10px" }}>
+                <Icon n="camera" size={10} color="var(--c-warn)" />
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 10, fontWeight: 700, color: "#fff" }}>İşletmeden</span>
+              </div>
+            )}
+          </div>
+
+          {/* Başlık ve künye */}
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 6px", display: "flex", alignItems: "center", gap: 8 }}>
+            {r.name}
+            {claimed && <VerifiedStar size={16} />}
+          </h2>
+          {detayRozet.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <BadgeChips badges={detayRozet} max={4} size="sm" onLight />
+            </div>
+          )}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)" }}>
+              <Icon n="star" color="var(--c-warn)" size={13} />{r.rating}
+            </span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)" }}>{r.cat}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)" }}>· {distText(r)}</span>
+            {r.price && <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)" }}>· {r.price}</span>}
+          </div>
+
+          {/* Çalışma saatleri — açık/kapalı sinyali metinden okunur. Saat
+              bilinmiyorsa satır hiç çizilmiyor: uydurma saat yazmak, "bilgi
+              yok"tan kötü. */}
+          {r.hours && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--c-subtle)", borderRadius: 14, padding: "10px 14px", marginBottom: 12 }}>
+              <Icon n="clock" size={14} color="#FF6600" />
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)" }}>Bugün {r.hours}</span>
+            </div>
+          )}
+
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "var(--c-ink-2)", lineHeight: 1.6, margin: "0 0 16px" }}>{r.desc}</p>
+
+          {/* Popüler yemekler */}
+          {r.popular?.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Popüler yemekler</p>
+              <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                {r.popular.map(p => (
+                  <span key={p} style={{ background: "rgba(255,102,0,0.08)", border: "1px solid rgba(255,102,0,0.16)", borderRadius: 999, padding: "6px 13px", fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 600, color: "var(--c-brand-ink)" }}>{p}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Menü ve masa ayırtma yalnızca kaydını sahiplenmiş işletmelerde
+              açık: menüyü güncelleyen ve masayı tutan taraf işletmenin
+              kendisi. Sahiplenilmemiş kayıtta bunları göstermek, karşılığı
+              olmayan bir söz vermek olurdu. */}
+          {claimed && canMenu ? (
+            <>
+              {r.menu?.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Menü</p>
+                  <HScroll style={{ gap: 9, paddingBottom: 4 }}>
+                    {r.menu.map((m, i) => (
+                      <div key={i} onClick={() => setMenuOpen(m)} style={{ width: 96, height: 132, borderRadius: 14, overflow: "hidden", flexShrink: 0, cursor: "pointer", border: "1px solid var(--c-border)", position: "relative" }}>
+                        <Img src={m} style={{ position: "absolute", inset: 0 }} bg="#f2ede7" box={192} />
+                      </div>
+                    ))}
+                  </HScroll>
+                </div>
+              )}
+            </>
+          ) : (
+            <button type="button" className="gur-btn" onClick={() => setSoon(true)}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "1px dashed rgba(45,36,25,0.16)", background: "var(--c-subtle)", borderRadius: 16, padding: "13px 15px", marginBottom: 16, cursor: "pointer", outline: "none" }}>
+              <Icon n="doc" size={15} color="var(--c-muted)" />
+              <span style={{ flex: 1, fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 600, color: "var(--c-ink-2)" }}>Menü ve masa ayırtma</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-muted)" }}>Henüz GUR uldamadı</span>
+            </button>
+          )}
+
+          {/* Yol tarifi — cihazın kendi haritasına doğrudan açılır */}
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Yol tarifi</p>
+          <Btn
+            text={MAP_PROVIDERS.find(p => p.id === provider)?.label + " ile git"}
+            onClick={() => openMap(provider)} variant="filled"
+            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11" /></svg>}
+          />
+          <div style={{ display: "flex", gap: 8, marginTop: 8, marginBottom: 16 }}>
+            {MAP_PROVIDERS.filter(p => p.id !== provider).map(p => (
+              <button key={p.id} type="button" className="gur-btn" onClick={() => openMap(p.id)}
+                style={{ flex: 1, border: "1px solid rgba(45,36,25,0.14)", background: "var(--c-card)", borderRadius: 999, padding: "9px 0", cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 600, color: "var(--c-ink-2)" }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <ExternalReviews reviews={detail?.externalReviews || []} photos={detail?.externalPhotos || []} restaurant={r} loading={!detail} />
+
+          {/* Yorum kapısı — uygulamanın her yerinde aynı bileşen */}
+          <div style={{ marginBottom: 16 }}>
+            <ReviewGate restaurant={r} onReview={onReview} onVerifyLocation={onVerifyLocation} />
+          </div>
+
+          <Btn text="Kaydet" onClick={() => { onSave?.(); close(); }} variant="filled" size="md" />
+        </div>
+
+        {/* Tam ekrana geç / kapat. Sayfayı kapatmanın tek yolu aşağı
+            sürüklemekti; keşfedilmesi gereken bir jest, görünür bir düğmenin
+            yerini tutmuyor. */}
+        <div style={{ position: "absolute", top: 6, right: 10, display: "flex", alignItems: "center", gap: 2 }}>
+          <button
+            type="button" className="gur-btn"
+            onClick={full ? collapse : expand}
+            style={{ border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 6, fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "var(--c-brand-ink)" }}>
+            {full ? "Küçült" : "Tam ekran"}
+          </button>
+          <IconBtn onClick={close} tone="subtle" size={30} title="Kapat"
+            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+        </div>
+      </motion.div>
+
+      {soon && (
+        <NotYetSheet r={r} onClose={() => setSoon(false)} />
+      )}
+
+      {/* Menü görseli tam ekran */}
+      {menuOpen && (
+        <div onClick={() => setMenuOpen(null)} style={{ position: "absolute", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, cursor: "pointer" }}>
+          <Img src={menuOpen} style={{ width: "100%", maxHeight: "100%", aspectRatio: "2/3", borderRadius: 14 }} bg="#1a1008" />
+        </div>
+      )}
+    </>
+  );
+}
+
+function SwipeScreen({ onDetail, onExplore, onFavorites, favorites, setFavorites, filterCat, restaurants = RESTAURANTS, dataSource = "demo", onPremium, onAddReview, onVerifyLocation }) {
+  // Bumble kalıbı: detay ayrı bir ekrana gitmez, kartın üstünde açılan
+  // genişleyebilir bir sayfa olarak gelir.
+  const [sheetCard, setSheetCard] = useState(null);
+  const [composing, setComposing] = useState(null);
+  // useMemo şart: filtre açıkken `filter` her render'da YENİ dizi üretiyor
+  // ve bu dizi aşağıdaki deste hesaplarının bağımlılığı. Kimliği sürekli
+  // değişince deste her çizimde yeniden kuruluyor, `topCard` yeni nesne
+  // oluyor ve ona bağlı gösterim effect'leri boşuna tekrar çalışıyor.
+  // (Aynı hata sınıfı AnimatedNumber'da sayaçları dondurmuştu.)
+  const inCategory = useMemo(
+    () => (filterCat ? restaurants.filter(r => r.cat === filterCat || r.tags.includes(filterCat)) : restaurants),
+    [restaurants, filterCat]
+  );
+
+  // Konum: kaba doğrulukta, yalnızca sıralama için. İzin zaten verilmişse
+  // sessizce alınır; verilmemişse istem açılmaz, varsayılan merkez kullanılır
+  // ve kullanıcıya bunu söyleyen bir şerit çizilir.
+  const loc = geo.useUserLocation();
+  useEffect(() => { geo.requestLocation({ silent: true }); }, []);
+  const precise = loc.source === "device";
+  const origin = (precise || loc.source === "manual") ? { lat: loc.lat, lng: loc.lng } : geo.DEFAULT_ORIGIN;
+
+  // Bu kullanıcıya daha önce gösterilmiş kampanyalar destede yeniden
+  // çıkmaz. Sınır destenin KURULDUĞU ANDA okunuyor, canlı dinlenmiyor:
+  // kart üstte göründüğü an depo değişiyor, canlı dinlesek deste
+  // kullanıcının parmağının altında yeniden kurulur ve kartlar tekrar
+  // eder. Deste sıfırlanınca (kategori/veri değişimi) yeniden okunur.
+  const [seenAds, setSeenAds] = useState(() => seenCampaigns());
+
+  // Sıklık sınırından geçen kampanyalar. Sınırı burada uyguluyoruz ki
+  // elenen kampanyanın restoranı organik havuza geri dönsün.
+  const campaigns = useMemo(
+    () => rankCampaigns(hydrateCampaigns(restaurants), { category: filterCat })
+      .filter(c => !seenAds.includes(String(c.id))),
+    [restaurants, filterCat, seenAds]
+  );
+
+  // Aktif kampanyası olan mekan organik destede görünmez: reklamverenin
+  // parasını ödediği kartı bir de bedava göstermek olurdu. Kampanya sıklık
+  // sınırına takılıp elenince mekan organik havuza geri döner.
+  const organic = useMemo(() => {
+    const adIds = new Set(campaigns.map(c => String(c.restaurant.id)));
+    const pool = inCategory.filter(r => !adIds.has(String(r.id)));
+    // Kategori içinde yakından uzağa: ilk kartlar yürüme mesafesinde,
+    // kaydırma sürdükçe yarıçap halka halka büyüyor
+    // (shared/deck.js → orderByProximity).
+    return orderByProximity(pool, origin, { seed: `${filterCat || "all"}:${origin.lat.toFixed(3)},${origin.lng.toFixed(3)}` });
+    // origin nesnesi her çizimde yeni; kimliğine değil koordinatına bakıyoruz.
+  }, [inCategory, campaigns, origin.lat, origin.lng, filterCat]);
+
+  // Sponsorlu kartlar organik akışa burada harmanlanır. Aynı fonksiyonu
+  // sunucu da çağırıyor (shared/deck.js) — yerleşim hissi iki tarafta
+  // birebir aynı olsun diye. Sponsorlu kart mesafeye BAKMAZ: reklamveren
+  // uzakta diye elenmez, sırasını açık artırma ve boşluk kuralı belirler.
+  // ─── SATIN ALINMIŞ İKİNCİ ŞANS ───
+  //
+  // Kullanıcının SOLA kaydırdığı ve o mekanın aktif paketi olan kayıtlar
+  // desteye geri giriyor. Organik havuzun içine değil ARKASINA ekleniyor:
+  // kullanıcı bir kez "hayır" demiş, önce hiç görmediklerini görsün.
+  //
+  // Kesişim şart: paket aktif olsa bile kullanıcı o mekanı hiç geçmemişse
+  // hedefte değil — hiç görmemiş kişiye "ikinci şans" diye bir şey yok.
+  // Seçim OTURUM BAŞINDA DONDURULUYOR — ve bu şart.
+  //
+  // Canlı hesaplansaydı şu olurdu: kart en üste gelir, gösterim kaydedilir,
+  // depo değişir, `candidatesFor` "bugün gösterildi" deyip kartı listeden
+  // düşürür ve kart daha kullanıcı görmeden desteden silinir. Sayaç ilerler,
+  // restoran parasını öder, kullanıcı hiçbir şey görmez.
+  //
+  // Bu yüzden aday listesi bir kez alınıp ref'te tutuluyor; deste yeniden
+  // kurulsa da (kategori değişimi, veri tazelenmesi) aynı kimlikler kalıyor.
+  const scState = secondChance.useSecondChance();
+  const scDondurulmus = useRef(null);
+  if (scDondurulmus.current === null) {
+    scDondurulmus.current = secondChance.candidatesFor(secondChance.passedIds(), "demo", scState);
+  }
+  const geriGelenler = useMemo(() => {
+    const idler = scDondurulmus.current;
+    if (!idler.length) return [];
+    const set = new Set(idler);
+    // Geri gelen kart organik listede zaten varsa iki kez çıkmasın.
+    const zatenVar = new Set(organic.map(r => String(r.id)));
+    return inCategory
+      .filter(r => set.has(String(r.id)) && !zatenVar.has(String(r.id)))
+      .map(r => ({ ...r, secondChance: true }));
+  }, [inCategory, organic]);
+
+  const allCards = useMemo(
+    () => buildDeck([...organic, ...geriGelenler], campaigns, {
+      seed: `${filterCat || "all"}:${new Date().toISOString().slice(0, 10)}`,
+      seenCampaigns: seenAds,
+    }),
+    [organic, geriGelenler, campaigns, filterCat, seenAds]
+  );
+
+  const [idx, setIdx] = useState(0);
+  const [toast, setToast] = useState(null);
+  const [done, setDone] = useState(false);
+  // Faz 2 — "İkinci Şans": geçilen restoranlar deste bitince tekrar önerilir
+  const [passed, setPassed] = useState([]);
+  const [encore, setEncore] = useState(null); // {cards, idx} | null
+  const topCardRef = useRef(null);
+
+  const show = (m, t) => { setToast({ m, t }); setTimeout(() => setToast(null), 1400); };
+
+  // Kota sunucuda tutulan bir sayı; arayüz yalnızca niteliksel baskıyı
+  // bilir. "used" hiçbir yerde ekrana yazılmaz.
+  const [used, setUsed] = useState(0);
+  const [bonus, setBonus] = useState(0);
+  const [gate, setGate] = useState(false);
+  const [playingAd, setPlayingAd] = useState(null);
+  const [adIdx, setAdIdx] = useState(0);
+  // Ödüllü videonun üç girdisi: kim yayında (rezervasyon), video onaylı mı
+  // (medya) ve bu kullanıcı neyi izlemiş.
+  const slotState = useAdSlots();
+  const mediaState = useMedia();
+  const rewardedSeen = useRewardedSeen();
+  const reklamGorsel = useAdContent();
+
+  const quota = quotaState({ plan: "free", used, bonus });
+  const outOfSwipes = !quota.allowed;
+
+  // Hangi reklam oynayacak: yakındaki, izlenmemiş restoran videosu →
+  // GUR'un demo havuzu → Google yedeği. Kural lib/rewarded.js'te tek yerde.
+  const watchAd = () => {
+    setPlayingAd(pickRewardedAd({
+      restaurants, origin: geo.origin(), houseAds: REWARD_ADS.map(a => ({ ...a, img: adImage(a.id, reklamGorsel) })), houseIndex: adIdx,
+      seen: rewardedSeen, slots: slotState, media: mediaState,
+    }));
+    setGate(false);
+  };
+  const finishAd = () => {
+    // İzlendi işareti: aynı video bu kullanıcıya bir daha açılmaz.
+    if (playingAd?.id) markWatched(playingAd.id);
+    setPlayingAd(null);
+    setAdIdx(i => i + 1);
+    setBonus(b => b + REWARD_SWIPES);
+    backend.rewardedAdDone();
+    // Kazanılan hak sayısı da söylenmez; yalnızca akışın açıldığı bildirilir.
+    show("Keşfe devam", "fav");
+  };
+  const abortAd = () => { setPlayingAd(null); setGate(true); };
+
+  useEffect(() => {
+    setIdx(0); setDone(false); setPassed([]); setEncore(null);
+    setSeenAds(seenCampaigns());
+  }, [filterCat, restaurants]);
+
+  const deck = encore ? encore.cards : allCards;
+  const cursor = encore ? encore.idx : idx;
+  const visible = deck.slice(cursor, cursor + 2).reverse();
+
+  const next = () => {
+    // Her kaydırma kotadan düşer; sınıra gelince teklif açılır.
+    setUsed(u => {
+      const next = u + 1;
+      if (!quotaState({ plan: "free", used: next, bonus }).allowed) setGate(true);
+      return next;
+    });
+    if (encore) {
+      if (encore.idx >= encore.cards.length - 1) { setEncore(null); setDone(true); }
+      else setEncore(e => ({ ...e, idx: e.idx + 1 }));
+      return;
+    }
+    if (idx >= allCards.length - 1) {
+      // Deste bitti: geçilenler varsa ikinci şans turu başlar
+      if (passed.length > 0) {
+        setEncore({ cards: passed, idx: 0 });
+        setPassed([]);
+        show("İkinci şans: geçtiğin yerler", "fav");
+      } else setDone(true);
+    } else setIdx(i => i + 1);
+  };
+
+  const save = (r, superLike) => {
+    if (!r) return;
+    if (!favorites.find(f => f.id === r.id)) {
+      setFavorites(p => [...p, superLike ? { ...r, isSuper: true } : r]);
+    }
+    if (r.sponsored) {
+      trackEvent(r.sponsored.pricing === "cpe" ? "ad_engagement" : "ad_click", {
+        campaignId: r.sponsored.campaignId, restaurantId: r.id, bidMinor: r.sponsored.bidMinor,
+      });
+    }
+  };
+
+  // Her karar sunucuya da yazılır: kota, kampanya ücretlendirmesi ve
+  // 30 günlük hatırlatmanın çıpası olan saved_places orada tutuluyor.
+  const sync = (r, direction) => {
+    if (!r) return;
+    backend.recordSwipe({
+      restaurantId: r.id, direction,
+      campaignId: r.sponsored?.campaignId ?? null,
+      deckPosition: r.deckPosition ?? null,
+    });
+  };
+
+  const right = () => {
+    const r = deck[cursor];
+    save(r, false); sync(r, "right");
+    show(r?.name + " favorilere eklendi!", "fav");
+    next();
+  };
+  // Yukarı kaydırma bir karar değil, bir istek: "bu mekânı bana anlat".
+  // Deste ilerlemiyor, kota harcanmıyor; yalnızca sayfa açılıyor.
+  const openSheet = (r) => {
+    if (!r) return;
+    setSheetCard(r);
+    trackEvent("detail_open", { restaurantId: r.id, source: "swipe_up" });
+  };
+  const left = () => {
+    const r = deck[cursor];
+    if (r && !encore) setPassed(p => (p.find(x => x.id === r.id) ? p : [...p, r]));
+    // Oturum içi tur `passed`ten besleniyor; SATIN ALINAN paketin hedef
+    // kitlesi ise kalıcı kayıttan. İkisi ayrı: biri bu oturumda, diğeri
+    // günler sonra başka bir oturumda iş görüyor.
+    if (r) secondChance.recordPass(r.id);
+    sync(r, "left");
+    show("Geçildi", "nope");
+    next();
+  };
+
+  // Sponsorlu kart EKRANDA ÜSTTE göründüğü an gösterim sayılır ve bir daha
+  // bu kullanıcıya çıkmaz. Deste kurulurken saymak, görülmeyen kartı da
+  // harcamak olurdu.
+  const topCard = deck[cursor];
+  useEffect(() => {
+    if (!done && topCard?.sponsored?.campaignId) markShown(topCard.sponsored.campaignId);
+  }, [topCard, done]);
+
+  // Satın alınmış İkinci Şans kartı da EKRANDA GÖRÜNDÜĞÜ an sayılır.
+  // Kota "200 farklı kullanıcı" demek; aynı kullanıcı aynı gün ikinci kez
+  // görürse sayaç ilerlemiyor (kural second-chance.js içinde).
+  useEffect(() => {
+    if (!done && topCard?.secondChance) secondChance.recordImpression(topCard.id, "demo");
+  }, [topCard, done]);
+
+  // Kaydırma ilerledikçe hangi halkadayız — kullanıcı yarıçapın büyüdüğünü
+  // görsün, "neden birden uzak yerler geliyor" sorusu doğmasın.
+  const ringNow = topCard && topCard.ring != null && !topCard.sponsored ? topCard.ring : null;
+
+  const progress = deck.length > 0 ? ((cursor + (done ? 1 : 0)) / deck.length) * 100 : 0;
+
+  return (
+    <Screen grad={false}>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#000" }}>
+
+        {/* Header — sadece logo ortada + kategori filtresi */}
+        <div style={{ padding: "44px 18px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+          <GurLogo size={42} pill />
+          {dataSource === "live" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(76,175,80,0.12)", border: "1px solid rgba(76,175,80,0.25)", borderRadius: 12, padding: "3px 12px" }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--c-ok-light)", animation: "pulse 1.5s ease-in-out infinite" }} />
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-ok-light)", fontWeight: 600 }}>Canlı Veri • OpenStreetMap</span>
+            </div>
+          )}
+          {filterCat && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "#fff", background: "rgba(255,102,0,0.2)", borderRadius: 14, padding: "5px 16px", fontWeight: 600, border: "1px solid rgba(255,102,0,0.25)" }}>{filterCat}</span>
+              <IconBtn
+                onClick={onExplore} tone="glassLight" shape="rounded" size={26} title="Filtreyi kaldır"
+                icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
+              />
+            </div>
+          )}
+          {/* Mesafe halkası — deste yakından uzağa açıldıkça değişir */}
+          {ringNow != null && !done && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "3px 12px" }}>
+              <Icon n="pin" size={11} color={precise ? "#FF9A4D" : "rgba(255,255,255,0.45)"} />
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,0.72)" }}>
+                {precise ? ringLabel(ringNow) : `${ringLabel(ringNow)} · ${geo.DEFAULT_ORIGIN.label}ne göre`}
+              </span>
+              {!precise && (
+                <button type="button" className="gur-btn" onClick={() => geo.requestLocation()}
+                  style={{ border: "none", background: "transparent", padding: 0, marginLeft: 2, cursor: "pointer", outline: "none", fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, color: "#FF9A4D" }}>
+                  Konumumu kullan
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Progress bar */}
+          {deck.length > 0 && !done && (
+            <div style={{ width: "60%", height: 3, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+              <div style={{ width: `${progress}%`, height: "100%", borderRadius: 2, background: "#FF6600", transition: "width 0.4s ease-out" }} />
+            </div>
+          )}
+        </div>
+
+        {/* Swipe alanı */}
+        <div style={{ flex: 1, position: "relative", margin: "0 16px 8px", minHeight: 0 }}>
+          {deck.length === 0 ? (
+            <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
+<div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon n="search" color="rgba(255,255,255,0.4)" size={20} />
+              </div>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>Restoran bulunamadı</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(255,255,255,0.25)" }}>Bu kategoride henüz restoran yok</p>
+              <div style={{ marginTop: 8 }}>
+                <Btn text="← Keşfete Dön" onClick={onExplore} variant="plain" size="sm" fullWidth={false} />
+              </div>
+            </div>
+          ) : done ? (
+            <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
+<div style={{ width: 90, height: 90, borderRadius: "50%", background: "rgba(255,102,0,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon n="plate" color="#FF6600" size={30} />
+              </div>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 800, color: "#fff", textAlign: "center" }}>Hepsini gördün!</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "rgba(255,255,255,0.35)" }}>
+                {favorites.length > 0 ? `${favorites.length} favori eklendi` : "Henüz favori eklemedin"}
+              </p>
+              <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                <Btn text="Tekrar Keşfet" onClick={() => { setIdx(0); setDone(false); }} variant="filled" size="md" fullWidth={false} />
+                <Btn text="Kategoriler" onClick={onExplore} variant="outline" size="md" fullWidth={false} />
+              </div>
+            </div>
+          ) : visible.map((r, i) => {
+            const top = i === visible.length - 1;
+            return <SwipeCard key={`${r.id}-${cursor}`} ref={top ? topCardRef : null} r={r} isTop={top && !outOfSwipes}
+              onRight={right} onLeft={left} onSuper={() => openSheet(deck[cursor])}
+              onTap={() => openSheet(deck[cursor])} />;
+          })}
+        </div>
+
+        {/* Aksiyon butonları — kartı sürüklemekle aynı fiziksel çıkışı tetikler */}
+        {!done && deck.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 20, padding: "10px 16px 16px", zIndex: 10 }}>
+            <IconBtn
+              onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.fling(-1))}
+              tone="solidLight" size={ACTION_SIZE} elevated title="Geç"
+              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={GLOSS} strokeWidth="3.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
+            />
+
+            <IconBtn
+              onClick={() => openSheet(deck[cursor])}
+              tone="solidLight" size={ACTION_SIZE} elevated title="Restorana git"
+              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={GLOSS} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11" /><polyline points="17 18 12 13 7 18" /></svg>}
+            />
+
+            <IconBtn
+              onClick={() => (outOfSwipes ? setGate(true) : topCardRef.current?.fling(1))}
+              tone="solidLight" size={ACTION_SIZE} elevated title="Favorilere ekle"
+              icon={<svg width="26" height="26" viewBox="0 0 24 24" fill={GLOSS} stroke={GLOSS} strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>}
+            />
+          </div>
+        )}
+
+        {/* Kotaya yaklaşıldığında sayı değil, sıcak bir vinyet: kullanıcı
+            sayaç izlemeden akışın yavaşladığını hissetsin (§8). */}
+        {quota.pressure === "near" && !done && (
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3,
+            background: "radial-gradient(circle at 50% 62%, transparent 42%, rgba(255,102,0,0.16) 100%)" }} />
+        )}
+
+        {/* Detay sayfası — desteyi kaybetmeden açılır */}
+        <AnimatePresence>
+          {sheetCard && !composing && (
+            <CardDetailSheet
+              key={sheetCard.id}
+              r={sheetCard}
+              onClose={() => setSheetCard(null)}
+              onSave={() => { setSheetCard(null); right(); }}
+              onReview={() => setComposing(sheetCard)}
+              onDirections={(provider) => {
+                trackEvent("directions_open", { restaurantId: sheetCard.id, provider });
+                backend.trackDirections(sheetCard.id, provider);
+              }}
+              onVerifyLocation={onVerifyLocation}
+            />
+          )}
+        </AnimatePresence>
+
+        {composing && (
+          <ReviewComposer
+            restaurantName={composing.name}
+            onCancel={() => setComposing(null)}
+            onSubmit={async (review) => {
+              onAddReview?.(composing.id, { ...review, verified: true });
+              trackEvent("review_submit", { restaurantId: composing.id, verified: true });
+              setComposing(null);
+              setSheetCard(null);
+              try {
+                await backend.submitReview(composing.id, review);
+                show("Yorumun yayınlandı • Konumla doğrulandı", "fav");
+              } catch (err) {
+                // Sunucu doğrulanmış ziyaret görmüyorsa yorum yayımlanmaz;
+                // sessizce başarılı göstermek yerine sebebini söylüyoruz.
+                show(err.message || "Yorum gönderilemedi", "nope");
+              }
+            }}
+          />
+        )}
+
+        {/* Kota teklifi ve ödüllü reklam */}
+        <AnimatePresence>
+          {gate && !playingAd && <PremiumOffer onWatch={watchAd} onExplore={onExplore} onPlus={() => { setGate(false); onPremium?.(); }} />}
+          {playingAd && <RewardedAdOverlay ad={playingAd} onComplete={finishAd} onAbort={abortAd} />}
+        </AnimatePresence>
+
+        {/* Toast */}
+        {toast && (
+          <div role="status" aria-live="polite" style={{
+            position: "absolute", top: 120, left: "50%", transform: "translateX(-50%)",
+            background: toast.t === "fav" ? "var(--c-ok-light)" : "var(--c-bad)",
+            color: "#fff", padding: "10px 22px", borderRadius: 16,
+            fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700,
+            zIndex: 100, boxShadow: "var(--sh-d2)",
+            animation: "fadeInUp 0.3s ease-out",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+{toast.t === "fav" ? <Icon n="heart" color="#fff" size={16} /> : <Icon n="cross" color="#fff" size={16} />}
+            {toast.m}
+          </div>
+        )}
+
+        {/* Alt bar — beyaz, keşfet sayfası ile aynı.
+            Pasif öğe SOLUKLAŞTIRILMIYOR: opacity 0.4 etiketi ~2:1'e
+            düşürüyordu. Aktif/pasif farkı renkle kuruluyor — pasif
+            --c-muted (5.6:1), aktif marka mürekkebi. */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "var(--shadow-bar)", flexShrink: 0 }}>
+          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Keşfet</span>
+          </div>
+          <div style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
+          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Favoriler</span>
+          </div>
+        </div>
       </div>
     </Screen>
   );
 }
 
 // ═══════════════════════════════════════════════
-// KAYDIRMA (Swipe) SAYFASI — Jestler ve Buton Karar Sistemi
+// GUR MATCH — Arkadaşınla birlikte kaydır
 // ═══════════════════════════════════════════════
-function SwipeScreen({
-  onDetail,
-  onExplore,
-  onFavorites,
-  favorites,
-  setFavorites,
-  filterCat,
-  restaurants = RESTAURANTS,
-  dataSource = "google_maps",
-  syncMetadata = null,
-  isSyncing = false,
-  onSyncGoogleMaps = null
-}) {
-  // Varsayılan olarak Google Maps backend verisini kullan
-  const [selectedSource, setSelectedSource] = useState("google_maps"); // "google_maps" | "mock"
-  const activeRestaurants = (selectedSource === "google_maps" && restaurants && restaurants.length > 0)
-    ? restaurants
-    : RESTAURANTS;
+function MatchStartScreen({ onBack, onStart }) {
+  const [mode, setMode] = useState(null); // null | "create" | "join"
+  const [code] = useState(() => makeInviteCode());
+  const [joinCode, setJoinCode] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  const allCards = filterCat
-    ? activeRestaurants.filter(r => r.cat === filterCat || (r.tags && r.tags.includes(filterCat)))
-    : activeRestaurants;
-
-  const [idx, setIdx] = useState(0);
-  const [toast, setToast] = useState(null);
-  const [done, setDone] = useState(false);
-  const [animatingDir, setAnimatingDir] = useState(null);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [historyStack, setHistoryStack] = useState([]); // [{ index, action: 'like' | 'dislike', restaurant }]
-
-  // Kategori veya veri kaynağı değiştiğinde sıfırla
-  useEffect(() => {
-    setIdx(0);
-    setDone(false);
-    setHistoryStack([]);
-    setAnimatingDir(null);
-  }, [filterCat, selectedSource, restaurants]);
-
-  const showToast = (m, t) => {
-    setToast({ m, t });
-    setTimeout(() => setToast(null), 1200);
+  const copy = () => {
+    try { navigator.clipboard?.writeText(code); } catch { /* pano yoksa sessiz geç */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
   };
-
-  // Karttan tamamlanan karar (jestle veya buton animasyonuyla)
-  const handleCardSwiped = (direction) => {
-    const currentR = allCards[idx];
-    if (!currentR) {
-      setAnimatingDir(null);
-      return;
-    }
-
-    if (direction === "right") {
-      if (!favorites.some(f => f.id === currentR.id)) {
-        setFavorites(p => [...p, currentR]);
-      }
-      showToast(`${currentR.name} favorilere eklendi!`, "fav");
-      setHistoryStack(prev => [...prev, { index: idx, action: "like", restaurant: currentR }]);
-    } else {
-      showToast("Geçildi", "nope");
-      setHistoryStack(prev => [...prev, { index: idx, action: "dislike", restaurant: currentR }]);
-    }
-
-    setAnimatingDir(null);
-    setDragOffset(0);
-
-    if (idx >= allCards.length - 1) {
-      setDone(true);
-    } else {
-      setIdx(i => i + 1);
-    }
-  };
-
-  // Buton kararları (kartın uçuş animasyonunu tetikler)
-  const handleButtonLike = () => {
-    if (animatingDir || done || idx >= allCards.length) return;
-    setAnimatingDir("right");
-  };
-
-  const handleButtonDislike = () => {
-    if (animatingDir || done || idx >= allCards.length) return;
-    setAnimatingDir("left");
-  };
-
-  // Geri Al (Undo): Önceki restorana geri dön
-  const handleUndo = () => {
-    if (historyStack.length === 0 || animatingDir) return;
-    const last = historyStack[historyStack.length - 1];
-    setHistoryStack(prev => prev.slice(0, -1));
-
-    if (last.action === "like" && last.restaurant) {
-      setFavorites(p => p.filter(f => f.id !== last.restaurant.id));
-    }
-
-    setIdx(last.index);
-    setDone(false);
-    setAnimatingDir(null);
-    setDragOffset(0);
-    showToast("Önceki restorana dönüldü", "undo");
-  };
-
-  // Döngüyü başa sar
-  const handleResetCycle = () => {
-    setIdx(0);
-    setDone(false);
-    setHistoryStack([]);
-    setAnimatingDir(null);
-    setDragOffset(0);
-    showToast("Restoran listesi başa sarıldı!", "fav");
-  };
-
-  // Klavye kısayolları (← Sol ok: Geç, → Sağ ok: Beğen, Boşluk/↑: Detay, Z: Geri Al)
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (done || idx >= allCards.length) return;
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        handleButtonLike();
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        handleButtonDislike();
-      } else if (e.key === "ArrowUp" || e.key === " ") {
-        e.preventDefault();
-        if (allCards[idx]) onDetail(allCards[idx]);
-      } else if ((e.key === "z" || e.key === "Z") && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        handleUndo();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [idx, done, animatingDir, allCards, historyStack]);
-
-  const visibleCards = allCards.slice(idx, idx + 2).reverse();
-  const progress = allCards.length > 0 ? ((idx + (done ? 1 : 0)) / allCards.length) * 100 : 0;
 
   return (
     <Screen grad={false}>
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#0a0a12", position: "relative" }}>
-
-        {/* Üst Bar: Logo, Sayaç, Veri Kaynağı ve İlerleme Çubuğu */}
-        <div style={{ padding: "40px 18px 4px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-            {/* Geri Al / Sayfa Geri */}
-            <button
-              onClick={handleUndo}
-              disabled={historyStack.length === 0 || animatingDir !== null}
-              style={{
-                background: historyStack.length > 0 ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.03)",
-                border: "none", borderRadius: 12, padding: "8px 12px",
-                cursor: historyStack.length > 0 ? "pointer" : "default",
-                display: "flex", alignItems: "center", gap: 5,
-                color: historyStack.length > 0 ? "#FFA500" : "rgba(255,255,255,0.2)",
-                fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700,
-                transition: "all 0.2s"
-              }}
-            >
-              <Icon n="undo" size={14} color={historyStack.length > 0 ? "#FFA500" : "rgba(255,255,255,0.2)"} />
-              Geri
-            </button>
-
-            <GurLogo size={38} pill />
-
-            {/* Restoran Sayaç Rozeti */}
-            <div style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: "5px 10px", display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#FFA500" }}>
-                {Math.min(idx + 1, allCards.length)}
-              </span>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
-                / {allCards.length}
-              </span>
-            </div>
-          </div>
-
-          {/* Google Maps İstanbul & Haftalık Güncelleme Rozeti */}
-          <div style={{
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            borderRadius: 14,
-            padding: "6px 12px",
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E", animation: "pulse 1.8s ease-in-out infinite" }} />
-              <div>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#fff", fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
-                  Google Maps • İstanbul
-                </p>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "rgba(255,255,255,0.45)", margin: 0 }}>
-                  {syncMetadata?.lastSyncedAt ? "Backend Datasında Haftalık Güncel" : "Canlı Google Maps Datası"}
-                </p>
-              </div>
-            </div>
-
-            {onSyncGoogleMaps && (
-              <button
-                onClick={onSyncGoogleMaps}
-                disabled={isSyncing}
-                title="Google Maps üzerinden İstanbul restoranlarını haftalık güncelle"
-                style={{
-                  background: "rgba(255,102,0,0.2)",
-                  border: "1px solid rgba(255,102,0,0.4)",
-                  borderRadius: 10,
-                  padding: "4px 9px",
-                  cursor: isSyncing ? "default" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  color: "#FFA500",
-                  fontFamily: "'Outfit', sans-serif",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  transition: "all 0.2s"
-                }}
-              >
-                <div style={{ display: "inline-block", animation: isSyncing ? "spin 0.8s linear infinite" : "none" }}>
-                  <Icon n="refresh" size={12} color="#FFA500" />
-                </div>
-                {isSyncing ? "Güncelleniyor..." : "Haftalık Güncelle"}
-              </button>
-            )}
-          </div>
-
-          {/* Veri Kaynağı Seçici: Google Maps Backend vs Örnek Liste */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "center" }}>
-            <button
-              onClick={() => setSelectedSource("google_maps")}
-              style={{
-                background: selectedSource === "google_maps" ? "rgba(34,197,94,0.22)" : "rgba(255,255,255,0.05)",
-                border: selectedSource === "google_maps" ? "1px solid #22C55E" : "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 10, padding: "3px 10px", cursor: "pointer",
-                color: selectedSource === "google_maps" ? "#22C55E" : "rgba(255,255,255,0.5)",
-                fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 700
-              }}
-            >
-              Google Maps Backend ({restaurants.length})
-            </button>
-            <button
-              onClick={() => setSelectedSource("mock")}
-              style={{
-                background: selectedSource === "mock" ? "rgba(255,102,0,0.25)" : "rgba(255,255,255,0.05)",
-                border: selectedSource === "mock" ? "1px solid #FF6600" : "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 10, padding: "3px 10px", cursor: "pointer",
-                color: selectedSource === "mock" ? "#fff" : "rgba(255,255,255,0.5)",
-                fontFamily: "'Outfit', sans-serif", fontSize: 10, fontWeight: 700
-              }}
-            >
-              Örnek Liste ({RESTAURANTS.length})
-            </button>
-          </div>
-
-          {/* Aktif Kategori Filtresi */}
-          {filterCat && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#fff", background: "rgba(255,102,0,0.2)", borderRadius: 12, padding: "4px 14px", fontWeight: 600, border: "1px solid rgba(255,102,0,0.3)" }}>
-                {filterCat}
-              </span>
-              <button onClick={onExplore} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, padding: "4px 7px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
-            </div>
-          )}
-
-          {/* İlerleme Çubuğu */}
-          {allCards.length > 0 && !done && (
-            <div style={{ width: "80%", height: 3, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
-              <div style={{ width: `${progress}%`, height: "100%", borderRadius: 2, background: "linear-gradient(90deg, #FFA500, #FF3B30)", transition: "width 0.3s ease-out" }} />
-            </div>
-          )}
+      <div style={{ height: "100%", background: "linear-gradient(160deg, #1a0f00, #2b1400 55%, #1a0f00)", display: "flex", flexDirection: "column", padding: "44px 22px 24px", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26 }}>
+          <IconBtn onClick={onBack} tone="glassLight" title="Geri"
+            icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>} />
+          <GurLogo size={42} pill />
+          <div style={{ width: 40 }} />
         </div>
 
-        {/* Kart Swipe Alanı */}
-        <div style={{ flex: 1, position: "relative", margin: "4px 14px 4px", minHeight: 0 }}>
-          {allCards.length === 0 ? (
-            <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
-              <div style={{ width: 70, height: 70, borderRadius: "50%", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon n="search" color="rgba(255,255,255,0.4)" size={24} />
-              </div>
-              <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 17, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: 0 }}>Restoran bulunamadı</p>
-              <button onClick={onExplore} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 14, padding: "10px 22px", cursor: "pointer", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600 }}>
-                ← Kategorilere Dön
-              </button>
-            </div>
-          ) : done ? (
-            <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "20px 16px" }}>
-              <div style={{ width: 84, height: 84, borderRadius: "50%", background: "linear-gradient(135deg, rgba(255,102,0,0.2), rgba(255,0,0,0.1))", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 30px rgba(255,102,0,0.2)" }}>
-                <Icon n="plate" color="#FF6600" size={36} />
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <h3 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>
-                  Tüm Restoranları İncelediniz!
-                </h3>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.5)", margin: 0 }}>
-                  Bu turda {favorites.length} restoran favorilerinize kaydedildi.
-                </p>
-              </div>
-
-              {/* Özet Kartı */}
-              <div style={{ display: "flex", gap: 12, width: "100%", maxWidth: 300, margin: "6px 0" }}>
-                <div style={{ flex: 1, background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 16, padding: "12px 10px", textAlign: "center" }}>
-                  <span style={{ display: "block", fontSize: 18, fontWeight: 900, color: "#22C55E", fontFamily: "'Outfit', sans-serif" }}>
-                    {favorites.length}
-                  </span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", fontFamily: "'Outfit', sans-serif" }}>Beğenilen</span>
-                </div>
-                <div style={{ flex: 1, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 16, padding: "12px 10px", textAlign: "center" }}>
-                  <span style={{ display: "block", fontSize: 18, fontWeight: 900, color: "#EF4444", fontFamily: "'Outfit', sans-serif" }}>
-                    {Math.max(0, allCards.length - favorites.length)}
-                  </span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", fontFamily: "'Outfit', sans-serif" }}>Geçilen</span>
-                </div>
-              </div>
-
-              {/* Aksiyon butonları */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 280, marginTop: 4 }}>
-                <button
-                  onClick={handleResetCycle}
-                  style={{
-                    background: GRAD, border: "none", borderRadius: 18, padding: "13px 20px",
-                    color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800,
-                    cursor: "pointer", boxShadow: "0 6px 20px rgba(255,102,0,0.35)",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8
-                  }}
-                >
-                  <Icon n="refresh" size={16} color="#fff" />
-                  Döngüyü Baştan Başlat
-                </button>
-
-                <button
-                  onClick={onFavorites}
-                  style={{
-                    background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 18, padding: "12px 20px",
-                    color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700,
-                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8
-                  }}
-                >
-                  <Icon n="heart" size={16} color="#FF3B30" />
-                  Favorilere Git ({favorites.length})
-                </button>
-
-                <button
-                  onClick={onExplore}
-                  style={{
-                    background: "transparent", border: "none", padding: "8px 0",
-                    color: "rgba(255,255,255,0.45)", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 600,
-                    cursor: "pointer"
-                  }}
-                >
-                  Farklı Kategori Seç
-                </button>
-              </div>
-            </div>
-          ) : (
-            visibleCards.map((r, i) => (
-              <SwipeCard
-                key={r.id}
-                r={r}
-                isTop={i === visibleCards.length - 1}
-                onSwiped={handleCardSwiped}
-                onTap={() => onDetail(allCards[idx])}
-                triggerDir={i === visibleCards.length - 1 ? animatingDir : null}
-                dragOffset={dragOffset}
-                setDragOffset={setDragOffset}
-              />
-            ))
-          )}
+        <div style={{ textAlign: "center", marginBottom: 28, animation: "fadeInUp 0.5s ease-out" }}>
+          <div style={{ width: 76, height: 76, borderRadius: "50%", background: "rgba(255,102,0,0.14)", border: "1px solid rgba(255,102,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+            <Icon n="sparkle" size={30} color="var(--c-warn)" />
+          </div>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 8px" }}>GUR Match</h2>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, color: "rgba(255,255,255,0.55)", margin: 0, lineHeight: 1.55 }}>
+            Arkadaşınla aynı anda kaydır. İkiniz de sağa kaydırdığınız restoranlar eşleşme olur — nereye gideceğinizi tartışmayın, bırakın kartlar karar versin.
+          </p>
         </div>
 
-        {/* Karar Butonları Sistemi (Pas, Detay, Beğen, Başa Sar) */}
-        {!done && allCards.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 16px 8px", zIndex: 10 }}>
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 14 }}>
-              {/* Başa Sar / Sıfırla Butonu */}
-              <button
-                onClick={handleResetCycle}
-                title="Döngüyü Başa Sar"
-                style={{
-                  width: 44, height: 44, borderRadius: "50%",
-                  border: "none", background: "rgba(255,255,255,0.1)",
-                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.15s", boxShadow: "0 2px 10px rgba(0,0,0,0.2)"
-                }}
-                onMouseDown={e => e.currentTarget.style.transform = "scale(0.88)"}
-                onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
-              >
-                <Icon n="refresh" size={18} color="rgba(255,255,255,0.8)" />
-              </button>
+        {mode === null && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, animation: "fadeInUp 0.5s ease-out 0.1s both" }}>
+            <Btn text="Yeni oturum başlat" onClick={() => setMode("create")} variant="filled" size="lg" />
+            <Btn text="Koda katıl" onClick={() => setMode("join")} variant="outline" size="lg" />
+          </div>
+        )}
 
-              {/* PAS / GEÇ (Dislike) Butonu */}
-              <button
-                onClick={handleButtonDislike}
-                disabled={animatingDir !== null}
-                title="Pas Geç (Sol Ok)"
-                style={{
-                  width: 58, height: 58, borderRadius: "50%",
-                  border: "none", background: "#fff",
-                  cursor: animatingDir ? "default" : "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.15s", boxShadow: "0 6px 20px rgba(239,68,68,0.25)"
-                }}
-                onMouseDown={e => !animatingDir && (e.currentTarget.style.transform = "scale(0.88)")}
-                onMouseUp={e => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-
-              {/* DETAY / BİLGİ Butonu */}
-              <button
-                onClick={() => onDetail(allCards[idx])}
-                title="Restoran Detayları"
-                style={{
-                  width: 44, height: 44, borderRadius: "50%",
-                  border: "none", background: "rgba(255,255,255,0.9)",
-                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: "0 4px 14px rgba(0,0,0,0.18)"
-                }}
-                onMouseDown={e => e.currentTarget.style.transform = "scale(0.88)"}
-                onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0284C7" strokeWidth="2.5" strokeLinecap="round">
-                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-                </svg>
-              </button>
-
-              {/* BEĞEN / FAVORİ (Like) Butonu */}
-              <button
-                onClick={handleButtonLike}
-                disabled={animatingDir !== null}
-                title="Favorilere Ekle (Sağ Ok)"
-                style={{
-                  width: 66, height: 66, borderRadius: "50%",
-                  border: "none", background: "#fff",
-                  cursor: animatingDir ? "default" : "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.15s", boxShadow: "0 8px 24px rgba(34,197,94,0.3)"
-                }}
-                onMouseDown={e => !animatingDir && (e.currentTarget.style.transform = "scale(0.88)")}
-                onMouseUp={e => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-              </button>
+        {mode === "create" && (
+          <div style={{ animation: "fadeInUp 0.4s ease-out" }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.45)", textAlign: "center", margin: "0 0 12px" }}>Bu kodu arkadaşına gönder</p>
+            <div onClick={copy} style={{ background: "rgba(255,255,255,0.06)", border: "1px dashed rgba(255,165,0,0.45)", borderRadius: 20, padding: "22px 16px", textAlign: "center", cursor: "pointer", marginBottom: 16 }}>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 32, fontWeight: 800, color: "var(--c-warn)", letterSpacing: 6 }}>{code}</span>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: copied ? "var(--c-ok-light)" : "rgba(255,255,255,0.35)", margin: "10px 0 0" }}>
+                {copied ? "Kopyalandı!" : "Kopyalamak için dokun"}
+              </p>
             </div>
-
-            {/* İpucu: Jest & Klavye */}
-            <div style={{ marginTop: 8, textAlign: "center" }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
-                ← Pas | Beğen → • Sürükleyin veya butonları kullanın
-              </span>
+            <Btn text={`${friendNameFor(code)} katıldı — Başla`} onClick={() => onStart(code)} variant="filled" size="lg" />
+            <div style={{ marginTop: 10 }}>
+              <Btn text="Geri" onClick={() => setMode(null)} variant="plain" size="sm" />
             </div>
           </div>
         )}
 
-        {/* Toast Bildirimi */}
-        {toast && (
-          <div
-            style={{
-              position: "absolute", top: 110, left: "50%", transform: "translateX(-50%)",
-              background: toast.t === "fav" ? "#22C55E" : toast.t === "undo" ? "#F59E0B" : "#EF4444",
-              color: "#fff", padding: "10px 22px", borderRadius: 16,
-              fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700,
-              zIndex: 100, boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
-              animation: "fadeInUp 0.25s ease-out",
-              display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap"
-            }}
-          >
-            {toast.t === "fav" ? <Icon n="heart" color="#fff" size={16} /> : toast.t === "undo" ? <Icon n="undo" color="#fff" size={16} /> : <Icon n="cross" color="#fff" size={16} />}
-            {toast.m}
+        {mode === "join" && (
+          <div style={{ animation: "fadeInUp 0.4s ease-out" }}>
+            <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 20, padding: "18px 16px 4px", marginBottom: 16 }}>
+              <InputField label="Davet kodu" value={joinCode} onChange={v => setJoinCode(v.toUpperCase().slice(0, 6))} placeholder="ÖRN: K7WQ2M" />
+            </div>
+            <Btn text="Katıl ve kaydırmaya başla" onClick={() => onStart(joinCode)} variant="filled" size="lg" disabled={joinCode.length < 4} />
+            <div style={{ marginTop: 10 }}>
+              <Btn text="Geri" onClick={() => setMode(null)} variant="plain" size="sm" />
+            </div>
           </div>
         )}
 
-        {/* Alt Navigasyon Barı */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", margin: "0 16px 14px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", flexShrink: 0 }}>
-          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
-          </div>
-          <div style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
-          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler ({favorites.length})</span>
-          </div>
+        <div style={{ marginTop: "auto", paddingTop: 20 }}>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 10.5, color: "rgba(255,255,255,0.62)", textAlign: "center", margin: 0, lineHeight: 1.5 }}>
+            Demo sürümü — arkadaşın kararları davet kodundan üretilir. Gerçek eş zamanlı oturum için backend gerekir.
+          </p>
         </div>
       </div>
     </Screen>
+  );
+}
+
+function MatchSwipeScreen({ code, restaurants, onExit, onFinish }) {
+  const cards = restaurants;
+  const friendName = friendNameFor(code);
+  const likes = useMemo(() => friendLikes(code, cards.map(c => c.id)), [code, cards]);
+
+  const [idx, setIdx] = useState(0);
+  const [matches, setMatches] = useState([]);
+  const [popup, setPopup] = useState(null); // eşleşme overlay'i
+  const topCardRef = useRef(null);
+
+  const visible = cards.slice(idx, idx + 2).reverse();
+  const advance = () => { if (idx >= cards.length - 1) onFinish(matches); else setIdx(i => i + 1); };
+
+  const right = () => {
+    const r = cards[idx];
+    if (r && likes.has(r.id)) {
+      const next = [...matches, r];
+      setMatches(next);
+      setPopup(r);           // eşleşme: ikisi de sağa kaydırdı
+      haptic([14, 50, 22, 50, 14]);
+      return;                // kart ilerletme overlay kapanınca
+    }
+    advance();
+  };
+  const left = () => advance();
+
+  const closePopup = () => { setPopup(null); advance(); };
+
+  return (
+    <Screen grad={false}>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#0a0500" }}>
+        {/* Header */}
+        <div style={{ padding: "44px 18px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            <IconBtn onClick={onExit} tone="glassLight" size={34} title="Çık"
+              icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>} />
+            <GurLogo size={42} pill />
+            <div style={{ width: 34 }} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,102,0,0.12)", border: "1px solid rgba(255,165,0,0.28)", borderRadius: 14, padding: "5px 14px" }}>
+            <Icon n="sparkle" size={12} color="var(--c-warn)" />
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-warn)", fontWeight: 700 }}>
+              {friendName} ile eşleşiyorsun • {matches.length} eşleşme
+            </span>
+          </div>
+        </div>
+
+        {/* Kartlar — tüketici swipe'ıyla birebir aynı fizik */}
+        <div style={{ flex: 1, position: "relative", margin: "10px 16px 8px", minHeight: 0 }}>
+          {visible.map((r, i) => {
+            const top = i === visible.length - 1;
+            return <SwipeCard key={r.id} ref={top ? topCardRef : null} r={r} isTop={top} onRight={right} onLeft={left} onTap={() => {}} />;
+          })}
+        </div>
+
+        {/* Aksiyonlar */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 22, padding: "10px 16px 20px", zIndex: 10 }}>
+          <IconBtn onClick={() => topCardRef.current?.fling(-1)} tone="solidLight" size={ACTION_SIZE} elevated title="Geç"
+            icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={GLOSS} strokeWidth="3.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+          <IconBtn onClick={() => topCardRef.current?.fling(1)} tone="solidLight" size={ACTION_SIZE} elevated title="Beğen"
+            icon={<svg width="26" height="26" viewBox="0 0 24 24" fill={GLOSS} stroke={GLOSS} strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>} />
+        </div>
+
+        {/* Eşleşme anı */}
+        <AnimatePresence>
+          {popup && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={closePopup}
+              style={{ position: "absolute", inset: 0, background: "rgba(10,5,0,0.92)", backdropFilter: "blur(10px)", zIndex: 200, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 28, cursor: "pointer" }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                style={{ width: "100%", textAlign: "center" }}
+              >
+                {/* Aynı zil: kota dolunca "mutfak kapandı", eşleşince
+                    "masa hazır" diyor. Tek nesne, iki an. */}
+                <div style={{ position: "relative", width: 104, height: 104, margin: "0 auto 6px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span className="gur-bell-wave" />
+                  <span className="gur-bell-wave" />
+                  <DinnerBell size={82} />
+                </div>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-brand-light)", fontWeight: 800, letterSpacing: 3, margin: "0 0 10px" }}>EŞLEŞTİNİZ!</p>
+                <div style={{ width: "100%", height: 220, borderRadius: 24, overflow: "hidden", position: "relative", marginBottom: 18, boxShadow: "var(--sh-brand-lg)" }}>
+                  <Img src={popup.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#2c1810" />
+                  <div style={{ position: "absolute", inset: 0, background: scrim(0.85, 60) }} />
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px 18px", textAlign: "left" }}>
+                    <h3 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 4px" }}>{popup.name}</h3>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "rgba(255,255,255,0.65)", margin: 0 }}>{popup.cat} • {popup.dist}</p>
+                  </div>
+                </div>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "rgba(255,255,255,0.7)", margin: "0 0 20px" }}>
+                  Sen ve {friendName} ikiniz de beğendiniz
+                </p>
+                <Btn text="Kaydırmaya devam et" onClick={closePopup} variant="filled" size="md" />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </Screen>
+  );
+}
+
+function MatchResultScreen({ code, matches, onDetail, onRestart, onExplore }) {
+  const friendName = friendNameFor(code);
+  return (
+    <Screen>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: "44px 16px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18, position: "relative" }}>
+          <GurLogo size={42} pill />
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#2D2419", margin: "0 0 6px" }}>
+            {matches.length > 0 ? `${matches.length} eşleşme!` : "Eşleşme çıkmadı"}
+          </h2>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(45,36,25,0.55)", margin: 0 }}>
+            {matches.length > 0 ? `${friendName} ile ikinizin de beğendiği yerler` : `${friendName} ile ortak beğeniniz olmadı — tekrar deneyin`}
+          </p>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+          {matches.map((r, i) => (
+            <div key={r.id} onClick={() => onDetail(r)} style={{
+              display: "flex", gap: 12, alignItems: "center", background: "#fff", borderRadius: 20, padding: 10, marginBottom: 10,
+              boxShadow: "var(--shadow-bar)", cursor: "pointer", animation: `fadeInUp 0.35s ease-out ${i * 0.05}s both`,
+            }}>
+              <div style={{ width: 74, height: 74, borderRadius: 16, overflow: "hidden", flexShrink: 0, position: "relative" }}>
+                <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#e8e0d8" box={74} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h4 style={{ fontFamily: "var(--f-body)", fontSize: 14.5, fontWeight: 800, color: "#2D2419", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</h4>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(45,36,25,0.5)", margin: "0 0 6px" }}>{r.cat} • {r.dist}</p>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,102,0,0.1)", borderRadius: 10, padding: "3px 9px", fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 700, color: "var(--c-brand-ink)" }}>
+                  <Icon n="sparkle" size={10} color="#FF6600" /> Eşleşme
+                </span>
+              </div>
+            </div>
+          ))}
+          {matches.length === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60%", gap: 12 }}>
+              <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(45,36,25,0.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon n="brokenHeart" size={26} color="rgba(45,36,25,0.3)" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 10, padding: "14px 0 18px" }}>
+          <Btn text="Yeni oturum" onClick={onRestart} variant="filled" size="md" />
+          <Btn text="Keşfete dön" onClick={onExplore} variant="outlineDark" size="md" />
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// REZERVASYON
+// ═══════════════════════════════════════════════
+// Kullanıcı keşifle kalmıyor, doğrudan masa ayırtıyor. Ne kullanıcıdan ne
+// işletmeden ücret alınıyor: rezervasyon platformun gelir kalemi değil,
+// keşfin sonucu.
+
+function ReservationSheet({ r, onClose, onConfirm }) {
+  const [people, setPeople] = useState(2);
+  const [day, setDay] = useState("Bugün");
+  const [time, setTime] = useState(null);
+  const times = ["18:30", "19:00", "19:30", "20:00", "20:30", "21:00"];
+  const deal = dealFor(r.id);
+
+  return (
+    <Sheet title="Masa ayırt" subtitle={r.name} onClose={onClose}>
+      <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Kişi sayısı</label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+        {[1, 2, 3, 4, 5, 6].map(n => <Chip key={n} label={n === 6 ? "6+" : String(n)} active={people === n} onClick={() => setPeople(n)} />)}
+      </div>
+
+      <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Gün</label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        {["Bugün", "Yarın", "Cumartesi"].map(d => <Chip key={d} label={d} active={day === d} onClick={() => setDay(d)} />)}
+      </div>
+
+      <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#2D2419", marginBottom: 8 }}>Saat</label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {times.map(t => <Chip key={t} label={t} active={time === t} onClick={() => setTime(t)} />)}
+      </div>
+
+      {deal && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 14, padding: "11px 14px", marginBottom: 18 }}>
+          <span style={{ background: "var(--c-ok)", borderRadius: 8, padding: "3px 8px", fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 800, color: "var(--c-ok-on)" }}>%{deal.pct}</span>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-ok-ink)", margin: 0, lineHeight: 1.4 }}>
+            Anlık fırsat bu rezervasyona uygulanır — {formatCountdown(deal.minutesLeft)} kaldı
+          </p>
+        </div>
+      )}
+
+      <Btn text={time ? `${day} ${time} • ${people} kişi — Onayla` : "Saat seçin"} onClick={() => time && onConfirm({ day, time, people, deal })} variant="filled" disabled={!time} />
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(45,36,25,0.4)", textAlign: "center", margin: "12px 0 0", lineHeight: 1.5 }}>
+        Rezervasyon ücretsizdir. Ne senden ne restorandan komisyon alınır.
+      </p>
+    </Sheet>
+  );
+}
+
+function ConfirmSheet({ title, lines, note, onClose }) {
+  return (
+    <Sheet title={title} subtitle={note ? "İşletmeye iletildi" : "Onaylandı"} onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "6px 0 18px" }}>
+        <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#EAF7EC", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon n="check" color="var(--c-ok-ink)" size={26} strokeWidth={2.5} />
+        </div>
+      </div>
+      <div style={{ background: "#FBFAF8", borderRadius: 16, padding: "12px 16px", marginBottom: 18 }}>
+        {lines.map(([k, v]) => (
+          <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "rgba(45,36,25,0.6)" }}>{k}</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#2D2419", fontVariantNumeric: "tabular-nums" }}>{v}</span>
+          </div>
+        ))}
+      </div>
+      {note && (
+        <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(45,36,25,0.5)", textAlign: "center", margin: "-6px 0 14px", lineHeight: 1.5 }}>{note}</p>
+      )}
+      <Btn text="Tamam" onClick={onClose} variant="filled" />
+    </Sheet>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// YORUM YAZMA — puan, metin ve fotoğraf ekleme
+// ═══════════════════════════════════════════════
+function ReviewComposer({ restaurantName, onCancel, onSubmit }) {
+  const [stars, setStars] = useState(0);
+  const [text, setText] = useState("");
+  const [photos, setPhotos] = useState([]);
+  const fileRef = useRef(null);
+
+  // Blob URL'ler yalnızca vazgeçildiğinde serbest bırakılır; gönderilen
+  // yorumun görselleri uygulama boyunca yaşamaya devam eder.
+  const addPhotos = (e) => {
+    // Dosyalar burada, olay anında okunur — state güncelleyicisinin içinde
+    // değil: React güncelleyiciyi sonraya bıraktığı için o ana kadar input
+    // temizlenmiş olur ve seçim kaybolurdu. Ayrıca StrictMode güncelleyiciyi
+    // iki kez çağırdığından blob URL üretimi de dışarıda kalmalı.
+    const room = Math.max(0, 4 - photos.length);
+    const picked = toMediaFiles(Array.from(e.target.files || []).slice(0, room));
+    e.target.value = "";
+    if (picked.length) setPhotos(prev => [...prev, ...picked].slice(0, 4));
+  };
+  const removePhoto = (i) => setPhotos(prev => {
+    if (prev[i]?.url) URL.revokeObjectURL(prev[i].url);
+    return prev.filter((_, j) => j !== i);
+  });
+  const cancel = () => { photos.forEach(f => f.url && URL.revokeObjectURL(f.url)); onCancel(); };
+
+  const canSubmit = stars > 0 && text.trim().length >= 10;
+  const submit = () => {
+    if (!canSubmit) return;
+    onSubmit({
+      stamp: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      user: "Sen",
+      stars,
+      text: text.trim(),
+      date: "az önce",
+      photos: photos.map(f => f.url),
+      mine: true,
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      style={{ position: "absolute", inset: 0, background: "rgba(20,14,8,0.55)", backdropFilter: "blur(4px)", zIndex: 300, display: "flex", alignItems: "flex-end" }}
+      onClick={cancel}
+    >
+      <motion.div
+        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+        onClick={e => e.stopPropagation()}
+        style={{ width: "100%", maxHeight: "88%", overflowY: "auto", background: "var(--c-card)", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: "20px 20px 24px" }}
+      >
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: "#E5E0DA", margin: "0 auto 16px" }} />
+
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+          <div style={{ minWidth: 0 }}>
+            <h3 style={{ fontFamily: "var(--f-body)", fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 3px" }}>Yorumunu yaz</h3>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{restaurantName}</p>
+          </div>
+          <IconBtn onClick={cancel} tone="subtle" size={34} title="Vazgeç"
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>} />
+        </div>
+
+        {/* Puan */}
+        <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", marginBottom: 8 }}>Puanın</label>
+        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          {[1, 2, 3, 4, 5].map(n => (
+            <motion.button
+              key={n} onClick={() => setStars(n)} className="gur-icon-btn"
+              whileTap={{ scale: 0.86 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+              aria-label={`${n} yıldız`} title={`${n} yıldız`}
+              style={{ border: "none", background: "transparent", cursor: "pointer", padding: 2, outline: "none", WebkitTapHighlightColor: "transparent" }}>
+              <Icon n="star" size={30} color={n <= stars ? "var(--c-warn)" : "#E5E0DA"} />
+            </motion.button>
+          ))}
+        </div>
+
+        {/* Metin */}
+        <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", marginBottom: 8 }}>Deneyimin</label>
+        <textarea
+          value={text} onChange={e => setText(e.target.value)} rows={4}
+          placeholder="Ne yedin, servis nasıldı, tekrar gider misin?"
+          style={{
+            width: "100%", resize: "vertical", borderRadius: 16, padding: "13px 14px",
+            border: "1.5px solid rgba(45,36,25,0.14)", background: "var(--c-subtle)",
+            fontFamily: "var(--f-body)", fontSize: 16, color: "var(--c-ink)", lineHeight: 1.5, outline: "none",
+          }}
+          onFocus={e => { e.currentTarget.style.borderColor = "#FF6600"; keepVisible(e); }}
+          onBlur={e => e.currentTarget.style.borderColor = "var(--c-border)"}
+        />
+        <div style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: text.trim().length < 10 ? "var(--c-bad-ink)" : "rgba(45,36,25,0.4)", margin: "6px 0 18px" }}>
+          {text.trim().length < 10 ? `En az 10 karakter (${text.trim().length}/10)` : `${text.trim().length} karakter`}
+        </div>
+
+        {/* Fotoğraflar */}
+        <label style={{ display: "block", fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", marginBottom: 8 }}>
+          Fotoğraf ekle <span style={{ fontWeight: 500, color: "var(--c-muted)" }}>— en fazla 4</span>
+        </label>
+        <input ref={fileRef} type="file" accept="image/*" multiple onChange={addPhotos} style={{ display: "none" }} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
+          {photos.map((f, i) => (
+            <div key={i} style={{ position: "relative", width: 74, height: 74, borderRadius: 14, overflow: "hidden", border: "1.5px solid rgba(45,36,25,0.1)" }}>
+              <img src={f.url} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <button type="button" className="gur-icon-btn" onClick={() => removePhoto(i)} title="Fotoğrafı kaldır" aria-label="Fotoğrafı kaldır" style={{ position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: "50%", border: "none", padding: 0, outline: "none", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✕</button>
+            </div>
+          ))}
+          {photos.length < 4 && (
+            <motion.button
+              onClick={() => fileRef.current?.click()} className="gur-icon-btn"
+              whileTap={{ scale: 0.94 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+              title="Fotoğraf seç"
+              style={{
+                width: 74, height: 74, borderRadius: 14, cursor: "pointer", outline: "none",
+                border: "2px dashed rgba(255,102,0,0.35)", background: "rgba(255,102,0,0.05)",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
+              }}>
+              <Icon n="camera" size={19} color="#FF6600" />
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 10.5, fontWeight: 700, color: "var(--c-brand-ink)" }}>Ekle</span>
+            </motion.button>
+          )}
+        </div>
+
+        <Btn text="Yorumu Paylaş" onClick={submit} variant="filled" disabled={!canSubmit} />
+      </motion.div>
+    </motion.div>
   );
 }
 
 // ═══════════════════════════════════════════════
 // RESTORAN DETAY — Fotoğraf carousel + kaydırılabilir yorumlar
 // ═══════════════════════════════════════════════
-function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavorites }) {
+function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavorites, userReviews = [], onAddReview, onVerifyLocation }) {
+  // Özellik kapıları: yönetici paneli hem platform genelinde hem tek bir
+  // işletme için kapatabiliyor (src/lib/platform.js → featureOn).
+  const canReserve = useFeature("reservationsEnabled", r?.id);
+  const canMenu = useFeature("menuEnabled", r?.id);
+  const chefVideoOn = useFeature("gastroVideoEnabled", r?.id);
+  const dealsOn = useFeature("instantDealsEnabled", r?.id);
+  const [sheet, setSheet] = useState(null);      // "reserve" | "soon" | null
+  const [confirmed, setConfirmed] = useState(null);
+  // İşletmenin aldığı hizmetler ve Google yorumları
+  const [detail, setDetail] = useState(null);
+  useEffect(() => {
+    let off = false;
+    backend.loadRestaurantDetail(r)
+      .then(d => { if (!off) setDetail(d); })
+      .catch(() => { if (!off) setDetail({ services: null, externalReviews: [], externalPhotos: [] }); });
+    return () => { off = true; };
+  }, [r]);
+  const claimed = !!(detail?.services?.claimed ?? (r.claimed || r.ownerClaimed));
+  const deal = dealsOn ? dealFor(r.id) : null;
   const [photoIdx, setPhotoIdx] = useState(0);
+  // Şef tanıtımı ayrı bir bölüm değil, galerinin bir karesi.
+  const gallery = useMemo(() => galleryOf(r, chefVideoOn), [r, chefVideoOn]);
   const [showMenu, setShowMenu] = useState(false);
   const photoRef = useRef(null);
 
@@ -2081,7 +3116,7 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
     const endX = e.changedTouches?.[0]?.clientX || e.clientX;
     const diff = photoTouch.current.startX - endX;
     if (Math.abs(diff) > 50) {
-      if (diff > 0 && photoIdx < r.imgs.length - 1) setPhotoIdx(i => i + 1);
+      if (diff > 0 && photoIdx < gallery.length - 1) setPhotoIdx(i => i + 1);
       if (diff < 0 && photoIdx > 0) setPhotoIdx(i => i - 1);
     }
   };
@@ -2100,32 +3135,34 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
     }
   };
 
-  // Google Maps aç
-  const openMaps = () => {
-    if (r.googleMapsUri) {
-      window.open(r.googleMapsUri, "_blank");
-    } else {
-      const url = r.lat && r.lng
-        ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`
-        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + " " + r.addr)}`;
-      window.open(url, "_blank");
-    }
+  // Harita: cihazın kendi uygulamasına doğrudan açılır. Sağlayıcı seçimi
+  // ve URL biçimi shared/deeplink.js'te — sunucu bildirim gövdesine aynı
+  // bağlantıyı gömüyor, iki yerde ayrı format tutmak birinin bozulması demek.
+  const [mapSheet, setMapSheet] = useState(false);
+  const place = { name: r.name, address: r.addr, lat: r.lat, lng: r.lng };
+  const mapDefault = defaultMapProvider(typeof navigator !== "undefined" ? navigator.userAgent : "");
+  const openMapWith = (provider) => {
+    trackEvent("directions_open", { restaurantId: r.id, provider });
+    backend.trackDirections(r.id, provider);
+    // noopener: açılan sayfa window.opener üzerinden bu sekmeyi yönlendiremez
+    window.open(directionsUrl(place, provider), "_blank", "noopener,noreferrer");
+    setMapSheet(false);
   };
+  const openMaps = () => setMapSheet(true);
 
-  // Google Maps üzerinden gelen gerçek yorumlar veya fallback
-  const defaultReviews = [
-    { user: "A.O.", stars: 5, text: "Taze malzemeler, hızlı servis ve harika sunum! Kesinlikle tavsiye ederim. Özellikle ana yemekler muhteşemdi.", date: "2 saat önce", photos: [r.imgs[0], r.imgs[1] || r.imgs[0]] },
-    { user: "Elif K.", stars: 4, text: "Ambiyans çok güzel, servis hızlı. Fiyatlar biraz yüksek ama kalite var. Tatlıları da denemenizi öneririm.", date: "1 gün önce", photos: [r.imgs[1] || r.imgs[0]] },
-    { user: "Mert S.", stars: 5, text: "Şehirdeki en iyi mekan! Personel çok ilgili ve yemekler şahane. Arkadaşlarımla harika vakit geçirdik.", date: "3 gün önce", photos: [r.imgs[2] || r.imgs[0], r.imgs[0]] },
-    { user: "Zeynep A.", stars: 3, text: "Yemekler güzeldi ama bekleme süresi uzundu. Genel olarak fena değil ama iyileştirme gerekli.", date: "1 hafta önce", photos: [] },
-  ];
-  const reviews = (r.reviews && r.reviews.length > 0) ? r.reviews : defaultReviews;
+  // Yalnızca kullanıcının bu restorana yazdıkları. Eskiden her restoranın
+  // altına dört UYDURMA yorum ("A.O.", "Elif K.", "Mert S.", "Zeynep A.")
+  // ekleniyordu; havuz gerçek işletmelerden oluşunca bu, onlar adına
+  // yazılmamış yorumlar göstermek olurdu. Dış kaynak yorumları ayrı blokta,
+  // kaynağı yazılı.
+  const reviews = [...userReviews];
 
   const [selectedReview, setSelectedReview] = useState(null);
+  const [composing, setComposing] = useState(false);
 
   return (
     <Screen grad={false}>
-      <div style={{ height: "100%", background: "#fff", overflowY: "auto" }}>
+      <div style={{ height: "100%", background: "var(--c-card)", overflowY: "auto" }}>
         <div style={{ background: GRAD, padding: "44px 16px 0", position: "relative" }}>
           {/* Header */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -2136,16 +3173,25 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
 
           {/* Info chips */}
           <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 10, flexWrap: "wrap" }}>
-            <span style={{ background: "#fff", borderRadius: 14, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: "#FF6600", fontFamily: "'Outfit', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>★ {r.rating}</span>
-            <span style={{ background: "#fff", borderRadius: 14, padding: "5px 14px", fontFamily: "'Outfit', sans-serif", fontSize: 16, color: "#333", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>{r.name}</span>
-            <span style={{ background: "#FF6600", borderRadius: 14, padding: "5px 14px", fontSize: 13, color: "#fff", fontWeight: 700, fontFamily: "'Outfit', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>{r.dist}</span>
+            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontSize: 14, fontWeight: 700, color: "var(--c-brand-ink)", fontFamily: "var(--f-body)", boxShadow: "var(--sh-1)" }}>★ {r.rating}</span>
+            <span style={{ background: "var(--c-card)", borderRadius: 14, padding: "5px 14px", fontFamily: "var(--f-body)", fontSize: 16, color: "var(--c-warm-ink)", boxShadow: "var(--sh-1)", display: "inline-flex", alignItems: "center", gap: 7 }}>
+              {r.name}
+              {claimed && <VerifiedStar size={14} />}
+            </span>
+            <span style={{ background: "#FF6600", borderRadius: 14, padding: "5px 14px", fontSize: 13, color: "#fff", fontWeight: 700, fontFamily: "var(--f-body)", boxShadow: "var(--sh-1)" }}>{distText(r)}</span>
           </div>
 
           {/* Açıklama */}
-          <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "#fff", margin: "0 4px 14px", lineHeight: 1.35, textShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{r.desc}</p>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 15, color: "#fff", margin: "0 4px 14px", lineHeight: 1.35, textShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{r.desc}</p>
 
-          {/* Fotoğraf Carousel — kaydırılabilir */}
-          <div style={{ position: "relative", marginBottom: 12 }}>
+          {/* Fotoğraf Carousel — kaydırılabilir.
+              Dış kutu keşfetteki kartın görseliyle AYNI layoutId'yi
+              taşıyor: karta dokununca o görsel buraya kadar büyüyor.
+              layoutId sarmalayıcıda, karusel şeridinde değil — şerit
+              zaten translateX ile kayıyor, ikisi aynı düğümde olsaydı
+              Motion'ın morph'u ile karusel kaydırması aynı transform
+              üzerinde çakışırdı. */}
+          <motion.div layoutId={`gur-kapak-${r.id}`} style={{ position: "relative", marginBottom: 12 }}>
             <div
               onTouchStart={handlePhotoStart}
               onTouchEnd={handlePhotoEnd}
@@ -2156,179 +3202,282 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 display: "flex", transition: "transform 0.35s cubic-bezier(.4,0,.2,1)",
                 transform: `translateX(-${photoIdx * 100}%)`,
               }}>
-                {r.imgs.map((img, i) => (
-                  <div key={i} style={{ minWidth: "100%", flexShrink: 0 }}>
-                    <Img src={img} style={{ width: "100%", height: 210, borderRadius: 0 }} bg="#d4c8bc" />
+                {gallery.map((g, i) => (
+                  <div key={i} style={{ minWidth: "100%", flexShrink: 0, position: "relative" }}>
+                    <Img src={g.src} style={{ width: "100%", height: 210, borderRadius: 0 }} bg="#d4c8bc" />
+                    {g.chef && <ChefOverlay chefName={g.chefName} />}
                   </div>
                 ))}
               </div>
             </div>
             {/* Dot indicators */}
             <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
-              {r.imgs.map((_, i) => (
+              {gallery.map((g, i) => (
                 <div key={i} onClick={() => setPhotoIdx(i)} style={{
                   width: i === photoIdx ? 20 : 8, height: 8, borderRadius: 4,
-                  background: i === photoIdx ? "#fff" : "rgba(255,255,255,0.35)",
+                  background: i === photoIdx ? (g.chef ? "var(--c-warn)" : "#fff") : "rgba(255,255,255,0.35)",
                   transition: "all 0.3s", cursor: "pointer",
                 }} />
               ))}
             </div>
-          </div>
+          </motion.div>
 
           {/* Küçük thumbnail'lar */}
-          <div style={{ display: "flex", gap: 10, paddingBottom: 16, overflowX: "auto", scrollbarWidth: "none" }}>
-            {r.imgs.map((img, i) => (
+          <HScroll style={{ gap: 10, paddingBottom: 16, scrollbarWidth: "none" }}>
+            {gallery.map((g, i) => (
               <div key={i} onClick={() => setPhotoIdx(i)} style={{
                 flexShrink: 0, width: 80, height: 60, borderRadius: 12, overflow: "hidden",
                 border: i === photoIdx ? "3px solid #fff" : "3px solid rgba(255,255,255,0.2)",
                 opacity: i === photoIdx ? 1 : 0.6, transition: "all 0.2s", cursor: "pointer",
+                position: "relative",
               }}>
-                <Img src={img} style={{ width: "100%", height: "100%" }} bg="#d4c8bc" />
+                <Img src={g.src} style={{ width: "100%", height: "100%" }} bg="#d4c8bc" />
+                {g.chef && (
+                  <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><polygon points="6 3 20 12 6 21" /></svg>
+                  </div>
+                )}
               </div>
             ))}
-          </div>
+          </HScroll>
         </div>
 
         {/* Beyaz alan */}
         <div style={{ padding: "18px 0 110px" }}>
 
-          {/* Yorumlar — tek tek gösterim */}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
-<p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, fontWeight: 700, color: "#333", margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icon n="chat" color="#333" size={16} />Yorumlar</p>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#bbb" }}>{revIdx + 1} / {reviews.length}</span>
-            </div>
+          {/* Google Haritalar yorumları ve yorum kapısı — kart detayıyla
+              birebir aynı bileşenler, aynı kural. */}
+          <div style={{ padding: "0 16px", marginBottom: 18 }}>
+            <ExternalReviews reviews={detail?.externalReviews || []} photos={detail?.externalPhotos || []} restaurant={r} loading={!detail} />
+            <ReviewGate restaurant={r} onReview={() => setComposing(true)} onVerifyLocation={onVerifyLocation} />
+          </div>
 
-            <div
-              onTouchStart={handleRevStart}
-              onTouchEnd={handleRevEnd}
-              onMouseDown={handleRevStart}
-              onMouseUp={handleRevEnd}
-              style={{ overflow: "hidden", margin: "0 16px", cursor: "grab" }}>
-              <div style={{
-                transition: "transform 0.4s cubic-bezier(.25,.8,.25,1)",
-                transform: `translateX(-${revIdx * 100}%)`,
-                display: "flex",
-              }}>
-                {reviews.map((rev, i) => (
-                  <div key={i} style={{ minWidth: "100%", width: "100%", flexShrink: 0, padding: "0 2px", boxSizing: "border-box" }}>
-                    <div
-                      onClick={() => { if (!revTouch.current.moved) setSelectedReview(rev); }}
-                      style={{
-                        background: "#FFF8F4", border: "2px solid #FF6600",
-                        borderRadius: 20, padding: "16px 18px",
-                        boxShadow: "0 2px 12px rgba(255,102,0,0.06)",
-                        cursor: "pointer",
-                      }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 34, height: 34, borderRadius: 12, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 800 }}>{rev.user.charAt(0)}</div>
-                          <div>
-                            <p style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, fontSize: 14, color: "#FF6600", margin: 0 }}>{rev.user}</p>
-                            <div style={{ display: "flex", gap: 2 }}>
-                              {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "#FFA500" : "#ddd" }}>★</span>)}
+          {/* Yorumlar — tek tek gösterim. Kullanıcının yazdığı yorum yoksa blok hiç çizilmiyor. */}
+          {reviews.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
+  <p style={{ fontFamily: "var(--f-body)", fontSize: 15, fontWeight: 700, color: "var(--c-warm-ink)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icon n="chat" color="var(--c-warm-ink)" size={16} />Yorumlar</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-warm-4)" }}>{revIdx + 1} / {reviews.length}</span>
+                </div>
+              </div>
+
+              <div
+                onTouchStart={handleRevStart}
+                onTouchEnd={handleRevEnd}
+                onMouseDown={handleRevStart}
+                onMouseUp={handleRevEnd}
+                style={{ overflow: "hidden", margin: "0 16px", cursor: "grab" }}>
+                <div style={{
+                  transition: "transform 0.4s cubic-bezier(.25,.8,.25,1)",
+                  transform: `translateX(-${revIdx * 100}%)`,
+                  display: "flex",
+                }}>
+                  {reviews.map((rev, i) => (
+                    <div key={i} style={{ minWidth: "100%", width: "100%", flexShrink: 0, padding: "0 2px", boxSizing: "border-box" }}>
+                      <div
+                        onClick={() => { if (!revTouch.current.moved) setSelectedReview(rev); }}
+                        style={{
+                          background: "#FFF8F4", border: "2px solid #FF6600",
+                          borderRadius: 20, padding: "16px 18px",
+                          boxShadow: "var(--sh-1)",
+                          cursor: "pointer",
+                        }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 34, height: 34, borderRadius: 12, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 800 }}>{rev.user.charAt(0)}</div>
+                            <div>
+                              <p style={{ fontFamily: "var(--f-body)", fontWeight: 800, fontSize: 14, color: "var(--c-brand-ink)", margin: 0 }}>{rev.user}</p>
+                              <div style={{ display: "flex", gap: 2 }}>
+                                {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 11, color: s <= rev.stars ? "var(--c-warn)" : "var(--c-warm-2)" }}>★</span>)}
+                              </div>
                             </div>
                           </div>
+                          <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-warm-3)" }}>{rev.date}</span>
                         </div>
-                        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "#ccc" }}>{rev.date}</span>
+                        <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)", margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{rev.text}</p>
+                        {rev.photos && rev.photos.length > 0 && (
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {rev.photos.slice(0, 3).map((p, pi) => (
+                              <div key={pi} style={{ width: 44, height: 44, borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,102,0,0.15)" }}>
+                                <Img src={p} style={{ width: 44, height: 44 }} bg="#f0e8e0" />
+                              </div>
+                            ))}
+                            <div style={{ display: "flex", alignItems: "center" }}>
+                              <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-warm-3)" }}>detay →</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#666", margin: "0 0 8px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{rev.text}</p>
-                      {rev.photos && rev.photos.length > 0 && (
-                        <div style={{ display: "flex", gap: 6 }}>
-                          {rev.photos.slice(0, 3).map((p, pi) => (
-                            <div key={pi} style={{ width: 44, height: 44, borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,102,0,0.15)" }}>
-                              <Img src={p} style={{ width: 44, height: 44 }} bg="#f0e8e0" />
-                            </div>
-                          ))}
-                          <div style={{ display: "flex", alignItems: "center" }}>
-                            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "#ccc" }}>detay →</span>
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dot indicators */}
+              <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 12 }}>
+                {reviews.map((_, i) => (
+                  <div key={i} onClick={() => setRevIdx(i)} style={{
+                    width: i === revIdx ? 20 : 7, height: 7, borderRadius: 4,
+                    background: i === revIdx ? "#FF6600" : "var(--c-warm-2)",
+                    transition: "all 0.3s", cursor: "pointer",
+                  }} />
                 ))}
               </div>
             </div>
-
-            {/* Dot indicators */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 12 }}>
-              {reviews.map((_, i) => (
-                <div key={i} onClick={() => setRevIdx(i)} style={{
-                  width: i === revIdx ? 20 : 7, height: 7, borderRadius: 4,
-                  background: i === revIdx ? "#FF6600" : "#e0e0e0",
-                  transition: "all 0.3s", cursor: "pointer",
-                }} />
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* Tags */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "0 16px", marginBottom: 18 }}>
-            {r.tags.map(t => <span key={t} style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>{t}</span>)}
-            <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "#FF6600", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>🕐 {r.hours}</span>
+            {r.tags.map(t => <span key={t} style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "var(--c-brand-ink)", fontFamily: "var(--f-body)", fontWeight: 600 }}>{t}</span>)}
+            {r.hours && <span style={{ background: "#FFF0E5", borderRadius: 14, padding: "6px 16px", fontSize: 13, color: "var(--c-brand-ink)", fontFamily: "var(--f-body)", fontWeight: 600 }}>🕐 {r.hours}</span>}
           </div>
+
+          {/* Anlık fırsat */}
+          {deal && (
+            <div style={{ margin: "0 16px 16px", display: "flex", alignItems: "center", gap: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)", borderRadius: 18, padding: "13px 15px" }}>
+              <div style={{ background: "var(--c-ok)", borderRadius: 10, padding: "6px 11px", flexShrink: 0 }}>
+                <span style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-ok-on)" }}>%{deal.pct}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ok-ink)", margin: "0 0 2px" }}>Şu an geçerli</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "rgba(22,101,52,0.75)", margin: 0 }}>{deal.note}</p>
+              </div>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 11.5, fontWeight: 700, color: "var(--c-ok-ink)", flexShrink: 0 }}>{formatCountdown(deal.minutesLeft)}</span>
+            </div>
+          )}
+
+          {/* Masa ayırtma işletmenin taahhüdü; kaydını sahiplenmemiş bir
+              mekan adına söz veremeyiz. Yönetici paneli bu özelliği hem
+              platform genelinde hem tek bir işletme için kapatabilir. */}
+          {claimed && canReserve && (
+            <div style={{ padding: "0 16px", marginBottom: 12 }}>
+              <Btn text="Masa Ayırt" onClick={() => setSheet("reserve")} variant="filled" size="md" />
+            </div>
+          )}
 
           {/* Favori butonu */}
           <div style={{ padding: "0 16px" }}>
-            <button onClick={toggleFav} style={{ width: "100%", padding: "15px 0", borderRadius: 30, border: "none", background: isFav ? "#f5f5f5" : GRAD, color: isFav ? "#FF6600" : "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 18, cursor: "pointer", boxShadow: isFav ? "none" : "0 6px 24px rgba(255,69,0,0.25)" }}>
-{isFav ? "Favorilerden Çıkar" : "Favorilere Ekle"}
-            </button>
+            <Btn
+              text={isFav ? "Favorilerden Çıkar" : "Favorilere Ekle"} onClick={toggleFav}
+              variant={isFav ? "outlineDark" : "filled"}
+            />
           </div>
         </div>
 
         {/* Alt bar — Explore ile aynı stil */}
-        <div style={{ position: "sticky", bottom: 0, background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-around", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-          <div onClick={() => setShowMenu(true)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.5 }}>
+        <div style={{ position: "sticky", bottom: 0, background: "var(--c-card)", display: "flex", alignItems: "center", justifyContent: "space-around", borderRadius: 24, padding: "10px 8px", margin: "0 16px 16px", boxShadow: "var(--sh-2)" }}>
+          <div onClick={() => (claimed && canMenu ? setShowMenu(true) : setSheet("soon"))} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: claimed ? 0.5 : 0.35 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Menü</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-brand-ink)", fontWeight: 700 }}>Menü</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
-          <div onClick={openMaps} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.5 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Konum</span>
+          <div onClick={openMaps} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Konum</span>
           </div>
         </div>
 
-        {/* Yorum Detay Overlay */}
+        {mapSheet && (
+          <Sheet title="Yol tarifi" subtitle={r.addr} onClose={() => setMapSheet(false)}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: 6 }}>
+              {MAP_PROVIDERS.map(p => (
+                <Btn key={p.id} text={p.label} onClick={() => openMapWith(p.id)}
+                  variant={p.id === mapDefault ? "filled" : "outlineDark"} size="md" />
+              ))}
+              <Btn text="Haritada göster (yol tarifi olmadan)"
+                onClick={() => { window.open(placeUrl(place, mapDefault), "_blank", "noopener,noreferrer"); setMapSheet(false); }}
+                variant="plainDark" size="sm" />
+            </div>
+          </Sheet>
+        )}
+
+        <AnimatePresence>
+          {sheet === "soon" && (
+            <NotYetSheet r={r} onClose={() => setSheet(null)} />
+          )}
+          {sheet === "reserve" && (
+            <ReservationSheet r={r} onClose={() => setSheet(null)}
+              onConfirm={(b) => {
+                // Masa "ayrıldı" değil "talep edildi": masayı verecek olan
+                // taraf işletme. Talep işletmenin paneline bildirim düşer.
+                reservations.requestTable({
+                  restaurantId: r.id, restaurantName: r.name,
+                  day: b.day, time: b.time, people: b.people,
+                  dealPct: b.deal?.pct ?? null,
+                });
+                trackEvent("reservation_request", { restaurantId: r.id });
+                setSheet(null);
+                setConfirmed({ title: "Talebin iletildi", lines: [["Restoran", r.name], ["Gün", b.day], ["Saat", b.time], ["Kişi", `${b.people}`], ...(b.deal ? [["Fırsat", `%${b.deal.pct} indirim`]] : [])], note: "İşletme onaylayınca bildirim alacaksın." });
+              }} />
+          )}
+          {confirmed && <ConfirmSheet title={confirmed.title} lines={confirmed.lines} note={confirmed.note} onClose={() => setConfirmed(null)} />}
+        </AnimatePresence>
+
+        {/* Yorum Yazma — yıldız, metin ve fotoğraf ekleme */}
+        <AnimatePresence>
+        {composing && (
+          <ReviewComposer
+            restaurantName={r.name}
+            onCancel={() => setComposing(false)}
+            onSubmit={async (review) => {
+              // Kart detayındaki akışın aynısı: yerel kayıt + sunucuya
+              // gönderim + ziyaretin tüketilmesi. Tek fark yok.
+              onAddReview?.(r.id, { ...review, verified: true });
+              trackEvent("review_submit", { restaurantId: r.id, verified: true });
+              setComposing(false);
+              setRevIdx(0);
+              try { await backend.submitReview(r.id, review); }
+              catch { /* sunucu doğrulanmış ziyaret görmedi; yerel kopya kalır */ }
+            }}
+          />
+        )}
+        </AnimatePresence>
+
+        {/* Yorum Detay Overlay — alttan gelip alta geri döner (§7 — giriş/çıkış aynı yol) */}
+        <AnimatePresence>
         {selectedReview && (
-          <div style={{ position: "absolute", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", animation: "fadeInUp 0.25s ease-out" }}>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
+            style={{ position: "absolute", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column" }}>
             <div style={{ flex: 1, overflowY: "auto" }}>
               {/* Header */}
               <div style={{ padding: "52px 20px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-<h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 28, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: 10 }}><Icon n="chat" color="#fff" size={22} />Yorum Detayı</h2>
-                <button onClick={() => setSelectedReview(null)} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", padding: 10, borderRadius: 14, backdropFilter: "blur(8px)" }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                </button>
+<h2 style={{ fontFamily: "var(--f-body)", fontSize: 28, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: 10 }}><Icon n="chat" color="#fff" size={22} />Yorum Detayı</h2>
+                <IconBtn
+                  onClick={() => setSelectedReview(null)} tone="glassLight" title="Kapat"
+                  icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
+                />
               </div>
 
               <div style={{ padding: "0 20px 40px" }}>
                 {/* Kullanıcı bilgisi */}
                 <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-                  <div style={{ width: 52, height: 52, borderRadius: 18, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 800 }}>{selectedReview.user.charAt(0)}</div>
+                  <div style={{ width: 52, height: 52, borderRadius: 18, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 800 }}>{selectedReview.user.charAt(0)}</div>
                   <div>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>{selectedReview.user}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", margin: "0 0 3px" }}>{selectedReview.user}</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ display: "flex", gap: 2 }}>
-                        {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 14, color: s <= selectedReview.stars ? "#FFA500" : "rgba(255,255,255,0.15)" }}>★</span>)}
+                        {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 14, color: s <= selectedReview.stars ? "var(--c-warn)" : "rgba(255,255,255,0.15)" }}>★</span>)}
                       </div>
-                      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{selectedReview.date}</span>
+                      <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{selectedReview.date}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Yorum metni */}
                 <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 20, padding: "18px 20px", marginBottom: 20, border: "1px solid rgba(255,255,255,0.06)" }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 15, color: "rgba(255,255,255,0.85)", margin: 0, lineHeight: 1.65 }}>{selectedReview.text}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 15, color: "rgba(255,255,255,0.85)", margin: 0, lineHeight: 1.65 }}>{selectedReview.text}</p>
                 </div>
 
                 {/* Fotoğraflar */}
                 {selectedReview.photos && selectedReview.photos.length > 0 && (
                   <div>
-<p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: "0 0 12px" }}>Fotoğraflar</p>
+<p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: "0 0 12px" }}>Fotoğraflar</p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {selectedReview.photos.map((p, pi) => (
-                        <div key={pi} style={{ borderRadius: 18, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
+                        <div key={pi} style={{ borderRadius: 18, overflow: "hidden", boxShadow: "var(--sh-2)" }}>
                           <Img src={p} style={{ width: "100%", height: 200, borderRadius: 18 }} bg="#2a1a0a" />
                         </div>
                       ))}
@@ -2340,27 +3489,33 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
                 <div style={{ background: "rgba(255,102,0,0.1)", borderRadius: 18, padding: "14px 16px", marginTop: 20, display: "flex", alignItems: "center", gap: 12, border: "1px solid rgba(255,102,0,0.15)" }}>
 <Icon n="plate" color="#FF6600" size={16} />
                   <div>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#FF6600", margin: 0 }}>{r.name}</p>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.4)", margin: 0 }}>{r.cat} • {r.addr}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-brand-ink)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.4)", margin: 0 }}>{r.cat} • {r.addr}</p>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
 
         {/* Menü Overlay — Görsel Galeri */}
+        <AnimatePresence>
         {showMenu && (
-          <div style={{ position: "absolute", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", animation: "fadeInUp 0.25s ease-out" }}>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
+            style={{ position: "absolute", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column" }}>
             {/* Header */}
             <div style={{ padding: "52px 20px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-<h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 700, color: "#fff", margin: "0 0 3px", display: "flex", alignItems: "center", gap: 8 }}><Icon n="doc" color="#fff" size={16} />Menü</h2>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.4)", margin: 0 }}>{r.name} • {r.menu ? r.menu.length : 0} sayfa</p>
+<h2 style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 700, color: "#fff", margin: "0 0 3px", display: "flex", alignItems: "center", gap: 8 }}><Icon n="doc" color="#fff" size={16} />Menü</h2>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.4)", margin: 0 }}>{r.name} • {r.menu ? r.menu.length : 0} sayfa</p>
               </div>
-              <button onClick={() => setShowMenu(false)} style={{ background: "rgba(255,255,255,0.1)", border: "none", cursor: "pointer", padding: 10, borderRadius: 14 }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
+              <IconBtn
+                onClick={() => setShowMenu(false)} tone="glassLight" title="Kapat"
+                icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
+              />
             </div>
 
             {/* Menü görselleri */}
@@ -2368,11 +3523,11 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
               {r.menu && r.menu.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {r.menu.map((menuImg, mi) => (
-                    <div key={mi} style={{ borderRadius: 18, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.3)", animation: `fadeInUp 0.4s ease-out ${mi * 0.1}s both` }}>
+                    <div key={mi} style={{ borderRadius: 18, overflow: "hidden", boxShadow: "var(--sh-2)", animation: `fadeInUp 0.4s ease-out ${mi * 0.1}s both` }}>
                       <div style={{ position: "relative" }}>
-                        <Img src={menuImg} style={{ width: "100%", height: 380, borderRadius: 18 }} bg="#1a1a1a" />
+                        <Img src={menuImg} style={{ width: "100%", height: 380, borderRadius: 18 }} bg="var(--c-warm-dark)" />
                         <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.5)", borderRadius: 10, padding: "4px 10px", backdropFilter: "blur(6px)" }}>
-                          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "rgba(255,255,255,0.7)" }}>{mi + 1} / {r.menu.length}</span>
+                          <span style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "rgba(255,255,255,0.7)" }}>{mi + 1} / {r.menu.length}</span>
                         </div>
                       </div>
                     </div>
@@ -2381,13 +3536,14 @@ function DetailScreen({ r, onBack, isFav, toggleFav, onExplore, onSwipe, onFavor
               ) : (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 20px" }}>
 <div style={{ marginBottom: 16 }}><Icon n="bank" color="rgba(255,255,255,0.4)" size={36} /></div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: "0 0 6px" }}>Menü henüz eklenmedi</p>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.3)", margin: 0 }}>Restoran menüsünü yakında yükleyecek</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 700, color: "rgba(255,255,255,0.6)", margin: "0 0 6px" }}>Menü henüz eklenmedi</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.3)", margin: 0 }}>Restoran menüsünü yakında yükleyecek</p>
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
     </Screen>
   );
@@ -2408,15 +3564,17 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
         {/* Header — aynı keşfet animasyonu */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, position: "relative", animation: "fadeInUp 0.6s ease-out" }}>
           <GurLogo size={42} pill />
-          <button onClick={onProfile} style={{ position: "absolute", right: 0, width: 40, height: 40, borderRadius: "50%", border: "none", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 10px rgba(0,0,0,0.06)" }}>
-            <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 800 }}>B</div>
-          </button>
+          <div style={{ position: "absolute", right: 0 }}>
+            <IconBtn onClick={onProfile} tone="solidLight" size={40} title="Profil">
+              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#FF6600", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--c-on-brand)", fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 800 }}>B</div>
+            </IconBtn>
+          </div>
         </div>
 
         <div style={{ textAlign: "center", marginBottom: 24, animation: "fadeInUp 0.6s ease-out 0.15s both" }}>
-          <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 800, color: "#2D2419", margin: "0 0 6px" }}>Favorilerim</h2>
+          <h2 style={{ fontFamily: "var(--f-body)", fontSize: 16, fontWeight: 800, color: "var(--c-ink)", margin: "0 0 6px" }}>Favorilerim</h2>
           {favorites.length > 0 && (
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "rgba(45,36,25,0.5)", margin: 0 }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-muted)", margin: 0 }}>
               {favorites.length} restoran kayıtlı
             </p>
           )}
@@ -2428,13 +3586,11 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
             <div style={{ width: 100, height: 100, borderRadius: "50%", background: "#FFF3EA", margin: "0 auto 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon n="brokenHeart" color="#FF6600" size={32} />
             </div>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 18, fontWeight: 700, color: "#2D2419", margin: "0 0 8px" }}>Henüz favori eklemediniz</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "rgba(45,36,25,0.5)", margin: "0 0 28px", lineHeight: 1.5 }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 18, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 8px" }}>Henüz favori eklemediniz</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-muted)", margin: "0 0 28px", lineHeight: 1.5 }}>
               Restoranları sağa kaydırarak favorilerinize ekleyin
             </p>
-            <button onClick={onSwipe} style={{ background: "#fff", border: "none", borderRadius: 30, padding: "15px 36px", color: "#FF6600", fontFamily: "'Outfit', sans-serif", fontSize: 18, cursor: "pointer", boxShadow: "0 4px 20px rgba(255,69,0,0.2)" }}>
-              Keşfetmeye Başla
-            </button>
+            <Btn text="Keşfetmeye Başla" onClick={onSwipe} variant="filled" fullWidth={false} />
           </div>
         ) : (
           <>
@@ -2445,10 +3601,10 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
                 { label: "Ort. Puan", value: (favorites.reduce((a, r) => a + r.rating, 0) / favorites.length).toFixed(1), icon: <Icon n="star" color="#FF6600" size={18} /> },
                 { label: "Kategori", value: [...new Set(favorites.map(r => r.cat))].length, icon: <Icon n="plate" color="#FF6600" size={18} /> },
               ].map((s, i) => (
-                <div key={i} style={{ flex: 1, background: "#fff", borderRadius: 18, padding: "14px 10px", textAlign: "center", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
+                <div key={i} style={{ flex: 1, background: "var(--c-card)", borderRadius: 18, padding: "14px 10px", textAlign: "center", boxShadow: "var(--sh-1)" }}>
                   <div style={{ display: "flex", justifyContent: "center" }}>{s.icon}</div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#2D2419", margin: "4px 0 2px" }}>{s.value}</p>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "rgba(45,36,25,0.5)", margin: 0 }}>{s.label}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "var(--c-ink)", margin: "4px 0 2px" }}>{s.value}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-muted)", margin: 0 }}>{s.label}</p>
                 </div>
               ))}
             </div>
@@ -2456,59 +3612,65 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
             {/* Favori kartları */}
             {favorites.map((r, i) => (
               <div key={r.id} style={{
-                background: "#fff", borderRadius: 22, overflow: "hidden", marginBottom: 14,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+                background: "var(--c-card)", borderRadius: 22, overflow: "hidden", marginBottom: 14,
+                boxShadow: "var(--sh-1)",
                 animation: `fadeInUp 0.4s ease-out ${i * 0.06}s both`,
               }}>
                 {/* Üst kısım — fotoğraf */}
                 <div onClick={() => onDetail(r)} style={{ cursor: "pointer", position: "relative", height: 160 }}>
                   <Img src={r.imgs[0]} style={{ position: "absolute", inset: 0 }} bg="#d4c8bc" />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 45%)" }} />
+                  <div style={{ position: "absolute", inset: 0, background: scrim(0.7, 45) }} />
 
                   {/* Puan ve kategori */}
                   <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6 }}>
-                    <span style={{ background: "#fff", borderRadius: 10, padding: "4px 10px", fontSize: 12, fontWeight: 700, color: "#1C1917", fontFamily: "'Outfit', sans-serif", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="#F59E0B" size={11} />{r.rating}</span>
-                    <span style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(6px)", borderRadius: 10, padding: "4px 10px", fontSize: 11, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>{r.cat}</span>
+                    <span style={{ background: "var(--c-card)", borderRadius: 10, padding: "4px 10px", fontSize: 12, fontWeight: 700, color: "var(--c-ink)", fontFamily: "var(--f-body)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon n="star" color="var(--c-warn)" size={11} />{r.rating}</span>
+                    <span style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(6px)", borderRadius: 10, padding: "4px 10px", fontSize: 11, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 600 }}>{r.cat}</span>
                   </div>
 
                   {/* Fiyat */}
-                  <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", borderRadius: 10, padding: "4px 10px", fontSize: 12, color: "#fff", fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>{r.price}</span>
+                  {r.price && <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", borderRadius: 10, padding: "4px 10px", fontSize: 12, color: "#fff", fontFamily: "var(--f-body)", fontWeight: 600 }}>{r.price}</span>}
 
                   {/* İsim ve mesafe */}
                   <div style={{ position: "absolute", bottom: 12, left: 14, right: 14, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{r.name}</span>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "rgba(255,255,255,0.8)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(4px)", borderRadius: 8, padding: "3px 8px" }}>{r.dist}</span>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 800, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{r.name}</span>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.8)", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(4px)", borderRadius: 8, padding: "3px 8px" }}>{r.dist}</span>
                   </div>
                 </div>
 
                 {/* Alt kısım — bilgiler + silme */}
                 <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4CAF50" }} />
-                      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#4CAF50", fontWeight: 700 }}>Açık</span>
-                    </div>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, color: "#bbb" }}>{r.hours}</span>
+                    {/* "Açık" yalnızca saati bilinen mekânda: saati olmayana açık demek uydurma. */}
+                    {r.hours && (
+                      <>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-ok-light)" }} />
+                          <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-ok-light)", fontWeight: 700 }}>Açık</span>
+                        </div>
+                        <span style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-warm-4)" }}>{r.hours}</span>
+                      </>
+                    )}
                   </div>
 
                   {/* Silme — onaylı */}
                   {confirmDelete === r.id ? (
                     <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => removeFav(r.id)} style={{ background: "#FF3B30", border: "none", borderRadius: 10, padding: "6px 14px", cursor: "pointer", fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 700, color: "#fff" }}>Sil</button>
-                      <button onClick={() => setConfirmDelete(null)} style={{ background: "#eee", border: "none", borderRadius: 10, padding: "6px 14px", cursor: "pointer", fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 600, color: "#666" }}>İptal</button>
+                      <Btn text="Sil" onClick={() => removeFav(r.id)} variant="destructive" size="sm" fullWidth={false} />
+                      <Btn text="İptal" onClick={() => setConfirmDelete(null)} variant="outlineDark" size="sm" fullWidth={false} />
                     </div>
                   ) : (
-                    <button onClick={() => setConfirmDelete(r.id)} style={{ background: "rgba(255,59,48,0.06)", border: "none", borderRadius: 12, padding: "8px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-<Icon n="trash" color="#FF3B30" size={14} />
-                      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#FF3B30", fontWeight: 600 }}>Kaldır</span>
-                    </button>
+                    <Btn
+                      text="Kaldır" onClick={() => setConfirmDelete(r.id)}
+                      variant="destructiveSoft" size="sm" fullWidth={false}
+                      icon={<Icon n="trash" color="var(--c-bad)" size={14} />}
+                    />
                   )}
                 </div>
 
                 {/* Adres */}
                 <div style={{ padding: "0 16px 14px" }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, color: "#bbb", margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11, color: "var(--c-warm-4)", margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-warm-3)" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
                     {r.addr}
                   </p>
                 </div>
@@ -2520,15 +3682,15 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
       </div>
       {/* Alt bar — beyaz, keşfet sayfası ile aynı */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 16px 16px", zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", boxShadow: "var(--sh-2)" }}>
+          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px" }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF3B30" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--c-bad)" stroke="var(--c-bad)" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-bad-ink)", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
       </div>
@@ -2539,12 +3701,9 @@ function FavScreen({ onExplore, onSwipe, onDetail, favorites, setFavorites, onPr
 // ═══════════════════════════════════════════════
 // PROFİLİM
 // ═══════════════════════════════════════════════
-const MY_REVIEWS = [
-  { rid: 1, name: "Nusr-Et Steakhouse", stars: 5, text: "Etler mükemmel pişmiş, servis çok hızlıydı. Kesinlikle tekrar geleceğim.", date: "3 gün önce", img: I.steak1 },
-  { rid: 8, name: "Nonna's Trattoria", stars: 4, text: "Pizza hamuru harikaydı, sadece bekleme süresi biraz uzundu.", date: "1 hafta önce", img: I.pasta1 },
-  { rid: 12, name: "Karaköy Güllüoğlu", stars: 5, text: "1820'den beri neden efsane olduğu belli, baklava enfes.", date: "2 hafta önce", img: I.dessert1 },
-  { rid: 6, name: "Klein Bistro", stars: 4, text: "Kahve kalitesi çok iyi, brunch menüsü de doyurucu.", date: "3 hafta önce", img: I.cafe1 },
-];
+// Profildeki "Yorumlarım" örnekleri. Boş: eskiden gerçek işletmeler hakkında
+// uydurma yorum metinleri vardı; kullanıcı yorum yazınca liste dolar.
+const MY_REVIEWS = [];
 
 const BADGES = [
   { icon: "sparkle", label: "İlk Yorum" },
@@ -2553,19 +3712,43 @@ const BADGES = [
   { icon: "flame", label: "Sadık Müşteri" },
 ];
 
-function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onDetail, accentColor = "#FF6600", showBadges = true, badgeSpeed = 14 }) {
+function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onDetail, accentColor = "#FF6600", showBadges = true, badgeSpeed = 14, userReviews = {}, restaurants = [], onRemoveUserReview, onDeleteAccount, onLegal }) {
   const [tab, setTab] = useState("reviews");
-  const [reviews, setReviews] = useState(MY_REVIEWS);
+  // Rezervasyonlar: şerit geçici, burası kalıcı kayıt. Kullanıcı "onay
+  // geldi mi" diye bakacağı bir yer olmadan bildirim tek başına yetmez.
+  const myTables = reservations.useReservations();
+  const pendingTables = myTables.filter(x => x.status === "pending").length;
+  // Silme geri alınamıyor; her ikisi de önce onay ister
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [confirmAccount, setConfirmAccount] = useState(false);
+  const [sampleReviews, setSampleReviews] = useState(MY_REVIEWS);
+  // Uygulama içinde yazılan yorumlar profil listesinin şekline dönüştürülür
+  const written = useMemo(() => Object.entries(userReviews).flatMap(([restId, list]) =>
+    (list || []).map(v => {
+      const rest = restaurants.find(x => String(x.id) === String(restId));
+      return {
+        rid: v.stamp, restId, mine: true,
+        name: rest?.name || "Restoran",
+        img: v.photos?.[0] || rest?.imgs?.[0],
+        date: v.date, stars: v.stars, text: v.text, photos: v.photos || [],
+      };
+    })
+  ), [userReviews, restaurants]);
+  const reviews = [...written, ...sampleReviews];
   const [photo, setPhoto] = useState(null);
   const fileRef = useRef(null);
   const pickPhoto = () => fileRef.current?.click();
   const onPhoto = (e) => { const f = e.target.files?.[0]; if (f) setPhoto(URL.createObjectURL(f)); };
-  const removeReview = (rid) => setReviews(prev => prev.filter(r => r.rid !== rid));
+  const removeReview = (rid) => {
+    const mine = written.find(r => r.rid === rid);
+    if (mine) onRemoveUserReview?.(mine.restId, rid);
+    else setSampleReviews(prev => prev.filter(r => r.rid !== rid));
+  };
   const avgScore = reviews.length ? (reviews.reduce((a, r) => a + r.stars, 0) / reviews.length).toFixed(1) : "-";
 
   return (
     <Screen grad={false}>
-      <div style={{ height: "100%", background: "#fff", overflowY: "auto" }}>
+      <div style={{ height: "100%", background: "var(--c-card)", overflowY: "auto" }}>
         {/* Header */}
         <div style={{ padding: "44px 20px 8px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
@@ -2576,23 +3759,23 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
             <input ref={fileRef} type="file" accept="image/*" onChange={onPhoto} style={{ display: "none" }} />
             <div onClick={pickPhoto} style={{ position: "relative", cursor: "pointer" }}>
-              <div style={{ width: 84, height: 84, borderRadius: "50%", background: photo ? "transparent" : accentColor, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "'Outfit', sans-serif", fontSize: 30, fontWeight: 800 }}>
+              <div style={{ width: 84, height: 84, borderRadius: "50%", background: photo ? "transparent" : accentColor, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "var(--f-body)", fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em" }}>
                 {photo ? <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "B"}
               </div>
-              <div style={{ position: "absolute", bottom: 0, right: 0, width: 26, height: 26, borderRadius: "50%", background: "#fff", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
+              <div style={{ position: "absolute", bottom: 0, right: 0, width: 26, height: 26, borderRadius: "50%", background: "var(--c-card)", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--sh-1)" }}>
                 <Icon n="camera" size={13} color={accentColor} />
               </div>
             </div>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, fontWeight: 800, color: "#1C1917", margin: "14px 0 3px" }}>Bora Çolpan</p>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#A8A29E", margin: "0 0 16px" }}>Nisan 2024'ten beri üye</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "14px 0 3px" }}>Bora Çolpan</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 16px" }}>Nisan 2024'ten beri üye</p>
 
             {/* Tek satır istatistik */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#57534E" }}><b style={{ color: "#1C1917" }}>{favorites.length}</b> Favori</span>
-              <span style={{ width: 3, height: 3, borderRadius: "50%", background: "#D6D0C4" }} />
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#57534E" }}><b style={{ color: "#1C1917" }}>{reviews.length}</b> Yorum</span>
-              <span style={{ width: 3, height: 3, borderRadius: "50%", background: "#D6D0C4" }} />
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, color: "#57534E", display: "flex", alignItems: "center", gap: 3 }}><Icon n="star" size={12} color="#F59E0B" /><b style={{ color: "#1C1917" }}>{avgScore}</b> Ortalama</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)" }}><b style={{ color: "var(--c-ink)" }}>{favorites.length}</b> Favori</span>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--c-line)" }} />
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)" }}><b style={{ color: "var(--c-ink)" }}>{reviews.length}</b> Yorum</span>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--c-line)" }} />
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)", display: "flex", alignItems: "center", gap: 3 }}><Icon n="star" size={12} color="var(--c-warn)" /><b style={{ color: "var(--c-ink)" }}>{avgScore}</b> Ortalama</span>
             </div>
           </div>
 
@@ -2604,7 +3787,7 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
                   {[...BADGES, ...BADGES].map((b, i) => (
                     <div key={i} style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, border: "1px solid rgba(0,0,0,0.08)", borderRadius: 999, padding: "6px 12px" }}>
                       <Icon n={b.icon} size={12} color={accentColor} />
-                      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 600, color: "#57534E", whiteSpace: "nowrap" }}>{b.label}</span>
+                      <span style={{ fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 600, color: "var(--c-ink-2)", whiteSpace: "nowrap" }}>{b.label}</span>
                     </div>
                   ))}
                 </div>
@@ -2614,14 +3797,18 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
         </div>
 
         {/* Tab seçici — alt çizgi stili */}
-        <div style={{ display: "flex", gap: 0, margin: "24px 20px 0", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
-          {[{ id: "reviews", label: "Yorumlarım" }, { id: "favorites", label: "Beğendiğim Yerler" }].map(t => (
+        <div style={{ display: "flex", gap: 0, margin: "24px 20px 0", borderBottom: "1px solid var(--c-border)" }}>
+          {[{ id: "reviews", label: "Yorumlarım" }, { id: "tables", label: "Rezervasyonlarım", badge: pendingTables }, { id: "favorites", label: "Beğendiğim Yerler" }].map(t => (
             <div key={t.id} onClick={() => setTab(t.id)} style={{
               padding: "0 0 12px", marginRight: 28, cursor: "pointer",
               borderBottom: tab === t.id ? "2px solid #FF6600" : "2px solid transparent",
-              transition: "all 0.2s",
+              transition: "all 0.2s", display: "flex", alignItems: "center", gap: 5,
             }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, color: tab === t.id ? "#1C1917" : "#A8A29E" }}>{t.label}</span>
+              <span style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, color: tab === t.id ? "var(--c-ink)" : "var(--c-muted)" }}>{t.label}</span>
+              {/* Bekleyen talep sayısı: cevap bekleyen bir şey varsa görünsün */}
+              {t.badge > 0 && (
+                <span style={{ minWidth: 16, height: 16, borderRadius: 8, background: "#FF6600", color: "#fff", fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{t.badge}</span>
+              )}
             </div>
           ))}
         </div>
@@ -2630,26 +3817,35 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
           {tab === "reviews" && (
             reviews.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 20px" }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#8A7A68", margin: 0 }}>Henüz yorum yapmadın</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-muted)", margin: 0 }}>Henüz yorum yapmadın</p>
               </div>
             ) : reviews.map((rev, i) => (
               <div key={rev.rid} style={{ display: "flex", gap: 12, padding: "16px 0", borderBottom: i < reviews.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", animation: `fadeInUp 0.35s ease-out ${i * 0.06}s both` }}>
                 <div style={{ width: 50, height: 50, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
-                  <Img src={rev.img} style={{ width: "100%", height: "100%" }} bg="#e8e0d8" />
+                  <Img src={rev.img} style={{ width: "100%", height: "100%" }} bg="var(--c-img-bg)" box={50} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#1C1917", margin: 0 }}>{rev.name}</p>
-                    <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 10, color: "#C4B5A3", flexShrink: 0, marginLeft: 6 }}>{rev.date}</span>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)", margin: 0 }}>{rev.name}</p>
+                    <span style={{ fontFamily: "var(--f-body)", fontSize: 10, color: "var(--c-muted)", flexShrink: 0, marginLeft: 6 }}>{rev.date}</span>
                   </div>
                   <div style={{ display: "flex", gap: 2, margin: "4px 0 6px" }}>
-                    {[1,2,3,4,5].map(st => <Icon key={st} n="star" size={10} color={st <= rev.stars ? "#F59E0B" : "#E5E0D8"} />)}
+                    {[1,2,3,4,5].map(st => <Icon key={st} n="star" size={10} color={st <= rev.stars ? "var(--c-warn)" : "#E5E0D8"} />)}
                   </div>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12.5, color: "#57534E", margin: 0, lineHeight: 1.45 }}>{rev.text}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-ink-2)", margin: 0, lineHeight: 1.45 }}>{rev.text}</p>
+                  {rev.photos?.length > 0 && (
+                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                      {rev.photos.map((src, pi) => (
+                        <div key={pi} style={{ width: 46, height: 46, borderRadius: 10, overflow: "hidden", flexShrink: 0, border: "1px solid rgba(0,0,0,0.06)" }}>
+                          <img src={src} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <button onClick={() => removeReview(rev.rid)} style={{ background: "none", border: "none", cursor: "pointer", alignSelf: "flex-start", flexShrink: 0, padding: 4 }}>
-                  <Icon n="trash" size={14} color="#C4B5A3" />
-                </button>
+                <div style={{ alignSelf: "flex-start" }}>
+                  <IconBtn onClick={() => setPendingDelete(rev)} tone="plain" size={28} title="Yorumu sil" icon={<Icon n="trash" size={14} color="var(--c-muted)" />} />
+                </div>
               </div>
             ))
           )}
@@ -2657,38 +3853,96 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
           {tab === "favorites" && (
             favorites.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 20px" }}>
-                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "#8A7A68", margin: 0 }}>Henüz beğendiğin bir yer yok</p>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-muted)", margin: 0 }}>Henüz beğendiğin bir yer yok</p>
               </div>
             ) : favorites.map((r, i) => (
               <div key={r.id} onClick={() => onDetail(r)} style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: i < favorites.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", cursor: "pointer" }}>
                 <div style={{ width: 46, height: 46, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
-                  <Img src={r.imgs[0]} style={{ width: "100%", height: "100%" }} bg="#e8e0d8" />
+                  <Img src={r.imgs[0]} style={{ width: "100%", height: "100%" }} bg="var(--c-img-bg)" box={46} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 700, color: "#1C1917", margin: "0 0 2px" }}>{r.name}</p>
-                  <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11.5, color: "#8A7A68", margin: 0 }}>{r.cat} · {r.dist}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 2px", display: "flex", alignItems: "center", gap: 6 }}>{r.name}{(r.claimed || r.ownerClaimed) && <VerifiedStar size={12} />}</p>
+                  <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: 0 }}>{r.cat} · {r.dist}</p>
                 </div>
                 <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                  <Icon n="star" color="#F59E0B" size={12} />
-                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 12, fontWeight: 700, color: "#1C1917" }}>{r.rating}</span>
+                  <Icon n="star" color="var(--c-warn)" size={12} />
+                  <span style={{ fontFamily: "var(--f-body)", fontSize: 12, fontWeight: 700, color: "var(--c-ink)" }}>{r.rating}</span>
                 </span>
               </div>
             ))
           )}
+          {tab === "tables" && (
+            myTables.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                <p style={{ fontFamily: "var(--f-body)", fontSize: 14, color: "var(--c-muted)", margin: 0 }}>Henüz masa talebin yok</p>
+              </div>
+            ) : myTables.map((x, i) => {
+              const tone = x.status === "confirmed" ? "var(--c-ok-ink)" : x.status === "declined" ? "var(--c-bad-ink)" : "var(--c-brand-ink)";
+              const soft = x.status === "confirmed" ? "rgba(34,197,94,0.1)" : x.status === "declined" ? "rgba(255,59,48,0.09)" : "rgba(255,102,0,0.09)";
+              const label = x.status === "confirmed" ? "Kabul edildi" : x.status === "declined" ? "Kabul edilmedi" : "İşletme onayında";
+              const rest = restaurants.find(r => String(r.id) === String(x.restaurantId));
+              return (
+                <div key={x.id} onClick={() => rest && onDetail(rest)}
+                  style={{ display: "flex", gap: 12, alignItems: "center", padding: "14px 0", borderBottom: i < myTables.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", cursor: rest ? "pointer" : "default" }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 14, background: soft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon n="clock" size={18} color={tone} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 14, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.restaurantName}</p>
+                    <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: 0 }}>
+                      {x.day} · {x.time} · {x.people} kişi{x.dealPct ? ` · %${x.dealPct} fırsat` : ""}
+                    </p>
+                  </div>
+                  <span style={{ flexShrink: 0, fontFamily: "var(--f-body)", fontSize: 11, fontWeight: 800, color: tone, background: soft, borderRadius: 999, padding: "5px 11px" }}>{label}</span>
+                </div>
+              );
+            })
+          )}
+
+          {/* Hesap — geri alınamayan işlem, listelerden ayrı ve en altta */}
+          <div style={{ marginTop: 30, paddingTop: 18, borderTop: "1px solid var(--c-border)" }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 4px" }}>Hesap</p>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12.5, color: "var(--c-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
+              Hesabını silersen yorumların, favorilerin ve rozetlerin kalıcı olarak kaldırılır.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <Btn text="Yasal metinler" onClick={onLegal} variant="outlineDark" size="md" fullWidth={false} />
+              <Btn text="Hesabımı sil" onClick={() => setConfirmAccount(true)} variant="destructiveSoft" size="md" fullWidth={false} />
+            </div>
+          </div>
         </div>
       </div>
 
+      {pendingDelete && (
+        <DangerConfirm
+          title="Yorumu sil"
+          message={`"${pendingDelete.name}" için yazdığın yorum kaldırılacak.`}
+          confirmText="Yorumu sil"
+          onConfirm={() => { removeReview(pendingDelete.rid); setPendingDelete(null); }}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
+      {confirmAccount && (
+        <DangerConfirm
+          title="Hesabımı sil"
+          message="Tüm yorumların, favorilerin ve profil bilgilerin silinir ve giriş ekranına dönersin."
+          confirmText="Hesabımı kalıcı olarak sil"
+          onConfirm={() => { setConfirmAccount(false); onDeleteAccount?.(); }}
+          onClose={() => setConfirmAccount(false)}
+        />
+      )}
+
       {/* Alt bar */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 16px 16px", zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "#fff", borderRadius: 24, padding: "10px 8px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", background: "var(--c-card)", borderRadius: 24, padding: "10px 8px", boxShadow: "var(--sh-2)" }}>
+          <div onClick={onExplore} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
             <Icon n="search" color="#FF6600" size={22} />
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF6600", fontWeight: 700 }}>Keşfet</span>
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Keşfet</span>
           </div>
           <div onClick={onSwipe} style={{ cursor: "pointer" }}><GurLogo size={24} pill /></div>
-          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer", opacity: 0.4 }}>
-            <Icon n="heart" color="#FF3B30" size={22} />
-            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 9, color: "#FF3B30", fontWeight: 700 }}>Favoriler</span>
+          <div onClick={onFavorites} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "4px 14px", cursor: "pointer" }}>
+            <Icon n="heart" color="var(--c-bad)" size={22} />
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>Favoriler</span>
           </div>
         </div>
       </div>
@@ -2697,69 +3951,159 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
 }
 
 // ═══════════════════════════════════════════════
-// MAIN APP
+// YASAL METİNLER
+// İşletme bilgileri yayına çıkmadan önce doldurulmalı ve metinler bir
+// hukuk danışmanına onaylatılmalıdır; buradaki içerik hukuki tavsiye değildir.
 // ═══════════════════════════════════════════════
-// ═══════════════════════════════════════════════
-// CANLI VERİ — OpenStreetMap Overpass API (ücretsiz, key gerektirmez)
-// Gerçek İstanbul restoranlarını çeker; başarısız olursa mock veriye düşer
-// ═══════════════════════════════════════════════
-const CAT_MAP = {
-  turkish: "Türk Mutfağı", kebab: "Türk Mutfağı", regional: "Türk Mutfağı",
-  japanese: "Uzak Doğu", sushi: "Uzak Doğu", chinese: "Uzak Doğu", asian: "Uzak Doğu", thai: "Uzak Doğu", korean: "Uzak Doğu", vietnamese: "Uzak Doğu", ramen: "Uzak Doğu",
-  italian: "İtalyan", pizza: "İtalyan", pasta: "İtalyan",
-  burger: "Fast Food", fast_food: "Fast Food", sandwich: "Fast Food", chicken: "Fast Food",
-  seafood: "Deniz Ürünleri", fish: "Deniz Ürünleri",
-  coffee_shop: "Kafe", cafe: "Kafe", breakfast: "Kafe",
-  dessert: "Tatlıcı", ice_cream: "Tatlıcı", cake: "Tatlıcı", baklava: "Tatlıcı",
-  indian: "Hint", curry: "Hint",
-  vegetarian: "Sağlıklı", vegan: "Sağlıklı", salad: "Sağlıklı",
-  barbecue: "Mangal", grill: "Mangal", steak_house: "Mangal",
-  bar: "Gece Hayatı", pub: "Gece Hayatı",
-};
+const LEGAL_OPERATOR = "GUR Teknoloji A.Ş.";       // ticaret unvanı
+const LEGAL_ADDRESS = "İstanbul, Türkiye";          // tebligat adresi
+const LEGAL_CONTACT = "kvkk@gur.app";               // veri sorumlusu iletişimi
+const LEGAL_UPDATED = "1 Eylül 2026";
 
-function osmToRestaurant(el, idx) {
-  const t = el.tags || {};
-  const cuisineRaw = (t.cuisine || "").split(";")[0].trim().toLowerCase();
-  const cat = CAT_MAP[cuisineRaw] || "Türk Mutfağı";
-  const seed = `osm-${el.id}`;
-  const streetAddr = [t["addr:street"], t["addr:housenumber"]].filter(Boolean).join(" No:");
-  return {
-    id: `osm-${el.id}`,
-    name: t.name,
-    cat,
-    rating: (3.8 + ((el.id % 12) / 10)).toFixed(1) * 1, // 3.8 - 4.9 arası deterministik
-    dist: `${(0.3 + (el.id % 70) / 10).toFixed(1)} km`,
-    price: ["₺150+", "₺300+", "₺500+", "₺800+"][el.id % 4],
-    addr: streetAddr ? `${streetAddr}, ${t["addr:district"] || "Kadıköy"}, İstanbul` : `${t["addr:district"] || "Kadıköy"}, İstanbul`,
-    desc: t.description || `${cat} kategorisinde${cuisineRaw ? ` (${cuisineRaw})` : ""} hizmet veren mekan.`,
-    imgs: [
-      `https://picsum.photos/seed/${seed}-a/600/400`,
-      `https://picsum.photos/seed/${seed}-b/600/400`,
-      `https://picsum.photos/seed/${seed}-c/600/400`,
+const LEGAL_DOCS = [
+  {
+    id: "kvkk",
+    label: "KVKK",
+    title: "Kişisel Verilerin Korunması Aydınlatma Metni",
+    body: [
+      ["Veri sorumlusu", `6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") uyarınca kişisel verileriniz, veri sorumlusu sıfatıyla ${LEGAL_OPERATOR} (${LEGAL_ADDRESS}) tarafından aşağıda açıklanan kapsamda işlenmektedir.`],
+      ["İşlenen veriler", "Kimlik ve iletişim verileri (ad, e-posta, doğum yılı), uygulama kullanım verileri (kaydırma, favori, yorum ve puanlar), yüklediğiniz görseller, cihaz ve bağlantı verileri (cihaz türü, işletim sistemi, IP adresi) ve izin vermeniz hâlinde konum verisi."],
+      ["İşleme amaçları", "Üyelik kaydının oluşturulması, restoran önerilerinin kişiselleştirilmesi, favori ve yorumların saklanması, Gastro Onaylı değerlendirmelerinin yürütülmesi, kampanya ve kupon süreçleri, hizmet güvenliğinin sağlanması ve yasal yükümlülüklerin yerine getirilmesi."],
+      ["Hukuki sebepler", "Sözleşmenin kurulması ve ifası (m.5/2-c), hukuki yükümlülük (m.5/2-ç), meşru menfaat (m.5/2-f) ve açık rızanız (m.5/1) — konum, pazarlama iletişimi ve isteğe bağlı çerezler yalnızca açık rızaya dayanır."],
+      ["Aktarım", "Veriler; barındırma, ödeme, bildirim ve analiz hizmeti aldığımız tedarikçilere, talep hâlinde yetkili kamu kurumlarına ve restoran hesabınızın olması durumunda yalnızca kendi işletmenize ait istatistikler kapsamında ilgili işletmeye aktarılabilir. Yurt dışına aktarım KVKK m.9 şartlarına uygun olarak yapılır."],
+      ["Saklama süresi", "Üyelik verileri hesabınız açık kaldığı sürece; hesap silindiğinde yasal zorunluluklar dışında en geç 6 ay içinde silinir veya anonim hâle getirilir."],
+      ["Haklarınız", `KVKK m.11 kapsamında verilerinize erişme, düzeltme, silme, işlemeye itiraz etme ve veri taşınabilirliği haklarına sahipsiniz. Başvurularınızı ${LEGAL_CONTACT} adresine iletebilirsiniz; talepleriniz en geç 30 gün içinde yanıtlanır. Uygulamadaki "Hesabımı sil" seçeneği silme talebinizi doğrudan başlatır.`],
     ],
-    menu: [`https://picsum.photos/seed/${seed}-menu/600/900`],
-    hours: t.opening_hours ? t.opening_hours.slice(0, 20) : "11:00 - 23:00",
-    tags: [cat, cuisineRaw ? cuisineRaw.charAt(0).toUpperCase() + cuisineRaw.slice(1) : "Restoran"].filter((v, i, a) => a.indexOf(v) === i),
-    lat: el.lat, lng: el.lon,
-    isLive: true, // OSM'den geldiğini işaretle
-  };
+  },
+  {
+    id: "privacy",
+    label: "Gizlilik",
+    title: "Gizlilik Politikası",
+    body: [
+      ["Ne topluyoruz", "Yalnızca hizmeti sunmak için gerekli olanı: hesap bilgileriniz, uygulama içi tercihleriniz ve yazdığınız içerikler. Rehberinize, galerinizin tamamına veya mikrofonunuza erişmiyoruz."],
+      ["İzinler", "Konum izni yalnızca yakınınızdaki restoranları sıralamak, kamera/galeri izni yalnızca yorumunuza fotoğraf eklemek, bildirim izni yalnızca kampanya ve eşleşme bildirimleri için istenir. Her izin ihtiyaç doğduğu anda ve gerekçesiyle sorulur; reddetmeniz hâlinde uygulamanın kalan bölümleri çalışmaya devam eder."],
+      ["Çerezler ve ölçümleme", "Oturumunuzu sürdürmek için zorunlu yerel depolama kullanılır. Ziyaret istatistikleri için ölçümleme araçları yalnızca açık rızanızla ve IP maskeleme açıkken çalıştırılır."],
+      ["Üçüncü taraflar", "Harita bağlantıları Google Haritalar'a, restoran verisinin bir bölümü OpenStreetMap'e, görseller görsel dağıtım ağına yönlendirir. Bu servislerin kendi gizlilik politikaları geçerlidir."],
+      ["Reklamlar", "Ödüllü video reklamlar ve keşfet banner'ları kampanya bazlıdır; reklam gösterimi için kimliğinizi reklam verenle paylaşmayız, yalnızca toplulaştırılmış gösterim ve tamamlanma sayıları raporlanır."],
+      ["Güvenlik", "Veriler aktarımda TLS ile korunur, parolalar geri döndürülemez biçimde saklanır. Bir ihlal hâlinde KVKK m.12 uyarınca en kısa sürede Kurul'a ve size bildirim yapılır."],
+      ["Çocuklar", "Uygulama 13 yaşın altındaki kullanıcılara yönelik değildir."],
+    ],
+  },
+  {
+    id: "terms",
+    label: "Koşullar",
+    title: "Kullanım Koşulları",
+    body: [
+      ["Hizmet", `GUR, restoran keşfi sunan bir platformdur. ${LEGAL_OPERATOR} restoranların işletmecisi değildir; yemek, servis ve hijyen sorumluluğu ilgili işletmeye aittir.`],
+      ["Hesabınız", "Verdiğiniz bilgilerin doğruluğundan ve hesabınızın güvenliğinden siz sorumlusunuz. Hesabınızı istediğiniz zaman profil ekranından silebilirsiniz."],
+      ["İçerik kuralları", "Yorum ve fotoğraflarınız gerçek bir deneyime dayanmalıdır. Hakaret, ayrımcılık, gizli reklam, başkasına ait içerik ve yanıltıcı puanlama yasaktır; bu içerikler bildirim üzerine veya resen kaldırılabilir."],
+      ["Gastro Onaylı", "Gastro rozeti bağımsız şef değerlendirmesine dayanır ve satın alınamaz. Abonelik planları rozetin verilmesini etkilemez."],
+      ["Abonelik ve kampanyalar", "Restoran abonelikleri ile kupon ve indirim kampanyaları ilgili sayfada belirtilen süre ve koşullarla geçerlidir. Ücretli hizmetlerde cayma hakkınız Mesafeli Sözleşmeler Yönetmeliği kapsamında saklıdır."],
+      ["Sorumluluğun sınırı", "Puanlar, mesafeler ve çalışma saatleri bilgilendirme amaçlıdır ve hata içerebilir. Rezervasyon ve ödeme işlemlerinde aracı konumundayız."],
+      ["Uygulanacak hukuk", `Bu koşullara Türk hukuku uygulanır; uyuşmazlıklarda İstanbul mahkemeleri ve icra daireleri yetkilidir. Sorularınız için ${LEGAL_CONTACT}.`],
+    ],
+  },
+];
+
+// Çerez/ölçümleme rıza bandı. Rıza verilmeden hiçbir ölçümleme scripti
+// yüklenmez; reddedilirse bir daha sorulmaz.
+function ConsentBanner({ onDecide, onLegal }) {
+  return (
+    <>
+    {/* PERDE — kutu zaten arkadaki ekranı ÇALIŞMAZ kılıyordu ama bunu
+        söylemiyordu: karşılama ekranındaki "GUR'u kullanmaya başla" hapı
+        kutunun altında kalıyor, görünüyor, basılabilir duruyor ve hiçbir
+        şey yapmıyordu (393×852'de ölçüldü: hap 714–767, kutunun metni
+        onun üstünde). Karar verilmeden devam edilemiyorsa bu bir modal;
+        perde onu görünür kılıyor. Perdeye dokunmak KAPATMIYOR: rıza
+        sorusunun sessizce geçiştirilecek bir cevabı yok. */}
+    <div aria-hidden="true" style={{
+      position: "absolute", inset: 0, zIndex: 890,
+      background: "rgba(18,12,6,0.55)", backdropFilter: "blur(1.5px)",
+      animation: "fadeIn 0.3s ease-out",
+    }} />
+    <div role="dialog" aria-modal="true" aria-labelledby="gur-riza-baslik" style={{
+      position: "absolute", left: 12, right: 12, bottom: 12, zIndex: 900,
+      background: "rgba(20,14,8,0.92)", backdropFilter: "blur(12px)",
+      border: "1px solid rgba(255,255,255,0.1)", borderRadius: 22, padding: "16px 16px 14px",
+      boxShadow: "var(--sh-d3)", animation: "fadeInUp 0.4s ease-out",
+    }}>
+      <p id="gur-riza-baslik" style={{ fontFamily: "var(--f-body)", fontSize: 13, fontWeight: 700, color: "#fff", margin: "0 0 5px" }}>Ölçümleme çerezleri</p>
+      <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.5, margin: "0 0 13px" }}>
+        Uygulamayı geliştirmek için anonim kullanım istatistikleri toplayabiliriz. Zorunlu olanlar dışında hiçbir şey izniniz olmadan çalışmaz.{" "}
+        <span onClick={onLegal} style={{ color: "var(--c-warn)", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>Ayrıntılar</span>
+      </p>
+      {/* İki seçenek aynı görsel ağırlıkta: reddetmek kabul etmek kadar
+          kolay olmalı. Dolgulu "kabul", ince "reddet" bir yönlendirmedir. */}
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn text="Yalnızca zorunlu" onClick={() => onDecide("denied")} variant="outline" size="md" />
+        <Btn text="Kabul et" onClick={() => onDecide("granted")} variant="outline" size="md" />
+      </div>
+    </div>
+    </>
+  );
 }
 
-async function fetchLiveRestaurants() {
-  // Kadıköy merkez bölgesi bounding box
-  const query = `[out:json][timeout:15];node["amenity"="restaurant"]["name"](40.980,29.015,41.005,29.045);out body 40;`;
-  const res = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: "data=" + encodeURIComponent(query),
-  });
-  if (!res.ok) throw new Error("Overpass hata: " + res.status);
-  const data = await res.json();
-  const list = (data.elements || [])
-    .filter(el => el.tags && el.tags.name)
-    .map(osmToRestaurant);
-  if (list.length < 5) throw new Error("Yetersiz veri");
-  return list;
+function LegalScreen({ onBack, initialDoc = "kvkk" }) {
+  const [docId, setDocId] = useState(initialDoc);
+  const doc = LEGAL_DOCS.find(d => d.id === docId) || LEGAL_DOCS[0];
+
+  return (
+    <Screen grad={false}>
+      <div style={{ height: "100%", background: "var(--c-card)", overflowY: "auto" }}>
+        <div style={{ padding: "44px 20px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+            <BackBtn onClick={onBack} variant="light" />
+            <h2 style={{ fontFamily: "var(--f-body)", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: 0 }}>Yasal metinler</h2>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            {LEGAL_DOCS.map(d => (
+              <button
+                key={d.id} type="button" onClick={() => setDocId(d.id)} className="gur-btn"
+                style={{
+                  border: d.id === docId ? "none" : "1px solid rgba(0,0,0,0.1)",
+                  background: d.id === docId ? "#FF6600" : "#fff",
+                  color: d.id === docId ? "#fff" : "var(--c-ink-2)",
+                  borderRadius: 999, padding: "7px 14px", cursor: "pointer", outline: "none",
+                  fontFamily: "var(--f-body)", fontSize: 12.5, fontWeight: 700,
+                }}>{d.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ padding: "18px 20px 120px" }}>
+          <h3 style={{ fontFamily: "var(--f-body)", fontSize: 16.5, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--c-ink)", margin: "0 0 4px", lineHeight: 1.3 }}>{doc.title}</h3>
+          <p style={{ fontFamily: "var(--f-body)", fontSize: 11.5, color: "var(--c-muted)", margin: "0 0 18px" }}>Son güncelleme: {LEGAL_UPDATED}</p>
+
+          {doc.body.map(([heading, text]) => (
+            <div key={heading} style={{ marginBottom: 18 }}>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13.5, fontWeight: 700, color: "var(--c-ink)", margin: "0 0 5px" }}>{heading}</p>
+              <p style={{ fontFamily: "var(--f-body)", fontSize: 13, color: "var(--c-ink-2)", lineHeight: 1.6, margin: 0 }}>{text}</p>
+            </div>
+          ))}
+
+          <div style={{ background: "#FFF8F4", border: "1px solid rgba(255,102,0,0.18)", borderRadius: 14, padding: "12px 14px", marginTop: 6 }}>
+            <p style={{ fontFamily: "var(--f-body)", fontSize: 12, color: "var(--c-ink-2)", lineHeight: 1.55, margin: 0 }}>
+              Bu metinler yayına hazırlık taslağıdır. Ticaret unvanı, adres ve iletişim bilgileri doldurulmadan ve bir hukuk danışmanına onaylatılmadan yayına çıkarılmamalıdır.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+// Kartlarda gösterilen mesafe. orderByProximity hesapladıysa gerçek değer
+// kullanılır; hesaplamadıysa (konum yok, liste sıralanmamış) kaydın kendi
+// metni. İki kaynak arasında seçim tek yerde yapılsın ki ekranlar ayrışmasın.
+function distText(r) {
+  if (Number.isFinite(r?.distanceKm)) {
+    return r.distanceKm < 1
+      ? `${Math.round(r.distanceKm * 1000)} m`
+      : `${r.distanceKm.toFixed(1)} km`;
+  }
+  return r?.dist || "";
 }
 
 export default function GurApp(props = {}) {
@@ -2771,116 +4115,410 @@ export default function GurApp(props = {}) {
   const [favorites, setFavorites] = useState([]);
   const [selected, setSelected] = useState(null);
   const [filterCat, setFilterCat] = useState(null);
-  const [restaurants, setRestaurants] = useState(RESTAURANTS);
-  const [syncMetadata, setSyncMetadata] = useState(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [dataSource, setDataSource] = useState("google_maps");
-  const [quotaExceeded, setQuotaExceeded] = useState(false);
-
-  // Google Maps Platform Quota Defense Listener
-  useEffect(() => {
-    const handleQuota = () => setQuotaExceeded(true);
-    window.addEventListener('gmp-quota-exceeded', handleQuota);
-    return () => window.removeEventListener('gmp-quota-exceeded', handleQuota);
-  }, []);
-
-  // Backend'de saklanan Google Maps İstanbul restoranlarını yükle
-  const fetchBackendRestaurants = async () => {
-    try {
-      const res = await fetch('/api/restaurants');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.restaurants && data.restaurants.length > 0) {
-          setRestaurants(data.restaurants);
-          setSyncMetadata(data.metadata || null);
-          setDataSource("google_maps");
-        }
-      }
-    } catch (err) {
-      console.warn("Backend restoran verisi alınamadı, yerel mock kullanılıyor:", err);
-    }
+  const [restaurants, setRestaurants] = useState(RESTAURANTS); // yerel havuz: Bakırköy listesi
+  const [dataSource, setDataSource] = useState("demo"); // "demo" | "live"
+  // Doyurucu panelinden yüklenen görseller. Eskiden burası boş bir
+  // useState'ti ve hiç doldurulmuyordu: işletmenin yüklediği menü ve
+  // fotoğraf tüketiciye HİÇ ulaşmıyordu. Artık ortak depodan geliyor ve
+  // yalnızca YÖNETİCİ ONAYINDAN GEÇMİŞ dosyalar (bkz. lib/media.js →
+  // `ownerMediaFor`, süzgeç orada: iki ekran ayrı süzseydi biri unuturdu).
+  const mediaState = useMedia();
+  // GUR Match oturumu
+  const [matchCode, setMatchCode] = useState("");
+  const [matchResults, setMatchResults] = useState([]);
+  // Yönetici panelinin açıp kapattığı özellik kapıları (src/lib/platform.js).
+  const platform = usePlatformSettings();
+  const modState = useModeration();
+  // Kullanıcının yazdığı yorumlar restoran id'sine göre — hem restoran
+  // detayında hem profildeki "Yorumlarım" listesinde aynı kaynaktan okunur
+  const [userReviews, setUserReviews] = useState({});
+  // null = henüz sorulmadı; "granted" | "denied" = karar verilmiş
+  const [consent, setConsentState] = useState(() => getConsent());
+  useEffect(() => { initAnalytics(); }, []);
+  const decideConsent = (value) => {
+    setConsent(value); setConsentState(value);
+    backend.syncConsent(value === "granted", value === "granted");
   };
 
-  // Google Maps üzerinden haftalık güncelleme tetikle
-  const handleSyncGoogleMaps = async () => {
-    setIsSyncing(true);
-    try {
-      const res = await fetch('/api/restaurants/sync', { method: 'POST' });
-      if (res.ok) {
-        await fetchBackendRestaurants();
-      }
-    } catch (err) {
-      console.error("Haftalık senkronizasyon hatası:", err);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
+  // Konum doğrulamalı ziyaret. İzin alınana kadar hiçbir konum okunmaz.
+  //
+  // İKİ KAPI VARDI, BİRLEŞTİRİLDİ. Girişten sonraki konum ekranında
+  // "Konumumu kullan" diyen kullanıcı tarayıcı iznini zaten veriyordu ama
+  // o izin yalnızca `geo`ya (deste sıralaması, konum çipi) gidiyordu;
+  // ziyaret takibini açan bayrak ayrıydı ve yalnızca "Buradayım, konumumu
+  // doğrula" düğmesinden açılıyordu. Sonuç: izin verilmiş olmasına rağmen
+  // takip hiç başlamıyor, düğme her mekânda çıkmaya devam ediyordu.
+  //
+  // Artık CİHAZ izni varsa (`source === "device"`) takip kendiliğinden
+  // başlıyor. Elle açma yolu duruyor: ilçesini elle seçmiş ya da izni
+  // reddetmiş kullanıcı oradan izin verebilmeli.
+  const [locationManual, setLocationManual] = useState(false);
+  const userLoc = geo.useUserLocation();
+  const locationOn = locationManual || userLoc.source === "device";
+  const [rationale, setRationale] = useState(null);   // doğrulanacak restoran
+  const [visitPrompt, setVisitPrompt] = useState(null);
+  const [reservationNotice, setReservationNotice] = useState(null);
+  // Bildirimler yalnızca giriş yapmış tüketici ekranlarında çıkar; giriş
+  // öncesi ekranlarda yeri yok. (İşletme ekranları artık bu uygulamada
+  // değil, ayrı uygulamada — bkz. src/business/GurBusiness.jsx.)
+  const PRE_LOGIN_SCREENS = ["splash", "welcome", "login", "register", "legal"];
+  const onOwnerScreen = PRE_LOGIN_SCREENS.includes(screen);
+  const [showPlus, setShowPlus] = useState(false);
+  // Sunucu ayakta mı? Ölçüm bir kez yapılır; sonuç her ekranın davranışını
+  // değil, yalnızca kalıcılığı belirler (bkz. src/lib/backend.js).
+  const [session, setSession] = useState({ mode: "unknown", user: null, info: null });
   useEffect(() => {
-    fetchBackendRestaurants();
+    backend.boot().then(setSession);
+    // MOD DEĞİŞİMİNE ABONE. `boot()` tek seferlik: sunucu geç açılırsa
+    // (dağıtımın ilk boot'u, yeniden başlatma) api.js arkadan yeniden
+    // yokluyor ama ekran bunu görmezse rozet YEREL kalır ve kullanıcı
+    // sayfayı yenilemeden bağlandığını anlamaz. `subscribeApi` bu iş için
+    // zaten vardı — kimse abone olmamıştı.
+    return backend.subscribeApi(() => {
+      if (backend.apiMode() !== "live") return;
+      backend.boot().then(setSession);
+    });
   }, []);
 
-  const nav = (to) => { setHistory(p => [...p, screen]); setScreen(to); };
-  const back = () => { if (history.length > 0) { setScreen(history[history.length - 1]); setHistory(h => h.slice(0, -1)); } };
+  const addReview = (restaurantId, review) =>
+    setUserReviews(prev => ({ ...prev, [restaurantId]: [review, ...(prev[restaurantId] || [])] }));
+  const removeUserReview = (restaurantId, stamp) =>
+    setUserReviews(prev => ({ ...prev, [restaurantId]: (prev[restaurantId] || []).filter(v => v.stamp !== stamp) }));
+
+  // Sahiplenme sonrası işletmenin girdiği alanlar; girilmeyenler API'den gelir
+  const ownerProfiles = useOwnerProfiles();
+  const [claimedRestaurant, setClaimedRestaurant] = useState(null);
+  const ownerRestaurant = useMemo(
+    () => claimedRestaurant || null,
+    [restaurants, claimedRestaurant]
+  );
+  // Tüketici tarafındaki her ekran bu türetilmiş listeden beslenir.
+  //
+  // Gizleme süzgeci BURADA, tek yerde: deste, arama, kategori sayıları,
+  // favoriler ve GUR Match hepsi `feed`'den besleniyor. Ekran ekran
+  // süzmek, eklenecek bir sonraki ekranda unutulacak bir kural olurdu.
+  // İki ayrı süzgeç, iki ayrı soru:
+  //   publishedOnly  → bu kayıt yönetici onayından geçti mi (moderasyon)
+  //   visibleRestaurants → onaylı ama elle gizlenmiş mi (görünürlük anahtarı)
+  // Birleştirmek yanlış olurdu: "henüz onaylanmadı" ile "onaylandı ama
+  // yayından kaldırıldı" farklı durumlar ve farklı ekranlarda yönetiliyor.
+  // Onaylı dosyalar. `useMemo` şart: `ownerMediaFor` her çağrıda yeni bir
+  // nesne üretiyor ve doğrudan `feed`in bağımlılığına konsaydı feed her
+  // render'da yeniden hesaplanırdı.
+  const ownerMedia = useMemo(
+    () => ownerMediaFor(ownerRestaurant?.id, mediaState),
+    [ownerRestaurant, mediaState]
+  );
+  const feed = useMemo(
+    () => visibleRestaurants(
+      publishedOnly(withOwnerMedia(restaurants, ownerRestaurant?.id, ownerMedia), modState),
+      platform)
+      .map(r => applyOwnerProfile(r, ownerProfiles)),
+    [restaurants, ownerRestaurant, ownerMedia, ownerProfiles, platform, modState]
+  );
+
+  // Veri kaynağı: CANLI modda kendi sunucumuz (sahiplenilmiş işletmelerin
+  // girdiği bilgiler yalnızca orada), YEREL modda Bakırköy listesi
+  // (`RESTAURANTS`, açılıştan beri state'te). Eskiden YEREL modda ayrıca
+  // Overpass'ten 40 Kadıköy mekânı çekilip havuzun yerine konuyordu: ana data
+  // artık tablo, dışarıdan başka bir ilçe karışmıyor.
+  useEffect(() => {
+    let cancelled = false;
+    if (session.mode !== "live") return undefined;
+    backend.loadRestaurants({ lat: geo.DEFAULT_ORIGIN.lat, lng: geo.DEFAULT_ORIGIN.lng, limit: 300 })
+      // CANLI modda yayın kararı SUNUCUDA (restaurants.review_status): liste
+      // yerel moderasyon kuyruğundan geçirilmiyor. Eskiden geçiyordu ve sunucu
+      // kimlikleri (UUID) tohum listede olmadığı için hepsi "bekliyor"
+      // sayılıp deste boş kalıyordu ("Burada henüz mekan yok").
+      .then(list => { if (!cancelled && list?.length) { setRestaurants(list); setDataSource("api"); } })
+      .catch(() => { /* yerel havuz zaten yüklü */ });
+    return () => { cancelled = true; };
+  }, [session.mode]);
+
+  // Detay ekranı seçim anındaki kopyayı değil güncel kaydı gösterir; böylece
+  // panelden yeni fotoğraf eklenince açık detay da tazelenir.
+  const liveSelected = useMemo(
+    () => (selected ? feed.find(r => r.id === selected.id) || selected : null),
+    [feed, selected]
+  );
+
+  // Cihazın/tarayıcının geri tuşu ile uygulama içi geri düğmesi aynı geçmişi
+  // kullanır: nav() her ileri gidişte bir tarayıcı kaydı iter, geri dönüş tek
+  // yoldan — popstate üzerinden — işlenir.
+  const historyRef = useRef(history);
+  useEffect(() => { historyRef.current = history; }, [history]);
+  const popScreen = () => {
+    const h = historyRef.current;
+    if (h.length === 0) return;
+    setScreen(h[h.length - 1]);
+    setHistory(h.slice(0, -1));
+  };
+  useEffect(() => {
+    const onPop = () => popScreen();
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // İzin verildiyse konum örnekleri toplanır; karar mantığı visits.js'te.
+  useEffect(() => {
+    if (!locationOn) return;
+    return visits.watchLocation(
+      sample => backend.pushLocationSample(feed, sample),
+      () => setLocationManual(false)      // izin geri alındıysa sessizce dur
+    );
+  }, [locationOn, feed]);
+
+  // Vakti gelen "deneyim nasıldı" daveti — hem uygulama içi hem sistem bildirimi.
+  useEffect(() => {
+    const check = () => {
+      const due = visits.duePrompt();
+      if (!due) return;
+      visits.markPrompted(due.id);
+      setVisitPrompt(due);
+      visits.pushLocalNotification(
+        `${due.restaurantName} nasıldı?`,
+        "Ziyaretin doğrulandı. Deneyimini yazarsan yorumun rozet alır.",
+        `visit-${due.id}`
+      );
+    };
+    check();
+    const t = setInterval(check, 20000);
+    const off = visits.subscribeVisits(check);
+    return () => { clearInterval(t); off(); };
+  }, []);
+
+  // İşletmenin masa talebi kararı misafire burada iletiliyor. Karar
+  // uygulama kapalıyken verilmiş olabilir; bayrak kararla değil bildirimle
+  // düşüyor, yani açılışta bekleyen kararlar da duyuluyor.
+  useEffect(() => {
+    // İşletme panelindeyken tüketilmez: bayrağı düşürüp şeridi göstermemek,
+    // kararı misafirin hiç duymaması demek olurdu. Ekran değişince tekrar
+    // bakılıyor.
+    if (onOwnerScreen) return;
+    const check = () => {
+      const [next] = reservations.pendingGuestNotices();
+      if (!next) return;
+      reservations.markGuestNotified(next.id);
+      setReservationNotice(next);
+      visits.pushLocalNotification(
+        next.status === "confirmed" ? "Rezervasyonun kabul edildi" : "Rezervasyonun kabul edilmedi",
+        `${next.restaurantName} · ${next.day} ${next.time} · ${next.people} kişi`,
+        `rsv-${next.id}`
+      );
+    };
+    check();
+    // Aynı sekmede depo olayı, başka sekmede storage olayı uyandırıyor.
+    const onStore = () => check();
+    window.addEventListener("gur:reservations", onStore);
+    window.addEventListener("storage", onStore);
+    return () => {
+      window.removeEventListener("gur:reservations", onStore);
+      window.removeEventListener("storage", onStore);
+    };
+  }, [onOwnerScreen]);
+
+  // Gerçek konum yoksa (önizleme, izin reddi) demo doğrulaması akışı kurtarır.
+  const verifyLocation = (restaurant) => setRationale(restaurant || true);
+  const allowLocation = () => {
+    setLocationManual(true);
+    // Cihaz iznini de iste: elle açan kullanıcı konum çipini ve deste
+    // sıralamasını da kazansın — aynı izin, iki ayrı fayda.
+    geo.requestLocation();
+    setRationale(null);
+  };
+  const demoVerify = () => {
+    const r = rationale && rationale !== true ? rationale : feed[0];
+    if (r) backend.demoVerifyVisit(r);
+    setRationale(null);
+  };
+
+  const nav = (to) => {
+    setHistory(p => [...p, screen]);
+    setScreen(to);
+    window.history.pushState({ gur: to }, "");
+  };
+  const back = () => {
+    if (window.history.state?.gur) window.history.back(); // popstate geri kalanı yapar
+    else popScreen();
+  };
   const openDetail = (r) => { setSelected(r); nav("detail"); };
   const isFav = (r) => favorites.some(f => f.id === r?.id);
-  const toggleFav = () => { if (!selected) return; if (isFav(selected)) setFavorites(p => p.filter(f => f.id !== selected.id)); else setFavorites(p => [...p, selected]); };
+  const toggleFav = () => { if (!selected) return; haptic(12); if (isFav(selected)) setFavorites(p => p.filter(f => f.id !== selected.id)); else setFavorites(p => [...p, selected]); };
   const goExplore = () => { setFilterCat(null); nav("explore"); };
   const goSwipe = () => { nav("swipe"); };
   const goFav = () => { nav("fav"); };
   const goProfile = () => { nav("profile"); };
   const catTap = (cat) => { setFilterCat(cat); nav("swipe"); };
+  const goMatch = () => { if (!platform.matchEnabled) return; setMatchResults([]); nav("match-start"); };
+  const startMatch = (code) => { setMatchCode(code); setMatchResults([]); nav("match-swipe"); };
+  const finishMatch = (found) => { setMatchResults(found); nav("match-result"); };
+  // Hesap silme: yerel durumun tamamı temizlenir (kalıcılık yok, backend yok)
+  const deleteAccount = () => {
+    backend.removeAccount();
+    setUserReviews({});
+    setFavorites([]);
+    setSelected(null);
+    setMatchResults([]);
+    setHistory([]);
+    setScreen("welcome");
+  };
+
+  // Sanal klavye açıldığında görsel viewport küçülür; farkı bir CSS
+  // değişkenine yazıp ekranın altına o kadar boşluk ekliyoruz, böylece
+  // odaklı alan klavyenin altında kalmıyor.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const sync = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      document.documentElement.style.setProperty("--gur-kb", `${Math.round(inset)}px`);
+    };
+    sync();
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    return () => { vv.removeEventListener("resize", sync); vv.removeEventListener("scroll", sync); };
+  }, []);
+
+  // Özellik kapatıldığı anda açık bir Match oturumu varsa akış Keşfet'e
+  // döner. Yönetici paneli başka bir sekmede kapatabilir; ekranda kalıp
+  // çalışmayan bir akış bırakmak kullanıcıyı çıkmaza sokardı.
+  useEffect(() => {
+    if (platform.matchEnabled) return;
+    if (screen === "match-start" || screen === "match-swipe" || screen === "match-result") {
+      setMatchResults([]);
+      nav("explore");
+    }
+    // nav kimliği her çizimde değişiyor; bağımlılığa alınırsa döngü olur.
+  }, [platform.matchEnabled, screen]);
+
+  // Girişten sonra: konum kararı verilmediyse önce o adım.
+  // Konum ekranı kurulum akışının İKİNCİ adımı mı, yoksa girişten gelen
+  // tek ekranlık bir soru mu — adım göstergesi buna bakıyor.
+  const [kurulumAkisi, setKurulumAkisi] = useState(false);
+  const afterAuth = (kayittan = false) => {
+    setKurulumAkisi(kayittan);
+    nav(geo.consentAsked() ? "explore" : "location");
+  };
+
+  // Sekme sırası geçişin YÖNÜNÜ belirliyor: alt barda sağdaki sekmeye
+  // giderken içerik sağdan, soldakine dönerken soldan geliyor. Yön
+  // rastgele olsaydı kullanıcı nerede olduğunu kaybederdi.
+  const SEKME_SIRA = ["explore", "swipe", "favorites", "profile"];
+  const oncekiScreen = useRef(screen);
+  const yon = (() => {
+    const a = SEKME_SIRA.indexOf(oncekiScreen.current);
+    const b = SEKME_SIRA.indexOf(screen);
+    if (a === -1 || b === -1 || a === b) return 0;   // sekme değilse kaydırma yok
+    return b > a ? 1 : -1;
+  })();
+  useEffect(() => { oncekiScreen.current = screen; }, [screen]);
 
   const render = () => {
     switch (screen) {
       case "splash": return <SplashScreen onNext={() => setScreen("welcome")} />;
-      case "welcome": return <WelcomeScreen onStart={() => nav("login")} onDoyurucu={() => nav("doyurucu-auth")} />;
-      case "login": return <LoginScreen onBack={back} onLogin={() => nav("explore")} onRegister={() => nav("register")} />;
-      case "register": return <RegisterScreen onBack={back} onDone={() => nav("explore")} />;
-      case "doyurucu-auth": return <DoyurucuAuthScreen onBack={back} onLogin={() => nav("doyurucu-login")} onRegister={() => nav("rest1")} />;
-      case "doyurucu-login": return <DoyurucuLoginScreen onBack={back} onLogin={() => nav("rest-dashboard")} />;
-      case "rest1": return <RestRegStep1 onBack={back} onNext={() => nav("rest2")} />;
-      case "rest2": return <RestRegStep2 onBack={back} onNext={() => nav("rest3")} />;
-      case "rest3": return <RestRegStep3 onBack={back} onDone={() => nav("rest-dashboard")} />;
-      case "rest-dashboard": return <RestaurantDashboard onLogout={() => { setHistory([]); setScreen("welcome"); }} />;
-      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} />;
-      case "swipe": return <SwipeScreen onDetail={openDetail} onExplore={goExplore} onFavorites={goFav} favorites={favorites} setFavorites={setFavorites} filterCat={filterCat} restaurants={restaurants} dataSource={dataSource} syncMetadata={syncMetadata} isSyncing={isSyncing} onSyncGoogleMaps={handleSyncGoogleMaps} />;
-      case "detail": return <DetailScreen r={selected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} />;
+      case "welcome": return <WelcomeScreen onStart={() => nav("login")} />;
+      // Girişten sonra konum adımı: kullanıcı daha önce karar verdiyse
+      // (izin verdi, ilçe seçti ya da "şimdi değil" dedi) tekrar sorulmaz.
+      case "login": return <LoginScreen onBack={back} onLogin={() => afterAuth(false)} onRegister={() => nav("register")} live={session.mode === "live"} />;
+      case "register": return <RegisterScreen onBack={back} onDone={() => afterAuth(true)} onLegal={() => nav("legal")} live={session.mode === "live"} />;
+      case "location": return <LocationSetupScreen onDone={goExplore} step={kurulumAkisi ? 2 : null} />;
+      case "explore": return <ExploreScreen onCategoryTap={catTap} onSwipe={goSwipe} onFavorites={goFav} onProfile={goProfile} onMatch={goMatch} matchEnabled={platform.matchEnabled} restaurants={feed} onDetail={openDetail} />;
+      case "match-start": return <MatchStartScreen onBack={back} onStart={startMatch} />;
+      case "match-swipe": return <MatchSwipeScreen code={matchCode} restaurants={feed} onExit={goExplore} onFinish={finishMatch} />;
+      case "match-result": return <MatchResultScreen code={matchCode} matches={matchResults} onDetail={openDetail} onRestart={goMatch} onExplore={goExplore} />;
+      case "swipe": return <SwipeScreen onDetail={openDetail} onExplore={goExplore} onFavorites={goFav} favorites={favorites} setFavorites={setFavorites} filterCat={filterCat} restaurants={feed} dataSource={dataSource}
+        onPremium={() => setShowPlus(true)} onAddReview={addReview} onVerifyLocation={verifyLocation} />;
+      case "detail": return <DetailScreen r={liveSelected} onBack={back} isFav={isFav(selected)} toggleFav={toggleFav} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} userReviews={userReviews[liveSelected?.id] || []} onAddReview={addReview} onVerifyLocation={verifyLocation} />;
       case "fav": return <FavScreen onExplore={goExplore} onSwipe={goSwipe} onDetail={openDetail} favorites={favorites} setFavorites={setFavorites} onProfile={goProfile} />;
-      case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} />;
+      case "profile": return <ProfileScreen onBack={back} onExplore={goExplore} onSwipe={goSwipe} onFavorites={goFav} favorites={favorites} onDetail={openDetail} accentColor={accentColor} showBadges={showBadges} badgeSpeed={badgeSpeed} userReviews={userReviews} restaurants={feed} onRemoveUserReview={removeUserReview} onDeleteAccount={deleteAccount} onLegal={() => nav("legal")} />;
+      case "legal": return <LegalScreen onBack={back} />;
       default: return <SplashScreen onNext={() => setScreen("welcome")} />;
     }
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 0" }}>
-      {quotaExceeded && (
-        <div style={{ background: "#fffbeb", borderBottom: "1px solid #fde68a", color: "#78350f", padding: "10px 16px", fontSize: 13, textAlign: "center", width: "100%", maxWidth: 600, borderRadius: 12, marginBottom: 16, zIndex: 9999, boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}>
-          <span>
-            Google Maps Platform quota reached. If you are the app owner, visit{' '}
-            <a
-              href="https://developers.google.com/maps/ai/ai-studio?utm_campaign=gmp_mcp_codeassist_v1_aistudio#quota_exceeded_errors"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ textDecoration: "underline", fontWeight: 700, color: "#451a03" }}
-            >
-              maps developer site
-            </a>{' '}
-            for instructions to update your account.
-          </span>
-        </div>
-      )}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
-        @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes badgeMarquee { from { transform:translateX(0); } to { transform:translateX(-50%); } }
-        @keyframes spin { to { transform:rotate(360deg); } }
-        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
-        * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
-        ::-webkit-scrollbar { display:none; }
-      `}</style>
-      <PhoneFrame>{render()}</PhoneFrame>
+    <div className="gur-stage" style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0d0d1a, #1a1a2e, #0d0d1a)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", colorScheme: "light" }}>
+      <GurStyles />
+      {/* Parlak turuncu simge gradyanı bir kez tanımlanıyor; simgeler
+          url(#gur-gloss) ile buna bağlanıyor. Her düğmede ayrı <defs>
+          çizilseydi aynı id çoğalır, tarayıcı ilkine bağlanırdı. */}
+      <GlossDefs />
+      <PhoneFrame>
+        {/* Ekran geçişi. mode="popLayout" giden ekranı akıştan çıkarıyor;
+            olmazsa iki ekran bir kare boyunca üst üste yığılıp sayfayı
+            uzatıyor. Yalnızca transform + opacity animasyonu var. */}
+        <AnimatePresence mode="popLayout" initial={false} custom={yon}>
+          <motion.div
+            key={screen}
+            custom={yon}
+            variants={EKRAN_GECIS}
+            initial="gir" animate="dur" exit="cik"
+            style={{ position: "absolute", inset: 0, willChange: "transform" }}
+          >
+            {render()}
+          </motion.div>
+        </AnimatePresence>
+        {/* Splash geçilene kadar sorulmaz — ilk izlenim bir onay kutusu olmasın */}
+        {!consent && screen !== "splash" && screen !== "legal" && (
+          <ConsentBanner onDecide={decideConsent} onLegal={() => nav("legal")} />
+        )}
+        {rationale && (
+          <LocationRationale onAllow={allowLocation} onDemo={demoVerify} onClose={() => setRationale(null)} />
+        )}
+        <AnimatePresence>
+          {reservationNotice && screen !== "splash" && !onOwnerScreen && (
+            <ReservationNotice
+              record={reservationNotice}
+              onOpen={() => {
+                const r = feed.find(x => String(x.id) === String(reservationNotice.restaurantId));
+                setReservationNotice(null);
+                if (r) { setSelected(r); nav("detail"); }
+              }}
+              onDismiss={() => setReservationNotice(null)}
+            />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {visitPrompt && screen !== "splash" && !onOwnerScreen && !reservationNotice && (
+            <VisitPrompt
+              visit={visitPrompt}
+              onWrite={() => {
+                const r = feed.find(x => String(x.id) === String(visitPrompt.restaurantId));
+                setVisitPrompt(null);
+                if (r) { setSelected(r); nav("detail"); }
+              }}
+              onDismiss={() => setVisitPrompt(null)}
+            />
+          )}
+        </AnimatePresence>
+        {showPlus && <PremiumSheet onClose={() => setShowPlus(false)} />}
+        {/* Hangi modda çalışıldığı gizlenmiyor: yerel modda yazılanlar
+            yalnızca bu tarayıcıda kalıyor, bunu söylemek dürüstlük. */}
+        {session.mode !== "unknown" && screen !== "splash" && (
+          <div style={{
+            // ÇENTİK PAYINI KENDİ ALIYOR. `.gur-frame` üstündeki
+            // safe-area dolgusu buraya işlemiyor: mutlak konumlanmış
+            // öğenin sarmalayıcısı ata öğenin DOLGU KUTUSU, yani dolgu
+            // onu aşağı itmiyor (ölçüldü: çerçeveye 59px dolgu verildi,
+            // rozet 8px'te kaldı). Çentikli telefonda durum çubuğunun
+            // altında kalıyordu.
+            position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 8px)",
+            right: "calc(env(safe-area-inset-right, 0px) + 10px)", zIndex: 700,
+            display: "inline-flex", alignItems: "center", gap: 5,
+            // %42 cam açık zeminin üstünde griye dönüyor, beyaz yazı 2.5:1
+            // kalıyordu. Sıcak ve daha opak: hem kâğıtta hem fotoğrafta okunur.
+            background: "rgba(28,20,12,0.82)", backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.14)", borderRadius: 20, padding: "3px 9px",
+          }} title={session.mode === "live"
+            ? `Sunucuya bağlı — ${session.info?.restaurants ?? 0} mekan`
+            : "Sunucu yok: veriler yalnızca bu tarayıcıda saklanıyor"}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: session.mode === "live" ? "var(--c-ok)" : "var(--c-warn)" }} />
+            <span style={{ fontFamily: "var(--f-body)", fontSize: 9.5, fontWeight: 700, color: "#fff" }}>
+              {session.mode === "live" ? "CANLI" : "YEREL"}
+            </span>
+          </div>
+        )}
+      </PhoneFrame>
     </div>
   );
 }

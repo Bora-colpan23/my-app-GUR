@@ -5,27 +5,33 @@
   "type": "module",
   "description": "GUR — İstanbul için Tinder-tarzı restoran keşif platformu",
   "scripts": {
-    "dev": "tsx server.ts",
-    "start": "tsx server.ts",
+    "dev": "vite",
     "build": "vite build",
+    "start": "node server/db/init.js && node server/index.js",
     "preview": "vite preview",
-    "lint": "eslint src --ext .js,.jsx"
+    "lint": "eslint src server shared --ext .js,.jsx",
+    "dev:api": "node server/index.js",
+    "dev:all": "npm run db:setup && npm run db:seed && concurrently -n api,web -c magenta,cyan \"npm:dev:api\" \"npm:dev\"",
+    "db:setup": "./server/db/setup.sh",
+    "db:reset": "./server/db/setup.sh --reset && npm run db:seed",
+    "db:seed": "node server/db/seed.js",
+    "leads:import": "node scripts/bakirkoy-iceri-al.mjs",
+    "artifact": "node scripts/build-artifact.mjs"
   },
   "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^18.0.8",
-    "express": "^5.3.0",
+    "motion": "^13.1.1",
+    "node-cron": "^4.6.0",
+    "pg": "^8.23.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0"
+    "react-router-dom": "^6.26.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
     "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^10.0.5",
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.35.0",
-    "tsx": "^4.23.15",
     "vite": "^5.4.0"
   }
 }
