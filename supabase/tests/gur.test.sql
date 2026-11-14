@@ -450,6 +450,144 @@ begin
   perform t.as_super();
 end $$;
 
+-- ═══ K2. Yönetici paneli (migration 000500) ═════════════════════════
+do $$
+declare
+  u1  uuid := '00000000-0000-0000-0000-0000000000a1';
+  u2  uuid := '00000000-0000-0000-0000-0000000000a2';
+  adm uuid := '00000000-0000-0000-0000-0000000000a3';
+  rid text; rid_ok text; rid_no text; cid uuid; n int; r jsonb; camp uuid; camp_status text; n_pub int; n_all int;
+begin
+  perform t.as_anon();
+  n_pub := jsonb_array_length(public.gur_restaurants());
+  perform t.as_super();
+  select count(*) into n_all from public.restaurants;
+  select id into rid from public.restaurants where is_active and review_status = 'approved' order by id limit 1;
+  select id into rid_ok from public.restaurants where claimed_by_org is null
+     and not exists (select 1 from public.restaurant_claims c where c.restaurant_id = restaurants.id)
+   order by id offset 20 limit 1;
+  select id into rid_no from public.restaurants where claimed_by_org is null
+     and not exists (select 1 from public.restaurant_claims c where c.restaurant_id = restaurants.id)
+   order by id offset 21 limit 1;
+
+  -- Yönetici OLMAYAN her yolda reddedilir
+  perform t.as_user(u2);
+  perform t.throws('select public.gur_admin_restaurants()', 'Yönetici yetkisi', 'kullanıcı: mekân havuzu yönetici ister');
+  perform t.throws(format('select public.gur_admin_set_restaurant(%L, ''{"gastro":true}'')', rid), 'Yönetici yetkisi', 'kullanıcı: Gastro VEREMEZ');
+  perform t.throws('select public.gur_admin_growth(12)', 'Yönetici yetkisi', 'kullanıcı: büyüme verisi yönetici ister');
+  perform t.throws('select public.gur_admin_set_district(''Bakırköy'', false)', 'Yönetici yetkisi', 'kullanıcı: ilçe kapatamaz');
+  perform t.throws('select public.gur_admin_campaigns()', 'Yönetici yetkisi', 'kullanıcı: kampanya listesi yönetici ister');
+  perform t.throws('insert into public.platform_settings (key, value) values (''x'', ''{}'')', 'permission denied', 'ayar tablosuna doğrudan yazma YOK');
+  perform t.ok(not (public.gur_admin_me() ->> 'admin')::boolean, 'gur_admin_me: kullanıcı yönetici değil');
+  perform t.ok((select count(*) from public.admin_audit) = 0, 'denetim kaydı kullanıcıya görünmez');
+  perform t.as_anon();
+  perform t.throws('select public.gur_admin_me()', 'permission denied', 'anon: gur_admin_me kapalı');
+  perform t.throws('select public.gur_admin_claims()', 'permission denied', 'anon: yönetici RPC''leri kapalı');
+
+  -- Yönetici: mekân alanları
+  perform t.as_user(adm);
+  perform t.ok((public.gur_admin_me() ->> 'admin')::boolean, 'gur_admin_me: yönetici');
+  perform t.ok(jsonb_array_length(public.gur_admin_restaurants()) = n_all, 'yönetici: yayında olmayanlar dahil TÜM mekânlar listelenir');
+  perform t.ok(jsonb_array_length(public.gur_admin_restaurants('pizza')) < n_all, 'yönetici: ada göre arama');
+  r := public.gur_admin_set_restaurant(rid, '{"gastro":true,"gastro_chef":"Şef Deneme"}');
+  perform t.ok((r ->> 'gastro')::boolean and r ->> 'gastroChef' = 'Şef Deneme', 'Gastro yönetici RPC''siyle verildi');
+  perform t.throws(format('select public.gur_admin_set_restaurant(%L, ''{"lat":1}'')', rid), 'Bilinmeyen alan', 'beyaz liste dışı alan HATA verir');
+  perform t.throws(format('select public.gur_admin_set_restaurant(%L, ''{"review":"yayinda"}'')', rid), 'enum', 'geçersiz yayın durumu reddedilir');
+  perform t.throws(format('select public.gur_admin_set_restaurant(%L, ''{}'')', rid), 'Güncellenecek alan yok', 'boş yama reddedilir');
+  perform t.throws('select public.gur_admin_set_restaurant(''yok-boyle'', ''{"active":false}'')', 'Mekân bulunamadı', 'olmayan mekân');
+  perform t.as_anon();
+  perform t.ok(exists (select 1 from jsonb_array_elements(public.gur_restaurants()) e
+                        where e ->> 'id' = rid and (e ->> 'gastro')::boolean), 'tüketici listesinde Gastro rozeti görünür');
+  perform t.as_user(adm);
+  perform public.gur_admin_set_restaurant(rid, '{"active":false}');
+  perform t.as_anon();
+  perform t.ok(not exists (select 1 from jsonb_array_elements(public.gur_restaurants()) e where e ->> 'id' = rid),
+    'gizlenen (is_active=false) mekân tüketici listesinden DÜŞTÜ');
+  perform t.as_user(adm);
+  perform public.gur_admin_set_restaurant(rid, '{"active":true,"gastro":false}');
+  perform t.as_anon();
+  perform t.ok(exists (select 1 from jsonb_array_elements(public.gur_restaurants()) e where e ->> 'id' = rid), 'geri açılan mekân listede');
+  perform t.as_user(adm);
+  perform public.gur_admin_set_restaurant(rid, '{"review":"pending"}');
+  perform t.as_anon();
+  perform t.ok(not exists (select 1 from jsonb_array_elements(public.gur_restaurants()) e where e ->> 'id' = rid),
+    'moderasyonda bekleyen mekân yayında DEĞİL');
+  perform t.as_user(adm);
+  perform public.gur_admin_set_restaurant(rid, '{"review":"approved"}');
+
+  -- İlçe aç/kapat
+  perform t.as_anon();
+  perform t.ok((select (e ->> 'open')::boolean from jsonb_array_elements(public.gur_districts()) e where e ->> 'name' = 'Bakırköy'),
+    'Bakırköy varsayılan AÇIK (mekânı var)');
+  perform t.as_user(adm);
+  perform public.gur_admin_set_district('Bakırköy', false);
+  perform public.gur_admin_set_district('Kadıköy', true);
+  perform t.as_anon();
+  perform t.ok(not exists (select 1 from jsonb_array_elements(public.gur_restaurants()) e where e ->> 'district' = 'Bakırköy'),
+    'kapalı ilçenin mekânları tüketiciye gitmiyor (ilçesiz kayıt kapatılamaz, kalır)');
+  perform t.ok(not exists (select 1 from jsonb_array_elements(public.gur_campaigns()) e where e -> 'restaurant' ->> 'district' = 'Bakırköy'),
+    'kapalı ilçenin kampanyası da gitmiyor');
+  perform t.ok(not (select (e ->> 'open')::boolean from jsonb_array_elements(public.gur_districts()) e where e ->> 'name' = 'Bakırköy'),
+    'gur_districts: Bakırköy KAPALI');
+  perform t.ok((select (e ->> 'open')::boolean from jsonb_array_elements(public.gur_districts()) e where e ->> 'name' = 'Kadıköy'),
+    'gur_districts: mekânsız ama açılmış ilçe de listelenir');
+  perform t.as_user(adm);
+  perform public.gur_admin_set_district('Bakırköy', null);
+  perform public.gur_admin_set_district('Kadıköy', null);
+  perform t.as_anon();
+  perform t.ok(jsonb_array_length(public.gur_restaurants()) = n_pub, 'karar silinince varsayılana döner');
+
+  -- Sahiplenme başvurusu kararı
+  perform t.as_user(u1);
+  perform public.gur_submit_claim(rid_ok, 'Onay Lokantası Ltd.', null, 'Ayşe', '5550000000', null);
+  perform public.gur_submit_claim(rid_no, 'Red Lokantası Ltd.', null, 'Ayşe', '5550000001', null);
+  perform t.as_user(u2);
+  perform t.throws('select public.gur_admin_claims()', 'Yönetici yetkisi', 'kullanıcı başvuru listesini göremez');
+  perform t.as_user(adm);
+  r := public.gur_admin_claims();
+  perform t.ok(exists (select 1 from jsonb_array_elements(r) e where e ->> 'restaurant_id' = rid_ok and e ->> 'status' = 'pending'
+                          and e ->> 'legal_name' = 'Onay Lokantası Ltd.'), 'yönetici başvuruyu listede görür');
+  select (e ->> 'id')::uuid into cid from jsonb_array_elements(r) e where e ->> 'restaurant_id' = rid_ok;
+  perform public.gur_admin_decide_claim(cid, 'approved');
+  perform t.as_super();
+  perform t.ok((select claimed_by_org from public.restaurants where id = rid_ok) is not null, 'onay sahipliği BAĞLADI (tetikleyici)');
+  perform t.ok((select reviewer_id from public.restaurant_claims where id = cid) = adm, 'karar veren yönetici kayda yazıldı');
+  perform t.as_user(adm);
+  perform t.throws(format('select public.gur_admin_decide_claim(%L, ''rejected'')', cid), 'Bekleyen başvuru', 'karar verilmiş başvuru tekrar kararlanmaz');
+  select (e ->> 'id')::uuid into cid from jsonb_array_elements(public.gur_admin_claims()) e where e ->> 'restaurant_id' = rid_no;
+  perform t.throws(format('select public.gur_admin_decide_claim(%L, ''belki'')', cid), 'Geçersiz karar', 'geçersiz karar reddedilir');
+  perform public.gur_admin_decide_claim(cid, 'rejected', 'Vergi levhası okunmuyor');
+  perform t.as_super();
+  perform t.ok((select status::text || '/' || reject_reason from public.restaurant_claims where id = cid) = 'rejected/Vergi levhası okunmuyor',
+    'ret sebebi kayda yazıldı');
+  perform t.ok((select claimed_by_org from public.restaurants where id = rid_no) is null, 'ret sahiplik BAĞLAMADI');
+
+  -- Kampanyalar
+  select id into camp from public.campaigns order by created_at limit 1;
+  perform t.as_user(adm);
+  perform t.ok(jsonb_array_length(public.gur_admin_campaigns() -> 'campaigns') >= 1, 'yönetici kampanyaları listeler');
+  select status::text into camp_status from public.campaigns where id = camp;
+  r := public.gur_admin_patch_campaign(camp, 'paused', 5);
+  perform t.ok(r ->> 'status' = 'paused' and (r ->> 'bid_minor')::int = 20, 'kampanya duraklatıldı, teklif tabana (20) çekildi');
+  perform t.throws(format('select public.gur_admin_patch_campaign(%L, ''exhausted'')', camp), 'Geçersiz durum', 'exhausted elle konamaz (sistem kararı)');
+  perform t.throws(format('select public.gur_admin_patch_campaign(%L)', camp), 'Güncellenecek alan yok', 'boş kampanya yaması reddedilir');
+  perform public.gur_admin_patch_campaign(camp, camp_status, null);
+
+  -- Büyüme
+  r := public.gur_admin_growth(12);
+  perform t.ok((r -> 'platform' ->> 'users')::int >= 4, 'büyüme: platform kullanıcı sayısı');
+  perform t.ok(jsonb_array_length(r -> 'cohorts') >= 1 and (r -> 'cohorts' -> 0 ->> 'cohort_size')::int >= 4, 'büyüme: bu haftanın kohortu');
+  perform t.ok((r -> 'cohorts' -> 0 -> 'd30') = 'null'::jsonb, 'büyüme: olgunlaşmamış D30 null (0 sayılmaz)');
+
+  -- Denetim kaydı
+  select count(*) into n from public.admin_audit;
+  perform t.ok(n >= 12, 'her yönetici işlemi denetim kaydına düştü (' || n || ')');
+  perform t.ok(exists (select 1 from public.admin_audit where action = 'claim.rejected' and detail ->> 'reason' = 'Vergi levhası okunmuyor'),
+    'denetim: ret sebebiyle birlikte');
+  perform t.throws('delete from public.admin_audit', 'permission denied', 'denetim kaydı SİLİNEMEZ');
+  perform t.as_super();
+end $$;
+
 -- ═══ L. Hesap silme ══════════════════════════════════════════════════
 do $$
 declare u1 uuid := '00000000-0000-0000-0000-0000000000a1'; rev_before int; rev_after int;

@@ -21,9 +21,11 @@
     "supabase:kur": "node scripts/supabase-kur.mjs",
     "supabase:test": "bash scripts/supabase-test.sh",
     "supabase:kur-test": "node supabase/tests/kur.test.mjs",
-    "supabase:mobil-test": "node supabase/tests/mobil.e2e.mjs"
+    "supabase:mobil-test": "node supabase/tests/mobil.e2e.mjs",
+    "supabase:yonetici-test": "node supabase/tests/yonetici.e2e.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "motion": "^13.1.1",
     "node-cron": "^4.6.0",
     "pg": "^8.23.0",

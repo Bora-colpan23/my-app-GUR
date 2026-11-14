@@ -247,17 +247,64 @@ izler**. Sağa kaydırma kaydeder (toggle değil), sola kaydırma kayıttan da �
 (sunucuyla aynı: son karar geçerli). Girişte `senkronla()` favorileri BİRLEŞTİRİR
 (`gur_sync_saved`: kotaya/ücrete dokunmaz). Çevrimdışı kuyruk YOK.
 
-**Test:** `npm run supabase:test` (145 SQL doğrulaması, gerçek PostgreSQL),
-`supabase:kur-test` (kurulum betiği, Yönetim API taklidiyle, 19),
-`supabase:mobil-test` (gerçek supabase-js + derlenmiş mobil uygulama, 20).
+**Test:** `npm run supabase:test` (191 SQL doğrulaması, gerçek PostgreSQL),
+`supabase:kur-test` (kurulum betiği, Yönetim API taklidiyle, 20),
+`supabase:mobil-test` (gerçek supabase-js + derlenmiş mobil uygulama, 20),
+`supabase:yonetici-test` (derlenmiş yönetici paneli + gerçek supabase-js, 22).
 **GERÇEK SUPABASE'E KARŞI HİÇ ÇALIŞTIRILMADI** (bu ortamda `api.supabase.com`
 kapalı): Auth/REST/Yönetim API katmanları taklit. İlk gerçek kurulumda proje
 oluşturma, Auth ayarı alan adları, `api-keys` biçimi, enum RPC parametreleri
 doğrulanmalı.
 
-**Taşınmadı:** web sitesi, Doyurucu, yönetici paneli (hâlâ `server/` + localStorage),
-moderasyon kuyruğu, İkinci Şans, işletme alan düzenleme, fiyat/teklif/reklam
-takvimi. Mobilde 22 bileşen hâlâ yok (SQL tarafı ziyaret/yorum/ödüllü için hazır).
+**Taşınmadı:** web sitesi, Doyurucu, işletme alan düzenleme / alan moderasyonu,
+İkinci Şans, fiyat/teklif/reklam takvimi/hizmet kapıları/medya onayı, rozetler,
+kullanıcı ve gelir sayfaları. **Yönetici paneli KISMEN taşındı** (aşağıdaki başlık).
+Mobilde 22 bileşen hâlâ yok (SQL tarafı ziyaret/yorum/ödüllü için hazır).
+
+### Yönetici paneli → Supabase (14 Kasım)
+
+`VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` build'de doluysa panel Node
+sunucusu yerine Supabase'e bakar (`npm run supabase:kur` bunları depo kökündeki
+`.env.local`a yazar, içindeki başka değişkenlere dokunmaz). Boşsa panel eskisi
+gibi Node/yerel modda çalışır. **Artifact önizlemesinde HİÇ devrede değil**
+(`__GUR_ARTIFACT__`; supabase-js pakete girmiyor, ölçüldü).
+
+Dosyalar: `supabase/migrations/…000500_gur_yonetici.sql` (şema + RPC),
+`src/lib/admin-supabase.js` (taşıma; `api.js` ile AYNI adlar, panelde
+`const be = sb.enabled ? sb : api`), `src/lib/admin-sync.js` (yerel depo ↔ sunucu).
+
+| Ne | Nasıl |
+|---|---|
+| Giriş | Supabase Auth e-posta + parola; yetki `platform_admins` (`gur_admin_me`). Geçerli parolalı ama yönetici olmayan hesap **girmez**. Oturum kalıcı: yenilemede içeride kalır |
+| Mekân havuzu / Gastro / görünürlük / moderasyon kararı | `gur_admin_restaurants`, `gur_admin_set_restaurant` (beyaz liste: `active`, `review`, `gastro`, `gastro_chef`, `gastro_video`; başka anahtar HATA). Görünürlük anahtarı = `is_active`, yayın kararı = `review_status` |
+| Sahiplenme başvurusu | `gur_admin_claims`, `gur_admin_decide_claim` (sahiplik `gur_claim_decided` tetikleyicisinde bağlanır; başka işletmeye ait mekân onaylanmaz) |
+| Kampanyalar | `gur_admin_campaigns`, `gur_admin_patch_campaign` (`exhausted` elle konamaz; teklif tabanı 20) |
+| Büyüme | `gur_admin_growth`: kohortlar CANLI hesaplanır (Node'daki gecelik toplama tablosu burada beslenmiyor) |
+| İlçe aç/kapat | `platform_settings.districts_open` + `gur_admin_set_district`; kapalı ilçenin mekânı ve kampanyası `gur_restaurants` / `gur_campaigns`tan **düşer** (mobil de bundan etkilenir). `gur_districts()` herkese açık |
+| Denetim | her yönetici işlemi `admin_audit`e düşer (yalnızca yönetici okur, silinemez) |
+
+**Sunucu gerçeğin kaynağı, yerel depolar yansıma.** Girişte `hydrate()` sunucudaki
+durumu `platform.js` / `moderation.js` depolarına yazar (ekranlar değişmeden okur);
+`push*()` önce yerele (anında tepki), sonra sunucuya yazar ve **reddedilirse yereli GERİ
+ALIR** + toast. Reddedilen "gizle" yerelde gizli görünse yönetici mekânın uygulamadan
+kalktığını sanırdı. Kampanya anahtarı da aynı kuralla geri alınıyor (eskiden hata
+yutuluyordu ve güncelleme fonksiyonunun içinde yan etki vardı).
+
+**Büyüme tanımları** (`gur_admin_growth`): dN = kayıt gününden N gün sonra en az bir
+kaydırma yapan kullanıcı %'si; kohortun N. günü dolmadıysa **null** (0 sayılmaz).
+`save_to_directions_pct` yalnızca analitik rızası verenleri sayar (rızasız olay
+kullanıcıya bağlanmaz). `arpu_minor` son 30 gün, `ltv_minor` tüm zaman, kullanıcı başına.
+
+**BİLİNEN AYRIM — iki veri tabanı:** Supabase modunda panel Supabase'i okur, ama web
+sitesi / Doyurucu / tüketici web uygulaması hâlâ Node `server/`a yazıyor. Yani sitedeki
+sahiplenme başvurusu panelde **görünmez**; yalnızca Supabase'e düşenler (mobil
+`gur_submit_claim`) görünür. Doyurucu kimliğinin de Supabase'e taşınması ayrı iş.
+Ayrıca: gizle/Gastro/ilçe/moderasyon kararları Supabase'e yazılıyor ama pazarlık,
+fiyat, reklam takvimi, hizmet kapıları, medya onayı, editoryal rozet ve
+alan-değişikliği moderasyonu hâlâ tarayıcı localStorage'ında. Mobil paket
+`gur_districts()`i henüz okumuyor (ilçe seçicisi sabit liste); kapalı ilçenin
+MEKÂNLARI düşüyor ama ilçenin kendisi mobilde "Çok yakında" yazmıyor.
+**Gerçek Supabase'e karşı çalıştırılmadı** (taklit Auth/REST üstünde gerçek PostgreSQL).
 
 ### İki mod: canlı ve yerel
 

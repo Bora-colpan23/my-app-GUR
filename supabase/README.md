@@ -82,13 +82,24 @@ listesine `api.supabase.com` ile `<proje-kodu>.supabase.co` eklenmelidir. Bu ort
 * **İşletme planı yok** (işletme aboneliği ürün kararıyla kaldırıldı); kullanıcı planı `free | plus`.
 * **Kota günü İstanbul gününe göre** başlar (UTC değil).
 
+## Yönetici paneli
+
+Panel aynı projeye bakar: `supabase:kur` depo köküne `.env.local` yazar
+(`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — yalnızca anon anahtar), sonra
+`npm run dev` / `npm run build`. Giriş: kurulumda `ADMIN_EMAIL` + `ADMIN_PASSWORD` ile
+açılan hesap (varsayılan parola YOK). Yetki `platform_admins` tablosunda; başka yönetici
+eklemek için hesabı Auth'ta açıp `insert into platform_admins (user_id) values (…)`.
+Tüm yönetici RPC'leri `gur_admin_*` adlı ve yönetici olmayana 42501 döner; kararlar
+`admin_audit` tablosuna yazılır.
+
 ## Testler
 
 | Komut | Ne sınar | Gerekir |
 |---|---|---|
-| `npm run supabase:test` | 145 SQL doğrulaması: RLS, RPC'ler, kota, ücretlendirme, ziyaret, masa talebi, hesap silme | yerel PostgreSQL (`su postgres` ya da `GUR_TEST_PG`) |
-| `GUR_TEST_PG=… npm run supabase:kur-test` | kurulum betiği, Yönetim API'sini taklit eden sunucuya karşı: idempotanlık, atomiklik, kuru çalıştırma, sızıntı yok (19) | süper kullanıcı bağlantısı |
+| `npm run supabase:test` | 191 SQL doğrulaması: RLS, RPC'ler, kota, ücretlendirme, ziyaret, masa talebi, hesap silme | yerel PostgreSQL (`su postgres` ya da `GUR_TEST_PG`) |
+| `GUR_TEST_PG=… npm run supabase:kur-test` | kurulum betiği, Yönetim API'sini taklit eden sunucuya karşı: idempotanlık, atomiklik, kuru çalıştırma, sızıntı yok (20) | süper kullanıcı bağlantısı |
 | `GUR_TEST_PG=… npm run supabase:mobil-test` | gerçek `supabase-js` ile derlenmiş mobil uygulama akışı (20) | + Playwright/Chromium, `mobile/` bağımlılıkları |
+| `GUR_TEST_PG=… npm run supabase:yonetici-test` | Supabase'li derlenmiş **yönetici paneli** (vite build) tarayıcıda: yönetici olmayan hesap girmez, Gastro/gizle/moderasyon/ilçe/sahiplenme/kampanya kararları veritabanına yazılır, denetim kaydı düşer (22) | + Playwright/Chromium |
 
 **Bu testlerin SINIRI:** hiçbiri gerçek bir Supabase projesine karşı çalışmadı (bu ortamda
 `api.supabase.com` kapalı). PostgreSQL gerçek; Auth/REST/Yönetim API katmanları taklit. Taklit ile gerçek arasındaki fark
@@ -98,10 +109,12 @@ dönüşümü. Hata olursa betiğin çıktısını olduğu gibi iletin.
 
 ## Bilinen eksikler
 
-* **Yalnızca mobil uygulama** Supabase'e bağlı. Web sitesi, işletme paneli (Doyurucu) ve
-  yönetici paneli hâlâ Node sunucusuna (`server/`) ve localStorage'a bakıyor; onlar için
-  moderasyon kuyruğu, İkinci Şans paketi, işletme alan düzenleme, fiyat/teklif/reklam takvimi
-  tabloları **taşınmadı**.
+* **Mobil uygulama ve yönetici paneli (kısmen)** Supabase'e bağlı. Web sitesi ve işletme
+  paneli (Doyurucu) hâlâ Node sunucusuna (`server/`) bakıyor; yani sitedeki sahiplenme
+  başvurusu Supabase modundaki yönetici panelinde görünmez. Yönetici panelinde mekân/Gastro/
+  gizleme/moderasyon/ilçe/sahiplenme/kampanya/büyüme taşındı (aşağıdaki bölüm); moderasyon
+  alan kuyruğu, İkinci Şans, fiyat/teklif/reklam takvimi, hizmet kapıları, medya onayı ve
+  editoryal rozetler **taşınmadı** (tarayıcı localStorage'ı).
 * **Mobil uygulamada 22 bileşen yok** (GUR Match, ödüllü reklam, GUR Plus, yorum yazma, ziyaret
   doğrulama arayüzü…). SQL tarafı hazır (`gur_visit_sample`, `gur_submit_review`,
   `gur_rewarded_ad_done`…) ama ekranları yazılmadı.

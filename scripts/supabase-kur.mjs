@@ -50,6 +50,7 @@ const KOK = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 // betiği gerçek mobile/ dosyalarını ezmeden sınasın diye).
 const SB = process.env.GUR_SUPABASE_DIR || path.join(KOK, 'supabase');
 const MOBIL = process.env.GUR_MOBILE_DIR || path.join(KOK, 'mobile');
+const WEB = process.env.GUR_WEB_DIR || KOK;                 // yönetici paneli (vite) için .env.local
 const PARCA = '-- @@gur-parca';
 
 const args = new Set(process.argv.slice(2));
@@ -375,6 +376,23 @@ function mobilYaz(url, anon) {
   tamam('mobile/eas.json (development / preview / production)');
 }
 
+// Yönetici paneli (web) de aynı projeye bakar. .env.local'ın İÇİNDEKİ başka
+// değişkenlere DOKUNULMAZ: yalnızca bu iki anahtar eklenir/güncellenir.
+function webYaz(url, anon) {
+  adim('Yönetici paneli (web) bağlantısı');
+  if (KURU) { log('  (kuru) .env.local içine VITE_SUPABASE_* yazılırdı'); return; }
+  const yol = path.join(WEB, '.env.local');
+  const mevcut = fs.existsSync(yol) ? fs.readFileSync(yol, 'utf8').split('\n') : [];
+  const yeni = { VITE_SUPABASE_URL: url, VITE_SUPABASE_ANON_KEY: anon };
+  const kalan = mevcut.filter(l => !Object.keys(yeni).some(k => l.startsWith(`${k}=`)));
+  while (kalan.length && kalan[kalan.length - 1] === '') kalan.pop();
+  fs.writeFileSync(yol, [...kalan,
+    ...(kalan.length ? [''] : []),
+    '# supabase:kur tarafından yazıldı. YALNIZCA anon anahtar; SERVICE ANAHTARINI buraya YAZMAYIN.',
+    ...Object.entries(yeni).map(([k, v]) => `${k}=${v}`), ''].join('\n'));
+  tamam('.env.local (yönetici paneli: VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY)');
+}
+
 // ─── Akış ─────────────────────────────────────────────────────────────
 
 async function main() {
@@ -418,7 +436,7 @@ async function main() {
 
     await yonetici(hedef, url, servis);
     await dogrula(hedef, url, anon);
-    if (url && anon) mobilYaz(url, anon);
+    if (url && anon) { mobilYaz(url, anon); webYaz(url, anon); }
     else uyar('URL/anon anahtar bilinmiyor (doğrudan DB yolu): mobile/.env yazılmadı. SUPABASE_URL ve SUPABASE_ANON_KEY verin.');
 
     log(`\n✓ Hazır${yeni ? ` — ${yeni} migration uygulandı` : ''}.`);

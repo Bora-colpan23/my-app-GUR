@@ -1,7 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useId, useState, useMemo, useEffect, useRef } from 'react';
 import { useClaims, decideClaim, useOwnerProfiles, ownerLogo } from '../lib/b2b.js';
 
 import * as api from '../lib/api.js';
+import * as sb from '../lib/admin-supabase.js';
+import * as sync from '../lib/admin-sync.js';
 import { motion, AnimatePresence } from 'motion/react';
 import { isServiceOpen, setServiceOpen, setServiceOpenFor, serviceGateReason, closedServiceCount, usePlatformSettings, toggleSetting, setStoreFeature, setRestaurantHidden, isRestaurantHidden, isDistrictOpen, setDistrictOpen, districtVenueCount, FEATURES, PER_STORE_FEATURES, SERVICE_GATES } from '../lib/platform.js';
 import * as pricing from '../lib/pricing.js';
@@ -906,11 +908,12 @@ function IconBtn({ onClick, icon, size = 38, title, danger, disabled }) {
 // için sunucu tarafı oturum/rol denetimi gerekir (bkz. CLAUDE.md, backend adımı).
 
 function AdminField({ label, value, onChange, type = 'text', autoFocus, onEnter }) {
+  const id = useId();   // etiket alana bağlı: ekran okuyucu ve etikete dokunma çalışsın
   return (
     <div style={{ marginBottom: 14 }}>
-      <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: C.dim, marginBottom: 6 }}>{label}</label>
+      <label htmlFor={id} style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: C.dim, marginBottom: 6 }}>{label}</label>
       <input
-        type={type} value={value} autoFocus={autoFocus}
+        id={id} type={type} value={value} autoFocus={autoFocus}
         onChange={e => onChange(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') onEnter?.(); }}
         style={{
@@ -924,6 +927,11 @@ function AdminField({ label, value, onChange, type = 'text', autoFocus, onEnter 
   );
 }
 
+// Arka uç seçimi: build'de Supabase tanımlıysa panel ona, değilse Node
+// sunucusuna (lib/api.js) bakar. İki modül aynı adları ve şekilleri sunar.
+const be = sb.enabled ? sb : api;
+const ensureLive = () => (sb.enabled ? Promise.resolve({ mode: 'live' }) : api.ensureMode());
+
 function AdminLogin({ onLogin, theme, onTheme }) {
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
@@ -931,7 +939,7 @@ function AdminLogin({ onLogin, theme, onTheme }) {
 
   const [busy, setBusy] = useState(false);
   const [live, setLive] = useState(false);
-  useEffect(() => { api.ensureMode().then(({ mode }) => setLive(mode === 'live')); }, []);
+  useEffect(() => { ensureLive().then(({ mode }) => setLive(mode === 'live')); }, []);
 
   // Canlı modda parola sunucuda scrypt özetiyle doğrulanır ve dönen
   // belirteç 'admin' rolü taşır; yönetici uçları bu rolü arıyor.
@@ -940,7 +948,7 @@ function AdminLogin({ onLogin, theme, onTheme }) {
     setError('');
     if (live) {
       setBusy(true);
-      try { await api.loginAdmin(user.trim(), pass); onLogin(); }
+      try { await (sb.enabled ? sb.signIn(user.trim(), pass) : api.loginAdmin(user.trim(), pass)); onLogin(); }
       catch (err) { setError(err.message || 'Giriş yapılamadı.'); }
       finally { setBusy(false); }
       return;
@@ -981,7 +989,7 @@ function AdminLogin({ onLogin, theme, onTheme }) {
         </div>
 
         <div style={{ ...CARD, padding: '22px 20px' }}>
-          <AdminField label="Kullanıcı adı" value={user} onChange={v => { setUser(v); setError(''); }} autoFocus onEnter={submit} />
+          <AdminField label={sb.enabled ? 'E-posta' : 'Kullanıcı adı'} value={user} onChange={v => { setUser(v); setError(''); }} autoFocus onEnter={submit} />
           <AdminField label="Parola" value={pass} onChange={v => { setPass(v); setError(''); }} type="password" onEnter={submit} />
 
           {error && (
@@ -1007,7 +1015,7 @@ function AdminLogin({ onLogin, theme, onTheme }) {
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
             <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
               {live
-                ? 'Sunucuya bağlı: parola scrypt özetiyle sunucuda doğrulanıyor.'
+                ? (sb.enabled ? 'Supabase\'e bağlı: kimlik Supabase Auth\'ta, yönetici yetkisi veritabanında doğrulanıyor.' : 'Sunucuya bağlı: parola scrypt özetiyle sunucuda doğrulanıyor.')
                 : __GUR_ARTIFACT__
                   ? 'Önizleme: sunucu ve hesap yok, veriler bu tarayıcıda. Panel parolasız açılır; gerçek yayında giriş sunucuda doğrulanır.'
                   : 'Sunucu yok — yönetici girişi yalnızca sunucuya bağlıyken çalışır.'}
@@ -1065,10 +1073,33 @@ export default function GurAdmin() {
     showToast(`${app.name} başvurusu reddedildi`, 'error');
   };
   const toggleGastro = (id) => {
-    setRestaurants(p => p.map(r => r.id === id ? { ...r, gastro: !r.gastro } : r));
     const r = restaurants.find(x => x.id === id);
+    const next = !r.gastro;
+    setRestaurants(p => p.map(x => x.id === id ? { ...x, gastro: next } : x));
     showToast(r.gastro ? `${r.name} Gastro Onayı kaldırıldı` : `${r.name} Gastro Onaylı yapıldı`);
+    // Supabase modunda karar sunucuya da yazılır; reddedilirse geri alınır.
+    if (sb.enabled) {
+      sync.pushGastro(id, next).then(ok => {
+        if (!ok) setRestaurants(p => p.map(x => x.id === id ? { ...x, gastro: !next } : x));
+      });
+    }
   };
+
+  // ─── SUPABASE: oturum + sunucu durumu ───
+  // Sayfa yenilenince kayıtlı yönetici oturumu sürer; giriş yapılınca sunucudaki
+  // görünürlük / moderasyon / ilçe / Gastro kararları yerel depolara yazılır.
+  useEffect(() => {
+    if (!sb.enabled) return undefined;
+    sync.onSyncError(msg => showToast(msg, 'error'));
+    sb.resume().then(me => { if (me) setAuthed(true); });
+    return () => sync.onSyncError(null);
+  }, []);
+  useEffect(() => {
+    if (!sb.enabled || !authed) return;
+    sync.hydrate()
+      .then(({ gastro }) => setRestaurants(p => p.map(r => (gastro.has(r.id) ? { ...r, gastro: gastro.get(r.id).gastro } : r))))
+      .catch(e => showToast(`Sunucu durumu yüklenemedi: ${e.message}`, 'error'));
+  }, [authed]);
   const toggleSuspend = (id) => {
     setRestaurants(p => p.map(r => r.id === id ? { ...r, status: r.status === 'active' ? 'suspended' : 'active' } : r));
   };
@@ -1216,7 +1247,7 @@ export default function GurAdmin() {
   // Gelir tablosundan müşteriye geçiş: aynı işletme kaydı, tek tıkla.
   const openStore = (id) => { setPage('restaurants'); setRestTab('list'); setOpenRestaurantId(id); };
 
-  const logout = () => { setAuthed(false); setPage('dashboard'); setQuery(''); setReviewDoc(null); setOpenRestaurantId(null); setRestTab('list'); };
+  const logout = () => { if (sb.enabled) sb.signOut(); setAuthed(false); setPage('dashboard'); setQuery(''); setReviewDoc(null); setOpenRestaurantId(null); setRestTab('list'); };
 
   // Giriş yapılmadan panel hiç render edilmez
   if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} theme={theme} onTheme={setTheme} />;
@@ -2816,8 +2847,8 @@ function ModerationPage({ restaurants = [], query = '', onCreate, onCreateMany, 
               </div>
               <Btn label="Detay" onClick={() => onOpen?.(r.id)} variant="outline" size="sm"
                 icon={<Icon path={icons.eye} size={13} color={C.dim} />} />
-              <Btn label="Reddet" onClick={() => decideVenue(r.id, 'rejected')} variant="soft" tone="red" size="sm" />
-              <Btn label="Yayınla" onClick={() => decideVenue(r.id, 'approved')} variant="filled" tone="green" size="sm" />
+              <Btn label="Reddet" onClick={() => (sb.enabled ? sync.pushVenueDecision(r.id, 'rejected') : decideVenue(r.id, 'rejected'))} variant="soft" tone="red" size="sm" />
+              <Btn label="Yayınla" onClick={() => (sb.enabled ? sync.pushVenueDecision(r.id, 'approved') : decideVenue(r.id, 'approved'))} variant="filled" tone="green" size="sm" />
             </div>
           ))}
       </section>
@@ -3115,10 +3146,10 @@ function CampaignsPage({ query = '' }) {
   // olduğu için aşağıdaki hesaplar iki durumda da çalışıyor.
   useEffect(() => {
     let off = false;
-    api.ensureMode().then(({ mode }) => {
+    ensureLive().then(({ mode }) => {
       if (mode !== 'live' || off) return;
       setLive(true);
-      api.getCampaigns()
+      be.getCampaigns()
         .then(({ campaigns }) => { if (!off) setRows(campaigns.map(fromApi)); })
         .catch(() => { /* tohum listesi kalır */ });
     });
@@ -3126,18 +3157,30 @@ function CampaignsPage({ query = '' }) {
   }, []);
 
   const say = (m) => { setToast(m); setTimeout(() => setToast(null), 2200); };
-  const toggle = (id) => setRows(rs => rs.map(r => {
-    if (r.id !== id || r.status === 'exhausted') return r;
+  // Sunucuya yazılamazsa satır ESKİ hâline döner ve yönetici bunu görür:
+  // eskiden hata yutuluyordu, ekran "duraklatıldı" derken kampanya yayında kalıyordu.
+  // (Yan etki güncelleme fonksiyonunun içinde DEĞİL: orada iki kez çalışabilir.)
+  const kaydet = (id, govde, once) => {
+    if (!live) return;
+    be.patchCampaign(id, govde).catch(e => {
+      setRows(rs => rs.map(x => (x.id === id ? { ...x, ...once } : x)));
+      say(`Sunucuya kaydedilemedi: ${e.message}`);
+    });
+  };
+  const toggle = (id) => {
+    const r = rows.find(x => x.id === id);
+    if (!r || r.status === 'exhausted') return;
     const status = r.status === 'active' ? 'paused' : 'active';
-    if (live) api.patchCampaign(id, { status }).catch(() => {});
-    return { ...r, status };
-  }));
-  const bump = (id, delta) => setRows(rs => rs.map(r => {
-    if (r.id !== id) return r;
+    setRows(rs => rs.map(x => (x.id === id ? { ...x, status } : x)));
+    kaydet(id, { status }, { status: r.status });
+  };
+  const bump = (id, delta) => {
+    const r = rows.find(x => x.id === id);
+    if (!r) return;
     const bid = Math.max(20, r.bid + delta);
-    if (live) api.patchCampaign(id, { bidMinor: bid }).catch(() => {});
-    return { ...r, bid };
-  }));
+    setRows(rs => rs.map(x => (x.id === id ? { ...x, bid } : x)));
+    kaydet(id, { bidMinor: bid }, { bid: r.bid });
+  };
 
   const money = (minor) => `₺${(minor / 100).toLocaleString('tr', { maximumFractionDigits: 0 })}`;
   // Kalite = etkileşim oranı; skor açık artırmadaki gerçek sıralama ölçütü.
@@ -3273,9 +3316,9 @@ function GrowthPage() {
   // panel boş bir iskelet gibi görünmesin.
   useEffect(() => {
     let off = false;
-    api.ensureMode().then(({ mode }) => {
+    ensureLive().then(({ mode }) => {
       if (mode !== 'live' || off) return;
-      api.getGrowth(12).then(d => {
+      be.getGrowth(12).then(d => {
         if (off) return;
         setPlatform(d.platform);
         if (d.cohorts?.length) {
@@ -3541,7 +3584,7 @@ function StoreFeatures({ restaurant }) {
               : 'Kapatırsan bu mekan tüketici uygulamasından tamamen kalkar — deste, arama ve listeler dahil. Kayıt silinmez, işletme paneli çalışmaya devam eder.'}
           </div>
         </div>
-        <Toggle on={!hidden} onChange={() => setRestaurantHidden(restaurant.id, !hidden)} />
+        <Toggle on={!hidden} onChange={() => (sb.enabled ? sync.pushHidden(restaurant.id, !hidden) : setRestaurantHidden(restaurant.id, !hidden))} />
       </div>
     </section>
 
@@ -3942,7 +3985,7 @@ function ClaimsPanel() {
   const localClaims = useClaims();
   const [remote, setRemote] = useState(null);
 
-  const load = () => api.getClaims()
+  const load = () => be.getClaims()
     .then(({ claims }) => setRemote(claims.map(c => ({
       id: c.id, status: c.status,
       restaurantName: c.restaurant_name,
@@ -3953,7 +3996,7 @@ function ClaimsPanel() {
 
   useEffect(() => {
     let off = false;
-    api.ensureMode().then(({ mode }) => { if (mode === 'live' && !off) load(); });
+    ensureLive().then(({ mode }) => { if (mode === 'live' && !off) load(); });
     return () => { off = true; };
      
   }, []);
@@ -3963,7 +4006,7 @@ function ClaimsPanel() {
     if (remote) {
       // Canlı modda karar sunucuda: onay aynı zamanda mekânın sahipliğini
       // bağlıyor, sonra listeyi tazeliyoruz.
-      try { await api.decideClaimRemote(id, status, status === 'rejected' ? 'Belge doğrulanamadı' : null); }
+      try { await be.decideClaimRemote(id, status, status === 'rejected' ? 'Belge doğrulanamadı' : null); }
       catch { /* liste tazelendiğinde gerçek durum görünür */ }
       await load();
       return;
@@ -5302,7 +5345,7 @@ function SettingsPage() {
             <SettingsRow key={d.name} item={{
               label: d.name,
               desc: n > 0 ? `${n} mekân` : 'Henüz mekân verisi yok',
-            }} on={open} onChange={() => setDistrictOpen(d.name, !open)}>
+            }} on={open} onChange={() => (sb.enabled ? sync.pushDistrict(d.name, !open) : setDistrictOpen(d.name, !open))}>
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: open ? C.greenSoft : C.orangeSoft, borderRadius: R.pill, padding: '4px 10px' }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: open ? C.green : C.orange }} />

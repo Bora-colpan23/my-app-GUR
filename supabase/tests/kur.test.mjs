@@ -101,6 +101,10 @@ const sunucu = http.createServer(async (req, res) => {
 await new Promise(r => sunucu.listen(0, '127.0.0.1', r));
 const TABAN = `http://127.0.0.1:${sunucu.address().port}`;
 
+const MIG = fs.readdirSync(path.join(KOK, 'supabase', 'migrations')).filter(f => f.endsWith('.sql')).sort();
+// Betik gerçek depodaki .env.local'a YAZMASIN: her çalıştırma için geçici web dizini.
+const WEBDIR = fs.mkdtempSync(path.join(os.tmpdir(), 'gur-web-'));
+
 // ─── Betiği çalıştır ──────────────────────────────────────────────────
 function mobilDizini() {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'gur-mobil-'));
@@ -115,7 +119,7 @@ function kur(ek = {}, argumanlar = []) {
       env: {
         PATH: process.env.PATH, HOME: os.tmpdir(),
         SUPABASE_API_BASE: TABAN, SUPABASE_URL: TABAN, SUPABASE_ACCESS_TOKEN: TOKEN,
-        SUPABASE_PROJECT_REF: 'abcd1234', ...ek,
+        SUPABASE_PROJECT_REF: 'abcd1234', GUR_WEB_DIR: WEBDIR, ...ek,
       },
     });
     let cikti = '';
@@ -136,8 +140,8 @@ try {
   let r = await kur({ GUR_MOBILE_DIR: mobil, ADMIN_EMAIL: 'yonetici@gur.test', ADMIN_PASSWORD: 'uzun-parola-1', SUPABASE_AUTO_CONFIRM: '1' });
   assert.equal(r.kod, 0, r.cikti);
   ok('ilk kurulum: çıkış 0');
-  assert.equal((await sorgu('select count(*)::int n from supabase_migrations.schema_migrations'))[0].n, 4);
-  ok('4 migration Supabase CLI defterine yazıldı');
+  assert.equal((await sorgu('select count(*)::int n from supabase_migrations.schema_migrations'))[0].n, MIG.length);
+  ok(`${MIG.length} migration Supabase CLI defterine yazıldı`);
   assert.equal((await sorgu('select count(*)::int n from public.restaurants'))[0].n, 218);
   ok('218 mekân yazıldı (seed parça parça)');
   assert.equal((await sorgu(`select count(*)::int n from public.platform_admins pa join auth.users u on u.id=pa.user_id where u.email='yonetici@gur.test'`))[0].n, 1);
@@ -152,6 +156,11 @@ try {
   assert.match(env, new RegExp(`EXPO_PUBLIC_SUPABASE_URL=${TABAN.replace(/[.]/g, '\\.')}`));
   assert.match(env, /EXPO_PUBLIC_SUPABASE_ANON_KEY=anon-test-key/);
   ok('mobile/.env: URL + anon anahtar');
+  const webEnv = fs.readFileSync(path.join(WEBDIR, '.env.local'), 'utf8');
+  assert.match(webEnv, new RegExp(`^VITE_SUPABASE_URL=${TABAN.replace(/[.]/g, '\\.')}$`, 'm'));
+  assert.match(webEnv, /^VITE_SUPABASE_ANON_KEY=\S+$/m);
+  assert.ok(!/service/i.test(webEnv.replace('SERVICE ANAHTARINI', '')), 'web .env.local servis anahtarı içeriyor');
+  ok('.env.local: yönetici paneli için VITE_SUPABASE_URL + anon anahtar (servis anahtarı YOK)');
   const eas = JSON.parse(fs.readFileSync(path.join(mobil, 'eas.json'), 'utf8'));
   for (const p of ['development', 'preview', 'production']) {
     assert.equal(eas.build[p].env.EXPO_PUBLIC_SUPABASE_ANON_KEY, ANON);
@@ -167,7 +176,7 @@ try {
   // 2 ─ İkinci çalıştırma: idempotent
   r = await kur({ GUR_MOBILE_DIR: mobil, ADMIN_EMAIL: 'yonetici@gur.test', ADMIN_PASSWORD: 'uzun-parola-1' });
   assert.equal(r.kod, 0, r.cikti);
-  assert.match(r.cikti, /4 migration zaten uygulanmış/);
+  assert.match(r.cikti, new RegExp(`${MIG.length} migration zaten uygulanmış`));
   assert.match(r.cikti, /218 mekân var, atlandı/);
   assert.match(r.cikti, /hesap zaten var/);
   assert.equal((await sorgu('select count(*)::int n from public.restaurants'))[0].n, 218);
@@ -188,7 +197,7 @@ try {
   await yeniDb();
   r = await kur({ GUR_MOBILE_DIR: mobil }, ['--kuru']);
   assert.equal(r.kod, 0, r.cikti);
-  assert.match(r.cikti, /4 migration uygulanırdı/);
+  assert.match(r.cikti, new RegExp(`${MIG.length} migration uygulanırdı`));
   assert.equal((await sorgu(`select to_regclass('supabase_migrations.schema_migrations')::text v`))[0].v, null);
   assert.equal((await sorgu(`select to_regclass('public.restaurants')::text v`))[0].v, null);
   ok('--kuru: defter bile oluşmadı, hiçbir tablo yok (salt okunur)');
@@ -210,8 +219,8 @@ try {
   assert.match(r.cikti, /tümü geri alındı/);
   assert.equal((await sorgu(`select to_regclass('public.yari_kalan')::text v`))[0].v, null);
   const surumler = (await sorgu('select version from supabase_migrations.schema_migrations order by 1')).map(x => x.version);
-  assert.deepEqual(surumler, ['20261114000100', '20261114000200', '20261114000300', '20261114000400']);
-  ok('bozuk migration: yarım kalan tablo YOK (atomik), deftere yazılmadı, önceki 4 sağlam');
+  assert.deepEqual(surumler, MIG.map(f => f.split('_')[0]));
+  ok(`bozuk migration: yarım kalan tablo YOK (atomik), deftere yazılmadı, önceki ${MIG.length} sağlam`);
   // Düzeltilince kaldığı yerden devam eder
   fs.unlinkSync(path.join(gecici, 'migrations', '20261114009999_boz.sql'));
   r = await kur({ GUR_SUPABASE_DIR: gecici, GUR_MOBILE_DIR: mobil });
