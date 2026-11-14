@@ -19,8 +19,9 @@ import { Logo } from '../bilesen/Logo.js';
 import { Ikon } from '../bilesen/Ikon.js';
 import { Hap } from '../bilesen/Hap.js';
 import { Alan } from '../bilesen/Alan.js';
-import { yaz } from '../depo.js';
+import { yaz, oku } from '../depo.js';
 import { girisYap, canliMi } from '../api.js';
+import { senkronla } from '../senkron.js';
 
 const epostaGecerli = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e.trim());
 
@@ -31,6 +32,7 @@ export default function Giris({ navigation, route }) {
   const [parola, setParola] = useState('');
   const [onay, setOnay] = useState(false);
   const [hata, setHata] = useState(null);
+  const [bilgi, setBilgi] = useState(null);
   const [bekle, setBekle] = useState(false);
 
   const eksik = kayit
@@ -42,14 +44,26 @@ export default function Giris({ navigation, route }) {
   const gonder = async () => {
     // DOĞRULAMA İLK SATIRDA, mod kontrolü sonra.
     if (eksik) { setHata(eksik); return; }
-    setHata(null); setBekle(true);
+    setHata(null); setBilgi(null); setBekle(true);
     try {
       let kullanici = { ad: ad.trim() || eposta.split('@')[0], email: eposta.trim() };
       if (canliMi()) {
-        const c = await girisYap({ email: eposta.trim(), password: parola, name: ad.trim() || undefined });
-        if (c?.user) kullanici = { ad: c.user.name || kullanici.ad, email: c.user.email || kullanici.email };
+        const c = await girisYap({
+          email: eposta.trim(), password: parola, name: ad.trim() || undefined,
+          kayit, riza: oku().riza,
+        });
+        // Sunucu "hayır" derse ekranda KALINIR ve sebep yazılır: eskiden
+        // hata sessizce yutuluyor, kullanıcı giriş yaptığını sanıyordu.
+        if (c?.hata) { setHata(c.hata); return; }
+        if (c?.dogrulamaBekliyor) {
+          setBilgi('Hesabın açıldı. E-postana bir doğrulama bağlantısı gönderdik; bağlantıya dokunduktan sonra giriş yap.');
+          setKayit(false);
+          return;
+        }
+        if (c?.kullanici) kullanici = { ad: c.kullanici.ad || kullanici.ad, email: c.kullanici.email || kullanici.email };
       }
       yaz({ kullanici });
+      senkronla().catch(() => {});
       navigation.reset({ index: 0, routes: [{ name: 'konum', params: { kayittan: kayit } }] });
     } finally {
       setBekle(false);
@@ -109,6 +123,12 @@ export default function Giris({ navigation, route }) {
             </Pressable>
           ) : null}
 
+          {bilgi ? (
+            <Text accessibilityRole="alert" style={{
+              fontFamily: F.govdeOrta, fontSize: 13, color: R.murekkep2, marginBottom: 12, lineHeight: 20,
+            }}>{bilgi}</Text>
+          ) : null}
+
           {hata ? (
             <Text accessibilityRole="alert" style={{
               fontFamily: F.govdeOrta, fontSize: 13, color: R.olumsuzMurekkep, marginBottom: 12,
@@ -123,7 +143,7 @@ export default function Giris({ navigation, route }) {
           />
 
           <Pressable
-            onPress={() => { setKayit(v => !v); setHata(null); }}
+            onPress={() => { setKayit(v => !v); setHata(null); setBilgi(null); }}
             accessibilityRole="button"
             style={{ minHeight: HEDEF, justifyContent: 'center', alignItems: 'center', marginTop: 10 }}>
             <Text style={{ fontFamily: F.govdeYari, fontSize: 14, color: R.markaMurekkep }}>

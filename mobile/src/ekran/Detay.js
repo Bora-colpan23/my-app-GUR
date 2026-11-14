@@ -22,8 +22,9 @@ import { Ikon } from '../bilesen/Ikon.js';
 import { Hap } from '../bilesen/Hap.js';
 import { directionsUrl } from '../../../shared/deeplink.js';
 import { mesafeMetni } from '../veri.js';
-import { useDepo, favoriCevir } from '../depo.js';
-import { istek, canliMi } from '../api.js';
+import { useDepo } from '../depo.js';
+import { favoriDegistir } from '../senkron.js';
+import { masaAyirt as masaTalebiGonder, canliMi } from '../api.js';
 
 const { width: EN } = Dimensions.get('window');
 
@@ -62,15 +63,15 @@ export default function Detay({ navigation, route, restoranlar = [] }) {
   // burada da duruyor — düğme kapalı olsa bile çağrı reddediliyor.
   const masaAyirt = async () => {
     if (!r.claimed) return;
-    const c = canliMi() ? await istek('/api/reservations', {
-      method: 'POST',
-      body: { restaurantId: r.id, people: 2 },
-    }) : null;
+    const c = canliMi() ? await masaTalebiGonder({ restaurantId: r.id, kisi: 2 }) : { atlandi: true };
+    // Sunucu reddederse (sahiplenmemiş mekân, oturum yok…) sebep AYNEN yazılır:
+    // "talebin iletildi" demek, iletilmemiş bir talep için yalan olurdu.
+    if (c.hata) { Alert.alert('Talep gönderilemedi', c.hata, [{ text: 'Tamam' }]); return; }
     Alert.alert(
-      'Masa talebin iletildi',
-      canliMi() && c
+      c.id ? 'Masa talebin iletildi' : 'Masa talebin kaydedilmedi',
+      c.id
         ? `${r.name} talebini aldı. Onaylandığında haber vereceğiz. Komisyon alınmıyor.`
-        : `${r.name} için talebin bu cihazda kaydedildi. Sunucuya bağlanınca iletilecek — komisyon alınmıyor.`,
+        : 'Sunucuya bağlı değilsin; talep iletilemedi. Bağlantın gelince tekrar dene.',
       [{ text: 'Tamam' }],
     );
   };
@@ -103,7 +104,7 @@ export default function Detay({ navigation, route, restoranlar = [] }) {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={favori ? 'Favorilerden çıkar' : 'Favorilere ekle'}
-                onPress={() => favoriCevir(r.id)}
+                onPress={() => favoriDegistir(r.id)}
                 style={{
                   width: HEDEF, height: HEDEF, borderRadius: 999,
                   backgroundColor: 'rgba(0,0,0,0.42)', alignItems: 'center', justifyContent: 'center',

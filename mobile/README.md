@@ -15,7 +15,9 @@ mobile/
 ├── App.js                # kök: fontlar, gezinme, rıza, açılış sırası
 └── src/
     ├── tema.js           # renk/tipografi/gölge jetonları (web GurStyles'ın eşi)
-    ├── api.js            # /api istemcisi + CANLI/YEREL mod ölçümü
+    ├── supabase.js       # Supabase istemcisi (adres/anahtar yoksa null → YEREL mod)
+    ├── api.js            # Supabase RPC/Auth taşıması + CANLI/YEREL mod ölçümü
+    ├── senkron.js        # yerel durum ↔ sunucu (ekranların çağırdığı tek yer)
     ├── depo.js           # AsyncStorage üstünde tek durum
     ├── veri.js           # mekan havuzu + deste (shared/deck.js ORTAK)
     ├── konum.js          # expo-location + elle ilçe seçimi
@@ -34,12 +36,19 @@ npx expo start --ios        # simülatör (macOS)
 npx expo start --android    # emülatör
 ```
 
-Sunucu adresi ortam değişkeninden geliyor; tanımsızken uygulama
-**YEREL** modda çalışır (hiçbir ekran kilitlenmez):
+Sunucu **Supabase**. Adres ve genel (anon) anahtar derleme ortamından
+geliyor; tanımsızken uygulama **YEREL** modda çalışır (hiçbir ekran
+kilitlenmez). Depo kökünden tek komutla kurulur ve bağlanır:
 
 ```bash
-EXPO_PUBLIC_API_URL=http://192.168.1.20:8787 npx expo start
+npm run supabase:kur          # şema + güvenlik + Bakırköy listesi, sonra
+                              # mobile/.env ve mobile/eas.json'a bağlantıyı yazar
+cd mobile && npx expo start
 ```
+
+Kimlik bilgisi nasıl verilir: `supabase/README.md`. Elle bağlamak isterseniz
+`mobile/.env.example` dosyasını `.env` olarak kopyalayıp doldurun (yalnızca
+**genel** anahtar; service anahtarı mağaza paketine ASLA girmez).
 
 Telefon ile aynı ağdaki bilgisayarın **IP adresi** gerekiyor —
 `localhost` telefonun kendisini gösterir.
@@ -59,7 +68,7 @@ Yayına çıkmadan önce doldurulacaklar:
 
 | Ne | Nerede |
 |---|---|
-| Sunucu adresi | `eas.json` → `production.env.EXPO_PUBLIC_API_URL` |
+| Supabase adresi + genel anahtar | `npm run supabase:kur` `eas.json` (3 profil) ve `.env`'e yazar |
 | Bundle id / package | `app.json` (`app.gur.mobile` — kendi hesabınızın kimliğiyle değiştirin) |
 | Apple Team / ASC App ID | `eas.json` → `submit.production` |
 | Gizlilik politikası adresi | App Store Connect + Play Console |
@@ -67,8 +76,9 @@ Yayına çıkmadan önce doldurulacaklar:
 
 ## Web ile ilişkisi
 
-**Tek veri katmanı.** Uygulama webdekiyle aynı sunucuya bakıyor
-(`src/api.js` → `/api/...`), saf kurgu modülleri de ortak:
+**Sunucu kuralları SQL'de.** Kota, sponsorlu kart ücretlendirmesi, ziyaret
+doğrulama, masa talebi kapısı `supabase/migrations/…_gur_rpc.sql` içinde;
+istemci (`src/api.js`) yalnızca taşır. Saf kurgu modülleri weble ortak:
 `shared/deck.js` (deste + yakınlık sıralaması) ve `shared/deeplink.js`
 (harita bağlantıları) depo kökünden okunuyor, kopyalanmıyor. Metro bunu
 `metro.config.js` içindeki `watchFolders` ile yapıyor.

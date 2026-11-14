@@ -216,7 +216,51 @@ yönetici paneline giriş çalıştı; ikinci açılış "veri hazır". **Railwa
 kendisinde denenmedi.** Dosya deposu yok: yüklemeler tarayıcı deposunda
 (bkz. "Bilinen kısıtlar"); Railway disk'i geçici, sunucuya dosya yazmıyoruz.
 
+### Supabase: mobil arka uç (14 Kasım)
+
+Mağaza paketi (`mobile/`) Node sunucusuna değil **Supabase**'e bakıyor: kimlik
+Supabase Auth, veri PostgreSQL + RLS, sunucu kuralları SQL fonksiyonları (RPC).
+Her şey `supabase/` altında ve **`npm run supabase:kur`** tek komutla kuruyor
+(şema, güvenlik, Bakırköy listesi, Auth ayarı, yönetici hesabı, `mobile/.env` +
+`mobile/eas.json` bağlantısı); idempotent, hatada migration tümüyle geri alınır.
+Kimlik bilgisi: `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF`
+(ayrıntı `supabase/README.md`). Adres/anahtar yokken uygulama YEREL modda açılır.
+
+**Kurallar (bunlar bozulursa güvenlik bozulur):**
+- **Her tablo RLS ile kapalı doğar**; yazma yolu RPC'dir. Yeni tabloda
+  `enable row level security` yazın — kurulum betiği RLS'siz tabloda HATA verir.
+- **İstemciden gelmez:** kullanıcı kimliği (`auth.uid()`), plan, gelir tutarı,
+  iştirak geliri. Yönetici = `platform_admins` tablosu (JWT metadata'ya güvenilmez).
+- **Sponsorlu kart ücreti** yalnızca o mekâna ait + aktif + bütçesi kalmış
+  kampanya için, kullanıcı başına BİR kez (`gur_record_swipe`). Kampanyalı mekân
+  organik destede çıkmaz (`veri.js` → `desteKur`), yoksa buildDeck sponsorlu
+  kartı hiç yerleştirmez ve reklamveren bedavaya gösterilirdi.
+- **Servis anahtarı** hiçbir dosyaya/pakete yazılmaz; mobile'a yalnızca anon.
+- `restaurants.id` **metin** (`bkr-<anahtar>`), uuid değil: YEREL favoriler
+  sunucuya geçerken yetim kalmasın. Eklenti yok (haversine, `gur_distance_m`).
+- Kota günü İstanbul gününe göre. Kota sunucuda sayılır ama **engellenmez**
+  (mobilde ödüllü reklam ekranı yok); `gur_record_swipe` içinde işaretli.
+
+**Mobil taraf:** `api.js` yalnızca taşıma (mod ölçümü, RPC, Auth); yerel durumla
+birleştirme `senkron.js`te — **yerel depo önce yazılır, sunucu en iyi çabayla
+izler**. Sağa kaydırma kaydeder (toggle değil), sola kaydırma kayıttan da çıkarır
+(sunucuyla aynı: son karar geçerli). Girişte `senkronla()` favorileri BİRLEŞTİRİR
+(`gur_sync_saved`: kotaya/ücrete dokunmaz). Çevrimdışı kuyruk YOK.
+
+**Test:** `npm run supabase:test` (145 SQL doğrulaması, gerçek PostgreSQL),
+`supabase:kur-test` (kurulum betiği, Yönetim API taklidiyle, 19),
+`supabase:mobil-test` (gerçek supabase-js + derlenmiş mobil uygulama, 20).
+**GERÇEK SUPABASE'E KARŞI HİÇ ÇALIŞTIRILMADI** (bu ortamda `api.supabase.com`
+kapalı): Auth/REST/Yönetim API katmanları taklit. İlk gerçek kurulumda proje
+oluşturma, Auth ayarı alan adları, `api-keys` biçimi, enum RPC parametreleri
+doğrulanmalı.
+
+**Taşınmadı:** web sitesi, Doyurucu, yönetici paneli (hâlâ `server/` + localStorage),
+moderasyon kuyruğu, İkinci Şans, işletme alan düzenleme, fiyat/teklif/reklam
+takvimi. Mobilde 22 bileşen hâlâ yok (SQL tarafı ziyaret/yorum/ödüllü için hazır).
+
 ### İki mod: canlı ve yerel
+
 
 Uygulama açılışta `/api/health` yoklar ve sağ üstte hangi modda olduğunu
 gösterir:
@@ -496,10 +540,13 @@ olmadığını söyler. Hesabı olmayan (yalnız dış beslemeden gelen) mekanla
 fiyatlandırma panelinde görünmez — teklif gönderilecek muhatap yoktur.
 
 **MOBİL UYGULAMA BU DEPOLARI PAYLAŞMAZ.** Telefondaki uygulamanın kendi
-kumbarası var (AsyncStorage) ve web yüzeyleriyle tek bağı SUNUCU:
-`/api/...`. Yani YEREL modda (sunucu yokken) mobil uygulama ile tarayıcı
-sekmeleri birbirini görmez — bu kasıtlı, iki ayrı cihazın localStorage'ı
-zaten paylaşılamaz. CANLI modda dördü de aynı PostgreSQL'i okur.
+kumbarası var (AsyncStorage) ve sunucusu **Supabase** (bkz. "Supabase:
+mobil arka uç"). Yani YEREL modda (sunucu yokken) mobil uygulama ile
+tarayıcı sekmeleri birbirini görmez — bu kasıtlı, iki ayrı cihazın
+localStorage'ı zaten paylaşılamaz. **CANLI modda ARTIK dördü AYNI veritabanını
+OKUMUYOR:** web yüzeyleri Node `server/` + kendi PostgreSQL'ine, mobil
+Supabase'e bakıyor; web/işletme/yönetici Supabase'e taşınana kadar iki ayrı
+veri var (taşıma kararı verilmedi).
 Ölçüldü (`butunluk.mjs`): siteden gönderilen sahiplenme başvurusu
 `gur.claims`e düşüyor, yönetici panelinde adıyla görünüyor ve yöneticinin
 görünürlük anahtarı gerçekten yazıyor (GİZLİ rozeti).
@@ -763,9 +810,8 @@ yerli dokunma hareketleri (Gesture Handler + Reanimated), yerli konum
 izni. Web sitesini saran bir `WebView` paketi değil — Apple'ın 4.2
 "Minimum Functionality" kuralı öyle bir paketi zaten reddediyor.
 
-**TEK VERİ KATMANI MOBİLDE DE GEÇERLİ.** Uygulama webdekiyle aynı
-sunucuya bakıyor (`mobile/src/api.js` → `/api/...`) ve saf kurgu
-modüllerini KOPYALAMIYOR: `shared/deck.js` (deste + yakınlık sıralaması)
+**SUNUCU SUPABASE** (`mobile/src/supabase.js` + `api.js`, ayrıntı "Supabase:
+mobil arka uç"); saf kurgu modüllerini KOPYALAMIYOR: `shared/deck.js` (deste + yakınlık sıralaması)
 ile `shared/deeplink.js` (harita bağlantıları) depo kökünden
 okunuyor. Metro bunu `mobile/metro.config.js` → `watchFolders` ile
 yapıyor; `disableHierarchicalLookup` de açık, yoksa metro depo

@@ -13,8 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { R, F, G, HEDEF } from '../tema.js';
 import { Ikon } from '../bilesen/Ikon.js';
 import { Hap } from '../bilesen/Hap.js';
-import { useDepo, yaz, hepsiniSil } from '../depo.js';
+import { useDepo, yaz } from '../depo.js';
 import { apiModu, sunucuBilgisi, cikisYap } from '../api.js';
+import { hesabiSil as hesabiSilSunucuyla, rizaKarari } from '../senkron.js';
 
 function Satir({ ikon, baslik, deger, onPress, son }) {
   const ic = (
@@ -61,15 +62,17 @@ export default function Profil({ navigation }) {
   const hesabiSil = () => {
     Alert.alert(
       'Hesabın silinsin mi?',
-      'Favorilerin, yorumların ve tercihlerin bu cihazdan kalıcı olarak silinir. Geri alınamaz.',
+      'Hesabın, favorilerin, yorumların ve tercihlerin kalıcı olarak silinir. Geri alınamaz.',
       [
         { text: 'Vazgeç', style: 'cancel' },
         {
           text: 'Sil',
           style: 'destructive',
           onPress: async () => {
-            await cikisYap();
-            await hepsiniSil();
+            // Sunucu silemezse yerel veri de SİLİNMEZ: yarım silme, kullanıcıya
+            // "silindi" deyip hesabı sunucuda bırakmak olurdu.
+            const s = await hesabiSilSunucuyla();
+            if (s.hata) { Alert.alert('Hesap silinemedi', s.hata, [{ text: 'Tamam' }]); return; }
             navigation.getParent()?.reset({ index: 0, routes: [{ name: 'karsilama' }] });
           },
         },
@@ -128,7 +131,7 @@ export default function Profil({ navigation }) {
             onPress={() => navigation.navigate('konumDegis')} />
           <Satir ikon="shield" baslik="Ölçümleme izni"
             deger={depo.riza === 'kabul' ? 'Açık' : 'Kapalı'}
-            onPress={() => yaz({ riza: depo.riza === 'kabul' ? 'ret' : 'kabul' })} />
+            onPress={() => rizaKarari(depo.riza === 'kabul' ? 'ret' : 'kabul')} />
           <Satir ikon="chart" baslik="Bağlantı"
             deger={mod === 'canli' ? `Canlı · ${sunucuBilgisi()?.restaurants ?? ''}` : 'Yerel'} son />
         </View>

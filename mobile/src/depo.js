@@ -23,6 +23,7 @@ const VARSAYILAN = {
   favoriler: [],           // restoran id listesi
   gecilen: [],             // sola kaydırılanlar — İkinci Şans'ın hedefi
   superBegeni: [],         // yukarı kaydırılanlar
+  gorulenKampanya: [],     // bu kullanıcıya gösterilmiş sponsorlu kampanyalar (ömür boyu bir kez)
   yorumlar: {},            // { [restoranId]: [{ puan, metin, tarih, dogrulandi }] }
   konum: null,             // { kaynak: "cihaz"|"elle", lat, lon, ilce }
   acilisGoruldu: false,    // ikinci açılışta kısa splash
@@ -80,10 +81,29 @@ export function favoriCevir(id) {
   return yaz({ favoriler: v });
 }
 
+/** Kaydet (idempotent). Sağa kaydırma bunu çağırır: kalp düğmesinin AÇ/KAPA'sı
+ *  değil — zaten favori olan karta sağa kaydırmak onu favoriden çıkarmamalı. */
+export function favoriEkle(id) {
+  const k = String(id);
+  if (durum.favoriler.includes(k)) return durum;
+  return yaz({ favoriler: [...durum.favoriler, k] });
+}
+
+/** Sola kaydırma: "geç". Sunucudaki gibi SON KARAR GEÇERLİ — kayıtlıysa kayıttan da
+ *  çıkar (yoksa yerel favori sunucuda silinmişken eşitlemede geri dirilirdi). */
 export function gecildi(id) {
   const k = String(id);
-  if (durum.gecilen.includes(k)) return durum;
-  return yaz({ gecilen: [...durum.gecilen, k] });
+  return yaz({
+    gecilen: durum.gecilen.includes(k) ? durum.gecilen : [...durum.gecilen, k],
+    favoriler: durum.favoriler.filter(x => x !== k),
+    superBegeni: durum.superBegeni.filter(x => x !== k),
+  });
+}
+
+export function kampanyaGorulduIsaretle(id) {
+  const k = String(id);
+  if (durum.gorulenKampanya.includes(k)) return durum;
+  return yaz({ gorulenKampanya: [...durum.gorulenKampanya, k] });
 }
 
 export function superBegenildi(id) {

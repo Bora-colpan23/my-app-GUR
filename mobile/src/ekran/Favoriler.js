@@ -6,7 +6,8 @@ import { Image } from 'expo-image';
 import { R, F, G, HEDEF } from '../tema.js';
 import { Ikon } from '../bilesen/Ikon.js';
 import { Hap } from '../bilesen/Hap.js';
-import { useDepo, favoriCevir } from '../depo.js';
+import { useDepo } from '../depo.js';
+import { favoriDegistir } from '../senkron.js';
 import { mesafeMetni } from '../veri.js';
 
 export default function Favoriler({ navigation, restoranlar = [] }) {
@@ -85,7 +86,7 @@ export default function Favoriler({ navigation, restoranlar = [] }) {
                 accessibilityRole="button"
                 accessibilityLabel="Favorilerden çıkar"
                 hitSlop={10}
-                onPress={() => favoriCevir(r.id)}
+                onPress={() => favoriDegistir(r.id)}
                 style={{ width: HEDEF, height: HEDEF, alignItems: 'center', justifyContent: 'center' }}>
                 <Ikon n="heart" size={20} color={R.marka} strokeWidth={2.6} />
               </Pressable>

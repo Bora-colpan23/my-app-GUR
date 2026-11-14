@@ -36,7 +36,8 @@ import {
 import { R, F, G } from './src/tema.js';
 import { Ikon } from './src/bilesen/Ikon.js';
 import { hidrateEt, useDepo, yaz } from './src/depo.js';
-import { jetonuYukle, modaKarar } from './src/api.js';
+import { oturumuYukle, oturumKapandiAbone, modaKarar, modaAbone, canliMi, kampanyalariGetir } from './src/api.js';
+import { senkronla, rizaKarari } from './src/senkron.js';
 import { havuzuGetir, yakinaGore, TOHUM } from './src/veri.js';
 
 import Acilis from './src/ekran/Acilis.js';
@@ -67,7 +68,7 @@ const SEKMELER = [
   { ad: 'Profil', ikon: 'kisi' },
 ];
 
-function Sekmeler({ feed, onKonum }) {
+function Sekmeler({ feed, kampanyalar, onKonum }) {
   return (
     <Sekme.Navigator
       screenOptions={({ route }) => ({
@@ -94,7 +95,7 @@ function Sekmeler({ feed, onKonum }) {
         {props => <Kesfet {...props} restoranlar={feed} onKonum={onKonum} />}
       </Sekme.Screen>
       <Sekme.Screen name="Kaydır">
-        {props => <Kaydir {...props} restoranlar={feed} />}
+        {props => <Kaydir {...props} restoranlar={feed} kampanyalar={kampanyalar} />}
       </Sekme.Screen>
       <Sekme.Screen name="Favoriler">
         {props => <Favoriler {...props} restoranlar={feed} />}
@@ -112,20 +113,29 @@ export default function App() {
   const [depoHazir, setDepoHazir] = useState(false);
   const [acilisBitti, setAcilisBitti] = useState(false);
   const [restoranlar, setRestoranlar] = useState(TOHUM);
+  const [kampanyalar, setKampanyalar] = useState([]);
   const depo = useDepo();
 
   useEffect(() => {
-    // Üçü paralel: hiçbiri diğerini beklemiyor, hiçbiri ekranı
-    // kilitlemiyor. Sunucu yoksa mod yerele düşüyor ve akış sürüyor.
-    jetonuYukle();
-    modaKarar();
+    // Hiçbiri diğerini beklemiyor, hiçbiri ekranı kilitlemiyor. Supabase
+    // yoksa/ulaşılamıyorsa mod yerele düşüyor ve akış sürüyor.
+    oturumuYukle().then(() => modaKarar()).then(() => senkronla()).catch(() => {});
     hidrateEt().finally(() => setDepoHazir(true));
+    // Oturum başka yerden/süre dolumuyla kapanırsa yerel kimlik de düşer
+    // (bir sonraki açılışta karşılama ekranı); ekranın altından çekmiyoruz.
+    return oturumKapandiAbone(() => yaz({ kullanici: null }));
   }, []);
 
   useEffect(() => {
     let iptal = false;
-    havuzuGetir().then(l => { if (!iptal) setRestoranlar(l); }).catch(() => {});
-    return () => { iptal = true; };
+    const yukle = () => {
+      havuzuGetir().then(l => { if (!iptal) setRestoranlar(l); }).catch(() => {});
+      kampanyalariGetir().then(k => { if (!iptal) setKampanyalar(k); }).catch(() => {});
+    };
+    yukle();
+    // Sunucu GEÇ açılırsa (YEREL → CANLI) havuz ve kampanyalar yenilenir, favoriler eşitlenir.
+    const birak = modaAbone(() => { if (canliMi()) { yukle(); senkronla().catch(() => {}); } });
+    return () => { iptal = true; birak(); };
   }, []);
 
   const hazir = fontHazir && depoHazir;
@@ -171,6 +181,7 @@ export default function App() {
                 <Sekmeler
                   {...props}
                   feed={feed}
+                  kampanyalar={kampanyalar}
                   onKonum={() => props.navigation.navigate('konumDegis')}
                 />
               )}
@@ -185,7 +196,7 @@ export default function App() {
 
         {/* Rıza SPLASH GEÇİLENE KADAR sorulmuyor: ilk izlenim bir onay
             kutusu olmasın. */}
-        <Riza gorunur={depo.riza === null} onKarar={(k) => yaz({ riza: k })} />
+        <Riza gorunur={depo.riza === null} onKarar={rizaKarari} />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

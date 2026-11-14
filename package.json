@@ -16,7 +16,12 @@
     "db:reset": "./server/db/setup.sh --reset && npm run db:seed",
     "db:seed": "node server/db/seed.js",
     "leads:import": "node scripts/bakirkoy-iceri-al.mjs",
-    "artifact": "node scripts/build-artifact.mjs"
+    "artifact": "node scripts/build-artifact.mjs",
+    "supabase:seed-uret": "node scripts/supabase-seed-uret.mjs",
+    "supabase:kur": "node scripts/supabase-kur.mjs",
+    "supabase:test": "bash scripts/supabase-test.sh",
+    "supabase:kur-test": "node supabase/tests/kur.test.mjs",
+    "supabase:mobil-test": "node supabase/tests/mobil.e2e.mjs"
   },
   "dependencies": {
     "motion": "^13.1.1",

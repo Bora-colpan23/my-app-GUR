@@ -10,16 +10,28 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { RESTAURANTS, CATEGORIES } from '../../src/data/restaurants.js';
-import { buildDeck, orderByProximity } from '../../shared/deck.js';
-import { istek } from './api.js';
+import { buildDeck, rankCampaigns, orderByProximity } from '../../shared/deck.js';
+import { restoranlariGetir } from './api.js';
 
 export { CATEGORIES, RESTAURANTS as TOHUM };
 
-/** Sunucudaki havuz; yoksa tohum liste. Hiçbir ekran boş kalmıyor. */
+// Sunucu kartı (gur_card) ile yerel tohum kartı AYNI şekilde olmalı: ekranlar
+// ayırt etmiyor. Sunucuda fotoğraf/menü yoksa tohumdakiyle aynı yer tutucu.
+const yerTutucu = (id) => [0, 1, 2].map(i => `https://picsum.photos/seed/${id}-${i}/600/400`);
+export function kartiHazirla(c) {
+  return {
+    menu: [], popular: [], source: 'api',
+    ...c,
+    imgs: c.imgs?.length ? c.imgs : yerTutucu(c.id),
+    // Koordinatı olmayan (ilçe merkezli) kartta mesafe yerine ilçe adı yazılır.
+    dist: c.dist || (c.area ? (c.district || '') : ''),
+  };
+}
+
+/** Sunucudaki havuz (Supabase); yoksa tohum liste. Hiçbir ekran boş kalmıyor. */
 export async function havuzuGetir() {
-  const c = await istek('/api/restaurants');
-  const liste = Array.isArray(c) ? c : Array.isArray(c?.restaurants) ? c.restaurants : null;
-  return liste?.length ? liste : RESTAURANTS;
+  const liste = await restoranlariGetir();
+  return liste?.length ? liste.map(kartiHazirla) : RESTAURANTS;
 }
 
 /** Yakınlık sıralaması — sunucunun kullandığı fonksiyonun aynısı.
@@ -42,7 +54,17 @@ export function mesafeMetni(r) {
 /** Deste: sponsorlu kartlar organik akışa harmanlanmış hâlde.
  *  `buildDeck` sunucuyla ORTAK — yerleşim hissi iki yerde ayrı yazılsaydı
  *  biri sessizce bozulurdu. */
-export function desteKur(restoranlar, { kampanyalar = [], gecilen = [], tohum = 1 } = {}) {
-  const kalan = restoranlar.filter(r => !gecilen.includes(String(r.id)));
-  try { return buildDeck(kalan, kampanyalar, { seed: tohum }); } catch { return kalan; }
+export function desteKur(restoranlar, { kampanyalar = [], gecilen = [], gorulenKampanya = [], tohum = 1 } = {}) {
+  // Aktif kampanyası olan mekân organik akışta ÇIKMAZ: aynı kartı hem bedava hem
+  // ücretli göstermek reklamvereni bedavaya ödetmek olur (sunucudaki deste ile
+  // aynı kural) — ve buildDeck, organikte zaten olan mekânın sponsorlu
+  // kartını hiç yerleştirmez.
+  const reklamli = new Set(kampanyalar.map(k => String(k.restaurant?.id)));
+  const kalan = restoranlar.filter(r => !gecilen.includes(String(r.id)) && !reklamli.has(String(r.id)));
+  try {
+    // Sponsorlu kartın restoranı da aynı kart şekline getirilir; açık artırma
+    // sıralaması (teklif × kalite) ve kullanıcı başına bir kez kuralı ortak koddan.
+    const sirali = rankCampaigns(kampanyalar.map(k => ({ ...k, restaurant: kartiHazirla(k.restaurant) })));
+    return buildDeck(kalan, sirali, { seed: tohum, seenCampaigns: gorulenKampanya });
+  } catch { return kalan; }
 }

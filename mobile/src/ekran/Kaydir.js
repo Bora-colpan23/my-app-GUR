@@ -10,7 +10,7 @@
 // çift ok = detay, kalp = kaydet. Üçü de marka turuncusu.
 // ═══════════════════════════════════════════════════════════════════════
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -19,7 +19,8 @@ import { Ikon } from '../bilesen/Ikon.js';
 import { Hap } from '../bilesen/Hap.js';
 import { KaydirmaKarti } from '../bilesen/KaydirmaKarti.js';
 import { desteKur } from '../veri.js';
-import { useDepo, favoriCevir, gecildi, superBegenildi } from '../depo.js';
+import { useDepo, oku } from '../depo.js';
+import { karar as kararVer, gosterildi } from '../senkron.js';
 
 const { height: BOY } = Dimensions.get('window');
 
@@ -41,7 +42,7 @@ function YuvarlakDugme({ ikon, onPress, buyuk = false, etiket }) {
   );
 }
 
-export default function Kaydir({ navigation, restoranlar = [] }) {
+export default function Kaydir({ navigation, restoranlar = [], kampanyalar = [] }) {
   const depo = useDepo();
   const [sayac, setSayac] = useState(0);      // kaç karar verildi
   const [tur, setTur] = useState(0);          // "geçtiklerine bir daha bak" turu
@@ -50,20 +51,28 @@ export default function Kaydir({ navigation, restoranlar = [] }) {
   // canlı hesaplansaydı kart en üste gelir, gösterim kaydedilir, depo
   // değişir ve kart kullanıcı görmeden listeden düşerdi.
   const deste = useMemo(
-    () => desteKur(restoranlar, { gecilen: tur === 0 ? depo.gecilen : [], tohum: tur + 1 }),
+    () => desteKur(restoranlar, {
+      kampanyalar,
+      gecilen: tur === 0 ? depo.gecilen : [],
+      gorulenKampanya: oku().gorulenKampanya,
+      tohum: tur + 1,
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [restoranlar, tur],
+    [restoranlar, kampanyalar, tur],
   );
 
   const kalan = deste.slice(sayac);
   const bitti = kalan.length === 0;
 
   const karar = useCallback((yon, r) => {
-    if (yon === 'sag') favoriCevir(r.id);
-    else if (yon === 'sol') gecildi(r.id);
-    else if (yon === 'yukari') superBegenildi(r.id);
+    kararVer(yon, r);          // yerel yazım + sunucu (kota, sponsorlu ücretlendirme orada)
     setSayac(s => s + 1);
   }, []);
+
+  // Sponsorlu kart EKRANA GELDİĞİ an sayılır (deste kurulurken değil):
+  // görülmeyen kartın gösterimi yazılırsa reklamveren boşuna ödemiş olur.
+  const ustKart = kalan[0];
+  useEffect(() => { if (ustKart?.sponsored) gosterildi(ustKart); }, [ustKart?.id]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const dugmeyle = (yon) => {
     const r = kalan[0];

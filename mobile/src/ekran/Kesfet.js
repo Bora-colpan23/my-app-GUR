@@ -17,7 +17,8 @@ import { Hap } from '../bilesen/Hap.js';
 import { KonumCipi } from '../bilesen/KonumCipi.js';
 import { Logo } from '../bilesen/Logo.js';
 import { CATEGORIES, mesafeMetni } from '../veri.js';
-import { useDepo, favoriCevir } from '../depo.js';
+import { useDepo } from '../depo.js';
+import { favoriDegistir } from '../senkron.js';
 
 function Satir({ r, onPress, favori, onFavori }) {
   return (
@@ -181,7 +182,7 @@ export default function Kesfet({ navigation, route, restoranlar = [], onKonum })
             <Satir
               r={item}
               favori={depo.favoriler.includes(String(item.id))}
-              onFavori={favoriCevir}
+              onFavori={favoriDegistir}
               onPress={r => navigation.navigate('detay', { id: r.id })}
             />
           )}
