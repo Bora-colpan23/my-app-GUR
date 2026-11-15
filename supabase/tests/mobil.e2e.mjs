@@ -120,6 +120,14 @@ try {
   await sayfa.getByPlaceholder('Adın').fill('Elif Kaya');
   await sayfa.getByPlaceholder('ornek@mail.com').fill('elif@example.com');
   await sayfa.getByPlaceholder('En az 6 karakter').fill('parola123');
+  // Kayıt ekranındaki onay metni OKUNABİLİR olmalı: koşullar ve gizlilik uygulama içinde açılır
+  await sayfa.getByText('gizlilik politikasını', { exact: true }).first().click();
+  await sayfa.getByText('Gizlilik Politikası', { exact: true }).first().waitFor({ timeout: 8000 });
+  assert.ok(await sayfa.getByText('Konum', { exact: true }).first().isVisible(), 'gizlilik metni konum bölümünü içermiyor');
+  assert.ok(await sayfa.getByText(/ham koordinatlarınız sunucularımıza gönderilmez/i).first().isVisible(), 'gizlilik metni konum beyanını içermiyor');
+  ok('kayıt ekranı: "gizlilik politikasını" bağlantısı uygulama içinde metni açtı (konum beyanı dahil)');
+  await dugme('Geri');
+  await sayfa.getByPlaceholder('Adın').waitFor({ timeout: 8000 });
   await sayfa.getByRole('checkbox').click();
   await dokun('Kaydını tamamla');
   await dokun('Şimdi değil');                 // konum ekranı
@@ -224,6 +232,16 @@ try {
   const baglanti = await sayfa.getByText(/Canlı · \d+/).first().isVisible().catch(() => false);
   assert.ok(baglanti, 'profil "Canlı" göstermiyor');
   ok('profil: Bağlantı "Canlı · <mekân sayısı>"');
+
+  // Mağaza gereksinimi: gizlilik/koşullar/KVKK profilden açılır, destek iletişimi görünür
+  await dokun('Kullanım koşulları');
+  await sayfa.getByText('Kullanım Koşulları', { exact: true }).first().waitFor({ timeout: 8000 });
+  assert.ok(await sayfa.getByText(/masa talebi göndermek ücretsizdir/i).first().isVisible(), 'koşullar masa talebi maddesini içermiyor');
+  await sayfa.getByRole('tab', { name: 'KVKK' }).click();
+  await sayfa.getByText('Kişisel Verilerin Korunması Aydınlatma Metni', { exact: true }).first().waitFor({ timeout: 4000 });
+  await dugme('Geri');
+  assert.ok(await sayfa.getByText('Destek ve içerik bildirimi', { exact: true }).first().isVisible(), 'profilde destek satırı yok');
+  ok('profil → yasal metinler (koşullar, KVKK) açılıyor, destek/içerik bildirimi iletişimi görünüyor');
 
   assert.deepEqual(sayfaHatalari, [], 'sayfa JS hataları: ' + sayfaHatalari.join(' | '));
   ok('tarayıcıda yakalanmamış JS hatası yok');

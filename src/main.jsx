@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import { TuketiciLanding } from './app/site.jsx';
+import { YasalMetin, HesapSilme, Destek } from './app/yasal.jsx';
 
 // ═══════════════════════════════════════════════════════════════════════
 // GUR DÖRT PARÇADAN OLUŞUR — üçü burada, biri ayrı depo klasöründe:
@@ -44,6 +45,13 @@ const AdminFallback = () => (
 
 const router = createBrowserRouter([
   { path: '/', element: <TuketiciLanding /> },
+  // Mağaza gereksinimi: gizlilik politikası, destek ve (Google Play için) hesap
+  // silme talebi HERKESE AÇIK birer web adresinde durmalı. Metin shared/legal.js'ten.
+  { path: '/gizlilik', element: <YasalMetin ad="gizlilik" /> },
+  { path: '/kosullar', element: <YasalMetin ad="kosullar" /> },
+  { path: '/kvkk', element: <YasalMetin ad="kvkk" /> },
+  { path: '/hesap-silme', element: <HesapSilme /> },
+  { path: '/destek', element: <Destek /> },
   { path: '/uygulama', element: <Suspense fallback={<AdminFallback />}><GurApp /></Suspense> },
   // Doyurucu'nun kendi alt yolları var (/isletme/kayit, /isletme/giris,
   // /isletme/panel …). Splat olmadan bu adresler "*" kuralına düşüp ana

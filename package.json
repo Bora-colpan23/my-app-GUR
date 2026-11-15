@@ -22,7 +22,8 @@
     "supabase:test": "bash scripts/supabase-test.sh",
     "supabase:kur-test": "node supabase/tests/kur.test.mjs",
     "supabase:mobil-test": "node supabase/tests/mobil.e2e.mjs",
-    "supabase:yonetici-test": "node supabase/tests/yonetici.e2e.mjs"
+    "supabase:yonetici-test": "node supabase/tests/yonetici.e2e.mjs",
+    "magaza:kontrol": "node scripts/magaza-kontrol.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",

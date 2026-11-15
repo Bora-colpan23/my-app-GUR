@@ -5,6 +5,7 @@ import { animate } from 'motion';
 import { getConsent, setConsent, initAnalytics, trackEvent } from '../lib/analytics.js';
 import { buildDeck, rankCampaigns, quotaState, orderByProximity, ringLabel } from '../../shared/deck.js';
 import { directionsUrl, placeUrl, defaultMapProvider, MAP_PROVIDERS } from '../../shared/deeplink.js';
+import { LEGAL_DOCS, LEGAL_UPDATED } from '../../shared/legal.js';
 import { hydrateCampaigns } from '../lib/campaigns.js';
 import { submitClaim, useClaims, applyOwnerProfile, useOwnerProfiles, saveOwnerProfile, saveOwnerLogo, clearOwnerLogo, ownerLogo, OVERRIDABLE } from '../lib/b2b.js';
 import { fileToSquareDataUrl } from '../lib/image.js';
@@ -3950,60 +3951,9 @@ function ProfileScreen({ onBack, onSwipe, onExplore, onFavorites, favorites, onD
   );
 }
 
-// ═══════════════════════════════════════════════
-// YASAL METİNLER
-// İşletme bilgileri yayına çıkmadan önce doldurulmalı ve metinler bir
-// hukuk danışmanına onaylatılmalıdır; buradaki içerik hukuki tavsiye değildir.
-// ═══════════════════════════════════════════════
-const LEGAL_OPERATOR = "GUR Teknoloji A.Ş.";       // ticaret unvanı
-const LEGAL_ADDRESS = "İstanbul, Türkiye";          // tebligat adresi
-const LEGAL_CONTACT = "kvkk@gur.app";               // veri sorumlusu iletişimi
-const LEGAL_UPDATED = "1 Eylül 2026";
-
-const LEGAL_DOCS = [
-  {
-    id: "kvkk",
-    label: "KVKK",
-    title: "Kişisel Verilerin Korunması Aydınlatma Metni",
-    body: [
-      ["Veri sorumlusu", `6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") uyarınca kişisel verileriniz, veri sorumlusu sıfatıyla ${LEGAL_OPERATOR} (${LEGAL_ADDRESS}) tarafından aşağıda açıklanan kapsamda işlenmektedir.`],
-      ["İşlenen veriler", "Kimlik ve iletişim verileri (ad, e-posta, doğum yılı), uygulama kullanım verileri (kaydırma, favori, yorum ve puanlar), yüklediğiniz görseller, cihaz ve bağlantı verileri (cihaz türü, işletim sistemi, IP adresi) ve izin vermeniz hâlinde konum verisi."],
-      ["İşleme amaçları", "Üyelik kaydının oluşturulması, restoran önerilerinin kişiselleştirilmesi, favori ve yorumların saklanması, Gastro Onaylı değerlendirmelerinin yürütülmesi, kampanya ve kupon süreçleri, hizmet güvenliğinin sağlanması ve yasal yükümlülüklerin yerine getirilmesi."],
-      ["Hukuki sebepler", "Sözleşmenin kurulması ve ifası (m.5/2-c), hukuki yükümlülük (m.5/2-ç), meşru menfaat (m.5/2-f) ve açık rızanız (m.5/1) — konum, pazarlama iletişimi ve isteğe bağlı çerezler yalnızca açık rızaya dayanır."],
-      ["Aktarım", "Veriler; barındırma, ödeme, bildirim ve analiz hizmeti aldığımız tedarikçilere, talep hâlinde yetkili kamu kurumlarına ve restoran hesabınızın olması durumunda yalnızca kendi işletmenize ait istatistikler kapsamında ilgili işletmeye aktarılabilir. Yurt dışına aktarım KVKK m.9 şartlarına uygun olarak yapılır."],
-      ["Saklama süresi", "Üyelik verileri hesabınız açık kaldığı sürece; hesap silindiğinde yasal zorunluluklar dışında en geç 6 ay içinde silinir veya anonim hâle getirilir."],
-      ["Haklarınız", `KVKK m.11 kapsamında verilerinize erişme, düzeltme, silme, işlemeye itiraz etme ve veri taşınabilirliği haklarına sahipsiniz. Başvurularınızı ${LEGAL_CONTACT} adresine iletebilirsiniz; talepleriniz en geç 30 gün içinde yanıtlanır. Uygulamadaki "Hesabımı sil" seçeneği silme talebinizi doğrudan başlatır.`],
-    ],
-  },
-  {
-    id: "privacy",
-    label: "Gizlilik",
-    title: "Gizlilik Politikası",
-    body: [
-      ["Ne topluyoruz", "Yalnızca hizmeti sunmak için gerekli olanı: hesap bilgileriniz, uygulama içi tercihleriniz ve yazdığınız içerikler. Rehberinize, galerinizin tamamına veya mikrofonunuza erişmiyoruz."],
-      ["İzinler", "Konum izni yalnızca yakınınızdaki restoranları sıralamak, kamera/galeri izni yalnızca yorumunuza fotoğraf eklemek, bildirim izni yalnızca kampanya ve eşleşme bildirimleri için istenir. Her izin ihtiyaç doğduğu anda ve gerekçesiyle sorulur; reddetmeniz hâlinde uygulamanın kalan bölümleri çalışmaya devam eder."],
-      ["Çerezler ve ölçümleme", "Oturumunuzu sürdürmek için zorunlu yerel depolama kullanılır. Ziyaret istatistikleri için ölçümleme araçları yalnızca açık rızanızla ve IP maskeleme açıkken çalıştırılır."],
-      ["Üçüncü taraflar", "Harita bağlantıları Google Haritalar'a, restoran verisinin bir bölümü OpenStreetMap'e, görseller görsel dağıtım ağına yönlendirir. Bu servislerin kendi gizlilik politikaları geçerlidir."],
-      ["Reklamlar", "Ödüllü video reklamlar ve keşfet banner'ları kampanya bazlıdır; reklam gösterimi için kimliğinizi reklam verenle paylaşmayız, yalnızca toplulaştırılmış gösterim ve tamamlanma sayıları raporlanır."],
-      ["Güvenlik", "Veriler aktarımda TLS ile korunur, parolalar geri döndürülemez biçimde saklanır. Bir ihlal hâlinde KVKK m.12 uyarınca en kısa sürede Kurul'a ve size bildirim yapılır."],
-      ["Çocuklar", "Uygulama 13 yaşın altındaki kullanıcılara yönelik değildir."],
-    ],
-  },
-  {
-    id: "terms",
-    label: "Koşullar",
-    title: "Kullanım Koşulları",
-    body: [
-      ["Hizmet", `GUR, restoran keşfi sunan bir platformdur. ${LEGAL_OPERATOR} restoranların işletmecisi değildir; yemek, servis ve hijyen sorumluluğu ilgili işletmeye aittir.`],
-      ["Hesabınız", "Verdiğiniz bilgilerin doğruluğundan ve hesabınızın güvenliğinden siz sorumlusunuz. Hesabınızı istediğiniz zaman profil ekranından silebilirsiniz."],
-      ["İçerik kuralları", "Yorum ve fotoğraflarınız gerçek bir deneyime dayanmalıdır. Hakaret, ayrımcılık, gizli reklam, başkasına ait içerik ve yanıltıcı puanlama yasaktır; bu içerikler bildirim üzerine veya resen kaldırılabilir."],
-      ["Gastro Onaylı", "Gastro rozeti bağımsız şef değerlendirmesine dayanır ve satın alınamaz. Abonelik planları rozetin verilmesini etkilemez."],
-      ["Abonelik ve kampanyalar", "Restoran abonelikleri ile kupon ve indirim kampanyaları ilgili sayfada belirtilen süre ve koşullarla geçerlidir. Ücretli hizmetlerde cayma hakkınız Mesafeli Sözleşmeler Yönetmeliği kapsamında saklıdır."],
-      ["Sorumluluğun sınırı", "Puanlar, mesafeler ve çalışma saatleri bilgilendirme amaçlıdır ve hata içerebilir. Rezervasyon ve ödeme işlemlerinde aracı konumundayız."],
-      ["Uygulanacak hukuk", `Bu koşullara Türk hukuku uygulanır; uyuşmazlıklarda İstanbul mahkemeleri ve icra daireleri yetkilidir. Sorularınız için ${LEGAL_CONTACT}.`],
-    ],
-  },
-];
+// YASAL METİNLER artık TEK KAYNAKTA: shared/legal.js. Web uygulaması, mağaza
+// paketi ve sitedeki /gizlilik /kosullar /kvkk /hesap-silme sayfaları aynı
+// diziyi okur — üç ayrı metin uygulamanın gerçekte yaptığından sapardı.
 
 // Çerez/ölçümleme rıza bandı. Rıza verilmeden hiçbir ölçümleme scripti
 // yüklenmez; reddedilirse bir daha sorulmaz.

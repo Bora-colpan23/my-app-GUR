@@ -17,12 +17,18 @@ import ReactDOM from 'react-dom/client';
 import { createHashRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import { TuketiciLanding } from '../src/app/site.jsx';
+import { YasalMetin, HesapSilme, Destek } from '../src/app/yasal.jsx';
 import GurApp from '../src/app/GurApp.jsx';
 import GurAdmin from '../src/admin/GurAdmin.jsx';
 import GurBusiness from '../src/business/GurBusiness.jsx';
 
 const router = createHashRouter([
   { path: '/', element: <TuketiciLanding /> },
+  { path: '/gizlilik', element: <YasalMetin ad="gizlilik" /> },
+  { path: '/kosullar', element: <YasalMetin ad="kosullar" /> },
+  { path: '/kvkk', element: <YasalMetin ad="kvkk" /> },
+  { path: '/hesap-silme', element: <HesapSilme /> },
+  { path: '/destek', element: <Destek /> },
   { path: '/uygulama', element: <GurApp /> },
   { path: '/isletme/*', element: <GurBusiness /> },
   { path: '/admin', element: <GurAdmin /> },

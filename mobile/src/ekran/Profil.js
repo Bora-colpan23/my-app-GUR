@@ -8,7 +8,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { R, F, G, HEDEF } from '../tema.js';
 import { Ikon } from '../bilesen/Ikon.js';
@@ -16,6 +16,7 @@ import { Hap } from '../bilesen/Hap.js';
 import { useDepo, yaz } from '../depo.js';
 import { apiModu, sunucuBilgisi, cikisYap } from '../api.js';
 import { hesabiSil as hesabiSilSunucuyla, rizaKarari } from '../senkron.js';
+import { LEGAL } from '../../../shared/legal.js';
 
 function Satir({ ikon, baslik, deger, onPress, son }) {
   const ic = (
@@ -134,6 +135,22 @@ export default function Profil({ navigation }) {
             onPress={() => rizaKarari(depo.riza === 'kabul' ? 'ret' : 'kabul')} />
           <Satir ikon="chart" baslik="Bağlantı"
             deger={mod === 'canli' ? `Canlı · ${sunucuBilgisi()?.restaurants ?? ''}` : 'Yerel'} son />
+        </View>
+
+        {/* Yasal metinler ve destek: mağaza gereksinimi (gizlilik politikasına
+            uygulama İÇİNDEN ulaşılmalı; içerik/hesap bildirimi için iletişim yolu). */}
+        <View style={[{
+          marginTop: 14, backgroundColor: R.kart, borderRadius: 22,
+          paddingHorizontal: 16, borderWidth: 1, borderColor: R.kenar,
+        }, G.g1]}>
+          <Satir ikon="shield" baslik="Gizlilik politikası"
+            onPress={() => navigation.navigate('yasal', { doc: 'privacy' })} />
+          <Satir ikon="doc" baslik="Kullanım koşulları"
+            onPress={() => navigation.navigate('yasal', { doc: 'terms' })} />
+          <Satir ikon="doc" baslik="KVKK aydınlatma metni"
+            onPress={() => navigation.navigate('yasal', { doc: 'kvkk' })} />
+          <Satir ikon="chat" baslik="Destek ve içerik bildirimi" deger={LEGAL.destek}
+            onPress={() => Linking.openURL(`mailto:${LEGAL.destek}`)} son />
         </View>
 
         {/* Yerel mod GİZLENMİYOR: ne olduğunu yazıyoruz. */}

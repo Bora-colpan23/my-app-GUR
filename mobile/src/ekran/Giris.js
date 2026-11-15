@@ -118,7 +118,20 @@ export default function Giris({ navigation, route }) {
                 {onay ? <Ikon n="check" size={15} color="#fff" strokeWidth={3} /> : null}
               </View>
               <Text style={{ flex: 1, fontFamily: F.govde, fontSize: 13.5, color: R.murekkep2, lineHeight: 20 }}>
-                Kullanım koşullarını ve gizlilik metnini okudum, kabul ediyorum.
+                <Text
+                  accessibilityRole="link"
+                  onPress={() => navigation.navigate('yasal', { doc: 'terms' })}
+                  style={{ color: R.markaMurekkep, fontFamily: F.govdeKalin, textDecorationLine: 'underline' }}>
+                  Kullanım koşullarını
+                </Text>
+                {' ve '}
+                <Text
+                  accessibilityRole="link"
+                  onPress={() => navigation.navigate('yasal', { doc: 'privacy' })}
+                  style={{ color: R.markaMurekkep, fontFamily: F.govdeKalin, textDecorationLine: 'underline' }}>
+                  gizlilik politikasını
+                </Text>
+                {' okudum, kabul ediyorum.'}
               </Text>
             </Pressable>
           ) : null}

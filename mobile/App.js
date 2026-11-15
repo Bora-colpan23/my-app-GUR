@@ -50,6 +50,7 @@ import Kaydir from './src/ekran/Kaydir.js';
 import Favoriler from './src/ekran/Favoriler.js';
 import Profil from './src/ekran/Profil.js';
 import Detay from './src/ekran/Detay.js';
+import Yasal from './src/ekran/Yasal.js';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -188,6 +189,8 @@ export default function App() {
             </Yigin.Screen>
             <Yigin.Screen name="konumDegis" component={KonumEkrani}
               options={{ presentation: 'modal' }} />
+            {/* Kayıt ekranından da, Profil'den de açılır; her yerden erişilebilir olmalı. */}
+            <Yigin.Screen name="yasal" component={Yasal} options={{ animation: 'slide_from_right' }} />
             <Yigin.Screen name="detay" options={{ animation: 'slide_from_right' }}>
               {props => <Detay {...props} restoranlar={feed} />}
             </Yigin.Screen>

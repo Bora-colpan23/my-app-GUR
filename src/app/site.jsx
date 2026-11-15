@@ -530,6 +530,13 @@ export function WebFooter() {
           {/* İŞLETME SÜTUNU BURAYA TAŞINDI. İşletme sitesinin kendi alt
               bilgisi vardı (`SiteFooter`); iki alt bilgi iki ayrı site
               demekti. Satırlar o alt bilgiden geldi, hiçbiri kaybolmadı. */}
+          {sutun("Yasal ve destek", [
+            ["Gizlilik politikası", () => nav("/gizlilik")],
+            ["Kullanım koşulları", () => nav("/kosullar")],
+            ["KVKK aydınlatma", () => nav("/kvkk")],
+            ["Hesap silme", () => nav("/hesap-silme")],
+            ["Destek", () => nav("/destek")],
+          ])}
           {sutun("İşletmeler", [
             ["Ne sunuyoruz", () => nav("/isletme")],
             ["Ücretsiz kayıt ol", () => nav("/isletme/kayit")],

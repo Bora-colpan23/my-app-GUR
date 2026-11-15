@@ -306,6 +306,37 @@ alan-değişikliği moderasyonu hâlâ tarayıcı localStorage'ında. Mobil pake
 MEKÂNLARI düşüyor ama ilçenin kendisi mobilde "Çok yakında" yazmıyor.
 **Gerçek Supabase'e karşı çalıştırılmadı** (taklit Auth/REST üstünde gerçek PostgreSQL).
 
+### Mağaza uyumu: Apple ve Google kuralları (15 Kasım)
+
+**Garanti YOK**: mağazalar kurallarını değiştirir ve son karar insan inceleyicinin.
+Kodda doğrulanabilenler `npm run magaza:kontrol` ile (HATA varsa gönderme), mağaza
+panellerinde doldurulacak formlar ve ürün/hukuk kararları `mobile/MAGAZA-KONTROL.md`de.
+
+- **Yasal metinler TEK KAYNAK:** `shared/legal.js` (web uygulaması, mobil `Yasal.js`
+  ekranı, sitedeki `/gizlilik` `/kosullar` `/kvkk` `/hesap-silme` `/destek` sayfaları —
+  `src/app/yasal.jsx`). Üç ayrı metin uygulamanın gerçekte yaptığından sapardı; gizlilik
+  metni–uygulama–mağaza formu uyumsuzluğu en sık ret/kaldırma sebebi. **Her cümle gerçekle
+  örtüşmeli**: eski metinde olmayan şeyler vardı (kamera izni, ödeme, "restoran abonelikleri",
+  ödüllü video reklam, IP maskeleme) — kaldırıldı. Yeni veri toplanınca önce `legal.js`,
+  sonra `app.json` → `privacyManifests` ve mağaza formları.
+- **İşletme bilgileri YER TUTUCU** (`LEGAL.unvan/adres/eposta/destek`, `dogrulandi:false`):
+  `magaza:kontrol` gerçek bilgi girilene kadar HATA verir. Alan adı/e-posta kutuları
+  doğrulanmamış (`gur.app` sahibi doğrulanmadı).
+- **Mobil:** kayıt ekranındaki onay metni tıklanıp okunabiliyor, Profil'de gizlilik / koşullar /
+  KVKK / destek satırları var (Apple 5.1.1, Play). Uygulama içi hesap silme zaten vardı;
+  Play ek olarak **web adresi** ister → `/hesap-silme`.
+- **`app.json`:** `privacyManifests` (takip yok; e-posta, ad, kullanıcı kimliği, ürün etkileşimi,
+  kullanıcı içeriği beyan edildi; konum YOK — mesafe cihazda hesaplanır, `magaza:kontrol` kodda
+  `p_lat/p_lng` gönderilirse HATA verir), `android.blockedPermissions` (kullanılmayan izinler
+  pakete girmesin), ölü `extra.apiUrl` kaldırıldı.
+- **Simge alfa kanalıydı** (`icon.png` RGBA): App Store Connect alfa'lı 1024 simgeyi reddeder;
+  kremsi zeminle düzleştirildi (RGB). Yeni simge eklerken `magaza:kontrol` bunu denetler.
+- **Sponsorlu kartlar = reklam:** Play Console'da "uygulama reklam içeriyor" → EVET.
+- **Açık kararlar:** puan / yorum sayısı Google Maps taramasından (Maps Platform şartları ve
+  Apple 5.2 / Play fikri mülkiyet riski); yaş derecesi (alkollü mekânlar); bundle ID (yayından
+  sonra değişmez); yorum yazma eklenirse bildir/engelle ZORUNLU (Apple 1.2); abonelik eklenirse
+  Apple IAP / Play Billing ZORUNLU; reklam SDK'sı eklenirse ATT + manifest + legal güncellenir.
+
 ### İki mod: canlı ve yerel
 
 
