@@ -1,0 +1,29 @@
+# Supabase CLI yapılandırması (yerel geliştirme: `supabase start`, `supabase db reset`).
+# Üretim kurulumu bu dosyaya bağlı DEĞİL: `npm run supabase:kur` Yönetim API'siyle çalışır.
+# Bu dosya Supabase CLI ile DENENMEDİ (bu ortamda CLI yok); yalnızca bilinen anahtarlar var.
+project_id = "gur"
+
+[api]
+enabled = true
+
+[db]
+port = 54322
+major_version = 15
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[auth]
+enabled = true
+site_url = "gur://"
+additional_redirect_urls = ["gur://**"]
+enable_signup = true
+minimum_password_length = 6
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+[storage]
+enabled = true

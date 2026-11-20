@@ -8,3 +8,7 @@ dist-ssr/
 *.log
 npm-debug.log*
 .vite/
+
+# Supabase kurulum kimlik bilgileri (supabase:kur okur) — ASLA commit edilmez
+.env.supabase
+mobile/.env
